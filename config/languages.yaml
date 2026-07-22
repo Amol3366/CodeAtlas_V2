@@ -1,0 +1,61 @@
+# Language support map (Blueprint §1.3, §4.4.5). Fixed for the MVP.
+# Extension dispatch drives the parser registry (Phase 3+).
+
+version: 1
+
+languages:
+  python:
+    extensions: [".py", ".pyi"]
+    classification: source_code
+    parser: tree_sitter_python
+    enrichment: python_ast
+
+  typescript:
+    extensions: [".ts", ".tsx"]
+    classification: source_code
+    parser: tree_sitter_typescript
+    enrichment: null            # TS compiler API enrichment is an evaluated follow-up (Phase 4)
+
+  javascript:
+    extensions: [".js", ".jsx", ".mjs", ".cjs"]
+    classification: source_code
+    parser: tree_sitter_javascript
+    enrichment: null
+
+  markdown:
+    extensions: [".md", ".markdown"]
+    classification: documentation
+    parser: markdown
+    enrichment: null
+
+  json:
+    extensions: [".json"]
+    classification: configuration
+    parser: configuration
+    enrichment: null
+
+  yaml:
+    extensions: [".yaml", ".yml"]
+    classification: configuration
+    parser: configuration
+    enrichment: null
+
+  toml:
+    extensions: [".toml"]
+    classification: configuration
+    parser: configuration
+    enrichment: null
+
+# Files that must NOT be auto-excluded even though they look non-source
+# (Blueprint §4.3.3 "Do not automatically exclude"). Impact analysis needs them.
+never_exclude_globs:
+  - "**/*.lock"
+  - "**/uv.lock"
+  - "**/package-lock.json"
+  - "**/poetry.lock"
+  - "**/migrations/**"
+  - "**/openapi*.y?(a)ml"
+  - "**/openapi*.json"
+  - "**/*.sql"
+  - "**/Dockerfile"
+  - "**/.github/workflows/**"

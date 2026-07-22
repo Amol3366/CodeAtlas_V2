@@ -1,0 +1,35 @@
+# structlog configuration (CLAUDE.md §3, §13).
+# Structured events; never log secrets or source snippets marked sensitive.
+
+version: 1
+
+logging:
+  level: INFO                # DEBUG | INFO | WARNING | ERROR
+  format: json               # json (production) | console (dev)
+  timestamps: true
+
+  # Fields bound into context throughout indexing/query (CLAUDE.md §13).
+  bound_context:
+    - repository_id
+    - snapshot_id
+
+  # Redaction: values under these keys are never emitted.
+  redact_keys:
+    - api_key
+    - openai_api_key
+    - authorization
+    - secret
+    - password
+    - token
+
+  # Never log raw source for these classifications (secret-leak safety, §8.11).
+  never_log_source_for:
+    - configuration
+    - dependency_manifest
+
+  # Representative event names (CLAUDE.md §13).
+  example_events:
+    - indexing.file.parsed
+    - snapshot.activated
+    - retrieval.plan.created
+    - change.analysis.completed

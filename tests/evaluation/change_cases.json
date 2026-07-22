@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "description": "Representative code-change cases (CLAUDE.md Phase 0 / Phase 8-10). Each case describes an edit to a fixture and the deterministic expected outcome: changed symbols, direct/transitive impact paths, contract change, related tests, and expected finding categories. Hand-authored; NO LLM-generated truth. change_kind ∈ {added, modified, moved, deleted}. impact paths are relation paths of the form [source, RELATION_TYPE, target, ...].",
+  "fixtures": {
+    "payments-python": "tests/fixtures/python_repo",
+    "orders-typescript": "tests/fixtures/typescript_repo",
+    "widget-markdown": "tests/fixtures/markdown_repo",
+    "notifications-mixed": "tests/fixtures/mixed_repo"
+  },
+  "cases": [
+    {
+      "id": "change_001",
+      "repository_fixture": "payments-python",
+      "description": "Add a required `currency` parameter to PaymentService.capture (public signature change).",
+      "edit": {"file_path": "src/services/payment_service.py", "operation": "modify_signature", "symbol": "PaymentService.capture", "detail": "add required positional parameter `currency`"},
+      "expected_changed_symbols": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.capture", "change_kind": "modified"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [
+        ["capture_partner_payment", "CALLS", "PaymentService.capture"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "tests/test_payment_service.py", "symbol": "test_capture_returns_transaction_id"},
+        {"file_path": "tests/test_payment_service.py", "symbol": "test_capture_is_idempotent"}
+      ],
+      "expected_findings": ["contract_change", "impact"]
+    },
+    {
+      "id": "change_002",
+      "repository_fixture": "payments-python",
+      "description": "Change PaymentService.capture body only (add a max-amount guard) with no signature change.",
+      "edit": {"file_path": "src/services/payment_service.py", "operation": "modify_body", "symbol": "PaymentService.capture", "detail": "add upper-bound amount check"},
+      "expected_changed_symbols": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.capture", "change_kind": "modified"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [
+        ["capture_partner_payment", "CALLS", "PaymentService.capture"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "tests/test_payment_service.py", "symbol": "test_capture_rejects_non_positive_amount"}
+      ],
+      "expected_findings": ["impact"]
+    },
+    {
+      "id": "change_003",
+      "repository_fixture": "payments-python",
+      "description": "Rename IdempotencyStore.claim to IdempotencyStore.acquire (breaking rename).",
+      "edit": {"file_path": "src/payments/idempotency.py", "operation": "modify_signature", "symbol": "IdempotencyStore.claim", "detail": "rename method to `acquire`"},
+      "expected_changed_symbols": [
+        {"file_path": "src/payments/idempotency.py", "symbol": "IdempotencyStore.claim", "change_kind": "deleted"},
+        {"file_path": "src/payments/idempotency.py", "symbol": "IdempotencyStore.acquire", "change_kind": "added"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [
+        ["PaymentService.capture", "CALLS", "IdempotencyStore.claim"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "tests/test_payment_service.py", "symbol": "test_capture_is_idempotent"}
+      ],
+      "expected_findings": ["contract_change", "impact"]
+    },
+    {
+      "id": "change_004",
+      "repository_fixture": "payments-python",
+      "description": "Delete PaymentService.refund entirely.",
+      "edit": {"file_path": "src/services/payment_service.py", "operation": "delete", "symbol": "PaymentService.refund", "detail": "remove method"},
+      "expected_changed_symbols": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.refund", "change_kind": "deleted"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["contract_change"]
+    },
+    {
+      "id": "change_005",
+      "repository_fixture": "payments-python",
+      "description": "Move AuthService from src/services/auth_service.py to src/auth/service.py (module move).",
+      "edit": {"file_path": "src/services/auth_service.py", "operation": "move", "symbol": "AuthService", "detail": "move class to src/auth/service.py; qualified name preserved"},
+      "expected_changed_symbols": [
+        {"file_path": "src/auth/service.py", "symbol": "AuthService", "change_kind": "moved"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [
+        ["login", "CALLS", "AuthService.authenticate"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "tests/test_auth.py", "symbol": "test_authenticate_accepts_valid_credentials"}
+      ],
+      "expected_findings": ["impact"]
+    },
+    {
+      "id": "change_006",
+      "repository_fixture": "payments-python",
+      "description": "Add a new method PaymentService.void (pure addition, no dependents yet).",
+      "edit": {"file_path": "src/services/payment_service.py", "operation": "add", "symbol": "PaymentService.void", "detail": "add new method"},
+      "expected_changed_symbols": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.void", "change_kind": "added"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["test_gap"]
+    },
+    {
+      "id": "change_007",
+      "repository_fixture": "payments-python",
+      "description": "Change AuthService.authenticate return type from bool to a Session object (contract change).",
+      "edit": {"file_path": "src/services/auth_service.py", "operation": "modify_signature", "symbol": "AuthService.authenticate", "detail": "return Session instead of bool"},
+      "expected_changed_symbols": [
+        {"file_path": "src/services/auth_service.py", "symbol": "AuthService.authenticate", "change_kind": "modified"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [
+        ["login", "CALLS", "AuthService.authenticate"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "tests/test_auth.py", "symbol": "test_authenticate_accepts_valid_credentials"},
+        {"file_path": "tests/test_auth.py", "symbol": "test_authenticate_rejects_wrong_password"}
+      ],
+      "expected_findings": ["contract_change", "impact"]
+    },
+    {
+      "id": "change_008",
+      "repository_fixture": "payments-python",
+      "description": "Rename config key DATABASE_URL usage in get_settings; docs still mention DATABASE_URL (documentation drift).",
+      "edit": {"file_path": "src/config/settings.py", "operation": "modify_body", "symbol": "get_settings", "detail": "read DB_DSN instead of DATABASE_URL"},
+      "expected_changed_symbols": [
+        {"file_path": "src/config/settings.py", "symbol": "get_settings", "change_kind": "modified"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [
+        ["capture_partner_payment", "CALLS", "get_settings"]
+      ],
+      "expected_related_tests": [],
+      "expected_findings": ["configuration_impact", "documentation_drift"]
+    },
+    {
+      "id": "change_009",
+      "repository_fixture": "payments-python",
+      "description": "Add a new route logout in auth_routes.py without a test (possible test gap).",
+      "edit": {"file_path": "src/api/auth_routes.py", "operation": "add", "symbol": "logout", "detail": "add new POST /auth/logout route"},
+      "expected_changed_symbols": [
+        {"file_path": "src/api/auth_routes.py", "symbol": "logout", "change_kind": "added"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["test_gap"]
+    },
+    {
+      "id": "change_010",
+      "repository_fixture": "payments-python",
+      "description": "Modify capture_partner_payment route body to add logging (leaf change, no dependents).",
+      "edit": {"file_path": "src/api/partner_payments.py", "operation": "modify_body", "symbol": "capture_partner_payment", "detail": "add structured logging"},
+      "expected_changed_symbols": [
+        {"file_path": "src/api/partner_payments.py", "symbol": "capture_partner_payment", "change_kind": "modified"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["impact"]
+    },
+    {
+      "id": "change_011",
+      "repository_fixture": "payments-python",
+      "description": "Change PaymentGateway.charge signature (protocol change) affecting FakePaymentGateway and capture.",
+      "edit": {"file_path": "src/payments/gateway.py", "operation": "modify_signature", "symbol": "PaymentGateway.charge", "detail": "add `currency` parameter to protocol method"},
+      "expected_changed_symbols": [
+        {"file_path": "src/payments/gateway.py", "symbol": "PaymentGateway.charge", "change_kind": "modified"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [
+        ["PaymentService.capture", "CALLS", "PaymentGateway.charge"],
+        ["FakePaymentGateway", "IMPLEMENTS", "PaymentGateway"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "tests/test_payment_service.py", "symbol": "test_capture_returns_transaction_id"}
+      ],
+      "expected_findings": ["contract_change", "impact"]
+    },
+    {
+      "id": "change_012",
+      "repository_fixture": "payments-python",
+      "description": "Delete the ADR-0001 idempotency document while IdempotencyStore.claim still exists (doc reference removed).",
+      "edit": {"file_path": "docs/adr/0001-idempotency.md", "operation": "delete", "symbol": "ADR-0001: Idempotent payment capture", "detail": "remove ADR file"},
+      "expected_changed_symbols": [
+        {"file_path": "docs/adr/0001-idempotency.md", "symbol": "ADR-0001: Idempotent payment capture", "change_kind": "deleted"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["documentation_drift"]
+    },
+    {
+      "id": "change_013",
+      "repository_fixture": "orders-typescript",
+      "description": "Add required `warehouseId` parameter to OrderService.createOrder (signature change).",
+      "edit": {"file_path": "src/services/orderService.ts", "operation": "modify_signature", "symbol": "OrderService.createOrder", "detail": "add required parameter warehouseId"},
+      "expected_changed_symbols": [
+        {"file_path": "src/services/orderService.ts", "symbol": "OrderService.createOrder", "change_kind": "modified"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [
+        ["orderRouter", "CALLS", "OrderService.createOrder"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "test/orderService.test.ts", "symbol": "reserves inventory when available"}
+      ],
+      "expected_findings": ["contract_change", "impact"]
+    },
+    {
+      "id": "change_014",
+      "repository_fixture": "orders-typescript",
+      "description": "Change InventoryRepository.reserve return type from boolean to a reservation object.",
+      "edit": {"file_path": "src/repositories/inventoryRepository.ts", "operation": "modify_signature", "symbol": "InventoryRepository.reserve", "detail": "return Reservation instead of boolean"},
+      "expected_changed_symbols": [
+        {"file_path": "src/repositories/inventoryRepository.ts", "symbol": "InventoryRepository.reserve", "change_kind": "modified"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [
+        ["OrderService.createOrder", "CALLS", "InventoryRepository.reserve"]
+      ],
+      "expected_related_tests": [
+        {"file_path": "test/orderService.test.ts", "symbol": "stays pending when inventory is insufficient"}
+      ],
+      "expected_findings": ["contract_change", "impact"]
+    },
+    {
+      "id": "change_015",
+      "repository_fixture": "orders-typescript",
+      "description": "Add a new enum member OrderStatus.Shipped (additive, non-breaking).",
+      "edit": {"file_path": "src/types/order.ts", "operation": "modify_body", "symbol": "OrderStatus", "detail": "add Shipped member"},
+      "expected_changed_symbols": [
+        {"file_path": "src/types/order.ts", "symbol": "OrderStatus", "change_kind": "modified"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [
+        ["OrderService.createOrder", "REFERENCES", "OrderStatus"]
+      ],
+      "expected_related_tests": [],
+      "expected_findings": ["impact"]
+    },
+    {
+      "id": "change_016",
+      "repository_fixture": "orders-typescript",
+      "description": "Rename field Order.quantity to Order.units (interface change).",
+      "edit": {"file_path": "src/types/order.ts", "operation": "modify_signature", "symbol": "Order", "detail": "rename field quantity -> units"},
+      "expected_changed_symbols": [
+        {"file_path": "src/types/order.ts", "symbol": "Order", "change_kind": "modified"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [
+        ["OrderService.createOrder", "REFERENCES", "Order"]
+      ],
+      "expected_related_tests": [],
+      "expected_findings": ["contract_change", "impact"]
+    },
+    {
+      "id": "change_017",
+      "repository_fixture": "orders-typescript",
+      "description": "Delete the orderRouter route (removes the only createOrder caller).",
+      "edit": {"file_path": "src/routes/orderRoutes.ts", "operation": "delete", "symbol": "orderRouter", "detail": "remove route module"},
+      "expected_changed_symbols": [
+        {"file_path": "src/routes/orderRoutes.ts", "symbol": "orderRouter", "change_kind": "deleted"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["contract_change"]
+    },
+    {
+      "id": "change_018",
+      "repository_fixture": "orders-typescript",
+      "description": "Add a new method OrderService.cancelOrder without a test (test gap).",
+      "edit": {"file_path": "src/services/orderService.ts", "operation": "add", "symbol": "OrderService.cancelOrder", "detail": "add cancel method"},
+      "expected_changed_symbols": [
+        {"file_path": "src/services/orderService.ts", "symbol": "OrderService.cancelOrder", "change_kind": "added"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["test_gap"]
+    },
+    {
+      "id": "change_019",
+      "repository_fixture": "widget-markdown",
+      "description": "Rename config key WIDGET_DATABASE_URL back to WIDGET_DB_URL in getting-started but not in the ADR (doc inconsistency).",
+      "edit": {"file_path": "docs/getting-started.md", "operation": "modify_body", "symbol": "Configuration keys", "detail": "rename WIDGET_DATABASE_URL to WIDGET_DB_URL"},
+      "expected_changed_symbols": [
+        {"file_path": "docs/getting-started.md", "symbol": "Configuration keys", "change_kind": "modified"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["documentation_drift"]
+    },
+    {
+      "id": "change_020",
+      "repository_fixture": "widget-markdown",
+      "description": "Document a new endpoint DELETE /widgets/{id} in api-reference.md (additive doc change).",
+      "edit": {"file_path": "docs/api-reference.md", "operation": "add", "symbol": "DELETE /widgets/{id}", "detail": "add endpoint section"},
+      "expected_changed_symbols": [
+        {"file_path": "docs/api-reference.md", "symbol": "DELETE /widgets/{id}", "change_kind": "added"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": []
+    },
+    {
+      "id": "change_021",
+      "repository_fixture": "notifications-mixed",
+      "description": "Add required `priority` parameter to NotificationService.send (Python signature change).",
+      "edit": {"file_path": "backend/app.py", "operation": "modify_signature", "symbol": "NotificationService.send", "detail": "add required parameter priority"},
+      "expected_changed_symbols": [
+        {"file_path": "backend/app.py", "symbol": "NotificationService.send", "change_kind": "modified"}
+      ],
+      "expected_contract_change": true,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["contract_change", "test_gap"]
+    },
+    {
+      "id": "change_022",
+      "repository_fixture": "notifications-mixed",
+      "description": "Change the notification channel default in config/app.yaml from email to sms (configuration change).",
+      "edit": {"file_path": "config/app.yaml", "operation": "modify_body", "symbol": "notification.channel", "detail": "change email -> sms"},
+      "expected_changed_symbols": [
+        {"file_path": "config/app.yaml", "symbol": "notification.channel", "change_kind": "modified"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["configuration_impact"]
+    },
+    {
+      "id": "change_023",
+      "repository_fixture": "notifications-mixed",
+      "description": "Change NotificationClient.notify to send a different request shape (TS body change, no dependents in-repo).",
+      "edit": {"file_path": "frontend/client.ts", "operation": "modify_body", "symbol": "NotificationClient.notify", "detail": "include priority in request body"},
+      "expected_changed_symbols": [
+        {"file_path": "frontend/client.ts", "symbol": "NotificationClient.notify", "change_kind": "modified"}
+      ],
+      "expected_contract_change": false,
+      "expected_impact_paths": [],
+      "expected_related_tests": [],
+      "expected_findings": ["impact"]
+    }
+  ]
+}

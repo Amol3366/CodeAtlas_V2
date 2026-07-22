@@ -1,0 +1,378 @@
+{
+  "schema_version": 1,
+  "description": "Deterministic benchmark questions (Blueprint §13.6). Hand-authored ground truth. NO LLM-generated truth. file_path is relative to the named fixture root; forward slashes.",
+  "fixtures": {
+    "payments-python": "tests/fixtures/python_repo",
+    "orders-typescript": "tests/fixtures/typescript_repo",
+    "widget-markdown": "tests/fixtures/markdown_repo",
+    "notifications-mixed": "tests/fixtures/mixed_repo"
+  },
+  "questions": [
+    {
+      "id": "query_001",
+      "repository_fixture": "payments-python",
+      "question": "Where is PaymentService.capture defined?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.capture"}
+      ],
+      "forbidden_claims": ["The capture is guaranteed exactly-once by the database."]
+    },
+    {
+      "id": "query_002",
+      "repository_fixture": "payments-python",
+      "question": "Where is idempotency enforced during capture?",
+      "intent": "TRACE_FLOW",
+      "required_evidence": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.capture"},
+        {"file_path": "src/payments/idempotency.py", "symbol": "IdempotencyStore.claim"}
+      ],
+      "forbidden_claims": ["The database guarantees exactly-once execution."]
+    },
+    {
+      "id": "query_003",
+      "repository_fixture": "payments-python",
+      "question": "Which code calls PaymentService.capture?",
+      "intent": "FIND_CALLERS",
+      "required_evidence": [
+        {"file_path": "src/api/partner_payments.py", "symbol": "capture_partner_payment"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_004",
+      "repository_fixture": "payments-python",
+      "question": "What does PaymentService.capture depend on?",
+      "intent": "FIND_DEPENDENCIES",
+      "required_evidence": [
+        {"file_path": "src/payments/idempotency.py", "symbol": "IdempotencyStore.claim"},
+        {"file_path": "src/payments/gateway.py", "symbol": "PaymentGateway.charge"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_005",
+      "repository_fixture": "payments-python",
+      "question": "Which tests reference PaymentService.capture?",
+      "intent": "FIND_TESTS",
+      "required_evidence": [
+        {"file_path": "tests/test_payment_service.py", "symbol": "test_capture_returns_transaction_id"}
+      ],
+      "forbidden_claims": ["PaymentService.capture is fully covered.", "The capture behavior passes all tests."]
+    },
+    {
+      "id": "query_006",
+      "repository_fixture": "payments-python",
+      "question": "Which documents describe the payment capture flow?",
+      "intent": "FIND_DOCUMENTS",
+      "required_evidence": [
+        {"file_path": "docs/architecture.md", "symbol": "Payment capture flow"},
+        {"file_path": "docs/adr/0001-idempotency.md", "symbol": "ADR-0001: Idempotent payment capture"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_007",
+      "repository_fixture": "payments-python",
+      "question": "Where is the authentication login route?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/api/auth_routes.py", "symbol": "login"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_008",
+      "repository_fixture": "payments-python",
+      "question": "How does login authenticate a user?",
+      "intent": "TRACE_FLOW",
+      "required_evidence": [
+        {"file_path": "src/api/auth_routes.py", "symbol": "login"},
+        {"file_path": "src/services/auth_service.py", "symbol": "AuthService.authenticate"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_009",
+      "repository_fixture": "payments-python",
+      "question": "Which configuration controls the database connection?",
+      "intent": "CONFIGURATION",
+      "required_evidence": [
+        {"file_path": "src/config/settings.py", "symbol": "get_settings"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_010",
+      "repository_fixture": "payments-python",
+      "question": "Where is the PaymentGateway protocol defined?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/payments/gateway.py", "symbol": "PaymentGateway"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_011",
+      "repository_fixture": "payments-python",
+      "question": "Which class implements the PaymentGateway protocol?",
+      "intent": "FIND_DEPENDENCIES",
+      "required_evidence": [
+        {"file_path": "src/payments/gateway.py", "symbol": "FakePaymentGateway"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_012",
+      "repository_fixture": "payments-python",
+      "question": "Where is the idempotency key claimed?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/payments/idempotency.py", "symbol": "IdempotencyStore.claim"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_013",
+      "repository_fixture": "payments-python",
+      "question": "Which tests reference AuthService.authenticate?",
+      "intent": "FIND_TESTS",
+      "required_evidence": [
+        {"file_path": "tests/test_auth.py", "symbol": "test_authenticate_accepts_valid_credentials"}
+      ],
+      "forbidden_claims": ["Authentication is fully covered."]
+    },
+    {
+      "id": "query_014",
+      "repository_fixture": "payments-python",
+      "question": "Where is the refund logic in the payment service?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.refund"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_015",
+      "repository_fixture": "payments-python",
+      "question": "What imports the IdempotencyStore?",
+      "intent": "FIND_CALLERS",
+      "required_evidence": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService"},
+        {"file_path": "src/api/partner_payments.py", "symbol": "capture_partner_payment"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_016",
+      "repository_fixture": "payments-python",
+      "question": "Which ADR governs idempotent capture and what does it require?",
+      "intent": "FIND_DOCUMENTS",
+      "required_evidence": [
+        {"file_path": "docs/adr/0001-idempotency.md", "symbol": "ADR-0001: Idempotent payment capture"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_017",
+      "repository_fixture": "payments-python",
+      "question": "What raises PaymentError?",
+      "intent": "FIND_CALLERS",
+      "required_evidence": [
+        {"file_path": "src/services/payment_service.py", "symbol": "PaymentService.capture"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_018",
+      "repository_fixture": "payments-python",
+      "question": "Give an overview of the payments project structure.",
+      "intent": "GENERAL_PROJECT",
+      "required_evidence": [
+        {"file_path": "docs/architecture.md", "symbol": "Payments Service Architecture"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_019",
+      "repository_fixture": "orders-typescript",
+      "question": "Where is OrderService.createOrder defined?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/services/orderService.ts", "symbol": "OrderService.createOrder"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_020",
+      "repository_fixture": "orders-typescript",
+      "question": "What does OrderService.createOrder depend on?",
+      "intent": "FIND_DEPENDENCIES",
+      "required_evidence": [
+        {"file_path": "src/repositories/inventoryRepository.ts", "symbol": "InventoryRepository.reserve"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_021",
+      "repository_fixture": "orders-typescript",
+      "question": "Which route creates an order?",
+      "intent": "TRACE_FLOW",
+      "required_evidence": [
+        {"file_path": "src/routes/orderRoutes.ts", "symbol": "orderRouter"},
+        {"file_path": "src/services/orderService.ts", "symbol": "OrderService.createOrder"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_022",
+      "repository_fixture": "orders-typescript",
+      "question": "Which tests reference OrderService.createOrder?",
+      "intent": "FIND_TESTS",
+      "required_evidence": [
+        {"file_path": "test/orderService.test.ts", "symbol": "OrderService.createOrder"}
+      ],
+      "forbidden_claims": ["OrderService.createOrder is fully covered."]
+    },
+    {
+      "id": "query_023",
+      "repository_fixture": "orders-typescript",
+      "question": "Where is the OrderStatus enum defined?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/types/order.ts", "symbol": "OrderStatus"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_024",
+      "repository_fixture": "orders-typescript",
+      "question": "Where is the Order interface defined?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/types/order.ts", "symbol": "Order"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_025",
+      "repository_fixture": "orders-typescript",
+      "question": "Which configuration controls the database connection in the order service?",
+      "intent": "CONFIGURATION",
+      "required_evidence": [
+        {"file_path": "src/config/settings.ts", "symbol": "getSettings"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_026",
+      "repository_fixture": "orders-typescript",
+      "question": "What calls InventoryRepository.reserve?",
+      "intent": "FIND_CALLERS",
+      "required_evidence": [
+        {"file_path": "src/services/orderService.ts", "symbol": "OrderService.createOrder"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_027",
+      "repository_fixture": "orders-typescript",
+      "question": "Where is inventory reserved?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "src/repositories/inventoryRepository.ts", "symbol": "InventoryRepository.reserve"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_028",
+      "repository_fixture": "widget-markdown",
+      "question": "Which configuration key controls the widget database connection?",
+      "intent": "CONFIGURATION",
+      "required_evidence": [
+        {"file_path": "docs/getting-started.md", "symbol": "Configuration keys"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_029",
+      "repository_fixture": "widget-markdown",
+      "question": "Where is the POST /widgets endpoint documented?",
+      "intent": "FIND_DOCUMENTS",
+      "required_evidence": [
+        {"file_path": "docs/api-reference.md", "symbol": "POST /widgets"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_030",
+      "repository_fixture": "widget-markdown",
+      "question": "Which ADR describes the configuration format?",
+      "intent": "FIND_DOCUMENTS",
+      "required_evidence": [
+        {"file_path": "docs/adr/0002-config-format.md", "symbol": "ADR-0002: Configuration via environment variables"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_031",
+      "repository_fixture": "widget-markdown",
+      "question": "How do I get started running the widget server?",
+      "intent": "EXPLAIN",
+      "required_evidence": [
+        {"file_path": "docs/getting-started.md", "symbol": "Running the server"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_032",
+      "repository_fixture": "widget-markdown",
+      "question": "What configuration keys changed in version 0.2.0?",
+      "intent": "HISTORY",
+      "required_evidence": [
+        {"file_path": "CHANGELOG.md", "symbol": "0.2.0"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_033",
+      "repository_fixture": "notifications-mixed",
+      "question": "Where is NotificationService.send defined?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "backend/app.py", "symbol": "NotificationService.send"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_034",
+      "repository_fixture": "notifications-mixed",
+      "question": "Where is the notification client that calls the backend?",
+      "intent": "LOCATE",
+      "required_evidence": [
+        {"file_path": "frontend/client.ts", "symbol": "NotificationClient.notify"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_035",
+      "repository_fixture": "notifications-mixed",
+      "question": "Which configuration sets the notification channel?",
+      "intent": "CONFIGURATION",
+      "required_evidence": [
+        {"file_path": "config/app.yaml", "symbol": "notification.channel"}
+      ],
+      "forbidden_claims": []
+    },
+    {
+      "id": "query_036",
+      "repository_fixture": "notifications-mixed",
+      "question": "Which configuration controls the database connection for notifications?",
+      "intent": "CONFIGURATION",
+      "required_evidence": [
+        {"file_path": "config/app.yaml", "symbol": "database_url"}
+      ],
+      "forbidden_claims": []
+    }
+  ]
+}

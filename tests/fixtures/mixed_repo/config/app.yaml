@@ -1,0 +1,7 @@
+# Notification app configuration (YAML).
+notification:
+  channel: email
+  retry:
+    max_attempts: 3
+    backoff_seconds: 5
+database_url: sqlite:///./notifications.db

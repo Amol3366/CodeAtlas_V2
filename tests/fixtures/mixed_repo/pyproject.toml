@@ -1,0 +1,10 @@
+[project]
+name = "notifications-mixed"
+version = "0.1.0"
+description = "Fixture: mixed Python + TypeScript + config repo for CodeAtlas evaluation."
+requires-python = ">=3.12"
+
+[tool.codeatlas]
+# A TOML config key surface for the configuration parser.
+default_channel = "email"
+max_attempts = 3

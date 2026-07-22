@@ -1,0 +1,77 @@
+# CodeAtlas default configuration.
+# Local-first and deterministic by default. Every optional/cloud feature is OFF
+# here and must be turned on explicitly (CLAUDE.md §2.3, §12).
+
+version: 1
+
+# --- Data locations (defaults derive from %LOCALAPPDATA%\CodeAtlas) ---
+paths:
+  data_dir: null      # -> %LOCALAPPDATA%\CodeAtlas\data
+  vectors_dir: null   # -> %LOCALAPPDATA%\CodeAtlas\vectors
+  cache_dir: null     # -> %LOCALAPPDATA%\CodeAtlas\cache
+
+# --- Repository scanning (Blueprint §4.3.2-4.3.3) ---
+scanning:
+  allow_unc_paths: false
+  follow_external_junctions: false      # never follow symlinks/junctions outside root
+  max_file_size_bytes: 2000000          # skip (with diagnostic) files larger than this
+  long_paths_enabled: true
+
+# --- Versioning that participates in cache keys (CLAUDE.md §2.14) ---
+versions:
+  parser_bundle_version: "0.1.0"
+  chunker_version: "0.1.0"
+  retrieval_policy_version: "0.1.0"
+  normalization_version: "0.1.0"
+
+# --- Chunking policy (Blueprint §4.5.4) ---
+chunking:
+  target_tokens_min: 300
+  target_tokens_max: 1200
+  hard_max_tokens: 1800
+  min_useful_tokens: 80
+  fallback_overlap_pct: 15
+
+# --- Graph traversal / impact bounds (Blueprint §4.8.5) ---
+impact_analysis:
+  max_depth: 3
+  max_nodes: 200
+  minimum_relation_confidence: 0.45
+  allowed_relations:
+    - CALLS
+    - MAY_CALL
+    - IMPORTS
+    - ROUTES_TO
+    - TESTS
+    - DOCUMENTS
+
+# --- Retrieval / fusion ---
+retrieval:
+  rrf_k: 60
+  rerank_limit: 20
+  exact_match_preserved: true   # exact matches can never be removed by later ranking
+
+# --- Confidence bands (Blueprint §7.7) ---
+confidence:
+  high_min: 0.80
+  medium_min: 0.55
+
+# --- Optional providers (explicit opt-in only) ---
+embeddings:
+  enabled: false
+  provider: "none"              # none | local | openai
+  model_id: null
+  dimensions: null
+  monthly_token_budget: null
+  max_chunks_per_update: 500
+
+answering:
+  enabled: false
+  provider: "none"              # none | ollama | openai
+  model_id: null
+  max_evidence_tokens: 6000
+
+# --- Watcher (Phase 11) ---
+watcher:
+  enabled: false
+  debounce_ms: 500

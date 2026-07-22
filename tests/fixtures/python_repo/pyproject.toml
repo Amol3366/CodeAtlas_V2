@@ -1,0 +1,9 @@
+[project]
+name = "payments-python"
+version = "0.1.0"
+description = "Fixture: realistic Python payments service for CodeAtlas evaluation."
+requires-python = ">=3.12"
+dependencies = ["fastapi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

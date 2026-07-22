@@ -1,0 +1,10 @@
+{
+  "notification": {
+    "channel": "email",
+    "retry": {
+      "maxAttempts": 3,
+      "backoffSeconds": 5
+    }
+  },
+  "databaseUrl": "sqlite:///./notifications.db"
+}

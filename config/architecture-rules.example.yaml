@@ -1,0 +1,51 @@
+# Example architecture rules (Blueprint §3.7). Copy to architecture-rules.yaml
+# in a target repository. Only NEW violations are flagged during change analysis
+# (existing ones are baselined). Every finding carries deterministic evidence.
+
+version: 1
+
+rules:
+  - id: controllers-cannot-access-repositories
+    type: forbidden_import      # forbidden_import | layer_direction | package_boundary
+                                # | naming | required_test | required_doc | sensitive_path
+    description: Controllers must call services instead of repositories.
+    severity: high
+    source:
+      path_glob: "src/**/controllers/**"
+    forbidden_target:
+      path_glob: "src/**/repositories/**"
+    relation_types: [IMPORTS, CALLS]
+
+  - id: domain-has-no-framework-imports
+    type: forbidden_import
+    description: The domain layer must not import web/framework packages.
+    severity: high
+    source:
+      path_glob: "src/**/domain/**"
+    forbidden_target:
+      module_glob: ["fastapi*", "sqlalchemy*", "starlette*"]
+
+  - id: layers-flow-inward
+    type: layer_direction
+    description: api -> analysis -> retrieval -> storage. Never the reverse.
+    severity: medium
+    layers: [api, analysis, retrieval, storage]
+
+  - id: public-services-require-tests
+    type: required_test
+    description: Exported service classes should have at least one related test.
+    severity: medium
+    source:
+      path_glob: "src/**/services/**"
+
+  - id: no-secrets-in-source
+    type: sensitive_path
+    description: Warn when tracked .env-like files are added.
+    severity: high
+    path_glob: ["**/.env", "**/*.pem", "**/id_rsa"]
+
+exceptions:
+  # Suppress a specific (rule_id, path) pair with a documented reason.
+  - rule_id: controllers-cannot-access-repositories
+    path_glob: "src/legacy/**"
+    reason: "Legacy module scheduled for refactor; tracked in ADR-0007."
