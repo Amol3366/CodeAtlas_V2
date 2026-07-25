@@ -1,0 +1,16 @@
+{
+  "contract_version": "1.0",
+  "fixtures_root": "fixtures",
+  "fixtures": [
+    {"id":"python_app","root":"python_app","kind":"python","snapshots":[{"id":"python-v1","members":["src/payments/service.py","src/payments/idempotency.py","tests/test_service.py"]}]},
+    {"id":"tsjs_app","root":"tsjs_app","kind":"typescript-javascript","snapshots":[{"id":"tsjs-v1","members":["src/orders.ts","src/client.js"]}]},
+    {"id":"docs_config","root":"docs_config","kind":"documents-config","snapshots":[{"id":"docs-v1","members":["README.md","config/settings.yaml","package.json","app.toml"]}]},
+    {"id":"mixed_app","root":"mixed_app","kind":"mixed-language","snapshots":[{"id":"mixed-v1","members":["backend.py","frontend.ts","docs/flow.md"]}]},
+    {"id":"git_changes","root":"git_changes","kind":"git-change","snapshots":[{"id":"git-base","members":["base/service.py"]},{"id":"git-target","members":["target/processor.py"]}]},
+    {"id":"malicious_unsupported","root":"malicious_unsupported","kind":"security","snapshots":[{"id":"security-v1","members":["source/malformed.py","content/untrusted.md","content/safe.json"]}]}
+  ],
+  "query_cases_file": "queries.json",
+  "change_cases_file": "changes.json",
+  "expected_query_count": 40,
+  "expected_change_count": 24
+}

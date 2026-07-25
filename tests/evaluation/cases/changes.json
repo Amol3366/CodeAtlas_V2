@@ -1,0 +1,1060 @@
+{
+    "contract_version":  "1.0",
+    "cases":  [
+                  {
+                      "id":  "c001",
+                      "repository_fixture":  "python_app",
+                      "snapshot_id":  "python-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:key-validation",
+                      "expected_symbols":  [
+                                               "PaymentService.capture"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/payments/service.py",
+                                                    "symbol":  "PaymentService.capture",
+                                                    "start_line":  7,
+                                                    "end_line":  11,
+                                                    "evidence_id":  "c001-e1",
+                                                    "snapshot_id":  "python-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "PaymentService.capture"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "PaymentService.capture",
+                                                        "test_capture_uses_idempotency_store"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "PUBLIC_BEHAVIOR_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+                                          "Fixture change is declarative in Phase 0."
+                                      ],
+                      "forbidden_claims":  [
+                                               "All affected tests passed."
+                                           ]
+                  },
+                  {
+                      "id":  "c002",
+                      "repository_fixture":  "python_app",
+                      "snapshot_id":  "python-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:return-format",
+                      "expected_symbols":  [
+                                               "PaymentService.capture"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/payments/service.py",
+                                                    "symbol":  "PaymentService.capture",
+                                                    "start_line":  10,
+                                                    "end_line":  11,
+                                                    "evidence_id":  "c002-e1",
+                                                    "snapshot_id":  "python-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "PaymentService.capture"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "PaymentService.capture",
+                                                        "test_capture_uses_idempotency_store"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "RETURN_VALUE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "No caller is affected."
+                                           ]
+                  },
+                  {
+                      "id":  "c003",
+                      "repository_fixture":  "python_app",
+                      "snapshot_id":  "python-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:claim-signature",
+                      "expected_symbols":  [
+                                               "IdempotencyStore.claim"
+                                           ],
+                      "expected_relations":  [
+                                                 "PaymentService.capture CALLS IdempotencyStore.claim"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/payments/idempotency.py",
+                                                    "symbol":  "IdempotencyStore.claim",
+                                                    "start_line":  5,
+                                                    "end_line":  9,
+                                                    "evidence_id":  "c003-e1",
+                                                    "snapshot_id":  "python-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "IdempotencyStore.claim"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "IdempotencyStore.claim",
+                                                        "PaymentService.capture"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "PUBLIC_SIGNATURE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+                                          "Dynamic callers may be missing."
+                                      ],
+                      "forbidden_claims":  [
+                                               "Every caller was resolved."
+                                           ]
+                  },
+                  {
+                      "id":  "c004",
+                      "repository_fixture":  "python_app",
+                      "snapshot_id":  "python-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:store-state",
+                      "expected_symbols":  [
+                                               "IdempotencyStore.__init__"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/payments/idempotency.py",
+                                                    "symbol":  "IdempotencyStore.__init__",
+                                                    "start_line":  2,
+                                                    "end_line":  3,
+                                                    "evidence_id":  "c004-e1",
+                                                    "snapshot_id":  "python-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "IdempotencyStore.__init__"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "IdempotencyStore.__init__",
+                                                        "PaymentService.__init__"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "STATE_INITIALIZATION_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Stored keys persist across processes."
+                                           ]
+                  },
+                  {
+                      "id":  "c005",
+                      "repository_fixture":  "python_app",
+                      "snapshot_id":  "python-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:test-expectation",
+                      "expected_symbols":  [
+                                               "test_capture_uses_idempotency_store"
+                                           ],
+                      "expected_relations":  [
+                                                 "test_capture_uses_idempotency_store TESTS PaymentService.capture"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "tests/test_service.py",
+                                                    "symbol":  "test_capture_uses_idempotency_store",
+                                                    "start_line":  3,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c005-e1",
+                                                    "snapshot_id":  "python-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "test_capture_uses_idempotency_store"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "TEST_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+                                          "A test relation does not prove coverage."
+                                      ],
+                      "forbidden_claims":  [
+                                               "Production behavior changed."
+                                           ]
+                  },
+                  {
+                      "id":  "c006",
+                      "repository_fixture":  "python_app",
+                      "snapshot_id":  "python-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:delete-fake",
+                      "expected_symbols":  [
+                                               "FakeStore"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "tests/test_service.py",
+                                                    "symbol":  "FakeStore",
+                                                    "start_line":  7,
+                                                    "end_line":  9,
+                                                    "evidence_id":  "c006-e1",
+                                                    "snapshot_id":  "python-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "FakeStore"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "FakeStore",
+                                                        "test_capture_uses_idempotency_store"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "SYMBOL_DELETED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "FakeStore is production code."
+                                           ]
+                  },
+                  {
+                      "id":  "c007",
+                      "repository_fixture":  "tsjs_app",
+                      "snapshot_id":  "tsjs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:order-field",
+                      "expected_symbols":  [
+                                               "Order"
+                                           ],
+                      "expected_relations":  [
+                                                 "total REFERENCES Order"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders.ts",
+                                                    "symbol":  "Order",
+                                                    "start_line":  1,
+                                                    "end_line":  3,
+                                                    "evidence_id":  "c007-e1",
+                                                    "snapshot_id":  "tsjs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "Order"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "Order",
+                                                        "total"
+                                                    ],
+                                                    [
+                                                        "total",
+                                                        "render"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "PUBLIC_TYPE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Runtime compatibility is guaranteed."
+                                           ]
+                  },
+                  {
+                      "id":  "c008",
+                      "repository_fixture":  "tsjs_app",
+                      "snapshot_id":  "tsjs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:total-signature",
+                      "expected_symbols":  [
+                                               "total"
+                                           ],
+                      "expected_relations":  [
+                                                 "render CALLS total"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders.ts",
+                                                    "symbol":  "total",
+                                                    "start_line":  5,
+                                                    "end_line":  7,
+                                                    "evidence_id":  "c008-e1",
+                                                    "snapshot_id":  "tsjs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "total"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "total",
+                                                        "render"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "PUBLIC_SIGNATURE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Render remains type-safe."
+                                           ]
+                  },
+                  {
+                      "id":  "c009",
+                      "repository_fixture":  "tsjs_app",
+                      "snapshot_id":  "tsjs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:render-format",
+                      "expected_symbols":  [
+                                               "render"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/client.js",
+                                                    "symbol":  "render",
+                                                    "start_line":  3,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c009-e1",
+                                                    "snapshot_id":  "tsjs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "render"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "RETURN_VALUE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Rendered UI was visually tested."
+                                           ]
+                  },
+                  {
+                      "id":  "c010",
+                      "repository_fixture":  "tsjs_app",
+                      "snapshot_id":  "tsjs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:remove-export",
+                      "expected_symbols":  [
+                                               "total"
+                                           ],
+                      "expected_relations":  [
+                                                 "orders EXPORTS total"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders.ts",
+                                                    "symbol":  "total",
+                                                    "start_line":  5,
+                                                    "end_line":  7,
+                                                    "evidence_id":  "c010-e1",
+                                                    "snapshot_id":  "tsjs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "total"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "total",
+                                                        "render"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "EXPORT_REMOVED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "No external consumer exists."
+                                           ]
+                  },
+                  {
+                      "id":  "c011",
+                      "repository_fixture":  "tsjs_app",
+                      "snapshot_id":  "tsjs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:client-import",
+                      "expected_symbols":  [
+                                               "render"
+                                           ],
+                      "expected_relations":  [
+                                                 "client IMPORTS total"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/client.js",
+                                                    "symbol":  null,
+                                                    "start_line":  1,
+                                                    "end_line":  4,
+                                                    "evidence_id":  "c011-e1",
+                                                    "snapshot_id":  "tsjs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "render"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "total",
+                                                        "render"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "DEPENDENCY_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The bundle succeeds."
+                                           ]
+                  },
+                  {
+                      "id":  "c012",
+                      "repository_fixture":  "docs_config",
+                      "snapshot_id":  "docs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:port",
+                      "expected_symbols":  [
+                                               "service.port"
+                                           ],
+                      "expected_relations":  [
+                                                 "README DOCUMENTS service.port"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "config/settings.yaml",
+                                                    "symbol":  "service.port",
+                                                    "start_line":  1,
+                                                    "end_line":  3,
+                                                    "evidence_id":  "c012-e1",
+                                                    "snapshot_id":  "docs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "service.port"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "service.port",
+                                                        "README.Sample Service"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "CONFIG_VALUE_CHANGED",
+                                                "DOCUMENT_REVIEW_REQUIRED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The new port is reachable."
+                                           ]
+                  },
+                  {
+                      "id":  "c013",
+                      "repository_fixture":  "docs_config",
+                      "snapshot_id":  "docs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:health-doc",
+                      "expected_symbols":  [
+                                               "README.Health"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "README.md",
+                                                    "symbol":  "Health",
+                                                    "start_line":  5,
+                                                    "end_line":  7,
+                                                    "evidence_id":  "c013-e1",
+                                                    "snapshot_id":  "docs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "README.Health"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "DOCUMENT_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The endpoint implementation changed."
+                                           ]
+                  },
+                  {
+                      "id":  "c014",
+                      "repository_fixture":  "docs_config",
+                      "snapshot_id":  "docs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:script",
+                      "expected_symbols":  [
+                                               "scripts.test"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "package.json",
+                                                    "symbol":  "scripts.test",
+                                                    "start_line":  4,
+                                                    "end_line":  6,
+                                                    "evidence_id":  "c014-e1",
+                                                    "snapshot_id":  "docs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "scripts.test"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "PACKAGE_SCRIPT_CHANGED"
+                                            ],
+                      "warnings":  [
+                                       "Package scripts must not execute during indexing."
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The new script passes."
+                                           ]
+                  },
+                  {
+                      "id":  "c015",
+                      "repository_fixture":  "mixed_app",
+                      "snapshot_id":  "mixed-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:get-order-return",
+                      "expected_symbols":  [
+                                               "get_order"
+                                           ],
+                      "expected_relations":  [
+                                                 "loadOrder ROUTES_TO get_order"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "backend.py",
+                                                    "symbol":  "get_order",
+                                                    "start_line":  1,
+                                                    "end_line":  2,
+                                                    "evidence_id":  "c015-e1",
+                                                    "snapshot_id":  "mixed-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "get_order"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "get_order",
+                                                        "loadOrder"
+                                                    ],
+                                                    [
+                                                        "get_order",
+                                                        "Order flow"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "PUBLIC_CONTRACT_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+                                          "Framework routing is not runtime-resolved."
+                                      ],
+                      "forbidden_claims":  [
+                                               "Frontend compatibility is guaranteed."
+                                           ]
+                  },
+                  {
+                      "id":  "c016",
+                      "repository_fixture":  "mixed_app",
+                      "snapshot_id":  "mixed-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:frontend-route",
+                      "expected_symbols":  [
+                                               "loadOrder"
+                                           ],
+                      "expected_relations":  [
+                                                 "loadOrder ROUTES_TO get_order"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "frontend.ts",
+                                                    "symbol":  "loadOrder",
+                                                    "start_line":  1,
+                                                    "end_line":  4,
+                                                    "evidence_id":  "c016-e1",
+                                                    "snapshot_id":  "mixed-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "loadOrder"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "loadOrder",
+                                                        "get_order"
+                                                    ],
+                                                    [
+                                                        "loadOrder",
+                                                        "Order flow"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "ROUTE_REFERENCE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The backend route moved."
+                                           ]
+                  },
+                  {
+                      "id":  "c017",
+                      "repository_fixture":  "mixed_app",
+                      "snapshot_id":  "mixed-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:health",
+                      "expected_symbols":  [
+                                               "health"
+                                           ],
+                      "expected_relations":  [
+                                                 "healthPath REFERENCES health"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "backend.py",
+                                                    "symbol":  "health",
+                                                    "start_line":  4,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c017-e1",
+                                                    "snapshot_id":  "mixed-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "health"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "health",
+                                                        "healthPath"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "PUBLIC_BEHAVIOR_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Health still returns HTTP 200."
+                                           ]
+                  },
+                  {
+                      "id":  "c018",
+                      "repository_fixture":  "mixed_app",
+                      "snapshot_id":  "mixed-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:health-path",
+                      "expected_symbols":  [
+                                               "healthPath"
+                                           ],
+                      "expected_relations":  [
+                                                 "healthPath REFERENCES health"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "frontend.ts",
+                                                    "symbol":  "healthPath",
+                                                    "start_line":  6,
+                                                    "end_line":  6,
+                                                    "evidence_id":  "c018-e1",
+                                                    "snapshot_id":  "mixed-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "healthPath"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "healthPath",
+                                                        "health"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "CONFIG_REFERENCE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The new path exists in backend routing."
+                                           ]
+                  },
+                  {
+                      "id":  "c019",
+                      "repository_fixture":  "mixed_app",
+                      "snapshot_id":  "mixed-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:flow-doc",
+                      "expected_symbols":  [
+                                               "Order flow"
+                                           ],
+                      "expected_relations":  [
+                                                 "Order flow DOCUMENTS get_order"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "docs/flow.md",
+                                                    "symbol":  "Order flow",
+                                                    "start_line":  1,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c019-e1",
+                                                    "snapshot_id":  "mixed-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "Order flow"
+                                                   ],
+                      "expected_impact_paths":  [
+                                                    [
+                                                        "Order flow",
+                                                        "get_order"
+                                                    ],
+                                                    [
+                                                        "Order flow",
+                                                        "loadOrder"
+                                                    ]
+                                                ],
+                      "expected_findings":  [
+                                                "DOCUMENT_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Code was updated to match the document."
+                                           ]
+                  },
+                  {
+                      "id":  "c020",
+                      "repository_fixture":  "git_changes",
+                      "snapshot_id":  "git-target",
+                      "base_ref":  "base",
+                      "target_ref":  "target",
+                      "expected_symbols":  [
+                                               "process"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "base/service.py",
+                                                    "symbol":  "process",
+                                                    "start_line":  1,
+                                                    "end_line":  2,
+                                                    "evidence_id":  "c020-e1",
+                                                    "snapshot_id":  "git-base"
+                                                },
+                                                {
+                                                    "file_path":  "target/processor.py",
+                                                    "symbol":  "process",
+                                                    "start_line":  1,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c020-e2",
+                                                    "snapshot_id":  "git-target"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "process"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "FILE_RENAMED",
+                                                "PUBLIC_SIGNATURE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+                                          "Rename evidence is fixture-declared in Phase 0."
+                                      ],
+                      "forbidden_claims":  [
+                                               "Git similarity was measured."
+                                           ]
+                  },
+                  {
+                      "id":  "c021",
+                      "repository_fixture":  "git_changes",
+                      "snapshot_id":  "git-target",
+                      "base_ref":  "base",
+                      "target_ref":  "target",
+                      "expected_symbols":  [
+                                               "legacy"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "base/service.py",
+                                                    "symbol":  "legacy",
+                                                    "start_line":  4,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c021-e1",
+                                                    "snapshot_id":  "git-base"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "legacy"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "SYMBOL_DELETED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Legacy remains in the active target snapshot."
+                                           ]
+                  },
+                  {
+                      "id":  "c022",
+                      "repository_fixture":  "git_changes",
+                      "snapshot_id":  "git-target",
+                      "base_ref":  "base",
+                      "target_ref":  "target:strict",
+                      "expected_symbols":  [
+                                               "process"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "target/processor.py",
+                                                    "symbol":  "process",
+                                                    "start_line":  1,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c022-e1",
+                                                    "snapshot_id":  "git-target"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "process"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "PARAMETER_ADDED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The new parameter is required."
+                                           ]
+                  },
+                  {
+                      "id":  "c023",
+                      "repository_fixture":  "git_changes",
+                      "snapshot_id":  "git-target",
+                      "base_ref":  "target",
+                      "target_ref":  "working-tree:error-message",
+                      "expected_symbols":  [
+                                               "process"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "target/processor.py",
+                                                    "symbol":  "process",
+                                                    "start_line":  2,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c023-e1",
+                                                    "snapshot_id":  "git-target"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "process"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "ERROR_BEHAVIOR_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "Every empty input now fails."
+                                           ]
+                  },
+                  {
+                      "id":  "c024",
+                      "repository_fixture":  "malicious_unsupported",
+                      "snapshot_id":  "security-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:prompt-injection",
+                      "expected_symbols":  [
+                                               "Ignore previous instructions"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "content/untrusted.md",
+                                                    "symbol":  "Ignore previous instructions",
+                                                    "start_line":  1,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "c024-e1",
+                                                    "snapshot_id":  "security-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "Ignore previous instructions"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "UNTRUSTED_CONTENT_CHANGED"
+                                            ],
+                      "warnings":  [
+                                       "Repository content is data, never application instruction."
+                                   ],
+                      "limitations":  [
+                                          "Malformed source may prevent symbol extraction."
+                                      ],
+                      "forbidden_claims":  [
+                                               "The repository authorized source upload."
+                                           ]
+                  }
+              ]
+}

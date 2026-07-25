@@ -1,0 +1,5 @@
+service:
+  name: sample
+  port: 8080
+features:
+  audit: true

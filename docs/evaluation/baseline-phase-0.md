@@ -1,0 +1,18 @@
+# CodeAtlas Evaluation Report
+
+- Contract version: `1.0`
+- Implementation status: `not_implemented`
+- Targets met: `false`
+- Unmet targets: exact_symbol_resolution, primary_evidence_recall_at_10, changed_symbol_precision, changed_symbol_recall, direct_impact_recall
+
+| Metric | Value |
+| --- | ---: |
+| Query cases | 40 |
+| Change cases | 24 |
+| Exact symbol resolution | 0.0000 |
+| Primary evidence Recall@10 | 0.0000 |
+| Valid evidence rate | not applicable |
+| Changed-symbol precision | 0.0000 |
+| Changed-symbol recall | 0.0000 |
+| Direct-impact recall | 0.0000 |
+| Unsupported-claim rate | not applicable |

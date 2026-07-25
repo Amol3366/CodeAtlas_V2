@@ -1,0 +1,508 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0",
+  "schemas": {
+    "error_envelope": {
+      "$defs": {
+        "ErrorDetail": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "minLength": 1,
+              "title": "Code",
+              "type": "string"
+            },
+            "details": {
+              "additionalProperties": true,
+              "title": "Details",
+              "type": "object"
+            },
+            "message": {
+              "minLength": 1,
+              "title": "Message",
+              "type": "string"
+            },
+            "request_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Request Id",
+              "type": "string"
+            },
+            "retryable": {
+              "title": "Retryable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "request_id",
+            "retryable"
+          ],
+          "title": "ErrorDetail",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorDetail"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "title": "ErrorEnvelope",
+      "type": "object"
+    },
+    "finding": {
+      "$defs": {
+        "Derivation": {
+          "enum": [
+            "deterministic",
+            "static_resolved",
+            "high_confidence_heuristic",
+            "low_confidence_heuristic",
+            "semantic_candidate",
+            "model_generated",
+            "unsupported"
+          ],
+          "title": "Derivation",
+          "type": "string"
+        },
+        "Severity": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "derivation": {
+          "$ref": "#/$defs/Derivation"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "remediation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remediation"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "title",
+        "description",
+        "derivation",
+        "confidence",
+        "evidence_ids"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "query_response": {
+      "$defs": {
+        "Answer": {
+          "additionalProperties": false,
+          "properties": {
+            "claims": {
+              "items": {
+                "$ref": "#/$defs/Claim"
+              },
+              "title": "Claims",
+              "type": "array"
+            },
+            "summary": {
+              "minLength": 1,
+              "title": "Summary",
+              "type": "string"
+            }
+          },
+          "required": [
+            "summary",
+            "claims"
+          ],
+          "title": "Answer",
+          "type": "object"
+        },
+        "Claim": {
+          "additionalProperties": false,
+          "properties": {
+            "claim_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Claim Id",
+              "type": "string"
+            },
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "evidence_ids": {
+              "items": {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "title": "Evidence Ids",
+              "type": "array"
+            },
+            "text": {
+              "minLength": 1,
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "claim_id",
+            "text",
+            "derivation",
+            "confidence",
+            "evidence_ids"
+          ],
+          "title": "Claim",
+          "type": "object"
+        },
+        "Derivation": {
+          "enum": [
+            "deterministic",
+            "static_resolved",
+            "high_confidence_heuristic",
+            "low_confidence_heuristic",
+            "semantic_candidate",
+            "model_generated",
+            "unsupported"
+          ],
+          "title": "Derivation",
+          "type": "string"
+        },
+        "Evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "content_hash": {
+              "minLength": 1,
+              "title": "Content Hash",
+              "type": "string"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "end_line": {
+              "minimum": 1,
+              "title": "End Line",
+              "type": "integer"
+            },
+            "evidence_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Evidence Id",
+              "type": "string"
+            },
+            "excerpt": {
+              "maxLength": 16384,
+              "title": "Excerpt",
+              "type": "string"
+            },
+            "file_path": {
+              "maxLength": 4096,
+              "title": "File Path",
+              "type": "string"
+            },
+            "repository_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            },
+            "snapshot_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Snapshot Id",
+              "type": "string"
+            },
+            "start_line": {
+              "minimum": 1,
+              "title": "Start Line",
+              "type": "integer"
+            },
+            "symbol": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Symbol"
+            },
+            "validation": {
+              "$ref": "#/$defs/EvidenceValidation"
+            }
+          },
+          "required": [
+            "evidence_id",
+            "repository_id",
+            "snapshot_id",
+            "file_path",
+            "start_line",
+            "end_line",
+            "excerpt",
+            "content_hash",
+            "derivation",
+            "confidence",
+            "validation"
+          ],
+          "title": "Evidence",
+          "type": "object"
+        },
+        "EvidenceValidation": {
+          "enum": [
+            "valid",
+            "invalid"
+          ],
+          "title": "EvidenceValidation",
+          "type": "string"
+        },
+        "SnapshotFreshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "partial",
+            "unknown"
+          ],
+          "title": "SnapshotFreshness",
+          "type": "string"
+        },
+        "SnapshotReference": {
+          "additionalProperties": false,
+          "properties": {
+            "freshness": {
+              "$ref": "#/$defs/SnapshotFreshness"
+            },
+            "git_head": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Git Head"
+            },
+            "semantic_coverage": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Semantic Coverage",
+              "type": "number"
+            },
+            "snapshot_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Snapshot Id",
+              "type": "string"
+            },
+            "working_tree_fingerprint": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Working Tree Fingerprint",
+              "type": "string"
+            }
+          },
+          "required": [
+            "snapshot_id",
+            "git_head",
+            "working_tree_fingerprint",
+            "freshness",
+            "semantic_coverage"
+          ],
+          "title": "SnapshotReference",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "$ref": "#/$defs/Answer"
+        },
+        "contract_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "repository_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Repository Id",
+          "type": "string"
+        },
+        "request_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/SnapshotReference"
+        },
+        "timing_ms": {
+          "additionalProperties": {
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "title": "Timing Ms",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "request_id",
+        "repository_id",
+        "snapshot",
+        "answer",
+        "evidence"
+      ],
+      "title": "QueryResponse",
+      "type": "object"
+    },
+    "stream_event_metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "conversation_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "message_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "request_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "conversation_id",
+        "message_id",
+        "sequence",
+        "timestamp"
+      ],
+      "title": "StreamEventMetadata",
+      "type": "object"
+    }
+  }
+}

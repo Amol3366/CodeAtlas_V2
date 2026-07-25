@@ -1,0 +1,7 @@
+{
+  "name": "sample",
+  "private": true,
+  "scripts": {
+    "test": "never-run-in-fixtures"
+  }
+}
