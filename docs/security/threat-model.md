@@ -56,6 +56,28 @@ providers remain disabled until a repository owner explicitly opts in.
 | Secret or content logging | Opaque IDs and aggregate telemetry; absolute paths, prompts, excerpts, source, answers, and secrets excluded by default | Redact and emit a diagnostic |
 | Denial of service | Query length, result, graph, evidence, parser, Git, storage, provider, and end-to-end limits with cancellation | Return bounded timeout/cancel status |
 
+## Phase 1 Enforcement Status
+
+As of 2026-07-25 the following controls are implemented and covered by tests in
+`tests/security/`. Everything not listed remains a design commitment only.
+
+| Control | Status | Where it is enforced |
+| --- | --- | --- |
+| Path traversal, absolute, backslash, UNC, reserved-name, trailing dot/space rejection | enforced | `domain/paths.py`, `test_path_safety.py`, `test_windows_paths.py` |
+| Symlink and Windows junction escape | enforced | `repositories/scanner.py` excludes with `SECURITY_LINK_ESCAPE`; a junction inside the root is still followed |
+| Size, depth, path-length, and file-count limits | enforced | `domain/repository.py` `ScanLimits`, `test_scanner.py` |
+| No execution of repository code | enforced | scanner and parser are data-only readers; asserted by tests that plant a side effect and by a source scan for execution primitives |
+| Non-shell Git invocation | enforced | `repositories/git_state.py` uses argument arrays with `cwd`; asserted by test |
+| Git scope confusion | enforced | a root that is not the Git top level yields `GIT_ROOT_MISMATCH` and no Git facts |
+| SQL injection | enforced | every statement in `storage/sqlite/stores.py` is parameterized |
+| Cross-snapshot or invented evidence | enforced | snapshot-scoped queries, pre-activation validation, content-hash re-verification at query time, contract-level membership checks |
+| Stale evidence | enforced | drifted files are detected by hash and their evidence is withheld with `EVIDENCE_STALE_FILE_CONTENT` |
+| Loopback-only API, no CORS | enforced | `apps/api/main.py`, asserted by test |
+| No secrets, paths, or traces in errors | enforced | `api/errors.py`; asserted by a test that raises a secret-bearing exception |
+| Prompt injection, secret scanning, provider boundary | not applicable yet | no provider or model exists in Phase 1 |
+| Markdown/HTML injection, editor opening | not applicable yet | no UI exists in Phase 1 |
+| Content logging | not applicable yet | Phase 1 adds no logging framework and writes no logs |
+
 ## Provider Opt-In Gate
 
 Provider use is prohibited until all of the following are recorded for the

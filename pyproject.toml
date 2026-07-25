@@ -9,22 +9,36 @@ description = "Local-first repository intelligence and change assurance"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "fastapi>=0.140,<1",
     "pydantic>=2.12,<3",
+    "tree-sitter>=0.25,<0.27",
+    "tree-sitter-python>=0.25,<0.26",
+    "typer>=0.27,<1",
+    "uvicorn>=0.51,<1",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28,<1",
     "mypy>=1.19,<2",
     "pytest>=9,<10",
     "ruff>=0.14,<1",
 ]
 
+[project.scripts]
+codeatlas = "codeatlas.cli.main:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/codeatlas"]
 
+# Migrations are data files, not modules, so they must be force-included for
+# `importlib.resources` to find them in an installed wheel.
+[tool.hatch.build.targets.wheel.force-include]
+"src/codeatlas/storage/sqlite/migrations" = "codeatlas/storage/sqlite/migrations"
+
 [tool.pytest.ini_options]
 addopts = "-ra -p no:cacheprovider --basetemp=.test-tmp"
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
 norecursedirs = ["tests/evaluation/cases/fixtures"]
 
@@ -39,9 +53,13 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "tests", "scripts"]
+files = ["src", "tests", "scripts", "apps"]
 exclude = ["tests/evaluation/cases/fixtures/"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["tree_sitter_python"]
+ignore_missing_imports = true

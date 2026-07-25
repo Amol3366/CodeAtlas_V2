@@ -1,0 +1,33 @@
+{
+  "case_counts": {
+    "changes": 24,
+    "queries": 40
+  },
+  "contract_version": "1.0",
+  "implementation_status": "implemented",
+  "metrics": {
+    "abstention_correctness": 0.15,
+    "changed_symbol_precision": 0.0,
+    "changed_symbol_recall": 0.0,
+    "direct_impact_recall": 0.0,
+    "exact_symbol_resolution": 0.1282051282051282,
+    "finding_precision": 0.0,
+    "mean_reciprocal_rank": 0.1282051282051282,
+    "ndcg_at_10": 0.1282051282051282,
+    "primary_evidence_recall_at_10": 0.06349206349206349,
+    "relation_path_correctness": 0.0,
+    "symbol_recall_at_10": 0.1282051282051282,
+    "total_duration_ms": 0.0,
+    "unsupported_claim_rate": 0.0,
+    "valid_evidence_rate": 0.8
+  },
+  "targets_met": false,
+  "unmet_targets": [
+    "exact_symbol_resolution",
+    "primary_evidence_recall_at_10",
+    "changed_symbol_precision",
+    "changed_symbol_recall",
+    "direct_impact_recall",
+    "valid_evidence_rate"
+  ]
+}

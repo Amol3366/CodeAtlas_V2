@@ -908,7 +908,7 @@ Update a phase to `[x]` only after every checklist item and its completion gate
 have been satisfied with current verification evidence.
 
 - [x] [Phase 0 — Product contract and evaluation](#phase-0--product-contract-and-evaluation)
-- [ ] [Phase 1 — Repository truth vertical slice](#phase-1--repository-truth-vertical-slice)
+- [x] [Phase 1 — Repository truth vertical slice](#phase-1--repository-truth-vertical-slice)
 - [ ] [Phase 2 — Snapshots, stable chunks, and lexical retrieval](#phase-2--snapshots-stable-chunks-and-lexical-retrieval)
 - [ ] [Phase 3 — Polyglot graph and delivery contracts](#phase-3--polyglot-graph-and-delivery-contracts)
 - [ ] [Phase 4 — Change assurance](#phase-4--change-assurance)

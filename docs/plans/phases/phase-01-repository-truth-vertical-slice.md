@@ -1,6 +1,6 @@
 # Phase 1 — Repository Truth Vertical Slice
 
-Status: `ready`
+Status: `complete`
 Gate authority: user
 Prerequisites: Phase 0 `complete`; `CLAUDE.md`; the industry blueprint
 Activation gate: this plan must be approved by the user before P1-SETUP moves to
@@ -236,17 +236,17 @@ actual versions and records them in its handoff; do not hand-edit `uv.lock`.
 
 | Task     | Deliverable                                            | Dependencies | Status    |
 | -------- | ------------------------------------------------------ | ------------ | --------- |
-| P1-SETUP | Phase activation, dependencies, ADR-0002, tooling       | Phase 0      | `ready`   |
-| P1-01    | Path safety and repository identity domain              | P1-SETUP     | `pending` |
-| P1-02    | Ignore rules, classification, limits, scanner           | P1-01        | `pending` |
-| P1-03    | Git state adapter                                       | P1-01        | `pending` |
-| P1-04    | SQLite connection, migrations, stores                   | P1-01        | `pending` |
-| P1-05    | Parser registry and Python parser                       | P1-02        | `pending` |
-| P1-06    | Indexing service, validation, atomic activation         | P1-03, P1-04, P1-05 | `pending` |
-| P1-07    | Exact symbol lookup, status, and diagnostics services   | P1-06        | `pending` |
-| P1-08    | `/v1` REST adapter                                      | P1-07        | `pending` |
-| P1-09    | Minimal CLI adapter                                     | P1-07        | `pending` |
-| P1-10    | Security/Windows sweep, baseline, docs, phase gate      | P1-08, P1-09 | `pending` |
+| P1-SETUP | Phase activation, dependencies, ADR-0002, tooling       | Phase 0      | `complete` |
+| P1-01    | Path safety and repository identity domain              | P1-SETUP     | `complete` |
+| P1-02    | Ignore rules, classification, limits, scanner           | P1-01        | `complete` |
+| P1-03    | Git state adapter                                       | P1-01        | `complete` |
+| P1-04    | SQLite connection, migrations, stores                   | P1-01        | `complete` |
+| P1-05    | Parser registry and Python parser                       | P1-02        | `complete` |
+| P1-06    | Indexing service, validation, atomic activation         | P1-03, P1-04, P1-05 | `complete` |
+| P1-07    | Exact symbol lookup, status, and diagnostics services   | P1-06        | `complete` |
+| P1-08    | `/v1` REST adapter                                      | P1-07        | `complete` |
+| P1-09    | Minimal CLI adapter                                     | P1-07        | `complete` |
+| P1-10    | Security/Windows sweep, baseline, docs, phase gate      | P1-08, P1-09 | `complete` |
 
 ---
 
@@ -2014,6 +2014,214 @@ powershell -ExecutionPolicy Bypass -File scripts/check_phase1.ps1 -SkipSync
 - Local scripts require `powershell -ExecutionPolicy Bypass -File ...`.
 
 ## Phase Handoff Log
+
+### 2026-07-25T20:04:24Z — Phase 1 approved and closed
+
+- Agent: Claude Code `claude-opus-5`
+- Approval: The user approved the Phase 1 gate and instructed that the work be
+  committed.
+- Transition: P1-10 `awaiting_user_approval -> complete`; Phase 1
+  `awaiting_user_approval -> complete`.
+- Verification: Status-only change; no executable tests were run for it. The
+  release-gate evidence remains the 2026-07-25T19:59:34Z entry.
+- Limitations: unchanged from the gate entry, including the deferred `q009`
+  evidence-granularity decision.
+- Next: await user instruction before preparing Phase 2.
+
+### 2026-07-25T19:59:34Z — P1-10 completed; Phase 1 awaiting user approval
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-10 `in_progress -> awaiting_user_approval`; Phase 1
+  `in_progress -> awaiting_user_approval`.
+- Outcome: Windows and security sweep (10 tests), the engine wired into the
+  Phase 0 evaluation runner, the first honest engine baseline,
+  `scripts/check_phase1.ps1`, and refreshed documentation including the
+  threat-model enforcement status.
+- Verification: `scripts/check_phase1.ps1 -SkipSync` exited 0 — 266 tests passed
+  in 8.59 s, Ruff clean, strict MyPy clean on 74 source files, dataset 6/40/24
+  valid, both tracked baselines unchanged. Baseline generation and `--check` both
+  exited 0.
+- Gate evidence: all eight `CLAUDE.md` Section 20 Phase 1 items are proven by
+  named tests, including identical evidence from the application service, REST,
+  and CLI for the same snapshot.
+- Baseline honesty: 5 of 5 supported cases resolved; 35 of 40 cases abstain by
+  design; `targets_met` is `false` and correctly so. `valid_evidence_rate` 0.8000
+  reflects one gold-range granularity disagreement (`q009`), not invalid
+  evidence: no emitted evidence fell outside real file bounds and no gold case
+  was edited.
+- Limitations: one intent; no relations, languages, change analysis, UI, or
+  provider; synchronous full-rebuild indexing; UNC rejected; a Git subdirectory
+  yields no Git state; the `q009` granularity decision is deferred.
+- Next: the user approves the Phase 1 gate or requests changes.
+
+### 2026-07-25T19:51:52Z — P1-09 completed; P1-10 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-09 `in_progress -> complete`; P1-10 `pending -> in_progress`.
+- Outcome: Typer CLI implemented test-first with `--json` and human output and
+  documented exit codes; CLI and REST proven to return identical evidence.
+- Verification: 11 task tests passed after failing first; full suite 251 passed
+  in 8.28 s; Ruff clean; strict MyPy clean on 70 source files; manual
+  console-script run succeeded end to end. All exit code 0 except the deliberate
+  abstention exit 4.
+- Defect found by manual verification and fixed: UTF-8 files with a byte-order
+  mark failed to parse, so anything written by common Windows tooling produced a
+  parse error and no symbols. The parser now strips the BOM and offsets spans by
+  its length; excerpts decode with `utf-8-sig`. Regression test added.
+- Limitation: `index` blocks with no progress output or cancellation.
+- Next: P1-10 test-first.
+
+### 2026-07-25T19:47:23Z — P1-08 completed; P1-09 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-08 `in_progress -> complete`; P1-09 `pending -> in_progress`.
+- Outcome: `/v1` REST adapter implemented test-first over the existing services.
+- Verification: 19 task tests passed after failing first; full suite 239 passed
+  in 7.52 s; Ruff clean; strict MyPy clean on 67 source files. All exit code 0.
+- Security: loopback bind and absent CORS asserted by test; error bodies carry no
+  trace, path, or exception message; validation errors do not echo the payload.
+- Deviation: one reused WAL connection closed by a lifespan handler, instead of
+  the planned per-request connection — single-user, single-writer profile.
+- Limitation: `POST /index` is synchronous and blocks for the run.
+- Next: P1-09 test-first.
+
+### 2026-07-25T19:43:07Z — P1-07 completed; P1-08 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-07 `in_progress -> complete`; P1-08 `pending -> in_progress`.
+- Outcome: `application/lookup.py` and `application/status.py` implemented
+  test-first; the container now exposes registration, indexing, lookup, status.
+- Verification: 25 task tests passed after failing first; full suite 220 passed
+  in 10.23 s; Ruff clean; strict MyPy clean on 60 source files. All exit code 0.
+- Trust behavior proven: distinct derivation for evidence and claims, abstention
+  without invention, stale-content detection by hash with evidence withheld,
+  unreadable-file handling, and full contract round-trip.
+- Storage note: `index_jobs.diagnostics` now stores a JSON object rather than an
+  array. Same column type, so no migration.
+- Limitations: only the `exact_symbol` intent; excerpts bounded to 200 lines and
+  8000 characters; `status` does not re-verify file drift, `lookup` does.
+- Next: P1-08 test-first.
+
+### 2026-07-25T19:39:05Z — P1-06 completed; P1-07 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-06 `in_progress -> complete`; P1-07 `pending -> in_progress`.
+- Outcome: `application/registration.py`, `application/indexing.py`, and
+  `application/container.py` implemented test-first. Register → scan → Git →
+  parse → stage → validate → activate now works end to end.
+- Verification: 17 task tests passed after failing first; full suite 195 passed
+  in 7.06 s; Ruff clean; strict MyPy clean on 56 source files. All exit code 0.
+- Invariants proven: idempotent re-index, supersede on change, previous active
+  snapshot preserved on validation failure, non-Git directory still activates,
+  malformed Python counted not fatal, no repository code executed.
+- Correction: replaced a bare `assert` on the post-activation read with an
+  explicit `SnapshotValidationError`, since asserts vanish under `-O`.
+- Limitations: synchronous in-process indexing, no cancellation, full rebuild on
+  any change (incremental reuse is Phase 2).
+- Next: P1-07 test-first.
+
+### 2026-07-25T19:35:07Z — P1-05 completed; P1-06 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-05 `in_progress -> complete`; P1-06 `pending -> in_progress`.
+- Outcome: `parsing/registry.py` and `parsing/python_parser.py` implemented
+  test-first. `ast` is authoritative for structure and lines; Tree-sitter
+  supplies byte spans and recovers symbols from files `ast` rejects.
+- Verification: 24 task tests passed after failing first; full suite 178 passed
+  in 5.29 s; Ruff clean; strict MyPy clean on 52 source files. All exit code 0.
+- Identity behavior proven by test: repeated parses are byte-identical in
+  `symbol_id` and `symbol_version_id`; a body edit moves the version ID only.
+- Security proven by test: no execution of module-level code or import side
+  effects, no execution primitives in the module, oversized and undecodable
+  content rejected with diagnostics, malformed and deeply nested input handled.
+- Limitations: no relations (Phase 3), docstrings unstored, Python only.
+- Next: P1-06 test-first.
+
+### 2026-07-25T19:30:39Z — P1-04 completed; P1-05 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-04 `in_progress -> complete`; P1-05 `pending -> in_progress`.
+- Outcome: snapshot/symbol domain types, SQLite connection with ADR-0002
+  pragmas, the numbered migration runner, migration 0001, and the five stores.
+- Migration: `SCHEMA_VERSION = 1`, forward-only, rollback is deleting the file.
+- Verification: 25 task tests passed after failing first; full suite 154 passed
+  in 4.39 s; Ruff clean; strict MyPy clean on 48 source files. All exit code 0.
+- Design decision: migrations execute statement by statement inside an explicit
+  `BEGIN IMMEDIATE` because `executescript` implicitly commits, which would leave
+  a failed migration half applied. Boundaries come from
+  `sqlite3.complete_statement`.
+- Invariants moved into the schema and covered by tests: one active snapshot per
+  repository (partial unique index), unique canonical root, cascading deletes,
+  and symbols that cannot outlive their file within a snapshot.
+- Next: P1-05 test-first.
+
+### 2026-07-25T19:25:56Z — P1-03 completed; P1-04 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-03 `in_progress -> complete`; P1-04 `pending -> in_progress`.
+- Outcome: `repositories/git_state.py` implemented test-first, with the real
+  `git_repo` fixture added to `tests/conftest.py`.
+- Verification: 11 task tests passed after failing first; full suite 129 passed
+  in 4.30 s; Ruff clean; strict MyPy clean on 41 source files. All exit code 0.
+- Defect found and fixed: a directory nested inside another Git repository
+  inherited that repository's HEAD, branch, and dirty state. The adapter now
+  requires `rev-parse --show-toplevel` to equal the approved root and otherwise
+  returns `GIT_ROOT_MISMATCH` with no Git facts.
+- Product consequence to carry forward: registering a subdirectory of a Git
+  repository indexes normally but records no Git state. Changing that requires
+  an explicit product decision.
+- Security: no `shell=True` or `os.system` in the module (asserted by test);
+  roots named like Git options degrade rather than inject.
+- Next: P1-04 test-first.
+
+### 2026-07-25T19:22:17Z — P1-02 completed; P1-03 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-02 `in_progress -> complete`; P1-03 `pending -> in_progress`.
+- Outcome: `ignore_rules.py`, `classification.py`, and `scanner.py` implemented
+  test-first.
+- Verification: 43 task tests passed after failing first; full suite 118 passed
+  in 1.42 s; Ruff clean; strict MyPy clean on 39 source files. All exit code 0.
+- Defects fixed: directory-only ignore patterns now exclude descendants when
+  queried directly; the scanner no longer derives relative paths through
+  `realpath`, so a junction escape is reported as `OUTSIDE_ROOT` with a
+  `SECURITY_LINK_ESCAPE` warning under its own name.
+- Limitation: `**`, `?`, and character-class ignore patterns are unsupported and
+  reported rather than approximated.
+- Next: P1-03 test-first.
+
+### 2026-07-25T19:04:58Z — P1-01 completed; P1-02 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P1-01 `in_progress -> complete`; P1-02 `pending -> in_progress`.
+- Outcome: `domain/errors.py`, `domain/ids.py`, `domain/paths.py`, and
+  `domain/repository.py` implemented test-first. Path validity delegates to the
+  contract's `RepositoryRelativePath` rule; no second validator was introduced.
+- Verification: tests observed failing first; then 25 passed for the task, 75
+  passed for the full suite, Ruff clean, strict MyPy clean on 33 source files.
+  All exit code 0.
+- Security: traversal, absolute, backslash, blank, root-itself, reserved device
+  name, UNC, and a real Windows junction escape are rejected under test.
+- Limitation: UNC roots are rejected rather than supported behind an opt-in.
+- Next: P1-02 test-first.
+
+### 2026-07-25T18:59:40Z — Phase 1 approved; P1-SETUP completed; P1-01 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: Phase 1 `ready -> in_progress`; P1-SETUP `ready -> complete`;
+  P1-01 `pending -> in_progress`.
+- Outcome: Dependencies locked (`tree-sitter==0.26.0`,
+  `tree-sitter-python==0.25.0`, `fastapi==0.140.0`, `uvicorn==0.51.0`,
+  `typer==0.27.0`, dev `httpx==0.28.1`), Tree-sitter Python bundle verified,
+  tooling extended, package skeleton created, ADR-0002 accepted.
+- Verification: `uv run pytest -q` — 50 passed; Ruff clean; strict MyPy clean on
+  26 source files; `scripts/check_phase0.ps1 -SkipSync` completed with the
+  tracked null baseline unchanged. All exit code 0.
+- Deviation: used `str(node)` instead of the deprecated `Node.sexp()` in the
+  parser smoke check.
+- Limitation: the `codeatlas` console script points at a module that lands in
+  P1-09.
+- Next: P1-01 test-first.
 
 ### 2026-07-25T18:37:04Z — Phase 1 plan created; awaiting user approval
 
