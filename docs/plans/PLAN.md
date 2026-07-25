@@ -54,7 +54,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Task status | `complete` |
 | Agent | Claude Code `claude-opus-5` |
 | Started UTC | 2026-07-25T19:51:52Z |
-| Git state | Branch `main` at `fb14126` ("initial commit", created during this session). All Phase 1 work is uncommitted on top of it. |
+| Git state | Branch `main` at `b2ea98e` — "feat: Phase 1 repository truth vertical slice", 74 files changed. Working tree clean. |
 | Next gate | Phase 1 was approved by the user on 2026-07-25T20:04:24Z. Await user instruction before preparing or activating Phase 2. |
 
 ### Phase 1 Task Board (authoritative status)
@@ -115,6 +115,10 @@ Every handoff entry contains:
   provider; synchronous full-rebuild indexing without progress or cancellation;
   UNC roots rejected; a Git subdirectory indexes without Git state; and the
   `q009` evidence-granularity disagreement still awaits a product decision.
+- Commit: Phase 1 was committed as `b2ea98e` ("feat: Phase 1 repository truth
+  vertical slice"), 74 files changed, 8,714 insertions, on branch `main` on top
+  of `fb14126`. This is the first handoff able to cite a commit SHA; earlier
+  entries recorded the absence of one accurately at the time they were written.
 - Next: await user instruction before preparing the Phase 2 plan.
 
 ### 2026-07-25T19:59:34Z — P1-10 completed; Phase 1 awaiting user approval
