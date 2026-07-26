@@ -911,7 +911,7 @@ have been satisfied with current verification evidence.
 - [X] [Phase 0 — Product contract and evaluation](#phase-0--product-contract-and-evaluation)
 - [X] [Phase 1 — Repository truth vertical slice](#phase-1--repository-truth-vertical-slice)
 - [X] [Phase 2 — Snapshots, stable chunks, and lexical retrieval](#phase-2--snapshots-stable-chunks-and-lexical-retrieval)
-- [ ] [Phase 3 — Polyglot graph and delivery contracts](#phase-3--polyglot-graph-and-delivery-contracts)
+- [X] [Phase 3 — Polyglot graph and delivery contracts](#phase-3--polyglot-graph-and-delivery-contracts)
 - [ ] [Phase 4 — Change assurance](#phase-4--change-assurance)
 - [ ] [Phase 5 — Persistent ChatGPT-style web application](#phase-5--persistent-chatgpt-style-web-application)
 - [ ] [Phase 6 — Continuous freshness and hardening](#phase-6--continuous-freshness-and-hardening)

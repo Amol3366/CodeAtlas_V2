@@ -39,8 +39,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 0 — Product contract and evaluation | [phase plan](phases/phase-00-product-contract-evaluation.md) | `complete` | User |
 | 1 — Repository truth vertical slice | [phase plan](phases/phase-01-repository-truth-vertical-slice.md) | `complete` | User |
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
-| 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `awaiting_user_approval` | User |
-| 4 — Change assurance | Created after Phase 3 approval | `pending` | User |
+| 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
+| 4 — Change assurance | Not yet created | `pending` (plan not written) | User |
 | 5 — Persistent web application | Created after Phase 4 approval | `pending` | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
@@ -49,15 +49,15 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Field | Value |
 | --- | --- |
-| Active phase | [Phase 3 — Polyglot graph and delivery contracts](phases/phase-03-polyglot-graph-and-delivery-contracts.md) |
-| Active task | None — Phase 3 awaits the user's gate approval |
-| Task status | P3-SETUP through P3-10 are `complete`; Phase 3 is `awaiting_user_approval` |
+| Active phase | Phase 4 — Change assurance (plan not yet written) |
+| Active task | None — the Phase 4 plan must be written and approved before any task starts (rule 11) |
+| Task status | Phase 3 is `complete`; no Phase 4 task exists yet |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-26T08:30:00Z |
-| Git state | Branch `main` at `3847469` — "feat: P3-01 relation domain, migration 0005, and RelationStore". Working tree dirty: P3-02 through P3-10 are uncommitted. |
-| Next gate | The user approves the Phase 3 completion gate. |
+| Started UTC | 2026-07-26T09:00:00Z |
+| Git state | Branch `main` at `41b1a8d` — "feat: Phase 3 polyglot graph and delivery contracts". Working tree clean apart from this approval record. |
+| Next gate | An agent drafts the Phase 4 plan; the user approves it before P4-SETUP may begin. |
 
-### Phase 3 Task Board (authoritative status)
+### Phase 3 Task Board (completed 2026-07-26)
 
 | Task     | Deliverable                                                  | Dependencies | Status    |
 | -------- | ------------------------------------------------------------ | ------------ | --------- |
@@ -73,9 +73,9 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P3-09    | Initial versioned MCP adapter                                 | P3-08        | `complete` |
 | P3-10    | Cross-adapter contract suite, baseline, docs, phase gate      | P3-09        | `complete` |
 
-The plan was approved by the user on 2026-07-26, so rule 11 no longer blocks
-execution. Task requirements, interfaces, tests, and acceptance criteria live in
-the [Phase 3 plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md).
+Every Phase 3 task is `complete` and the gate was approved by the user on
+2026-07-26; details live in the
+[Phase 3 plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md).
 
 ### Phase 2 Task Board (completed 2026-07-26)
 
@@ -127,6 +127,45 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-26T09:00:00Z — Phase 3 gate approved by the user
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P3-10 `complete` (unchanged); Phase 3
+  `awaiting_user_approval -> complete`; Phase 4 `pending` — its plan has not been
+  written, so rule 11 blocks every Phase 4 task until one exists and is approved.
+- Approval record, quoted verbatim so the log does not overstate it: after being
+  shown the Phase 3 gate report — the seven gate conditions and where each is
+  proven, the `check_phase3.ps1` exit-0 evidence, the baseline table including
+  the `exact_evidence_rate` fall to 0.4167, the four defects found during the
+  phase, and the three declared gaps — the user instructed **"approve the phase 3
+  gate"**. No changes to Phase 3 were requested.
+- Carried forward as open items, **not** closed by this approval:
+  1. **`DOCUMENTS` edges are specified but never derived.** `related_documents`
+     therefore always abstains. The relation kind, its `low_confidence_heuristic`
+     derivation, and the rule that it may never support a claim alone are all
+     implemented and tested; only the derivation step is missing.
+  2. **The MCP stdio transport loop is uncovered.** `run_stdio` is
+     `# pragma: no cover`. Every tool and the registry are tested directly, but
+     nothing exercises the transport wiring end to end.
+  3. **Test-first discipline was uneven.** P3-03, P3-07, P3-09, and P3-10 had
+     their tests written before implementation but never observed failing.
+  4. **Evidence granularity remains open**, as ADR-0003 intends. Phase 3 widened
+     the gap between `exact_evidence_rate` (0.4167) and
+     `containing_evidence_rate` (0.6250) by citing every supporting edge. The
+     decision returns in Phase 5, when the evidence drawer gives it a consumer.
+  5. **`mcp` contributes 18 transitive packages** and is used only by the stdio
+     server.
+- Verification: unchanged from the entry below —
+  `scripts/check_phase3.ps1` exited 0 with 676 tests passed, Ruff clean, strict
+  MyPy clean across 131 source files, the dataset valid, and both tracked
+  baselines reproducing.
+- Note: Phase 3 is committed on `main` as `41b1a8d`, following `3847469`
+  (P3-01) and `85d00f7` (P3-SETUP).
+- Next: an agent drafts the Phase 4 plan — change assurance — and the user
+  approves it before P4-SETUP moves to `in_progress`. Phase 4 is where the
+  changed-symbol precision and recall metrics, currently 0.0000, first become
+  meaningful.
 
 ### 2026-07-26T08:30:00Z — P3-02 through P3-10 completed; Phase 3 awaiting user approval
 
