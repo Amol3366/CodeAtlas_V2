@@ -8,7 +8,8 @@ import pytest
 
 from codeatlas.evaluation.dataset import load_dataset
 from codeatlas.evaluation.engine_adapter import (
-    SUPPORTED_INTENT,
+    SUPPORTED_FIXTURES,
+    SUPPORTED_INTENTS,
     predict_exact_symbols,
 )
 from codeatlas.evaluation.runner import PredictionFile
@@ -37,7 +38,7 @@ def test_supported_python_cases_resolve_their_expected_symbol(
     supported = [
         case
         for case in dataset.query_cases
-        if case.intent == SUPPORTED_INTENT and case.repository_fixture == "python_app"
+        if case.intent == "EXACT_SYMBOL" and case.repository_fixture == "python_app"
     ]
     assert supported, "the corpus must contain supported cases"
 
@@ -58,7 +59,10 @@ def test_unsupported_intents_abstain_rather_than_guess(
     by_id = {item.case_id: item for item in predictions.query_predictions}
 
     for case in dataset.query_cases:
-        if case.intent == SUPPORTED_INTENT and case.repository_fixture == "python_app":
+        if (
+            case.intent in SUPPORTED_INTENTS
+            and case.repository_fixture in SUPPORTED_FIXTURES
+        ):
             continue
         prediction = by_id[case.id]
         assert prediction.abstained is True
@@ -70,8 +74,11 @@ def test_no_evidence_references_a_file_the_engine_did_not_index(
     predictions: PredictionFile,
 ) -> None:
     dataset = load_dataset(DATASET_ROOT)
-    fixture_root = dataset.fixtures_root / "python_app"
+    fixture_by_case = {
+        case.id: case.repository_fixture for case in dataset.query_cases
+    }
     for prediction in predictions.query_predictions:
+        fixture_root = dataset.fixtures_root / fixture_by_case[prediction.case_id]
         for evidence in prediction.ranked_evidence:
             assert (fixture_root / evidence.file_path).is_file()
 

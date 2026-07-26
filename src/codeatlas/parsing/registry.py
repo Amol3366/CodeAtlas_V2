@@ -83,9 +83,11 @@ class ParserRegistry:
 
 
 def default_registry() -> ParserRegistry:
-    """Build the Phase 1 registry. Python is the only supported language."""
+    """Build the registry: Python source plus documents and configuration."""
+    from codeatlas.parsing.document_parser import DocumentParser
     from codeatlas.parsing.python_parser import PythonParser
 
     registry = ParserRegistry()
     registry.register(PythonParser())
+    registry.register(DocumentParser())
     return registry

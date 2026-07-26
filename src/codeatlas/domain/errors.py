@@ -23,6 +23,8 @@ class ErrorCode(StrEnum):
     SNAPSHOT_NOT_READY = "SNAPSHOT_NOT_READY"
     INDEX_IN_PROGRESS = "INDEX_IN_PROGRESS"
     UNSUPPORTED_QUERY_MODE = "UNSUPPORTED_QUERY_MODE"
+    SEARCH_QUERY_INVALID = "SEARCH_QUERY_INVALID"
+    NO_ROLLBACK_TARGET = "NO_ROLLBACK_TARGET"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -80,3 +82,15 @@ class IndexInProgressError(CodeAtlasError):
 
 class UnsupportedQueryModeError(CodeAtlasError):
     code = ErrorCode.UNSUPPORTED_QUERY_MODE
+
+
+class SearchQueryError(CodeAtlasError):
+    """The search query is empty, too long, or unusable after sanitization."""
+
+    code = ErrorCode.SEARCH_QUERY_INVALID
+
+
+class NoRollbackTargetError(CodeAtlasError):
+    """No superseded snapshot exists to roll back to."""
+
+    code = ErrorCode.NO_ROLLBACK_TARGET

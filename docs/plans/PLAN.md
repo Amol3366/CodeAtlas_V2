@@ -38,8 +38,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | --- | --- | --- | --- |
 | 0 — Product contract and evaluation | [phase plan](phases/phase-00-product-contract-evaluation.md) | `complete` | User |
 | 1 — Repository truth vertical slice | [phase plan](phases/phase-01-repository-truth-vertical-slice.md) | `complete` | User |
-| 2 — Snapshots, stable chunks, lexical retrieval | Created after Phase 1 approval | `pending` | User |
-| 3 — Polyglot graph and delivery contracts | Created after Phase 2 approval | `pending` | User |
+| 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
+| 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `awaiting_user_approval` (plan) | User |
 | 4 — Change assurance | Created after Phase 3 approval | `pending` | User |
 | 5 — Persistent web application | Created after Phase 4 approval | `pending` | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
@@ -49,15 +49,53 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Field | Value |
 | --- | --- |
-| Active phase | None; Phase 1 complete, Phase 2 not activated |
-| Active task | None |
-| Task status | `complete` |
+| Active phase | [Phase 3 — Polyglot graph and delivery contracts](phases/phase-03-polyglot-graph-and-delivery-contracts.md) |
+| Active task | None — the Phase 3 plan itself awaits user approval (rule 11) |
+| Task status | P3-SETUP is `pending` and MUST NOT move to `in_progress` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-25T19:51:52Z |
-| Git state | Branch `main` at `b2ea98e` — "feat: Phase 1 repository truth vertical slice", 74 files changed. Working tree clean. |
-| Next gate | Phase 1 was approved by the user on 2026-07-25T20:04:24Z. Await user instruction before preparing or activating Phase 2. |
+| Started UTC | 2026-07-26T05:10:00Z |
+| Git state | Branch `main` at `bc4897f` — "docs: record Phase 1 commit SHA in the handoff log". Working tree dirty: all Phase 2 implementation and the Phase 3 plan are uncommitted. |
+| Next gate | The user approves the Phase 3 plan. The evidence-granularity question is **decided** (score containment separately) and folded into P3-SETUP. |
 
-### Phase 1 Task Board (authoritative status)
+### Phase 3 Task Board (authoritative status)
+
+| Task     | Deliverable                                                  | Dependencies | Status    |
+| -------- | ------------------------------------------------------------ | ------------ | --------- |
+| P3-SETUP | Dependencies, ADR-0003 (granularity), ADR-0004 (contract)     | Phase 2      | `pending` |
+| P3-01    | Relation domain, identity, migration `0005`, `RelationStore`  | P3-SETUP     | `pending` |
+| P3-02    | Python reference extraction                                   | P3-01        | `pending` |
+| P3-03    | TypeScript/JavaScript parser (symbols)                        | P3-SETUP     | `pending` |
+| P3-04    | TypeScript/JavaScript reference extraction                    | P3-02, P3-03 | `pending` |
+| P3-05    | Snapshot resolution and indexing integration                  | P3-04        | `pending` |
+| P3-06    | Bounded graph traversal                                       | P3-05        | `pending` |
+| P3-07    | Graph query application services                              | P3-06        | `pending` |
+| P3-08    | Complete REST and CLI adapters, evidence addressing           | P3-07        | `pending` |
+| P3-09    | Initial versioned MCP adapter                                 | P3-08        | `pending` |
+| P3-10    | Cross-adapter contract suite, baseline, docs, phase gate      | P3-09        | `pending` |
+
+Every task is `pending` because the phase plan has not been approved. Rule 11
+forbids moving any of them to `in_progress` until it is. Task requirements,
+interfaces, tests, and acceptance criteria live in the
+[Phase 3 plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md).
+
+### Phase 2 Task Board (completed 2026-07-26)
+
+| Task  | Deliverable                                               | Dependencies | Status    |
+| ----- | --------------------------------------------------------- | ------------ | --------- |
+| P2-01 | Snapshot rollback, orphan recovery, retention              | Phase 1      | `complete` |
+| P2-02 | Chunk domain, identity, migration `0002`, `ChunkStore`     | P2-01        | `complete` |
+| P2-03 | Syntax-aware code chunking with oversized-symbol splitting | P2-02        | `complete` |
+| P2-04 | Document and configuration chunking                        | P2-02        | `complete` |
+| P2-05 | FTS5 projection and the validated query builder            | P2-03, P2-04 | `complete` |
+| P2-06 | Lexical and exact search services                          | P2-05        | `complete` |
+| P2-07 | Incremental indexing with proven reuse                     | P2-03, P2-04 | `complete` |
+| P2-08 | Crash, rollback, stale-entity, and reuse test suite        | P2-06, P2-07 | `complete` |
+| P2-09 | Search adapters, baseline, docs, phase gate                | P2-08        | `complete` |
+
+Every Phase 2 task is `complete`; details live in the
+[Phase 2 plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md).
+
+### Phase 1 Task Board (completed 2026-07-25)
 
 | Task     | Deliverable                                          | Dependencies        | Status    |
 | -------- | ---------------------------------------------------- | ------------------- | --------- |
@@ -73,7 +111,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P1-09    | Minimal CLI adapter                                   | P1-07               | `complete` |
 | P1-10    | Security/Windows sweep, baseline, docs, phase gate    | P1-08, P1-09        | `complete` |
 
-Task requirements, interfaces, tests, and acceptance criteria live in the
+Every Phase 1 task is `complete`; details live in the
 [Phase 1 plan](phases/phase-01-repository-truth-vertical-slice.md).
 
 ## Handoff Schema
@@ -90,6 +128,859 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-26T05:10:00Z — Phase 3 plan created; awaiting plan approval
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: Phase 3 `pending -> awaiting_user_approval` (plan approval, rule
+  11). Every P3 task stays `pending`. No implementation was started.
+- Outcome: `docs/plans/phases/phase-03-polyglot-graph-and-delivery-contracts.md`
+  now specifies eleven tasks covering TypeScript/JavaScript parsing, relation
+  extraction and resolution, bounded graph traversal, graph query services, the
+  completed REST and CLI surface, the first MCP adapter, and the cross-adapter
+  contract suite.
+- Files: `docs/plans/phases/phase-03-polyglot-graph-and-delivery-contracts.md`
+  (new), `docs/plans/PLAN.md`, `CLAUDE.md` (Phase 2 tracker box).
+- Contracts/migrations planned, not yet applied: migrations `0005` (relations)
+  and `0006` (`snapshots.resolver_version` plus the `evidence` table);
+  `SCHEMA_VERSION` 4 → 6; `PARSER_BUNDLE_VERSION` 1.0.0 → 1.1.0; a new
+  `RESOLVER_VERSION` joining snapshot identity; a new `RESOLVING` snapshot
+  state; three `*_NOT_FOUND` error codes; and an **additive, optional**
+  `relation_paths` field on `QueryResponse` that keeps `contract_version` at
+  `"1.0"`.
+- Central design decision: relation extraction and relation resolution are
+  separate stages. Extraction is a pure function of one file, so it is reusable;
+  resolution needs the whole snapshot, so it is recomputed every run. This is
+  what makes `CLAUDE.md` Section 9's "necessary reverse relations" requirement
+  hold by construction instead of by bookkeeping, and it makes a dangling
+  cross-file edge structurally impossible rather than merely unlikely.
+- **Evidence granularity — decided by the user: score containment separately.**
+  The Phase 2 gate measured the corpus expecting sub-definition ranges while the
+  engine emits whole structural units, costing `valid_evidence_rate` 0.8000 →
+  0.6923. Neither side is corrected. The evaluation runner will report
+  `exact_evidence_rate` and `containing_evidence_rate` side by side, and every
+  gate claim from Phase 3 onward must name which metric it used. Recorded as
+  ADR-0003 in P3-SETUP, with the underlying question deferred to Phase 5, when a
+  UI consumer exists to settle it.
+- Consequence of that ruling, stated plainly: adding two metrics changes the
+  baseline artifact **schema**, so `scripts/check_phase2.ps1` will stop passing
+  once P3-SETUP lands — the same way `check_phase1.ps1` did when the Phase 2
+  engine advanced. P3-SETUP marks it superseded. The Phase 2 artifacts are kept
+  unchanged as the record of that gate and are not regenerated. No engine output
+  changes from this ruling.
+- Verification: none applicable — this task produced planning documents only. No
+  source, test, migration, or dependency was changed. The Phase 2 gate evidence
+  in the entry below remains the current verification state of the tree.
+- Limitations: dependency versions for `tree-sitter-typescript`,
+  `tree-sitter-javascript`, and `mcp` are declared as ranges and must be pinned
+  from an actual resolution in P3-SETUP; they have not been installed or
+  verified to load.
+- Next: the user approves or amends the Phase 3 plan. The granularity ruling is
+  already recorded above. On plan approval an agent moves P3-SETUP to
+  `in_progress` and begins with ADR-0003 and the dual evidence metrics.
+
+### 2026-07-26T05:05:00Z — Phase 2 gate approved by the user
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-09 `awaiting_user_approval -> complete`; Phase 2
+  `awaiting_user_approval -> complete`; Phase 3 `pending -> active`.
+- Approval record, quoted verbatim so the log does not overstate it: the user
+  instructed **"start plan phase 3"** after being shown the Phase 2 gate report,
+  including the `valid_evidence_rate` regression, the three plan deviations, and
+  the P2-09 adapter-scope note. Direction to begin the next phase is taken as
+  approval of the gate; no changes to Phase 2 were requested.
+- Carried forward as open items, not closed by this approval:
+  1. **Evidence granularity** — now a blocking decision on P3-SETUP.
+  2. **P2-09 adapter scope** — three `/v1/search/*` routes, the rollback route,
+     and two CLI commands that `CLAUDE.md` nominally assigns to Phase 3. They
+     remain shipped; Phase 3 extends rather than revisits them.
+- Verification: unchanged from the entry below —
+  `scripts/check_phase2.ps1 -SkipSync` exited 0 with 477 tests passed, Ruff
+  clean, strict MyPy clean across 102 source files, the dataset valid, and both
+  tracked baselines unchanged.
+- Note: all Phase 2 implementation remains uncommitted on `main` at `bc4897f`.
+  The user has not requested a commit.
+- Next: create the Phase 3 plan (entry above).
+
+### 2026-07-26T04:30:00Z — P2-09 completed; Phase 2 awaiting user approval
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-09 `in_progress -> awaiting_user_approval`; Phase 2
+  `in_progress -> awaiting_user_approval`. Phase 2 is **not** complete: only the
+  user may approve the gate.
+- Outcome: search is reachable through REST and the CLI, rollback has an
+  adapter, the evaluation adapter answers two more intents, the Phase 2 baseline
+  is generated and reproducible, and `scripts/check_phase2.ps1` runs the whole
+  gate.
+- Files: `src/codeatlas/api/routers/search.py` (new),
+  `src/codeatlas/api/routers/repositories.py` (rollback route),
+  `src/codeatlas/api/app.py`, `src/codeatlas/api/errors.py`,
+  `src/codeatlas/cli/main.py` (`search`, `rollback`),
+  `src/codeatlas/evaluation/engine_adapter.py`,
+  `src/codeatlas/parsing/document_parser.py` (config key ranges, below),
+  `scripts/run_phase2_baseline.py` (new), `scripts/check_phase2.ps1` (new),
+  `scripts/check_phase1.ps1` (marked superseded),
+  `docs/evaluation/baseline-phase-2.json` and `.md` (new),
+  `docs/evaluation/phase-2-baseline-environment.md` (new),
+  `docs/operations/chunking-and-search.md` (new),
+  `docs/security/threat-model.md`, `README.md`,
+  `tests/contract/test_rest_api.py`, `tests/end_to_end/test_cli_workflow.py`,
+  `tests/evaluation/test_engine_adapter.py`.
+- Contracts: first `/v1/search/*` surface and the rollback route.
+  `SEARCH_QUERY_INVALID` maps to HTTP 400 and CLI exit 2; `NO_ROLLBACK_TARGET`
+  to HTTP 409 and CLI exit 3. No schema change in this task; schema version
+  stays 4.
+- **Scope note the user should see:** `CLAUDE.md` assigns "complete versioned
+  REST and CLI adapters" to Phase 3. This task deliberately exposes only three
+  search endpoints, one rollback endpoint, and two CLI commands, so Phase 2 is a
+  usable slice rather than a library. The plan flagged this and offered to
+  reduce it to documentation-only; it was built as planned. Say the word and it
+  can be withdrawn.
+- **Defect found by the baseline and fixed:** a configuration key recorded its
+  start line as its entire range, so citing `"scripts"` in a `package.json`
+  pointed at the key name and not the block that defines it. A key is only
+  meaningful with its value, so a key's range now runs to just before the next
+  top-level key, with a JSON object's own closing brace excluded because it
+  belongs to no key. Case `q022` went from disagreeing with the corpus to
+  matching it exactly.
+
+#### Phase 2 completion gate evidence
+
+Each `CLAUDE.md` Section 20 Phase 2 requirement, and where it is proven:
+
+1. **Snapshot staging, validation, activation, rollback** — `test_recovery.py`,
+   `test_snapshot_isolation.py`, `test_crash_recovery.py`.
+2. **Logical chunk identity, versions, membership** — `test_chunk_ids.py`,
+   `test_chunk_store.py`, migration `0002`.
+3. **Syntax-aware code and document chunks** — `test_code_chunking.py`,
+   `test_document_chunking.py`; boundaries follow symbols and headings, and
+   fixed-size splitting occurs only inside an oversized symbol.
+4. **FTS5 plus exact and lexical search** — `test_fts_query.py`,
+   `test_search_store.py`, `test_lexical_search.py`, `test_search_contract.py`.
+5. **Incremental one-symbol edit behavior** — `test_incremental_indexing.py`.
+6. **Crash, rollback, stale-entity, incremental-reuse tests** —
+   `test_snapshot_isolation.py`, `test_crash_recovery.py`, plus the Windows
+   chunking case in `test_windows_paths.py`.
+
+The three stated gate conditions:
+
+- *Unrelated chunks remain reusable after a one-symbol edit* — editing one
+  method body gives `files_reused=2, files_reparsed=1, symbols_reused=4,
+  chunks_reused=6, chunks_recomputed=5`, and the set of changed chunk versions
+  is exactly `{"PaymentService.capture"}`.
+- *Interrupted indexing preserves the previous active snapshot* — proven by
+  killing activation and by killing the FTS projection mid-write; in both cases
+  the previous snapshot stays active and still answers.
+- *Stale entities cannot appear in active results* — a deleted symbol is
+  unreachable through both lookup and search after re-indexing, while its rows
+  remain physically present in the superseded snapshot.
+
+#### Verification in the current environment
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase2.ps1 -SkipSync`
+  — **exit 0**. Stages: contract schema freshness; **477 tests passed** in
+  36.44 s; Ruff clean; strict MyPy clean on **102 source files**; dataset 6
+  fixtures / 40 query cases / 24 change cases valid; Phase 0 null baseline
+  unchanged; Phase 2 engine baseline unchanged.
+- Baseline reproducibility: generation and `--check` both exited 0.
+- Manual console-script run against a throwaway repository: `repo add` exited 0;
+  `index` exited 0 reporting `2 files, 2 parsed, 0 parse errors`;
+  `search <id> idempotency` exited 0 printing
+  `src/service.py:2-4  [high_confidence_heuristic]`;
+  `search <id> capture --kind symbols` exited 0 printing
+  `src/service.py:2-4  [deterministic]`; `search <id> zzzznotpresent` exited 4
+  with `NO_LEXICAL_MATCH`; `rollback <id>` exited 3 with `NO_ROLLBACK_TARGET`.
+- Artifacts: `baseline-phase-2.json` SHA-256
+  `C32444D3B72B8884FED54D88C16C9BCE1A916999E56649E6CCA1130CCCD33A97`;
+  `baseline-phase-2.md` SHA-256
+  `6301786284FF5C4C5EAA4A9489B095735F8B59CED266804ECD9770AD46748650`.
+  Environment: Windows 11 `10.0.26200`, Python 3.12.12.
+
+#### Baseline results, stated honestly
+
+| Metric | Phase 1 | Phase 2 |
+| --- | ---: | ---: |
+| Exact symbol resolution | 0.1282 | **0.2564** |
+| Primary evidence Recall@10 | 0.0635 | **0.1429** |
+| Valid evidence rate | 0.8000 | 0.6923 |
+| Changed-symbol precision / recall | 0.0000 | 0.0000 |
+| Unsupported-claim rate | 0.0000 | 0.0000 |
+
+`targets_met` is `false`, which is the correct result for a phase implementing
+three of nine intents. Resolution and recall doubled because configuration and
+document lookup are now answered instead of abstained.
+
+`valid_evidence_rate` **fell**, and the reason matters more than the number. It
+counts exact agreement with gold `(snapshot, path, start, end)` tuples. Phase 1
+emitted 5 evidence items and 4 agreed; Phase 2 emits 13 and 9 agree. Every one
+of the four disagreements names the **right file** and a range that **contains
+or overlaps** the expected one — none is invented:
+
+- `q009` — `src/payments/service.py` 7-11 versus expected 10-11. Carried from
+  Phase 1: a whole definition versus a sub-range.
+- `q023` — `app.toml` 1-4 versus expected 1-2. The `[server]` table block versus
+  part of it.
+- `q027`, `q031` — `docs/flow.md` 1-5 versus expected 1-3 and 3-5. One heading
+  section versus paragraph-level granularity within it.
+
+**The corpus was not edited to raise the metric.** Doing so would destroy its
+value as an independent check. The one disagreement that was a genuine
+implementation defect — `q022` — was fixed in the parser, not in the corpus.
+
+#### The open decision, now sharper
+
+Phase 1 raised `q009` as an evidence-granularity disagreement. Phase 2 turns it
+from one case into a pattern: the corpus expects sub-definition and
+sub-section ranges, and the engine emits whole structural units. This is now the
+single largest contributor to the headline evidence metric, and it is a product
+decision, not a bug: either evidence should narrow to the matched lines within a
+chunk, or the corpus should expect structural ranges. `SYMBOL_PART` ranges make
+the narrower option feasible. **This needs a decision before Phase 4**, where
+change analysis will multiply its effect.
+
+#### Limitations carried into Phase 3
+
+- Reuse is per file, not per symbol; a renamed file is a delete plus an add.
+- Ranking is unweighted BM25 — a path match and a body match rank alike, and the
+  generated/vendor-pollution risk noted in the plan is therefore unmeasured.
+- YAML is a line scanner limited to top-level keys; Setext Markdown headings are
+  unrecognized; JSON and TOML key lines are located by first textual occurrence.
+- No relations, TypeScript/JavaScript, MCP, change analysis, watcher,
+  embeddings, or UI. Indexing is synchronous with no progress or cancellation.
+- `prune` is never called automatically; retention requires an explicit call.
+- `scripts/check_phase1.ps1` is superseded and its Phase 1 baseline step now
+  exits 5 by design, because that artifact records the Phase 1 engine. A comment
+  in the script says so, and `check_phase2.ps1` does not re-check it.
+- Invoking `codeatlas search <id> ***` through `uv run` on Windows has the
+  argument expanded by the launcher before the CLI sees it, so the result is a
+  Typer usage error rather than `SEARCH_QUERY_INVALID`. Both exit 2. The
+  application path is proven correct by
+  `test_an_unusable_search_query_exits_with_the_invalid_input_code`, which
+  invokes the CLI directly; this is an argument-passing artifact, not a search
+  defect.
+- Crashes are simulated at the application layer, not by killing a process.
+
+#### Next: required decision
+
+The user reviews Phase 2 and either approves the gate or requests changes. On
+approval an agent records it here, sets P2-09 and Phase 2 to `complete`, ticks
+the Phase 2 box in the `CLAUDE.md` tracker, and only then prepares Phase 3.
+
+### 2026-07-26T03:30:00Z — P2-08 completed; P2-09 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-08 `in_progress -> complete`; P2-09 `pending -> in_progress`.
+- Outcome: all eight required adversarial scenarios are covered by tests. This
+  task added no production feature by design; it added two production **fixes**,
+  both found by the new tests.
+- Files: `tests/integration/test_snapshot_isolation.py` (new),
+  `tests/end_to_end/test_crash_recovery.py` (new),
+  `tests/security/test_windows_paths.py` (chunking under a deep, mixed-case,
+  non-ASCII path), `src/codeatlas/application/indexing.py`,
+  `src/codeatlas/application/recovery.py`,
+  `src/codeatlas/application/container.py`.
+- **Defect 1, found and fixed: a crashed run made its own retry impossible.**
+  A run that died between staging and activation left a snapshot row with the ID
+  derived from those exact inputs. Re-indexing the same tree derives the same ID,
+  so staging raised `sqlite3.IntegrityError: UNIQUE constraint failed:
+  snapshots.snapshot_id` and the repository could not be re-indexed until the
+  database was edited by hand. Phase 1's short-circuit only recognized an
+  *active* snapshot with that ID, so a failed or stranded one was never cleared.
+  Indexing now deletes an abandoned attempt before re-staging. Covered by
+  `test_the_repository_can_be_reindexed_after_a_crash`.
+- **Defect 2, found while fixing the first: pruning left searchable orphans.**
+  `chunk_search` and `file_search` are FTS5 virtual tables, so they have no
+  foreign keys and a snapshot delete cannot cascade into them. Deleting a
+  snapshot — during retention pruning or when clearing an abandoned attempt —
+  therefore left projection rows behind that no longer had any chunk. Both paths
+  now clear the projection explicitly, and `SnapshotRecoveryService` takes a
+  `SearchStore` for that purpose.
+- The eight scenarios and where each is proven: **(1) staging invisibility** —
+  `test_a_staged_snapshot_is_invisible_to_every_query` and
+  `test_a_staged_snapshot_never_holds_the_active_state`; **(2) crash between
+  staging and activation** —
+  `test_a_crash_between_staging_and_activation_leaves_the_index_usable`, which
+  reopens the database as a new process would and asserts recovery ran, no
+  snapshot is stranded, and the previous active snapshot still answers; **(3)
+  crash during FTS projection** — `test_a_partial_projection_is_caught_by_validation`,
+  which truncates the projection write and asserts activation is refused with
+  `SnapshotValidationError`; **(4) stale-entity exclusion** —
+  `test_a_deleted_symbol_cannot_be_returned_after_reindexing`, which also asserts
+  the row still exists physically in the superseded snapshot, proving membership
+  rather than deletion is what makes it unreachable; **(5) rollback** —
+  `test_rollback_reverts_search_results`; **(6) one active snapshot** —
+  `test_repeated_indexing_never_leaves_two_active_snapshots`, asserted against
+  the database after five runs; **(7) Windows paths** —
+  `test_a_deep_mixed_case_non_ascii_path_chunks_and_searches`, covering depth,
+  mixed case, a space, and non-ASCII segments, and asserting the cited path is
+  relative and forward-slashed; **(8) large files** —
+  `test_a_large_file_chunks_within_bounds_and_without_quadratic_time`, a
+  30,000-line file that chunks within the hard maximum, splits with contiguous
+  part indices, and stays far inside a deliberately generous time bound chosen
+  to catch quadratic behavior rather than slow hardware.
+- One test-side correction, not a product defect: a crash-recovery assertion
+  expected evidence for a symbol in the file the test had just edited on disk.
+  Withholding that evidence is correct — the file drifted from the snapshot — so
+  the test now asserts evidence from an untouched file *and* asserts the drifted
+  file yields `EVIDENCE_STALE_FILE_CONTENT`.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest -q` — **459 passed** in 21.73 s;
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 100 source
+  files.
+- Limitations: crashes are simulated by making activation raise, which exercises
+  the application's recovery path but not an actual process kill or an OS-level
+  power loss; SQLite's WAL is trusted for the latter. The large-file timing bound
+  is a smoke test for algorithmic behavior, not a performance benchmark; real
+  performance numbers with named hardware belong to P2-09.
+- Next: P2-09 — search adapters, evaluation baseline, documentation, phase gate.
+
+### 2026-07-26T03:00:00Z — P2-07 completed; P2-08 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-07 `in_progress -> complete`; P2-08 `pending -> in_progress`.
+- Outcome: indexing is incremental and produces chunks. A file whose content
+  hash is unchanged has its symbols, chunks, membership, and FTS projection
+  copied from the previous active snapshot instead of being re-read, re-parsed,
+  re-chunked, and re-projected. Search now works against snapshots built by the
+  real pipeline rather than by test scaffolding.
+- Files: `src/codeatlas/application/indexing.py`,
+  `src/codeatlas/application/container.py`,
+  `src/codeatlas/domain/snapshot.py` (`chunker_version`),
+  `src/codeatlas/domain/ids.py` (`snapshot_id` takes the chunker version),
+  `src/codeatlas/storage/sqlite/stores.py` (`SymbolStore.copy_from_snapshot`,
+  `SearchStore.copy_from_snapshot`, chunker version persisted),
+  `src/codeatlas/storage/sqlite/migrations/0004_snapshot_chunker_version.sql`
+  (new), `src/codeatlas/storage/sqlite/migrations.py` (`SCHEMA_VERSION = 4`),
+  `tests/integration/test_incremental_indexing.py` (new),
+  `tests/integration/test_lexical_search.py` and
+  `tests/contract/test_search_contract.py` (scaffolding removed, below),
+  `tests/integration/test_migrations.py`.
+- Contracts/migrations: **`SCHEMA_VERSION = 4`.** Migration `0004` adds
+  `snapshots.chunker_version` with an empty default. The default matters: a
+  snapshot created before this column has no chunks, so an empty value makes it
+  ineligible as a reuse source rather than silently trusted. `CHUNKER_VERSION`
+  now participates in `snapshot_id`, so every snapshot ID changes on first run
+  after this task — correct, because the derived content genuinely differs.
+  `IndexResult` gains `reuse`, additive with a default.
+- Reuse measured on the three-file fixture, not asserted in prose. First index:
+  `files_reused=0, files_reparsed=3, chunks_recomputed=11`. After editing one
+  method body: **`files_reused=2, files_reparsed=1, symbols_reused=4,
+  chunks_reused=6, chunks_recomputed=5`**. `test_unrelated_chunk_versions_survive_a_one_symbol_edit`
+  asserts the changed set is exactly `{"PaymentService.capture"}`, and
+  `test_a_reused_chunk_row_is_byte_identical` asserts a reused chunk's retrieval
+  text and version ID are unchanged, not merely equivalent.
+- Reuse is refused, with a test each, when: there is no active predecessor; the
+  predecessor is `failed` rather than `active`; `PARSER_BUNDLE_VERSION` changed;
+  or `CHUNKER_VERSION` changed. In every case the run falls back to full
+  derivation rather than copying rows whose provenance no longer matches.
+- Validation before activation was extended and applies to copied rows exactly
+  as to fresh ones: no chunk line range may exceed its file, no membership row
+  may reference a chunk outside the snapshot, membership count must equal chunk
+  count, and the FTS projection count must equal the chunk count. A partially
+  written projection therefore cannot activate.
+- Test scaffolding removed rather than left behind: P2-06's fixtures built
+  chunks by hand because indexing did not yet do so. With indexing wired in they
+  double-inserted and failed loudly, which is the right failure. Both fixtures
+  now register and index for real, so search tests exercise the same path a user
+  does. This is a strict improvement in fidelity over what P2-06 could achieve.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest tests/integration/test_incremental_indexing.py -q` — 13 passed
+  in 2.41 s; `uv run pytest -q` — **446 passed** in 18.09 s;
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 98 source
+  files.
+- Limitations: reuse is decided per file, not per symbol — editing one method
+  re-derives every chunk in that file, which is why `chunks_recomputed` is 5
+  rather than 1 in the measurement above. Per-symbol reuse would need the
+  previous snapshot's symbol hashes compared individually and is not required by
+  the phase gate. A file that is renamed is treated as a delete plus an add,
+  because `file_id` derives from the path. Indexing remains synchronous with no
+  progress reporting or cancellation.
+- Next: P2-08 — the adversarial crash, rollback, stale-entity, and reuse suite.
+
+### 2026-07-26T02:20:00Z — P2-06 completed; P2-07 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-06 `in_progress -> complete`; P2-07 `pending -> in_progress`.
+- Outcome: `LexicalSearchService` exposes `search_text`, `search_files`, and
+  `search_symbols` through `ApplicationServices`, each returning the same
+  contract `QueryResponse` Phase 1's lookup returns, with the same disk-read,
+  hash-verified, drift-aware evidence rules.
+- Files: `src/codeatlas/application/evidence.py` (new),
+  `src/codeatlas/retrieval/lexical.py` (new),
+  `src/codeatlas/application/lookup.py` (moved onto the shared builder),
+  `src/codeatlas/application/container.py` (wires `search`),
+  `src/codeatlas/storage/sqlite/stores.py` (column-scoped chunk search),
+  `tests/integration/test_lexical_search.py` (new),
+  `tests/contract/test_search_contract.py` (new),
+  `tests/contract/test_query_response_contract.py` (import moved).
+- Contracts/migrations: no schema change. `ApplicationServices` gains a `search`
+  field, additive. `MAX_EXCERPT_LINES` and `MAX_EXCERPT_CHARACTERS` moved from
+  `application.lookup` to `application.evidence`; the only importer was a test.
+- Refactor rather than duplication: the drift rules are the reason a citation can
+  be trusted, so they now live once in `EvidenceBuilder` and both lookup and
+  search call it. Duplicating them would have meant two places to get staleness
+  wrong.
+- **Defect found by the new contract test, and fixed in the shared builder:** a
+  file-summary chunk and its module chunk cover the same line range, so both
+  produced the same `evidence_id` — an evidence ID names a citable region, not a
+  chunk — and the response failed contract validation with "evidence IDs must be
+  unique". The builder now emits each `(file, start, end)` region once. That is
+  the correct semantics as well as the fix: citing one region twice would
+  mislead a reader into thinking two independent sources agreed.
+- Trust behavior, each proven by test: an exact symbol match is never displaced
+  by a lexical one — `search_symbols("capture")` returns
+  `PaymentService.capture` with `deterministic` evidence and a `static_resolved`
+  claim, and lexical matching only runs when exact resolution returns nothing;
+  every lexical result carries `high_confidence_heuristic` at confidence 0.7 on
+  both evidence and claims, because the bytes are real but the judgment that they
+  answer the question was made by a ranking function; a drifted file yields no
+  evidence and `EVIDENCE_STALE_FILE_CONTENT`; no match abstains with
+  `NO_LEXICAL_MATCH` rather than erroring; and results never come from a
+  superseded snapshot after a re-index.
+- Two test-side corrections, neither a product defect: a naive "no absolute
+  path" assertion matched `str:\n` inside a code excerpt, so it now asserts the
+  real property — the repository root never appears in a response and every
+  cited path is relative; and two fixtures needed explicit list annotations for
+  strict MyPy.
+- Testing note: indexing does not build chunks until P2-07, so both new test
+  fixtures derive and store chunks exactly as indexing will. This is recorded
+  rather than hidden, and P2-08 exercises the real wiring end to end.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest -q` — **433 passed** in 16.10 s;
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 97 source
+  files.
+- Limitations: file search cites the whole file as one range, so a large file's
+  excerpt is truncated with a warning. Ranking is unweighted BM25. The
+  `search_symbols` lexical fallback matches the indexed symbol-name column only;
+  fuzzy identifier matching is Phase 3. Search is reachable only through the
+  application service until P2-09 adds REST and CLI.
+- Next: P2-07 — incremental indexing with proven reuse.
+
+### 2026-07-26T01:40:00Z — P2-05 completed; P2-06 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-05 `in_progress -> complete`; P2-06 `pending -> in_progress`.
+- Outcome: Untrusted search text can now be turned into a safe FTS5 expression,
+  and chunks and file paths can be projected into FTS5 and queried with
+  snapshot-scoped, deterministically ordered results. No application service
+  exposes search yet — that is P2-06.
+- Files: `src/codeatlas/retrieval/__init__.py` (new),
+  `src/codeatlas/retrieval/fts_query.py` (new),
+  `src/codeatlas/domain/search.py` (new),
+  `src/codeatlas/storage/sqlite/stores.py` (`SearchStore`),
+  `src/codeatlas/storage/sqlite/migrations/0003_chunk_search_part_index.sql`
+  (new), `src/codeatlas/storage/sqlite/migrations.py` (`SCHEMA_VERSION = 3`),
+  `tests/unit/test_fts_query.py` (new),
+  `tests/security/test_fts_injection.py` (new),
+  `tests/integration/test_search_store.py` (new),
+  `tests/integration/test_migrations.py` (version expectations).
+- Contracts/migrations: **`SCHEMA_VERSION = 3`.** Migration `0003` recreates
+  `chunk_search` with a `part_index` column. Migration `0002` was **not** edited,
+  even though it is only hours old and uncommitted, because a database already at
+  version 2 must upgrade cleanly rather than silently disagree with a rewritten
+  migration; that is the whole point of the forward-only rule. FTS5 cannot add a
+  column in place, so the table is dropped and recreated, which loses nothing
+  because no code populated it before this task.
+- Why the column was needed: `chunks` is keyed by
+  `(snapshot_id, logical_chunk_id, part_index)`, so joining a search hit back to
+  its row on the logical chunk alone multiplied results for a split symbol and
+  made the projection row count disagree with the chunk row count that P2-07's
+  validation is specified to compare. `test_a_split_chunk_is_projected_once_per_part`
+  covers both: counts stay `(2, 2)` and a term appearing only in the second part
+  returns that part's line range, not the whole symbol's.
+- Test-first: all three test files were written before the implementation and
+  observed failing with `ModuleNotFoundError: No module named
+  'codeatlas.retrieval'`.
+- Deviation from the plan's test list, with reasoning: the plan specifies
+  `test_embedded_quotes_are_escaped`, asserting `""` appears in the output of
+  `build_match_expression('say "hi"')`. That can only hold if a quote survives
+  into a term, which would mean the tokenizer passes a quote through — precisely
+  the thing this builder exists to prevent. The safe design treats `"` as a
+  separator, so `say "hi"` becomes `"say" AND "hi"`. The test now asserts the
+  property that actually matters — that quotes cannot escape the literal and the
+  expression stays balanced. The doubling escape is still implemented in
+  `_escape`, documented as defence in depth for any future tokenizer change.
+- Two test-side defects found and fixed during the cycle, neither a product
+  defect: the plan's `test_term_count_is_capped` builds a 40-term query whose raw
+  length exceeds `MAX_SEARCH_QUERY_LENGTH`, so it was rejected for length before
+  the term cap could apply — the test now uses short terms and asserts the term
+  cap specifically; and a `delete_for_snapshot` test asserted chunk rows were
+  deleted along with the projection, which is not what the method does or should
+  do. It now asserts `(1, 0)`: the projection is gone, the chunk rows remain, and
+  both searches return nothing.
+- Security, proven against real SQLite rather than by inspection: twelve hostile
+  queries — including `" OR "" : *`, `chunk_search MATCH 'x'`,
+  `*; DROP TABLE chunks; --`, `NEAR(a b, 100000)`, `' UNION SELECT retrieval_text
+  FROM chunks --`, a bare `payment*`, an unterminated quote, a column filter
+  `col:value`, and an embedded NUL — are each executed against a populated index.
+  Every one either raises `SearchQueryError` or returns a bounded result set;
+  none raises `sqlite3.OperationalError`, none returns every row, and the
+  `chunks` table still holds its three rows after the whole hostile run.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest tests/unit/test_fts_query.py tests/security/test_fts_injection.py
+  tests/integration/test_search_store.py -q` — 53 passed in 1.84 s;
+  `uv run pytest -q` — **412 passed** in 23.12 s;
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 93 source
+  files.
+- Limitations: ranking is raw BM25 with no field weighting, so a match in a file
+  path and a match in code body rank alike; tuning is deferred until P2-09 can
+  measure it. `SearchStore` does not validate the match expression it is given —
+  that is the caller's contract, and every caller goes through
+  `build_match_expression`. Nothing populates the projection during indexing yet;
+  that is P2-07.
+- Next: P2-06 — lexical and exact search services.
+
+### 2026-07-26T01:10:00Z — P2-04 completed; P2-05 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-04 `in_progress -> complete`; P2-05 `pending -> in_progress`.
+- Outcome: Markdown, JSON, YAML, and TOML files now parse structurally and chunk
+  along their own boundaries. A Markdown heading becomes a `DOCUMENT_SECTION`
+  chunk carrying its full heading ancestry; a top-level configuration key becomes
+  a `CONFIG_KEY` chunk with its nested structure summarized as dotted paths.
+  Document symbols are emitted too, so exact lookup can already find a heading or
+  a configuration key by name.
+- Files: `src/codeatlas/parsing/document_parser.py` (new),
+  `src/codeatlas/chunking/documents.py` (new),
+  `src/codeatlas/chunking/retrieval_text.py` (two document builders added),
+  `src/codeatlas/chunking/chunker.py` (`split_line_spans` and `hash_text` made
+  public so document chunking reuses the same splitter rather than growing a
+  second one), `src/codeatlas/parsing/registry.py` (registers the parser),
+  `tests/unit/test_document_chunking.py` (new),
+  `tests/security/test_document_parser_safety.py` (new),
+  `tests/integration/test_indexing.py` (one expectation updated, below).
+- Contracts/migrations: none. `DocumentParser.version` reuses
+  `PARSER_BUNDLE_VERSION`, so document symbols participate in existing identity
+  rules without a new version axis.
+- Test-first: both test files were written before the implementation and
+  observed failing with `ModuleNotFoundError: No module named
+  'codeatlas.parsing.document_parser'`.
+- Behavior change with a knock-on effect, deliberately taken: registering the
+  document parser means indexing now parses Markdown and configuration files
+  that Phase 1 skipped. `test_register_then_index_activates_a_snapshot_with_symbols`
+  asserted `parsed_file_count == 2` for a fixture of two Python modules and a
+  README; it now asserts 3. This is the new intended behavior, not a regression,
+  and the assertion was updated with a comment recording why rather than
+  loosened.
+- Deviation from the plan, with reasoning: the plan states that a section below
+  `MIN_USEFUL_CHARACTERS` merges into its parent heading. That rule contradicts
+  the plan's own acceptance tests, which look up `Setup` and `Windows` chunks by
+  title in a fixture whose sections are only a few dozen characters — under
+  merging, neither chunk would exist. Dropping a heading's chunk also makes
+  "where is X documented" unanswerable for exactly the short, factual sections
+  most worth finding. Every heading therefore gets a chunk, and small sections
+  carry their heading ancestry in the retrieval text so a fragment is never
+  stranded without context. Oversized sections still split, at paragraph
+  boundaries, via the same splitter the code chunker uses.
+- Structural context is carried on `SymbolRecord.module_path`, which holds a
+  heading ancestry for a section and the dotted nested key paths for a
+  configuration key. This avoids widening `SymbolRecord` for one language family
+  and keeps the chunker from re-deriving structure the parser already knows.
+- Security, each asserted by a test in
+  `tests/security/test_document_parser_safety.py`: hostile Markdown containing
+  "IGNORE ALL PREVIOUS INSTRUCTIONS" and a `<script>` tag parses successfully and
+  is stored as ordinary text — it is data, and nothing interprets it; the module
+  contains no `exec`, `eval`, `importlib`, `__import__`, `runpy`, `subprocess`,
+  `yaml.load`, `pickle`, or `os.system`; **no YAML dependency is imported**, and
+  a test asserts the absence of `import yaml` directly; oversized documents are
+  rejected before parsing with `PARSE_FILE_TOO_LARGE`; undecodable bytes yield
+  `PARSE_ENCODING_ERROR`; a 500-line deeply nested heading structure does not
+  crash; and an unsupported language is refused with `PARSE_UNSUPPORTED`.
+- Path references named in prose are recorded only when they pass
+  `validate_relative_path`, and a separate test proves that `../../etc/passwd`
+  and `C:/Windows/system32` written in a document are **not** recorded as
+  repository paths. Only `json` and `tomllib` deserialize anything; YAML is a
+  line scanner that reports `PARSE_UNSUPPORTED` rather than guessing, proven by
+  a test feeding it a top-level sequence.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest tests/unit/test_document_chunking.py
+  tests/security/test_document_parser_safety.py -q` — 25 passed in 0.63 s;
+  `uv run pytest -q` — **359 passed** in 20.93 s;
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 87 source
+  files.
+- Limitations: YAML support is intentionally shallow — top-level keys and their
+  line ranges only, with no value interpretation, no anchors, no multi-document
+  streams, and no flow mappings; anything else is a diagnostic. JSON and TOML key
+  line numbers are located by scanning for the key's first textual occurrence,
+  which is exact for conventional formatting and approximate for a key name that
+  also appears earlier as a string value. Setext (underlined) Markdown headings
+  are not recognized; only ATX (`#`) headings are.
+- Next: P2-05 — the FTS5 projection and the validated query builder.
+
+### 2026-07-26T00:45:00Z — P2-03 completed; P2-04 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-03 `in_progress -> complete`; P2-04 `pending -> in_progress`.
+- Outcome: Python files now chunk along their own structure. Every file yields a
+  deterministic-metadata `FILE_SUMMARY`, one `SYMBOL` chunk per module, class,
+  function, method, and constant, and `SYMBOL_PART` chunks when a single
+  definition is too large to carry whole. Nothing is stored yet — indexing wires
+  chunking in at P2-07.
+- Files: `src/codeatlas/chunking/__init__.py` (new),
+  `src/codeatlas/chunking/retrieval_text.py` (new),
+  `src/codeatlas/chunking/chunker.py` (new),
+  `tests/unit/test_code_chunking.py` (new).
+- Contracts/migrations: none. `CHUNKER_VERSION = "1.0.0"` now exists but does
+  **not** yet participate in `snapshot_id`; it joins snapshot identity in P2-07
+  when indexing starts producing chunks, so that the identity change lands with
+  the behavior change rather than ahead of it.
+- Test-first: the tests were written before the implementation and observed
+  failing with `ModuleNotFoundError: No module named 'codeatlas.chunking'`.
+- Design decision, and a correction to the plan's own P2-07 sketch: a container
+  symbol — a module or a class — is chunked by its **outline**, not its members'
+  bodies. Its retrieval text lists member qualified names, and its content hash
+  covers the definition header plus that member list. The plan's P2-07 sketch
+  expects a one-symbol body edit to change
+  `{"PaymentService.capture", "src.payments.service"}`, which would require the
+  module chunk to hash the whole file. That contradicts this phase's own fixed
+  architecture decision, which states that editing one symbol changes *only*
+  that symbol's `chunk_version_id`. The architecture decision is the stronger
+  authority and is also the property the phase gate is written against, so the
+  implementation follows it: `test_editing_one_symbol_changes_only_that_chunk_version`
+  asserts the changed set is exactly `{"PaymentService.capture"}`. P2-07's test
+  will be written to that expectation, and this entry records why it differs
+  from the sketch. Structural change is still caught:
+  `test_adding_a_symbol_changes_the_container_and_summary` proves that adding a
+  method changes the class chunk and the file summary while leaving the
+  untouched sibling method's version identical.
+- Deviation from the plan's stated approach: the plan says to reuse the parser's
+  `SymbolRecord` byte spans. Chunk code is sliced by **line** range instead.
+  Byte spans from Tree-sitter begin at the `def` keyword and so drop the
+  definition's leading indentation, which would break exact line mapping for the
+  split parts, and line mapping is the stronger requirement — it is what makes
+  the citation checkable. Line ranges still come from the parser; only the
+  slicing differs. Chunk end lines are additionally clamped to the file's line
+  count, because the module symbol's recorded end line counts the trailing empty
+  line after a final newline and would otherwise report a line the file does not
+  have.
+- Additive interface beyond the plan: `build_symbol_retrieval_text` gained
+  `members`, `part_index`, and `part_count` keywords so containers and split
+  parts render through one builder rather than three.
+- Splitting behavior, measured rather than asserted: a 1,201-line function
+  produced 5 parts of about 6,450 characters each, all under the 7,200 hard
+  maximum, with a 35-line overlap window and complete coverage of lines 1 to
+  1,201 with no gaps. Cuts land on `ast` statement boundaries; when a single
+  statement is larger than the budget the cut falls on a line boundary instead,
+  so evidence stays line-exact either way. Every part repeats the definition
+  signature, shares one `symbol_id` and one `logical_chunk_id`, and carries a
+  distinct `chunk_version_id` and `part_index`.
+- Security: `ast.parse` is used to locate statement boundaries. It parses only —
+  no import, execution, or resolution — consistent with the Phase 1 parser. When
+  a file does not parse, splitting degrades to line alignment instead of
+  failing.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest tests/unit/test_code_chunking.py -q` — 16 passed in 0.75 s;
+  `uv run pytest -q` — **334 passed** in 20.64 s;
+  `uv run ruff check src tests scripts apps` — all checks passed (two lint
+  findings in the new test file, a long line and a `zip` that should be
+  `itertools.pairwise`, were fixed before this entry);
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 83 source
+  files.
+- Limitations: docstrings are still not stored by the parser, so the
+  `DOCSTRING:` header field is currently never populated for Python; the builder
+  supports it for when the parser does. `TARGET_MIN_CHARACTERS`,
+  `TARGET_MAX_CHARACTERS`, and `MIN_USEFUL_CHARACTERS` are declared but not yet
+  used to merge undersized chunks — a top-level definition is always emitted,
+  which is the stated behavior, and merging is only relevant to documents
+  (P2-04). Only Python chunks; documents and configuration are P2-04.
+- Next: P2-04 — document and configuration chunking.
+
+### 2026-07-26T00:20:00Z — P2-02 completed; P2-03 started
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P2-02 `in_progress -> complete`; P2-03 `pending -> in_progress`.
+- Outcome: Added the chunk domain type, chunk identity, migration `0002`, and
+  `ChunkStore`. A chunk can now be stored, listed, scoped to a snapshot, copied
+  into a new snapshot with the reuse count reported, and validated for impossible
+  line ranges. Nothing produces chunks yet — that is P2-03 and P2-04.
+- Files: `src/codeatlas/domain/chunks.py` (new), `src/codeatlas/domain/ids.py`,
+  `src/codeatlas/storage/sqlite/migrations/0002_phase2_chunks_and_search.sql`
+  (new), `src/codeatlas/storage/sqlite/migrations.py`,
+  `src/codeatlas/storage/sqlite/stores.py`, `tests/unit/test_chunk_ids.py` (new),
+  `tests/integration/test_chunk_store.py` (new),
+  `tests/integration/test_migrations.py`.
+- Contracts/migrations: **`SCHEMA_VERSION = 2`.** Migration `0002` is additive
+  and forward-only: it creates `chunks`, `snapshot_chunk_membership`, and the
+  `chunk_search` and `file_search` FTS5 virtual tables, and it touches no Phase 1
+  table. Migration `0001` was not edited. A version-1 database upgrades in place
+  with its rows intact, proven by
+  `test_upgrading_an_existing_version_1_database_preserves_data`, which applies
+  only migration `0001`, writes a repository and a snapshot, reopens the
+  database, upgrades to 2, and asserts the rows survive. There is no downgrade
+  path; rollback of a schema version remains deletion of the database file.
+- Defect found in the plan and corrected: the plan's
+  `snapshot_chunk_membership` primary key is `(snapshot_id, logical_chunk_id)`.
+  Every part of an oversized symbol shares one `logical_chunk_id` and is
+  distinguished by `part_index`, so the second part of the first split symbol
+  would have raised `IntegrityError`. Since P2-03 is specified to produce
+  `SYMBOL_PART` chunks, the plan as written would have failed on first contact
+  with a large function. The key is therefore
+  `(snapshot_id, logical_chunk_id, part_index)`, mirroring the `chunks` key
+  exactly. This preserves the plan's intent — membership stays a separate
+  authoritative table that cascades with its snapshot and is indexed by
+  `chunk_version_id` — and additionally makes P2-07's required validation
+  possible, because membership and chunk row counts can now be compared one to
+  one. `test_a_split_symbol_stores_one_row_per_part` covers it.
+- Interface additions beyond the plan's list, both needed by P2-07's stated
+  validation and cheaper to add here than to bolt on later:
+  `ChunkStore.count_membership` and `ChunkStore.orphan_membership`, the latter
+  returning membership rows with no matching chunk in the same snapshot.
+- Test-first: all three test files were written before any implementation and
+  observed failing with `ModuleNotFoundError: No module named
+  'codeatlas.domain.chunks'`.
+- One test-side defect during the cycle, not a product defect: the
+  `_apply_only_version_one` helper called `_apply_one` before
+  `schema_migrations` existed, because that table is created by
+  `current_version`. The helper now calls `current_version` first. No production
+  code changed as a result.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest tests/unit/test_chunk_ids.py tests/integration/test_chunk_store.py
+  tests/integration/test_migrations.py -q` — 37 passed in 1.11 s;
+  `uv run pytest -q` — **318 passed** in 19.78 s;
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 79 source
+  files.
+- Acceptance: a version-1 database upgrades with data intact; chunk identity
+  behaves like symbol identity, with `test_editing_content_changes_only_the_chunk_version`
+  and `test_chunker_version_participates_in_the_version_id` proving the split;
+  membership is a separate table and cascades with its snapshot
+  (`test_deleting_a_snapshot_cascades_to_chunks_and_membership`).
+- Limitations: `copy_from_snapshot` trusts the caller to pass file IDs that are
+  genuinely unchanged — it verifies nothing about content, because the content
+  comparison belongs to P2-07's indexing decision. Chunk rows carry no FTS
+  projection yet; `chunk_search` and `file_search` exist but stay empty until
+  P2-05. `CHUNKER_VERSION` does not yet exist and so does not yet participate in
+  `snapshot_id`; that lands with P2-03.
+- Next: P2-03 — syntax-aware code chunking with oversized-symbol splitting.
+
+### 2026-07-26T00:00:00Z — Phase 2 approved; P2-01 recovered and completed; P2-02 started
+
+- Agent: Claude Code `claude-opus-5`
+- Approval, recorded late: the user approved the Phase 2 plan on
+  2026-07-25T20:19:32Z and instructed execution to begin. The Active Work block
+  was updated at the time but no handoff entry was appended, so the approval
+  existed only as a table value. This entry supplies the missing record. Rule 8
+  forbids rewriting earlier entries, so the gap is documented rather than
+  back-filled.
+- Transition: P2-01 `in_progress -> complete`; P2-02 `pending -> in_progress`.
+- Recovery per rule 9: P2-01 was found `in_progress` with uncommitted work from
+  an interrupted session. The existing work was inspected and preserved, not
+  restarted. `application/recovery.py`, the `SnapshotStore` additions, the
+  container wiring, and `tests/integration/test_recovery.py` (19 tests) were
+  already present and passing. Two items from the task's own Files list were
+  outstanding: `tests/integration/test_stores.py` had not been updated, and no
+  handoff had been appended.
+- Outcome: snapshot rollback, crash recovery, and retention are complete.
+  `SnapshotRecoveryService.recover_interrupted()` runs from `build_services`, so
+  any process start fails snapshots a crashed predecessor left in a non-terminal
+  state without touching the active one. `rollback` swaps active and the newest
+  superseded snapshot inside one write transaction. `prune` keeps the active
+  snapshot plus one superseded rollback target and deletes the rest, cascading to
+  derived rows.
+- Files completed in this session: `tests/integration/test_stores.py` (+8 tests
+  covering `most_recent_superseded` ordering, the rollback swap and its
+  `LookupError` with no target, `list_for_repository` scoping, `list_by_states`
+  state and repository filtering, cascade on delete, and delete of an unknown ID
+  as a no-op). Files carried in from the interrupted session:
+  `src/codeatlas/application/recovery.py` (new),
+  `src/codeatlas/storage/sqlite/stores.py`,
+  `src/codeatlas/application/container.py`, `src/codeatlas/domain/errors.py`,
+  `src/codeatlas/domain/snapshot.py`, `tests/integration/test_recovery.py` (new).
+- Contracts/migrations: no schema change; schema version remains 1. Two new
+  public error codes, `NO_ROLLBACK_TARGET` and `SEARCH_QUERY_INVALID`, and a new
+  `SnapshotState.CHUNKING`. `ApplicationServices` gains a `recovery` field, which
+  is additive. `SEARCH_QUERY_INVALID` is declared ahead of its P2-05 use so the
+  enum is not edited twice; nothing raises it yet.
+- Test-first honesty: the recovery tests were written before their implementation
+  in the interrupted session, as its own notes show. The eight store tests added
+  in this session were written against code that already existed, so they were
+  not observed failing first. They are new coverage of untested store behavior,
+  not a TDD cycle, and are reported as such.
+- Deviations from the plan's stated interface, both deliberate:
+  1. the plan specified `SnapshotStore.list_non_terminal(repository_id)`; the
+     implementation provides the more general
+     `list_by_states(states, repository_id=None)`, which `recover_interrupted`
+     calls with `NON_TERMINAL_STATES` and `prune` reuses for superseded and
+     failed states. One query shape instead of three;
+  2. `SnapshotRecoveryService.__init__` takes an extra `repositories:
+     RepositoryStore` so `rollback` and `prune` can raise
+     `RepositoryNotFoundError` for an unknown repository rather than silently
+     succeeding on nothing.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest tests/integration/test_stores.py -q` — 21 passed in 1.22 s;
+  `uv run pytest -q` — **293 passed** in 17.81 s;
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in 76 source
+  files.
+- Acceptance, each proven by a named test: rollback restores the previous
+  snapshot atomically (`test_rollback_restores_the_previous_snapshot`) and cannot
+  produce a second active snapshot
+  (`test_rollback_never_creates_two_active_snapshots`, asserted against the
+  database); a crashed non-terminal snapshot is failed on the next service
+  construction with the active snapshot untouched
+  (`test_building_services_recovers_a_crashed_snapshot`,
+  `test_recovery_never_touches_active_or_superseded_snapshots`, parametrized over
+  all six non-terminal states); pruning never removes the active snapshot or the
+  rollback target (`test_prune_never_deletes_the_active_snapshot`,
+  `test_prune_leaves_a_rollback_target`); and search results revert with a
+  rollback (`test_rollback_makes_search_results_revert`).
+- Limitations: `prune` is never called automatically — no scheduled retention
+  exists, so a caller must invoke it. Recovery fails stranded snapshots but does
+  not delete their rows; `prune` is what reclaims the space. Rollback is
+  reachable only through the application service until P2-09 adds the REST route.
+- Git state: branch `main` at `bc4897f`, working tree dirty with the Phase 2 plan
+  and the P2-01 implementation uncommitted.
+- Next: P2-02 — chunk domain, identity, migration `0002`, and `ChunkStore`.
+
+### 2026-07-25T20:12:00Z — Phase 2 plan prepared; awaiting user approval
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: Phase 2 `pending -> ready`; P2-01 created with status `ready`. No
+  task moved to `in_progress` and no Phase 2 implementation was started.
+- Outcome: Created the Phase 2 shared execution plan
+  (`docs/plans/phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md`)
+  covering nine tasks: snapshot rollback and crash recovery, chunk identity and
+  migration `0002`, syntax-aware code chunking, document and configuration
+  chunking, the FTS5 projection and a validated query builder, lexical and exact
+  search, incremental indexing with measured reuse, an adversarial
+  crash/rollback/stale-entity suite, and the adapter/baseline/gate task.
+- Files: the new phase plan (new) and `docs/plans/PLAN.md` (phase index, active
+  work, Phase 2 task board, handoff).
+- Contracts/migrations: None yet. The plan specifies migration `0002`
+  (`chunks`, `snapshot_chunk_membership`, `chunk_search`, `file_search`) and
+  `SCHEMA_VERSION = 2`, but nothing is created until the plan is approved.
+  Migration `0001` is applied and must not be edited.
+- Grounding: written from the committed Phase 1 tree at `b2ea98e`, `CLAUDE.md`
+  Section 20, and blueprint Sections 2.5, 4.5, 4.6, 4.7.2, 8.8, and the
+  blueprint's own Phase 5 and Phase 6 exit criteria.
+- Verification: Documentation-only change; no executable tests were run. The
+  current release-gate evidence remains the Phase 1 entry of
+  2026-07-25T19:59:34Z.
+- Decisions fixed in the plan so tasks compose: chunk identity mirrors the
+  symbol logical/version split; `CHUNKER_VERSION` joins snapshot identity;
+  chunk sizing is expressed in characters as a declared proxy because Phase 2
+  has no tokenizer; lexical evidence is labeled `high_confidence_heuristic`
+  while exact resolution keeps `deterministic`/`static_resolved`; and an exact
+  match can never be displaced by a lexical one.
+- Scope decision needing a user call: P2-09 exposes three `/v1/search/*`
+  endpoints and one CLI command, which `CLAUDE.md` assigns to Phase 3. It is
+  included to keep Phase 2 a usable vertical slice and can be reduced to
+  documentation-only on request.
+- Limitations: no relations, no TypeScript/JavaScript, no MCP, no change
+  analysis, no watcher, no embeddings. No YAML dependency is added; YAML keys are
+  scanned line-by-line and anything ambiguous yields a diagnostic rather than a
+  guess.
+- Open decision carried from Phase 1: the `q009` evidence-granularity
+  disagreement remains unresolved. Chunking introduces `SYMBOL_PART` ranges that
+  may make sub-definition evidence natural; P2-09 must report the effect and must
+  not resolve it by editing the corpus.
+- Next: the user approves or amends the Phase 2 plan. On approval an agent
+  records the approval here and moves P2-01 from `ready` to `in_progress`.
 
 ### 2026-07-25T20:04:24Z — Phase 1 approved and closed
 

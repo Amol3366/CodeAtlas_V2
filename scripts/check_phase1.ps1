@@ -1,3 +1,9 @@
+# SUPERSEDED by scripts/check_phase2.ps1.
+#
+# Kept as the record of the Phase 1 gate. Its 'Phase 1 engine baseline'
+# step no longer passes, and should not: that artifact records what the
+# Phase 1 engine did, and the engine has since advanced. Re-running it
+# against a later engine exits 5 (stale artifact) by design.
 [CmdletBinding()]
 param(
     [switch]$SkipSync,

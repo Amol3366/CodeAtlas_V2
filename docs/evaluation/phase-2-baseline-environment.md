@@ -1,0 +1,42 @@
+# Phase 2 Baseline Environment
+
+The tracked Phase 2 baseline is generated with timings excluded, so the artifact
+is byte-for-byte reproducible on any machine. Correctness metrics do not depend
+on hardware; performance claims do, and are reported separately with the
+hardware named, per `CLAUDE.md` Section 19.3.
+
+## Environment of record
+
+| Field | Value |
+| --- | --- |
+| Platform | Windows 11 (`Windows-11-10.0.26200-SP0`) |
+| Python | 3.12.12 |
+| Dependency state | `uv sync --all-groups --frozen` against the committed `uv.lock` |
+| Dataset | `tests/evaluation/cases` — 6 fixtures, 40 query cases, 24 change cases |
+
+## Reproducing it
+
+```powershell
+uv run python scripts/run_phase2_baseline.py `
+    --dataset tests/evaluation/cases `
+    --json-output docs/evaluation/baseline-phase-2.json `
+    --markdown-output docs/evaluation/baseline-phase-2.md
+```
+
+Add `--check` to compare against the tracked artifacts instead of overwriting
+them. `--check` exits 5 when they differ.
+
+## Artifact hashes
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `baseline-phase-2.json` | `C32444D3B72B8884FED54D88C16C9BCE1A916999E56649E6CCA1130CCCD33A97` |
+| `baseline-phase-2.md` | `6301786284FF5C4C5EAA4A9489B095735F8B59CED266804ECD9770AD46748650` |
+
+## The Phase 1 baseline is historical
+
+`docs/evaluation/baseline-phase-1.*` records what the **Phase 1** engine did.
+Re-running `scripts/run_phase1_baseline.py --check` against the current engine
+exits 5, and should: the engine now answers intents it previously abstained
+from. The Phase 1 artifacts are kept unchanged as the record of that gate, and
+`scripts/check_phase2.ps1` deliberately does not re-check them.

@@ -35,11 +35,11 @@ Requirements: Windows 11, PowerShell 7 or Windows PowerShell 5.1, and `uv`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
-powershell -ExecutionPolicy Bypass -File scripts/check_phase1.ps1 -SkipSync
+powershell -ExecutionPolicy Bypass -File scripts/check_phase2.ps1 -SkipSync
 ```
 
 The quality command validates the tracked contract schema, tests, lint, types,
-the evaluation corpus, and both tracked baselines. Repository fixtures are
+the evaluation corpus, and the tracked Phase 0 and Phase 2 baselines. Repository fixtures are
 untrusted data and are never imported, built, or executed.
 
 - `docs/operations/development-windows.md` — setup and the Phase 0 gate

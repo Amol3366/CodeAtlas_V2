@@ -84,7 +84,9 @@ def test_register_then_index_activates_a_snapshot_with_symbols(
 
     assert result.snapshot.state is SnapshotState.ACTIVE
     assert result.snapshot.file_count == 3
-    assert result.snapshot.parsed_file_count == 2
+    # Two Python modules and the Markdown README. The document parser joined the
+    # registry in Phase 2, so a document is now parsed rather than skipped.
+    assert result.snapshot.parsed_file_count == 3
     assert result.snapshot.parse_error_count == 0
     assert result.snapshot.activated_at is not None
 

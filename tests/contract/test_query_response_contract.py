@@ -8,10 +8,8 @@ from pathlib import Path
 import pytest
 
 from codeatlas.application.container import ApplicationServices, build_services
-from codeatlas.application.lookup import (
-    MAX_EXCERPT_CHARACTERS,
-    SymbolLookupRequest,
-)
+from codeatlas.application.evidence import MAX_EXCERPT_CHARACTERS
+from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
 from codeatlas.contracts import CONTRACT_VERSION, EvidenceValidation, QueryResponse
 from codeatlas.storage.sqlite.connection import connect

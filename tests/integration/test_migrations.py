@@ -60,6 +60,112 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
+def test_schema_version_is_four() -> None:
+    assert SCHEMA_VERSION == 4
+
+
+def test_chunk_tables_and_fts_projections_exist(tmp_path: Path) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        rows = connection.execute(
+            "SELECT name, type FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    names = {row[0] for row in rows}
+    assert {"chunks", "snapshot_chunk_membership", "chunk_search", "file_search"} <= (
+        names
+    )
+
+
+def _apply_only_version_one(connection: sqlite3.Connection) -> None:
+    """Bring a database to schema version 1 exactly, as a pre-Phase-2 install."""
+    from codeatlas.storage.sqlite.migrations import _apply_one, _load_migrations
+
+    current_version(connection)  # creates the bookkeeping table
+    for migration in _load_migrations():
+        if migration.version == 1:
+            _apply_one(connection, migration)
+
+
+def test_upgrading_an_existing_version_1_database_preserves_data(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "db.sqlite"
+    with connect(database) as connection:
+        _apply_only_version_one(connection)
+        assert current_version(connection) == 1
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+
+    with connect(database) as connection:
+        assert apply_migrations(connection) == SCHEMA_VERSION
+        repositories = connection.execute(
+            "SELECT COUNT(*) FROM repositories"
+        ).fetchone()[0]
+        snapshots = connection.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
+        chunks = connection.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+
+    assert repositories == 1
+    assert snapshots == 1
+    assert chunks == 0
+
+
+def _insert_chunk(
+    connection: sqlite3.Connection,
+    snapshot_id: str,
+    logical_chunk_id: str,
+    file_id: str = "file_1",
+) -> None:
+    connection.execute(
+        "INSERT INTO chunks ("
+        " snapshot_id, logical_chunk_id, chunk_version_id, file_id, symbol_id,"
+        " role, qualified_name, heading_path, start_line, end_line, content_hash,"
+        " retrieval_text, part_index, part_count"
+        ") VALUES (?, ?, 'chunkv_1', ?, NULL, 'symbol', 'A', '', 1, 2, 'hash',"
+        " 'text', 0, 1)",
+        (snapshot_id, logical_chunk_id, file_id),
+    )
+    connection.execute(
+        "INSERT INTO snapshot_chunk_membership ("
+        " snapshot_id, logical_chunk_id, chunk_version_id, part_index"
+        ") VALUES (?, ?, 'chunkv_1', 0)",
+        (snapshot_id, logical_chunk_id),
+    )
+
+
+def test_deleting_a_snapshot_cascades_to_chunks_and_membership(
+    tmp_path: Path,
+) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+        connection.execute(
+            "INSERT INTO files ("
+            " snapshot_id, file_id, relative_path, display_path, content_hash,"
+            " size_bytes, line_count, language, classification"
+            ") VALUES ('snap_1', 'file_1', 'a.py', 'a.py', 'hash', 1, 1,"
+            " 'python', 'source_code')"
+        )
+        _insert_chunk(connection, "snap_1", "chunk_1")
+
+        connection.execute("DELETE FROM snapshots WHERE snapshot_id = 'snap_1'")
+
+        assert connection.execute("SELECT COUNT(*) FROM chunks").fetchone()[0] == 0
+        remaining_membership = connection.execute(
+            "SELECT COUNT(*) FROM snapshot_chunk_membership"
+        ).fetchone()[0]
+        assert remaining_membership == 0
+
+
+def test_a_chunk_requires_a_file_in_the_same_snapshot(tmp_path: Path) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+        with pytest.raises(sqlite3.IntegrityError):
+            _insert_chunk(connection, "snap_1", "chunk_1", file_id="missing_file")
+
+
 def _insert_repository(connection: sqlite3.Connection, repository_id: str) -> None:
     connection.execute(
         "INSERT INTO repositories"

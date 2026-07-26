@@ -193,3 +193,123 @@ def test_json_output_contains_no_absolute_paths(
         ["symbol", repository_id, "PaymentService.capture", "--db", database, "--json"],
     )
     assert str(sample_repo) not in result.stdout
+
+
+def test_search_returns_evidence_in_json(sample_repo: Path, tmp_path: Path) -> None:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+    runner.invoke(cli_app, ["index", repository_id, "--db", database])
+
+    result = runner.invoke(
+        cli_app,
+        ["search", repository_id, "claim", "--db", database, "--json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["contract_version"] == "1.0"
+    assert payload["evidence"]
+    assert all(
+        item["derivation"] == "high_confidence_heuristic"
+        for item in payload["evidence"]
+    )
+
+
+def test_search_by_symbol_prefers_the_exact_match(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+    runner.invoke(cli_app, ["index", repository_id, "--db", database])
+
+    result = runner.invoke(
+        cli_app,
+        [
+            "search",
+            repository_id,
+            "capture",
+            "--kind",
+            "symbols",
+            "--db",
+            database,
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["evidence"][0]["symbol"] == "PaymentService.capture"
+    assert payload["evidence"][0]["derivation"] == "deterministic"
+
+
+def test_an_unusable_search_query_exits_with_the_invalid_input_code(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+    runner.invoke(cli_app, ["index", repository_id, "--db", database])
+
+    result = runner.invoke(
+        cli_app, ["search", repository_id, "***", "--db", database]
+    )
+
+    assert result.exit_code == 2
+    assert "SEARCH_QUERY_INVALID" in result.output
+
+
+def test_an_unknown_search_kind_is_rejected(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+
+    result = runner.invoke(
+        cli_app,
+        ["search", repository_id, "claim", "--kind", "wat", "--db", database],
+    )
+
+    assert result.exit_code == 2
+
+
+def test_a_search_with_no_match_exits_with_the_partial_code(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+    runner.invoke(cli_app, ["index", repository_id, "--db", database])
+
+    result = runner.invoke(
+        cli_app, ["search", repository_id, "zzzznotpresent", "--db", database]
+    )
+
+    assert result.exit_code == 4
+    assert "NO_LEXICAL_MATCH" in result.output
+
+
+def test_rollback_without_a_target_exits_with_the_unavailable_code(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+    runner.invoke(cli_app, ["index", repository_id, "--db", database])
+
+    result = runner.invoke(cli_app, ["rollback", repository_id, "--db", database])
+
+    assert result.exit_code == 3
+    assert "NO_ROLLBACK_TARGET" in result.output
+
+
+def test_search_output_contains_no_absolute_path(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+    runner.invoke(cli_app, ["index", repository_id, "--db", database])
+
+    result = runner.invoke(
+        cli_app,
+        ["search", repository_id, "claim", "--db", database, "--json"],
+    )
+
+    assert str(sample_repo) not in result.stdout
+    assert str(sample_repo).replace("\\", "/") not in result.stdout

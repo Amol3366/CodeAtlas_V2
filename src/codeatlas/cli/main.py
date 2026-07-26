@@ -37,6 +37,7 @@ from codeatlas.domain.errors import (
     ErrorCode,
     InvalidRequestError,
 )
+from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
@@ -47,13 +48,17 @@ EXIT_PARTIAL = 4
 EXIT_POLICY_FAILURE = 5
 EXIT_INTERNAL_FAILURE = 6
 
+_SEARCH_KINDS = ("text", "files", "symbols")
+
 _EXIT_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.INVALID_REQUEST: EXIT_INVALID_INPUT,
     ErrorCode.REPOSITORY_ALREADY_REGISTERED: EXIT_INVALID_INPUT,
     ErrorCode.UNSUPPORTED_QUERY_MODE: EXIT_INVALID_INPUT,
+    ErrorCode.SEARCH_QUERY_INVALID: EXIT_INVALID_INPUT,
     ErrorCode.REPOSITORY_NOT_FOUND: EXIT_UNAVAILABLE,
     ErrorCode.SNAPSHOT_NOT_READY: EXIT_UNAVAILABLE,
     ErrorCode.INDEX_IN_PROGRESS: EXIT_UNAVAILABLE,
+    ErrorCode.NO_ROLLBACK_TARGET: EXIT_UNAVAILABLE,
     ErrorCode.PATH_NOT_ALLOWED: EXIT_POLICY_FAILURE,
     ErrorCode.PATH_OUTSIDE_ROOT: EXIT_POLICY_FAILURE,
     ErrorCode.SCAN_LIMIT_EXCEEDED: EXIT_POLICY_FAILURE,
@@ -259,6 +264,81 @@ def symbol(
         # The query ran and the snapshot was valid, but nothing was verified.
         # A script must be able to tell that apart from success.
         raise typer.Exit(EXIT_PARTIAL)
+
+
+@app.command("search")
+def search(
+    repository_id: Annotated[str, typer.Argument()],
+    query: Annotated[str, typer.Argument(help="Text to search for.")],
+    kind: Annotated[
+        str,
+        typer.Option("--kind", help="One of: text, files, symbols."),
+    ] = "text",
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=25)] = 25,
+) -> None:
+    """Search the active snapshot by text, path, or symbol name."""
+    if kind not in _SEARCH_KINDS:
+        typer.echo(
+            f"INVALID_REQUEST: --kind must be one of {', '.join(_SEARCH_KINDS)}.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_INVALID_INPUT)
+
+    try:
+        with _services(database) as services:
+            request = SearchRequest(
+                repository_id=repository_id,
+                query=query,
+                request_id=f"cli_{uuid.uuid4().hex}",
+                limit=limit,
+            )
+            method = {
+                "text": services.search.search_text,
+                "files": services.search.search_files,
+                "symbols": services.search.search_symbols,
+            }[kind]
+            response = method(request)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    if as_json:
+        typer.echo(response.model_dump_json(indent=2))
+    else:
+        typer.echo(response.answer.summary)
+        for item in response.evidence:
+            typer.echo(
+                f"  {item.file_path}:{item.start_line}-{item.end_line}"
+                f"  [{item.derivation.value}]"
+            )
+        for warning in response.warnings:
+            typer.echo(f"  warning: {warning}", err=True)
+
+    if not response.evidence:
+        raise typer.Exit(EXIT_PARTIAL)
+
+
+@app.command("rollback")
+def rollback(
+    repository_id: Annotated[str, typer.Argument()],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Restore the previous snapshot as the active one."""
+    try:
+        with _services(database) as services:
+            restored = services.recovery.rollback(repository_id)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    _emit(
+        {"repository_id": repository_id, "snapshot_id": restored.snapshot_id},
+        f"Rolled back to snapshot {restored.snapshot_id}",
+        as_json=as_json,
+    )
 
 
 def main() -> None:

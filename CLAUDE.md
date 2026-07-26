@@ -1,8 +1,8 @@
 # CodeAtlas — Universal Coding-Agent Context
 
-Version: 1.0  
-Status: Authoritative implementation context  
-Last updated: 2026-07-25  
+Version: 1.0
+Status: Authoritative implementation context
+Last updated: 2026-07-25
 Product blueprint: `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`
 
 ## 1. Purpose of This File
@@ -437,15 +437,15 @@ retrieval policy, model/prompt version, and candidate digest where applicable.
 
 Use this controlled derivation enum:
 
-| Class | Authority |
-| --- | --- |
-| `deterministic` | May support an authoritative finding |
-| `static_resolved` | May support a finding with language limitations |
-| `high_confidence_heuristic` | Labeled heuristic findings only |
-| `low_confidence_heuristic` | Advisory discovery only |
-| `semantic_candidate` | Candidate only without independent evidence |
-| `model_generated` | Narrative only without supporting evidence |
-| `unsupported` | Must abstain |
+| Class                         | Authority                                       |
+| ----------------------------- | ----------------------------------------------- |
+| `deterministic`             | May support an authoritative finding            |
+| `static_resolved`           | May support a finding with language limitations |
+| `high_confidence_heuristic` | Labeled heuristic findings only                 |
+| `low_confidence_heuristic`  | Advisory discovery only                         |
+| `semantic_candidate`        | Candidate only without independent evidence     |
+| `model_generated`           | Narrative only without supporting evidence      |
+| `unsupported`               | Must abstain                                    |
 
 Confidence and derivation are separate fields.
 
@@ -646,13 +646,14 @@ branding or exact visual assets.
 Use three coordinated regions:
 
 1. **Left sidebar**
+
    - CodeAtlas mark and “New chat” action
    - active repository selector and index/freshness indicator
    - searchable conversation history grouped by relative date
    - rename, archive/delete, and optional pin actions
    - settings and sidebar collapse control
-
 2. **Main conversation**
+
    - sticky compact header with repository, snapshot/freshness, and analysis mode
    - user and assistant turns in a readable centered column
    - streaming status such as “Resolving symbols” or “Checking callers”
@@ -661,8 +662,8 @@ Use three coordinated regions:
    - retry, copy, feedback, and export actions
    - sticky composer with multiline input, send/cancel, mode selector, and
      optional change-preflight shortcut
-
 3. **Evidence drawer/right rail**
+
    - opens from a citation or finding
    - file path, symbol, line range, derivation, confidence, snapshot
    - syntax-highlighted bounded source excerpt with cited lines emphasized
@@ -861,20 +862,20 @@ warnings, and forbidden claims.
 
 ### 19.3 Initial release targets
 
-| Metric | Target |
-| --- | ---: |
-| Valid file-and-line evidence | 100% |
-| Active-snapshot leakage | 0 |
-| Exact symbol lookup on fixtures | >= 98% |
-| Changed-symbol precision/recall on supported fixtures | >= 95% |
-| Direct dependency impact recall | >= 90% |
-| Primary evidence Recall@10 | >= 90% |
-| Unsupported factual claim rate | < 2% |
-| Incremental indexing correctness | 100% on fixtures |
-| Deterministic availability while semantic indexing lags | 100% |
-| Contract-valid REST/MCP responses | 100% |
-| Warm change-preflight p95 on declared target fixture | <= 10 s |
-| Ordinary changed-file deterministic refresh p95 | <= 2 s |
+| Metric                                                  |           Target |
+| ------------------------------------------------------- | ---------------: |
+| Valid file-and-line evidence                            |             100% |
+| Active-snapshot leakage                                 |                0 |
+| Exact symbol lookup on fixtures                         |           >= 98% |
+| Changed-symbol precision/recall on supported fixtures   |           >= 95% |
+| Direct dependency impact recall                         |           >= 90% |
+| Primary evidence Recall@10                              |           >= 90% |
+| Unsupported factual claim rate                          |             < 2% |
+| Incremental indexing correctness                        | 100% on fixtures |
+| Deterministic availability while semantic indexing lags |             100% |
+| Contract-valid REST/MCP responses                       |             100% |
+| Warm change-preflight p95 on declared target fixture    |          <= 10 s |
+| Ordinary changed-file deterministic refresh p95         |           <= 2 s |
 
 Performance claims must name hardware, repository profile, cold/warm state, and
 measurement method.
@@ -907,9 +908,9 @@ Execution is sequential:
 Update a phase to `[x]` only after every checklist item and its completion gate
 have been satisfied with current verification evidence.
 
-- [x] [Phase 0 — Product contract and evaluation](#phase-0--product-contract-and-evaluation)
-- [x] [Phase 1 — Repository truth vertical slice](#phase-1--repository-truth-vertical-slice)
-- [ ] [Phase 2 — Snapshots, stable chunks, and lexical retrieval](#phase-2--snapshots-stable-chunks-and-lexical-retrieval)
+- [X] [Phase 0 — Product contract and evaluation](#phase-0--product-contract-and-evaluation)
+- [X] [Phase 1 — Repository truth vertical slice](#phase-1--repository-truth-vertical-slice)
+- [X] [Phase 2 — Snapshots, stable chunks, and lexical retrieval](#phase-2--snapshots-stable-chunks-and-lexical-retrieval)
 - [ ] [Phase 3 — Polyglot graph and delivery contracts](#phase-3--polyglot-graph-and-delivery-contracts)
 - [ ] [Phase 4 — Change assurance](#phase-4--change-assurance)
 - [ ] [Phase 5 — Persistent ChatGPT-style web application](#phase-5--persistent-chatgpt-style-web-application)

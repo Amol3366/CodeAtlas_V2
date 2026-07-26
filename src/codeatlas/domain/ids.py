@@ -63,11 +63,50 @@ def symbol_version_id(
     return f"symv_{stable_hash(symbol_id_value, content_hash, parser_bundle_version)}"
 
 
+def logical_chunk_id(
+    repository_id_value: str,
+    relative_path: str,
+    qualified_name: str,
+    chunk_role: str,
+) -> str:
+    """Identify a chunk logically. Editing its content does not change this.
+
+    The role is included because a file summary and a symbol chunk can share a
+    qualified name and a location without being the same chunk.
+    """
+    digest = stable_hash(
+        repository_id_value, relative_path, qualified_name, chunk_role
+    )
+    return f"chunk_{digest}"
+
+
+def chunk_version_id(
+    logical_chunk_id_value: str,
+    content_hash: str,
+    parser_bundle_version: str,
+    chunker_version: str,
+) -> str:
+    """Identify one chunked version of a chunk's content.
+
+    The chunker version participates so that changing how chunks are cut
+    invalidates every stored chunk, which is the intended way to force a
+    re-chunk rather than leaving mixed-vintage rows in the database.
+    """
+    digest = stable_hash(
+        logical_chunk_id_value,
+        content_hash,
+        parser_bundle_version,
+        chunker_version,
+    )
+    return f"chunkv_{digest}"
+
+
 def snapshot_id(
     repository_id_value: str,
     working_tree_fingerprint: str,
     parser_bundle_version: str,
     index_version: str,
+    chunker_version: str = "",
 ) -> str:
     """Identify a snapshot by the inputs that determine its content.
 
@@ -79,6 +118,7 @@ def snapshot_id(
         working_tree_fingerprint,
         parser_bundle_version,
         index_version,
+        chunker_version,
     )
     return f"snap_{digest}"
 

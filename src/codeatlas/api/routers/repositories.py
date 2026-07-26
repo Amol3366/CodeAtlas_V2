@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from codeatlas.application.container import ApplicationServices
 from codeatlas.application.registration import RegisterRepositoryRequest
-from codeatlas.contracts import SnapshotReference
+from codeatlas.contracts import SnapshotFreshness, SnapshotReference
 from codeatlas.domain.errors import SnapshotNotReadyError
 from codeatlas.domain.repository import Repository, ScanLimits
 
@@ -162,6 +162,24 @@ def active_snapshot(
             "The repository has no active snapshot. Index it first."
         )
     return status_result.snapshot
+
+
+@router.post("/{repository_id}/rollback")
+def rollback(repository_id: str, services: Services) -> SnapshotReference:
+    """Restore the previous snapshot as active.
+
+    The escape hatch for an activation that turned out to be wrong. With no
+    previous snapshot to return to this is a conflict, not a server error.
+    """
+    services.registration.get(repository_id)
+    restored = services.recovery.rollback(repository_id)
+    return SnapshotReference(
+        snapshot_id=restored.snapshot_id,
+        git_head=restored.git_head,
+        working_tree_fingerprint=restored.working_tree_fingerprint,
+        freshness=SnapshotFreshness.FRESH,
+        semantic_coverage=0.0,
+    )
 
 
 def _repository_response(repository: Repository) -> RepositoryResponse:

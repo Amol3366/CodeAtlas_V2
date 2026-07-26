@@ -215,3 +215,127 @@ def test_unknown_symbol_returns_an_abstention_not_an_error(
     body = QueryResponse.model_validate(response.json())
     assert body.evidence == []
     assert body.answer.claims == []
+
+
+def _indexed(client: TestClient, root: Path) -> str:
+    """Register and index a repository through the API, returning its ID."""
+    repository_id = _register(client, root)
+    indexed = client.post(f"/v1/repositories/{repository_id}/index")
+    assert indexed.status_code == 200, indexed.text
+    return repository_id
+
+
+def test_search_text_returns_a_contract_response(
+    client: TestClient, sample_repo: Path
+) -> None:
+    repository_id = _indexed(client, sample_repo)
+
+    response = client.get(
+        "/v1/search/text", params={"repository_id": repository_id, "q": "claim"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["contract_version"] == "1.0"
+    assert body["evidence"]
+    assert all(
+        item["snapshot_id"] == body["snapshot"]["snapshot_id"]
+        for item in body["evidence"]
+    )
+
+
+def test_search_files_and_symbols_are_available(
+    client: TestClient, sample_repo: Path
+) -> None:
+    repository_id = _indexed(client, sample_repo)
+
+    files = client.get(
+        "/v1/search/files", params={"repository_id": repository_id, "q": "payments"}
+    )
+    symbols = client.get(
+        "/v1/search/symbols", params={"repository_id": repository_id, "q": "capture"}
+    )
+
+    assert files.status_code == 200
+    assert symbols.status_code == 200
+    assert symbols.json()["evidence"][0]["symbol"] == "PaymentService.capture"
+    assert symbols.json()["evidence"][0]["derivation"] == "deterministic"
+
+
+@pytest.mark.parametrize("hostile", ["***", "^^^^", "", "   ", "-- ;"])
+def test_a_hostile_search_query_returns_the_error_envelope(
+    client: TestClient, sample_repo: Path, hostile: str
+) -> None:
+    repository_id = _indexed(client, sample_repo)
+
+    response = client.get(
+        "/v1/search/text", params={"repository_id": repository_id, "q": hostile}
+    )
+
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["code"] == "SEARCH_QUERY_INVALID"
+    assert error["request_id"]
+    assert "Traceback" not in response.text
+
+
+def test_a_hostile_query_that_parses_returns_bounded_results(
+    client: TestClient, sample_repo: Path
+) -> None:
+    """FTS operators supplied by a user become literal terms, not syntax.
+
+    `" OR "" : *` reduces to the single term "or", so the correct outcome is an
+    ordinary bounded response — not an error, and emphatically not every row.
+    """
+    repository_id = _indexed(client, sample_repo)
+
+    response = client.get(
+        "/v1/search/text",
+        params={"repository_id": repository_id, "q": '" OR "" : *'},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["evidence"]) <= 25
+
+
+def test_search_on_an_unknown_repository_is_404(
+    client: TestClient, sample_repo: Path
+) -> None:
+    _indexed(client, sample_repo)
+    response = client.get(
+        "/v1/search/text", params={"repository_id": "repo_missing", "q": "claim"}
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "REPOSITORY_NOT_FOUND"
+
+
+def test_rollback_without_a_target_is_409(
+    client: TestClient, sample_repo: Path
+) -> None:
+    repository_id = _indexed(client, sample_repo)
+
+    response = client.post(f"/v1/repositories/{repository_id}/rollback")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "NO_ROLLBACK_TARGET"
+
+
+def test_rollback_restores_the_previous_snapshot(
+    client: TestClient, sample_repo: Path
+) -> None:
+    repository_id = _indexed(client, sample_repo)
+    first = client.get(f"/v1/repositories/{repository_id}/snapshots/active").json()
+
+    path = sample_repo / "src" / "payments" / "service.py"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\n    def extra(self) -> int:\n"
+        "        return 1\n",
+        encoding="utf-8",
+    )
+    client.post(f"/v1/repositories/{repository_id}/index")
+
+    response = client.post(f"/v1/repositories/{repository_id}/rollback")
+
+    assert response.status_code == 200
+    assert response.json()["snapshot_id"] == first["snapshot_id"]

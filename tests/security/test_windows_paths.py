@@ -153,3 +153,54 @@ def test_unreadable_directory_degrades_without_crashing(sample_repo: Path) -> No
     missing.mkdir()
     result = _scan(sample_repo)
     assert isinstance(result.files, tuple)
+
+
+def test_a_deep_mixed_case_non_ascii_path_chunks_and_searches(
+    tmp_path: Path, sample_repo: Path
+) -> None:
+    """Chunking and search must survive the paths Windows actually produces.
+
+    Deep nesting, mixed case, non-ASCII segments, and a space in a directory
+    name are all ordinary on a Windows workstation, and each one is a place a
+    path can be mangled between the scanner, the chunker, and FTS5.
+    """
+    from codeatlas.application.container import build_services
+    from codeatlas.application.registration import RegisterRepositoryRequest
+    from codeatlas.retrieval.lexical import SearchRequest
+    from codeatlas.storage.sqlite.connection import connect
+    from codeatlas.storage.sqlite.migrations import apply_migrations
+
+    nested = (
+        sample_repo / "src" / "Facturación" / "Sub Módulo" / "Deep" / "MixedCase"
+    )
+    nested.mkdir(parents=True)
+    (nested / "cobros_únicos.py").write_text(
+        "class CobroÚnico:\n"
+        "    def registrar(self, clave: str) -> str:\n"
+        "        return clave\n",
+        encoding="utf-8",
+    )
+
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        services = build_services(connection)
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(sample_repo))
+        )
+        services.indexing.index(repository.repository_id)
+
+        response = services.search.search_text(
+            SearchRequest(repository.repository_id, "registrar", "req-win-1")
+        )
+        assert response.evidence
+        cited = response.evidence[0]
+        assert "cobros_únicos.py" in cited.file_path
+        assert "\\" not in cited.file_path
+        assert not Path(cited.file_path).is_absolute()
+
+        by_path = services.search.search_files(
+            SearchRequest(repository.repository_id, "cobros_únicos", "req-win-2")
+        )
+        assert any(
+            "cobros_únicos.py" in item.file_path for item in by_path.evidence
+        )

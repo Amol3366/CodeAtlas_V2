@@ -22,7 +22,10 @@ from sqlite3 import Connection
 
 from pydantic import TypeAdapter, ValidationError
 
+from codeatlas.chunking.chunker import CHUNKER_VERSION, ChunkRequest, CodeChunker
+from codeatlas.chunking.documents import DocumentChunker
 from codeatlas.contracts import RepositoryRelativePath
+from codeatlas.domain.chunks import LogicalChunk
 from codeatlas.domain.errors import (
     CodeAtlasError,
     ErrorCode,
@@ -44,9 +47,11 @@ from codeatlas.repositories.ignore_rules import IgnoreRules
 from codeatlas.repositories.scanner import RepositoryScanner, ScanResult, SkippedFile
 from codeatlas.storage.sqlite.connection import write_transaction
 from codeatlas.storage.sqlite.stores import (
+    ChunkStore,
     FileStore,
     IndexJobStore,
     RepositoryStore,
+    SearchStore,
     SnapshotStore,
     SymbolStore,
 )
@@ -63,6 +68,22 @@ class SnapshotValidationError(CodeAtlasError):
 
 
 @dataclass(frozen=True)
+class ReuseStats:
+    """What an indexing run reused versus recomputed.
+
+    Reported rather than inferred: the phase claims that editing one symbol
+    re-derives only what that edit touched, and a claim like that is worth only
+    as much as the counter that proves it.
+    """
+
+    files_reused: int = 0
+    files_reparsed: int = 0
+    symbols_reused: int = 0
+    chunks_reused: int = 0
+    chunks_recomputed: int = 0
+
+
+@dataclass(frozen=True)
 class IndexResult:
     """The outcome of one indexing run."""
 
@@ -71,6 +92,7 @@ class IndexResult:
     warnings: tuple[str, ...]
     skipped: tuple[SkippedFile, ...]
     diagnostics: tuple[ParseDiagnostic, ...]
+    reuse: ReuseStats = ReuseStats()
 
 
 class IndexRepositoryService:
@@ -83,6 +105,8 @@ class IndexRepositoryService:
         files: FileStore,
         symbols: SymbolStore,
         jobs: IndexJobStore,
+        chunks: ChunkStore,
+        search: SearchStore,
         scanner: RepositoryScanner,
         git: GitAdapter,
         registry: ParserRegistry,
@@ -95,6 +119,10 @@ class IndexRepositoryService:
         self._files = files
         self._symbols = symbols
         self._jobs = jobs
+        self._chunks = chunks
+        self._search = search
+        self._code_chunker = CodeChunker()
+        self._document_chunker = DocumentChunker()
         self._scanner = scanner
         self._git = git
         self._registry = registry
@@ -136,7 +164,13 @@ class IndexRepositoryService:
             scan.working_tree_fingerprint,
             PARSER_BUNDLE_VERSION,
             INDEX_VERSION,
+            CHUNKER_VERSION,
         )
+
+        # Reuse is only sound against the previous *active* snapshot, and only
+        # when the logic that produced its rows is the logic running now.
+        previous = self._snapshots.get_active(repository_id_value)
+        reusable = self._reusable_files(previous, scan.files)
 
         existing = self._snapshots.get(snapshot_id)
         if existing is not None and existing.state is SnapshotState.ACTIVE:
@@ -160,8 +194,24 @@ class IndexRepositoryService:
                 diagnostics=(),
             )
 
+        if existing is not None:
+            # A previous attempt at these exact inputs died or failed. Its rows
+            # are unreachable by definition, and leaving them would make the
+            # retry collide on the snapshot's primary key, so the abandoned
+            # attempt is cleared before this one stages. The FTS projections are
+            # virtual tables with no foreign keys, so they are cleared
+            # explicitly rather than by cascade.
+            with write_transaction(self._connection):
+                self._search.delete_for_snapshot(snapshot_id)
+                self._snapshots.delete(snapshot_id)
+
         self._jobs.set_snapshot(job_id, snapshot_id)
-        parsed = self._parse_files(repository_id_value, snapshot_id, root, scan)
+        parsed = self._parse_files(
+            repository_id_value, snapshot_id, root, scan, skip=reusable
+        )
+        chunked = self._chunk_files(
+            repository_id_value, root, scan, parsed, skip=reusable
+        )
 
         snapshot = Snapshot(
             snapshot_id=snapshot_id,
@@ -179,13 +229,23 @@ class IndexRepositoryService:
             index_version=INDEX_VERSION,
             created_at=self._clock(),
             activated_at=None,
+            chunker_version=CHUNKER_VERSION,
         )
 
-        self._stage(snapshot, scan.files, parsed.symbols)
+        reuse = self._stage(
+            snapshot=snapshot,
+            files=scan.files,
+            symbols=parsed.symbols,
+            chunks=chunked,
+            previous=previous,
+            reusable=reusable,
+        )
         self._jobs.update_stage(job_id, "validating", "running")
 
         try:
-            self._validate_snapshot(snapshot_id, expected_file_count=len(scan.files))
+            self._validate_snapshot(
+                snapshot_id, expected_file_count=len(scan.files)
+            )
         except BaseException:
             self._snapshots.set_state(snapshot_id, SnapshotState.FAILED)
             self._jobs.finish(
@@ -207,6 +267,13 @@ class IndexRepositoryService:
                 "parse_diagnostics": [
                     diagnostic.code for diagnostic in parsed.diagnostics
                 ],
+                "reuse": {
+                    "files_reused": reuse.files_reused,
+                    "files_reparsed": reuse.files_reparsed,
+                    "symbols_reused": reuse.symbols_reused,
+                    "chunks_reused": reuse.chunks_reused,
+                    "chunks_recomputed": reuse.chunks_recomputed,
+                },
             },
         )
         active = self._snapshots.get(snapshot_id)
@@ -221,6 +288,7 @@ class IndexRepositoryService:
             warnings=warnings,
             skipped=scan.skipped,
             diagnostics=parsed.diagnostics,
+            reuse=reuse,
         )
 
     def _parse_files(
@@ -229,13 +297,19 @@ class IndexRepositoryService:
         snapshot_id: str,
         root: Path,
         scan: ScanResult,
+        skip: frozenset[str],
     ) -> _ParseOutcome:
         symbols: list[SymbolRecord] = []
         diagnostics: list[ParseDiagnostic] = []
+        contents: dict[str, bytes] = {}
         parsed_file_count = 0
         parse_error_count = 0
 
         for record in scan.files:
+            if record.file_id in skip:
+                # Byte-identical to the previous active snapshot: its symbols
+                # and chunks are copied instead of re-derived.
+                continue
             parser = self._registry.parser_for(record.language)
             if parser is None:
                 continue
@@ -267,25 +341,126 @@ class IndexRepositoryService:
                 parse_error_count += 1
             symbols.extend(result.symbols)
             diagnostics.extend(result.diagnostics)
+            contents[record.file_id] = content
 
         return _ParseOutcome(
             symbols=tuple(symbols),
             diagnostics=tuple(diagnostics),
+            contents=contents,
             parsed_file_count=parsed_file_count,
             parse_error_count=parse_error_count,
         )
 
+    def _reusable_files(
+        self, previous: Snapshot | None, files: tuple[FileRecord, ...]
+    ) -> frozenset[str]:
+        """File IDs whose derived rows may be copied from ``previous``.
+
+        Reuse requires three things to line up: an active predecessor, the same
+        parser and chunker that produced its rows, and a file whose content hash
+        is unchanged. Any mismatch means the derived content is no longer
+        comparable, and comparing it anyway is how stale rows reach a snapshot.
+        """
+        if previous is None or previous.state is not SnapshotState.ACTIVE:
+            return frozenset()
+        if previous.parser_bundle_version != PARSER_BUNDLE_VERSION:
+            return frozenset()
+        if previous.chunker_version != CHUNKER_VERSION:
+            return frozenset()
+
+        earlier = {
+            record.file_id: record
+            for record in self._files.list_for_snapshot(previous.snapshot_id)
+        }
+        return frozenset(
+            record.file_id
+            for record in files
+            if record.file_id in earlier
+            and earlier[record.file_id].content_hash == record.content_hash
+        )
+
+    def _chunk_files(
+        self,
+        repository_id_value: str,
+        root: Path,
+        scan: ScanResult,
+        parsed: _ParseOutcome,
+        skip: frozenset[str],
+    ) -> tuple[LogicalChunk, ...]:
+        """Chunk the files that were actually parsed in this run."""
+        by_file: dict[str, list[SymbolRecord]] = {}
+        for symbol in parsed.symbols:
+            by_file.setdefault(symbol.file_id, []).append(symbol)
+
+        chunks: list[LogicalChunk] = []
+        for record in scan.files:
+            if record.file_id in skip:
+                continue
+            content = parsed.contents.get(record.file_id)
+            if content is None:
+                continue
+            chunker = (
+                self._code_chunker
+                if record.language == "python"
+                else self._document_chunker
+            )
+            chunks.extend(
+                chunker.chunk(
+                    ChunkRequest(
+                        repository_id=repository_id_value,
+                        file=record,
+                        content=content,
+                        symbols=tuple(by_file.get(record.file_id, ())),
+                    )
+                )
+            )
+        return tuple(chunks)
+
     def _stage(
         self,
+        *,
         snapshot: Snapshot,
         files: tuple[FileRecord, ...],
         symbols: tuple[SymbolRecord, ...],
-    ) -> None:
+        chunks: tuple[LogicalChunk, ...],
+        previous: Snapshot | None,
+        reusable: frozenset[str],
+    ) -> ReuseStats:
+        paths_by_file_id = {record.file_id: record.relative_path for record in files}
+        reused_symbols = 0
+        reused_chunks = 0
+
         with write_transaction(self._connection):
             self._snapshots.add_staging(snapshot)
             self._files.add_many(snapshot.snapshot_id, files)
             self._symbols.add_many(snapshot.snapshot_id, symbols)
+            self._chunks.add_many(snapshot.snapshot_id, chunks)
+            self._search.index_chunks(
+                snapshot.snapshot_id, chunks, paths_by_file_id
+            )
+
+            if previous is not None and reusable:
+                file_ids = sorted(reusable)
+                reused_symbols = self._symbols.copy_from_snapshot(
+                    previous.snapshot_id, snapshot.snapshot_id, file_ids
+                )
+                reused_chunks = self._chunks.copy_from_snapshot(
+                    previous.snapshot_id, snapshot.snapshot_id, file_ids
+                )
+                self._search.copy_from_snapshot(
+                    previous.snapshot_id, snapshot.snapshot_id, file_ids
+                )
+
+            self._search.index_files(snapshot.snapshot_id, files)
             self._snapshots.set_state(snapshot.snapshot_id, SnapshotState.INDEXING)
+
+        return ReuseStats(
+            files_reused=len(reusable),
+            files_reparsed=len(files) - len(reusable),
+            symbols_reused=reused_symbols,
+            chunks_reused=reused_chunks,
+            chunks_recomputed=len(chunks),
+        )
 
     def _validate_snapshot(self, snapshot_id: str, *, expected_file_count: int) -> None:
         """Reject anything that must never reach an active snapshot."""
@@ -315,6 +490,29 @@ class IndexRepositoryService:
 
         if not snapshot.parser_bundle_version or not snapshot.index_version:
             raise SnapshotValidationError("The staged snapshot is missing versions.")
+        if not snapshot.chunker_version:
+            raise SnapshotValidationError("The staged snapshot is missing versions.")
+
+        # Reusing a row is not a reason to trust it less, so copied chunks face
+        # exactly the same checks as freshly derived ones.
+        if self._chunks.invalid_line_ranges(snapshot_id):
+            raise SnapshotValidationError(
+                "A staged chunk has a line range outside its file."
+            )
+        if self._chunks.orphan_membership(snapshot_id):
+            raise SnapshotValidationError(
+                "A membership row references a chunk that is not in the snapshot."
+            )
+
+        chunk_rows, projection_rows = self._search.count_indexed(snapshot_id)
+        if chunk_rows != projection_rows:
+            raise SnapshotValidationError(
+                "The search projection does not cover every chunk."
+            )
+        if self._chunks.count_membership(snapshot_id) != chunk_rows:
+            raise SnapshotValidationError(
+                "Chunk membership does not cover every chunk."
+            )
 
     def get_active_snapshot(self, repository_id_value: str) -> Snapshot | None:
         """Return the repository's active snapshot, if any."""
@@ -345,5 +543,6 @@ def _skipped_by_reason(skipped: tuple[SkippedFile, ...]) -> dict[str, int]:
 class _ParseOutcome:
     symbols: tuple[SymbolRecord, ...]
     diagnostics: tuple[ParseDiagnostic, ...]
+    contents: dict[str, bytes]
     parsed_file_count: int
     parse_error_count: int

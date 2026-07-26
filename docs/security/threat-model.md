@@ -74,9 +74,13 @@ As of 2026-07-25 the following controls are implemented and covered by tests in
 | Stale evidence | enforced | drifted files are detected by hash and their evidence is withheld with `EVIDENCE_STALE_FILE_CONTENT` |
 | Loopback-only API, no CORS | enforced | `apps/api/main.py`, asserted by test |
 | No secrets, paths, or traces in errors | enforced | `api/errors.py`; asserted by a test that raises a secret-bearing exception |
-| Prompt injection, secret scanning, provider boundary | not applicable yet | no provider or model exists in Phase 1 |
-| Markdown/HTML injection, editor opening | not applicable yet | no UI exists in Phase 1 |
-| Content logging | not applicable yet | Phase 1 adds no logging framework and writes no logs |
+| FTS5 query injection | enforced | user text never becomes FTS syntax; `retrieval/fts_query.py` reduces it to quoted literal terms, and `tests/security/test_fts_injection.py` runs twelve hostile queries against a real populated index, asserting each either raises `SearchQueryError` or returns bounded results |
+| Untrusted document content | enforced | Markdown, JSON, YAML, and TOML are read for structure only; text that reads like an instruction is stored as text. `json` and `tomllib` are the only deserializers, YAML is a line scanner with no library, and a source scan asserts the absence of `exec`, `eval`, `importlib`, `runpy`, `subprocess`, `yaml.load`, and `pickle` |
+| Path references named in prose | enforced | a path mentioned in a document is recorded only if it passes `validate_relative_path`; a test proves `../../etc/passwd` and `C:/Windows/system32` are not recorded |
+| Searchable orphans after deletion | enforced | FTS5 virtual tables have no foreign keys, so pruning and abandoned-attempt cleanup clear the projections explicitly rather than relying on a cascade |
+| Prompt injection, secret scanning, provider boundary | not applicable yet | no provider or model exists |
+| Markdown/HTML injection, editor opening | not applicable yet | no UI exists |
+| Content logging | not applicable yet | no logging framework exists and no logs are written |
 
 ## Provider Opt-In Gate
 

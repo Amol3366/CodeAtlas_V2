@@ -23,6 +23,7 @@ class SnapshotState(StrEnum):
     DISCOVERED = "discovered"
     SCANNING = "scanning"
     PARSING = "parsing"
+    CHUNKING = "chunking"
     INDEXING = "indexing"
     VALIDATING = "validating"
     ACTIVE = "active"
@@ -49,3 +50,6 @@ class Snapshot:
     index_version: str
     created_at: datetime
     activated_at: datetime | None
+    # Empty for any snapshot built before chunking existed, which is what makes
+    # such a snapshot ineligible as a reuse source rather than silently trusted.
+    chunker_version: str = ""

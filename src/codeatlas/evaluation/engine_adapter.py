@@ -29,11 +29,16 @@ from codeatlas.evaluation.runner import (
     PredictionFile,
     QueryPrediction,
 )
+from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
 SUPPORTED_INTENT = "EXACT_SYMBOL"
-SUPPORTED_FIXTURES = ("python_app",)
+# Phase 2 adds lexical retrieval, so documents and configuration keys can now be
+# answered. Everything still unimplemented abstains rather than guessing.
+LEXICAL_INTENTS = ("CONFIG_LOOKUP", "DOCUMENT_LOOKUP")
+SUPPORTED_INTENTS = (SUPPORTED_INTENT, *LEXICAL_INTENTS)
+SUPPORTED_FIXTURES = ("python_app", "docs_config", "mixed_app")
 
 
 def predict_exact_symbols(
@@ -62,7 +67,7 @@ def predict_exact_symbols(
 
             for case in dataset.query_cases:
                 if (
-                    case.intent != SUPPORTED_INTENT
+                    case.intent not in SUPPORTED_INTENTS
                     or case.repository_fixture not in supported
                 ):
                     predictions.append(_abstention(case))
@@ -105,13 +110,25 @@ def _answer(
 ) -> QueryPrediction:
     started = time.perf_counter()
     try:
-        response = services.lookup.lookup(  # type: ignore[attr-defined]
-            SymbolLookupRequest(
-                repository_id=repository_id,
-                query=_query_term(case),
-                request_id=f"eval_{case.id}",
+        if case.intent == SUPPORTED_INTENT:
+            response = services.lookup.lookup(  # type: ignore[attr-defined]
+                SymbolLookupRequest(
+                    repository_id=repository_id,
+                    query=_query_term(case),
+                    request_id=f"eval_{case.id}",
+                )
             )
-        )
+        else:
+            # Document and configuration questions are answered lexically. The
+            # results are labeled `high_confidence_heuristic` by the service, so
+            # the corpus is being told exactly how the answer was derived.
+            response = services.search.search_text(  # type: ignore[attr-defined]
+                SearchRequest(
+                    repository_id=repository_id,
+                    query=_query_term(case),
+                    request_id=f"eval_{case.id}",
+                )
+            )
     except CodeAtlasError:
         return _abstention(case)
 
