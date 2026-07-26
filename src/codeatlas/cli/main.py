@@ -30,13 +30,17 @@ from typing import Annotated, Any
 import typer
 
 from codeatlas.application.container import ApplicationServices, build_services
+from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
+from codeatlas.contracts import QueryResponse
 from codeatlas.domain.errors import (
     CodeAtlasError,
     ErrorCode,
     InvalidRequestError,
+    SnapshotNotReadyError,
 )
+from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.migrations import apply_migrations
@@ -59,6 +63,9 @@ _EXIT_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.SNAPSHOT_NOT_READY: EXIT_UNAVAILABLE,
     ErrorCode.INDEX_IN_PROGRESS: EXIT_UNAVAILABLE,
     ErrorCode.NO_ROLLBACK_TARGET: EXIT_UNAVAILABLE,
+    ErrorCode.EVIDENCE_NOT_FOUND: EXIT_UNAVAILABLE,
+    ErrorCode.FILE_NOT_FOUND: EXIT_UNAVAILABLE,
+    ErrorCode.SYMBOL_NOT_FOUND: EXIT_UNAVAILABLE,
     ErrorCode.PATH_NOT_ALLOWED: EXIT_POLICY_FAILURE,
     ErrorCode.PATH_OUTSIDE_ROOT: EXIT_POLICY_FAILURE,
     ErrorCode.SCAN_LIMIT_EXCEEDED: EXIT_POLICY_FAILURE,
@@ -337,6 +344,231 @@ def rollback(
     _emit(
         {"repository_id": repository_id, "snapshot_id": restored.snapshot_id},
         f"Rolled back to snapshot {restored.snapshot_id}",
+        as_json=as_json,
+    )
+
+
+# --- Graph, entity, and diagnostic commands -----------------------------------
+#
+# Each wraps one application service and prints the same evidence model the REST
+# adapter serializes. A truncated or empty answer exits 4 (partial), so a script
+# can tell a bounded answer from a complete one.
+
+
+def _graph_request(
+    repository_id: str, symbol_name: str, depth: int
+) -> GraphQueryRequest:
+    return GraphQueryRequest(
+        repository_id=repository_id,
+        symbol=symbol_name,
+        request_id=f"cli_{uuid.uuid4().hex}",
+        max_depth=depth,
+        limits=TraversalLimits(max_depth=depth),
+    )
+
+
+def _emit_graph(response: QueryResponse, *, as_json: bool) -> None:
+    if as_json:
+        typer.echo(response.model_dump_json(indent=2))
+    else:
+        typer.echo(response.answer.summary)
+        for claim in response.answer.claims:
+            typer.echo(f"  {claim.text}  [{claim.derivation.value}]")
+        for warning in response.warnings:
+            typer.echo(f"  warning: {warning}", err=True)
+
+    truncated = any("TRUNCATED" in warning for warning in response.warnings)
+    if not response.answer.claims or truncated:
+        raise typer.Exit(EXIT_PARTIAL)
+
+
+def _run_graph(
+    view: str,
+    repository_id: str,
+    symbol_name: str,
+    database: Path | None,
+    as_json: bool,
+    depth: int,
+) -> None:
+    try:
+        with _services(database) as services:
+            handler = {
+                "callers": services.graph.callers,
+                "callees": services.graph.callees,
+                "dependencies": services.graph.dependencies,
+                "dependents": services.graph.dependents,
+                "exports": services.graph.exports,
+                "tests": services.graph.related_tests,
+                "trace": services.graph.trace,
+            }[view]
+            response = handler(_graph_request(repository_id, symbol_name, depth))
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+    _emit_graph(response, as_json=as_json)
+
+
+@app.command("callers")
+def callers(
+    repository_id: Annotated[str, typer.Argument()],
+    symbol_name: Annotated[str, typer.Argument(help="Symbol whose callers to find.")],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+    depth: Annotated[int, typer.Option("--depth", min=1, max=MAX_ALLOWED_DEPTH)] = 2,
+) -> None:
+    """List the symbols that call this one."""
+    _run_graph("callers", repository_id, symbol_name, database, as_json, depth)
+
+
+@app.command("callees")
+def callees(
+    repository_id: Annotated[str, typer.Argument()],
+    symbol_name: Annotated[str, typer.Argument(help="Symbol whose callees to find.")],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+    depth: Annotated[int, typer.Option("--depth", min=1, max=MAX_ALLOWED_DEPTH)] = 2,
+) -> None:
+    """List the symbols this one calls."""
+    _run_graph("callees", repository_id, symbol_name, database, as_json, depth)
+
+
+@app.command("deps")
+def deps(
+    repository_id: Annotated[str, typer.Argument()],
+    symbol_name: Annotated[str, typer.Argument(help="Symbol or module to inspect.")],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+    direction: Annotated[str, typer.Option("--direction")] = "out",
+) -> None:
+    """List what this symbol depends on, or what depends on it."""
+    if direction not in {"in", "out"}:
+        typer.echo("--direction must be 'in' or 'out'.", err=True)
+        raise typer.Exit(EXIT_INVALID_INPUT)
+    view = "dependencies" if direction == "out" else "dependents"
+    _run_graph(view, repository_id, symbol_name, database, as_json, 2)
+
+
+@app.command("exports")
+def exports(
+    repository_id: Annotated[str, typer.Argument()],
+    module: Annotated[str, typer.Argument(help="Module whose exports to list.")],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """List what a module exports."""
+    _run_graph("exports", repository_id, module, database, as_json, 1)
+
+
+@app.command("tests")
+def related_tests(
+    repository_id: Annotated[str, typer.Argument()],
+    symbol_name: Annotated[str, typer.Argument(help="Symbol whose tests to find.")],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """List the tests that exercise this symbol."""
+    _run_graph("tests", repository_id, symbol_name, database, as_json, 1)
+
+
+@app.command("trace")
+def trace(
+    repository_id: Annotated[str, typer.Argument()],
+    symbol_name: Annotated[str, typer.Argument(help="Entry point to trace from.")],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+    depth: Annotated[int, typer.Option("--depth", min=1, max=MAX_ALLOWED_DEPTH)] = 2,
+) -> None:
+    """Trace bounded relation paths from an entry point."""
+    _run_graph("trace", repository_id, symbol_name, database, as_json, depth)
+
+
+@app.command("evidence")
+def evidence(
+    repository_id: Annotated[str, typer.Argument()],
+    evidence_id: Annotated[str, typer.Argument(help="Evidence ID to re-verify.")],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Re-read and re-verify one cited region."""
+    try:
+        with _services(database) as services:
+            response = services.entities.get_evidence(repository_id, evidence_id)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    if as_json:
+        typer.echo(response.model_dump_json(indent=2))
+    else:
+        typer.echo(response.answer.summary)
+        for item in response.evidence:
+            typer.echo(f"  {item.file_path}:{item.start_line}-{item.end_line}")
+        for warning in response.warnings:
+            typer.echo(f"  warning: {warning}", err=True)
+
+    if not response.evidence:
+        raise typer.Exit(EXIT_PARTIAL)
+
+
+@app.command("files")
+def files(
+    repository_id: Annotated[str, typer.Argument()],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """List the files in the active snapshot."""
+    try:
+        with _services(database) as services:
+            snapshot = services.indexing.get_active_snapshot(repository_id)
+            if snapshot is None:
+                raise SnapshotNotReadyError(
+                    "The repository has no active snapshot. Index it first."
+                )
+            payload: list[Any] = [
+                {
+                    "file_id": record.file_id,
+                    "path": record.relative_path,
+                    "language": record.language,
+                    "classification": record.classification.value,
+                    "lines": record.line_count,
+                }
+                for record in services.indexing.list_files(snapshot.snapshot_id)
+            ]
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    _emit(
+        payload,
+        "\n".join(f"{item['path']}  [{item['language']}]" for item in payload),
+        as_json=as_json,
+    )
+
+
+@app.command("diagnostics")
+def diagnostics(
+    repository_id: Annotated[str, typer.Argument()],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Report indexing diagnostics for the repository."""
+    try:
+        with _services(database) as services:
+            report = services.status.diagnostics(repository_id)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    payload: dict[str, Any] = {
+        "repository_id": report.repository_id,
+        "snapshot_id": report.snapshot_id,
+        "skipped_by_reason": dict(report.skipped_by_reason),
+        "parse_error_count": report.parse_error_count,
+        "warnings": list(report.warnings),
+    }
+    _emit(
+        payload,
+        "\n".join(f"{key}: {value}" for key, value in payload.items()),
         as_json=as_json,
     )
 

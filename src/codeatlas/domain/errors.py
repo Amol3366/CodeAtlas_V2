@@ -25,6 +25,9 @@ class ErrorCode(StrEnum):
     UNSUPPORTED_QUERY_MODE = "UNSUPPORTED_QUERY_MODE"
     SEARCH_QUERY_INVALID = "SEARCH_QUERY_INVALID"
     NO_ROLLBACK_TARGET = "NO_ROLLBACK_TARGET"
+    EVIDENCE_NOT_FOUND = "EVIDENCE_NOT_FOUND"
+    FILE_NOT_FOUND = "FILE_NOT_FOUND"
+    SYMBOL_NOT_FOUND = "SYMBOL_NOT_FOUND"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -94,3 +97,26 @@ class NoRollbackTargetError(CodeAtlasError):
     """No superseded snapshot exists to roll back to."""
 
     code = ErrorCode.NO_ROLLBACK_TARGET
+
+
+class EvidenceNotFoundError(CodeAtlasError):
+    """No such evidence in the active snapshot.
+
+    Evidence IDs are content-derived, so an unknown one means either a typo or a
+    citation from a snapshot that is no longer active. Both are the caller's to
+    resolve; neither is answered by guessing a nearby range.
+    """
+
+    code = ErrorCode.EVIDENCE_NOT_FOUND
+
+
+class FileNotFoundInSnapshotError(CodeAtlasError):
+    """No such file in the active snapshot."""
+
+    code = ErrorCode.FILE_NOT_FOUND
+
+
+class SymbolNotFoundError(CodeAtlasError):
+    """No such symbol in the active snapshot."""
+
+    code = ErrorCode.SYMBOL_NOT_FOUND

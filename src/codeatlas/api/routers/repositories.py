@@ -136,6 +136,57 @@ def repository_status(repository_id: str, services: Services) -> StatusResponse:
     )
 
 
+class FileEntry(StrictModel):
+    file_id: str
+    path: str
+    language: str
+    classification: str
+    line_count: int
+    size_bytes: int
+
+
+class FilesResponse(StrictModel):
+    repository_id: str
+    snapshot: SnapshotReference
+    files: list[FileEntry]
+
+
+@router.get("/{repository_id}/files")
+def repository_files(repository_id: str, services: Services) -> FilesResponse:
+    """List the files the active snapshot contains.
+
+    Paths are repository-relative, as everywhere else: the absolute root is not
+    echoed back, so a screenshot or diagnostic bundle cannot leak it.
+    """
+    services.registration.get(repository_id)
+    snapshot = services.indexing.get_active_snapshot(repository_id)
+    if snapshot is None:
+        raise SnapshotNotReadyError(
+            "The repository has no active snapshot. Index it first."
+        )
+    return FilesResponse(
+        repository_id=repository_id,
+        snapshot=SnapshotReference(
+            snapshot_id=snapshot.snapshot_id,
+            git_head=snapshot.git_head,
+            working_tree_fingerprint=snapshot.working_tree_fingerprint,
+            freshness=SnapshotFreshness.FRESH,
+            semantic_coverage=0.0,
+        ),
+        files=[
+            FileEntry(
+                file_id=record.file_id,
+                path=record.relative_path,
+                language=record.language,
+                classification=record.classification.value,
+                line_count=record.line_count,
+                size_bytes=record.size_bytes,
+            )
+            for record in services.indexing.list_files(snapshot.snapshot_id)
+        ],
+    )
+
+
 @router.get("/{repository_id}/diagnostics")
 def repository_diagnostics(
     repository_id: str, services: Services

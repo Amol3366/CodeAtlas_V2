@@ -30,9 +30,10 @@ from codeatlas.contracts import (
 )
 from codeatlas.domain.ids import evidence_id as build_evidence_id
 from codeatlas.domain.paths import resolve_inside_root
+from codeatlas.domain.relations import StoredEvidence
 from codeatlas.domain.repository import FileRecord
 from codeatlas.domain.snapshot import Snapshot
-from codeatlas.storage.sqlite.stores import FileStore
+from codeatlas.storage.sqlite.stores import EvidenceStore, FileStore
 
 MAX_EXCERPT_LINES: int = 200
 MAX_EXCERPT_CHARACTERS: int = 8000
@@ -66,8 +67,15 @@ class EvidenceOutcome:
 class EvidenceBuilder:
     """Verifies candidate ranges against the snapshot and the file on disk."""
 
-    def __init__(self, files: FileStore) -> None:
+    def __init__(
+        self, files: FileStore, evidence: EvidenceStore | None = None
+    ) -> None:
         self._files = files
+        # Optional so every existing caller keeps working. When present, each
+        # verified region's *address* is recorded so it can be fetched later by
+        # ID. Only the location and hash are stored — never the excerpt — so a
+        # stored row can never become a staler answer than the file itself.
+        self._evidence = evidence
 
     def build(
         self,
@@ -136,6 +144,22 @@ class EvidenceBuilder:
                         validation=EvidenceValidation.VALID,
                     ),
                 )
+            )
+
+        if self._evidence is not None and items:
+            self._evidence.upsert_many(
+                snapshot.snapshot_id,
+                [
+                    StoredEvidence(
+                        evidence_id=item.evidence_id,
+                        file_id=candidates[index].file_id,
+                        start_line=item.start_line,
+                        end_line=item.end_line,
+                        content_hash=item.content_hash,
+                        derivation=item.derivation,
+                    )
+                    for index, item in items
+                ],
             )
 
         return EvidenceOutcome(

@@ -28,6 +28,7 @@ from codeatlas.contracts import SymbolKind
 from codeatlas.domain.ids import symbol_id, symbol_version_id
 from codeatlas.domain.repository import FileClassification
 from codeatlas.domain.symbols import SymbolRecord, Visibility
+from codeatlas.extraction.python_relations import extract_python_references
 from codeatlas.parsing.registry import (
     PARSER_BUNDLE_VERSION,
     ParseDiagnostic,
@@ -145,12 +146,23 @@ class PythonParser:
             )
         )
 
+        # Extraction reuses the module `ast` already produced: one parse, not two.
+        extraction = extract_python_references(
+            module=module,
+            module_path=module_path,
+            file_id=request.file_id,
+            symbol_ids={
+                symbol.qualified_name: symbol.symbol_id for symbol in symbols
+            },
+        )
+
         return ParseResult(
             parser_name=self.name,
             parser_version=self.version,
             success=True,
             symbols=tuple(symbols),
-            diagnostics=(),
+            diagnostics=extraction.diagnostics,
+            references=extraction.references,
         )
 
     def _failed(self, diagnostic: ParseDiagnostic) -> ParseResult:

@@ -25,6 +25,23 @@ from enum import StrEnum
 from codeatlas.contracts import Derivation, RelationKind
 
 
+@dataclass(frozen=True)
+class StoredEvidence:
+    """An evidence row: where to look and what the content hashed to.
+
+    The excerpt is deliberately absent. Fetching re-reads the file and
+    re-verifies this hash, so a stored row can never outlive the content it
+    describes.
+    """
+
+    evidence_id: str
+    file_id: str
+    start_line: int
+    end_line: int
+    content_hash: str
+    derivation: Derivation
+
+
 class ResolutionState(StrEnum):
     """What resolution concluded about a reference's target."""
 
@@ -90,3 +107,24 @@ class RelationRecord:
     start_line: int
     end_line: int
     candidate_count: int
+    # Carried so a relation round-trips back into the reference that produced
+    # it. That is what lets an unchanged file's references be reused while its
+    # targets are still re-resolved from scratch.
+    module_hint: str = ""
+    reference_part: int = 0
+
+    def as_reference(self) -> SymbolReference:
+        """Recover the reference this relation was resolved from."""
+        return SymbolReference(
+            source_symbol_id=self.source_symbol_id,
+            file_id=self.file_id,
+            kind=(
+                # `MAY_CALL` is a resolution outcome, not something a file says.
+                RelationKind.CALLS if self.kind is RelationKind.MAY_CALL else self.kind
+            ),
+            target_hint=self.target_hint,
+            module_hint=self.module_hint,
+            start_line=self.start_line,
+            end_line=self.end_line,
+            part=self.reference_part,
+        )

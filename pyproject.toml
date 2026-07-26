@@ -30,6 +30,7 @@ dev = [
 
 [project.scripts]
 codeatlas = "codeatlas.cli.main:main"
+codeatlas-mcp = "codeatlas.mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/codeatlas"]
@@ -62,6 +63,14 @@ exclude = ["tests/evaluation/cases/fixtures/"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+# The `mcp` package ships untyped decorators, so the stdio wiring in
+# `mcp/server.py` cannot satisfy strict decorator typing. The relaxation is
+# scoped to that one module; everything it calls stays fully typed.
+[[tool.mypy.overrides]]
+module = ["codeatlas.mcp.server"]
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 module = [

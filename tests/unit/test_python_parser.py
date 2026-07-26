@@ -203,12 +203,16 @@ def test_undecodable_content_is_reported() -> None:
     assert any(d.code == "PARSE_DECODE_ERROR" for d in result.diagnostics)
 
 
-def test_registry_resolves_python_and_ignores_other_languages() -> None:
+def test_registry_resolves_python_and_ignores_unsupported_languages() -> None:
+    # Phase 3 added TypeScript and JavaScript, so this test no longer asserts
+    # that `typescript` is unsupported — that was Phase 1's truth, not a
+    # contract. It still asserts the property that matters: a language nobody
+    # registered resolves to nothing rather than to an arbitrary parser.
     registry = default_registry()
     parser = registry.parser_for("python")
     assert parser is not None
     assert parser.name == "python"
-    assert registry.parser_for("typescript") is None
+    assert registry.parser_for("rust") is None
 
 
 def test_registry_rejects_a_duplicate_language() -> None:

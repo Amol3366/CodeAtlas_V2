@@ -21,7 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from codeatlas.api.errors import codeatlas_error_response, error_response
-from codeatlas.api.routers import query, repositories, search
+from codeatlas.api.routers import entities, graph, query, repositories, search
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.domain.errors import CodeAtlasError, ErrorCode
 from codeatlas.storage.sqlite.connection import default_database_path
@@ -51,6 +51,8 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     app.include_router(repositories.router)
     app.include_router(query.router)
     app.include_router(search.router)
+    app.include_router(entities.router)
+    app.include_router(graph.router)
 
     @app.exception_handler(CodeAtlasError)
     async def handle_codeatlas_error(

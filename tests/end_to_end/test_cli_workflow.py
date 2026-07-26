@@ -313,3 +313,125 @@ def test_search_output_contains_no_absolute_path(
 
     assert str(sample_repo) not in result.stdout
     assert str(sample_repo).replace("\\", "/") not in result.stdout
+
+
+# --- Phase 3 graph, entity, and diagnostic commands ---------------------------
+
+
+def _indexed(tmp_path: Path, sample_repo: Path) -> tuple[str, str]:
+    database = _database(tmp_path)
+    repository_id = _add(database, sample_repo)
+    indexed = runner.invoke(cli_app, ["index", repository_id, "--db", database])
+    assert indexed.exit_code == 0, indexed.output
+    return database, repository_id
+
+
+def test_callees_reports_a_resolved_call(sample_repo: Path, tmp_path: Path) -> None:
+    database, repository_id = _indexed(tmp_path, sample_repo)
+
+    result = runner.invoke(
+        cli_app,
+        [
+            "callees",
+            repository_id,
+            "PaymentService.capture",
+            "--db",
+            database,
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    response = QueryResponse.model_validate_json(result.stdout)
+    assert any("claim" in claim.text for claim in response.answer.claims)
+
+
+def test_callers_of_an_uncalled_symbol_exits_partial(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    """A script must be able to tell "no callers" from "found callers"."""
+    database, repository_id = _indexed(tmp_path, sample_repo)
+
+    result = runner.invoke(
+        cli_app, ["callers", repository_id, "PaymentService.capture", "--db", database]
+    )
+
+    assert result.exit_code == 4
+
+
+def test_deps_rejects_an_unknown_direction(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database, repository_id = _indexed(tmp_path, sample_repo)
+
+    result = runner.invoke(
+        cli_app,
+        [
+            "deps",
+            repository_id,
+            "src.payments.service",
+            "--db",
+            database,
+            "--direction",
+            "sideways",
+        ],
+    )
+
+    assert result.exit_code == 2
+
+
+def test_evidence_round_trips_from_a_symbol_lookup(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database, repository_id = _indexed(tmp_path, sample_repo)
+    found = runner.invoke(
+        cli_app,
+        ["symbol", repository_id, "PaymentService.capture", "--db", database, "--json"],
+    )
+    looked_up = QueryResponse.model_validate_json(found.stdout)
+    evidence_id = looked_up.evidence[0].evidence_id
+
+    fetched = runner.invoke(
+        cli_app, ["evidence", repository_id, evidence_id, "--db", database, "--json"]
+    )
+
+    assert fetched.exit_code == 0, fetched.output
+    response = QueryResponse.model_validate_json(fetched.stdout)
+    assert response.evidence[0].evidence_id == evidence_id
+
+
+def test_an_unknown_evidence_id_exits_unavailable(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database, repository_id = _indexed(tmp_path, sample_repo)
+
+    result = runner.invoke(
+        cli_app, ["evidence", repository_id, "ev_missing", "--db", database]
+    )
+
+    assert result.exit_code == 3
+
+
+def test_files_lists_the_active_snapshot(sample_repo: Path, tmp_path: Path) -> None:
+    database, repository_id = _indexed(tmp_path, sample_repo)
+
+    result = runner.invoke(
+        cli_app, ["files", repository_id, "--db", database, "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    paths = {item["path"] for item in json.loads(result.stdout)}
+    assert "src/payments/service.py" in paths
+
+
+def test_diagnostics_reports_without_leaking_the_root(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    database, repository_id = _indexed(tmp_path, sample_repo)
+
+    result = runner.invoke(
+        cli_app, ["diagnostics", repository_id, "--db", database, "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert str(sample_repo) not in result.stdout

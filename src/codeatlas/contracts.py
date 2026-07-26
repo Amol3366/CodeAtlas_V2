@@ -212,6 +212,25 @@ class Finding(ContractModel):
     limitations: list[str] = Field(default_factory=list)
 
 
+class RelationStep(ContractModel):
+    """One edge of a relation path, citable on its own.
+
+    Every step carries its own evidence, so a path is auditable edge by edge
+    rather than as an opaque conclusion a reader has to take on faith.
+    """
+
+    source: NonEmptyText
+    kind: RelationKind
+    target: NonEmptyText
+    derivation: Derivation
+    confidence: Confidence
+    evidence_id: OpaqueId
+
+
+class RelationPath(ContractModel):
+    steps: list[RelationStep] = Field(min_length=1)
+
+
 class QueryResponse(ContractModel):
     contract_version: Literal["1.0"] = CONTRACT_VERSION
     request_id: OpaqueId
@@ -219,6 +238,9 @@ class QueryResponse(ContractModel):
     snapshot: SnapshotReference
     answer: Answer
     evidence: list[Evidence]
+    # Additive and optional (ADR-0004), so `contract_version` stays "1.0" and a
+    # client written against Phase 2 keeps working unchanged.
+    relation_paths: list[RelationPath] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     timing_ms: dict[str, NonNegativeDuration] = Field(default_factory=dict)
@@ -243,6 +265,13 @@ class QueryResponse(ContractModel):
             unknown = set(claim.evidence_ids) - evidence_by_id.keys()
             if unknown:
                 raise ValueError("claim references unknown evidence")
+
+        # A path step citing evidence that is not in the response would be an
+        # unverifiable link in an otherwise auditable chain.
+        for path in self.relation_paths:
+            for step in path.steps:
+                if step.evidence_id not in evidence_by_id:
+                    raise ValueError("relation step references unknown evidence")
         return self
 
 

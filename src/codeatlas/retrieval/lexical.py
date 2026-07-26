@@ -32,6 +32,7 @@ from codeatlas.domain.search import ChunkSearchHit
 from codeatlas.domain.snapshot import Snapshot
 from codeatlas.retrieval.fts_query import build_match_expression
 from codeatlas.storage.sqlite.stores import (
+    EvidenceStore,
     FileStore,
     RepositoryStore,
     SearchStore,
@@ -70,12 +71,13 @@ class LexicalSearchService:
         files: FileStore,
         symbols: SymbolStore,
         search: SearchStore,
+        evidence: EvidenceStore | None = None,
     ) -> None:
         self._repositories = repositories
         self._snapshots = snapshots
         self._symbols = symbols
         self._search = search
-        self._evidence = EvidenceBuilder(files)
+        self._evidence = EvidenceBuilder(files, evidence)
         self._files = files
 
     def search_text(self, request: SearchRequest) -> QueryResponse:

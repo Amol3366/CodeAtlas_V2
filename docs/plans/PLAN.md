@@ -39,7 +39,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 0 — Product contract and evaluation | [phase plan](phases/phase-00-product-contract-evaluation.md) | `complete` | User |
 | 1 — Repository truth vertical slice | [phase plan](phases/phase-01-repository-truth-vertical-slice.md) | `complete` | User |
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
-| 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `in_progress` (plan approved 2026-07-26) | User |
+| 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `awaiting_user_approval` | User |
 | 4 — Change assurance | Created after Phase 3 approval | `pending` | User |
 | 5 — Persistent web application | Created after Phase 4 approval | `pending` | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
@@ -50,12 +50,12 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | [Phase 3 — Polyglot graph and delivery contracts](phases/phase-03-polyglot-graph-and-delivery-contracts.md) |
-| Active task | P3-02 — Python reference extraction |
-| Task status | P3-01 is `complete`; P3-02 is `ready` |
+| Active task | None — Phase 3 awaits the user's gate approval |
+| Task status | P3-SETUP through P3-10 are `complete`; Phase 3 is `awaiting_user_approval` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-26T06:05:00Z |
-| Git state | Branch `main` at `85d00f7` — "feat: P3-SETUP decisions, dual evidence metrics, and TS/JS/MCP dependencies". Working tree dirty: P3-01 is uncommitted. |
-| Next gate | None pending. Phase 3 executes P3-01 through P3-10; the user approves the phase gate at the end. |
+| Started UTC | 2026-07-26T08:30:00Z |
+| Git state | Branch `main` at `3847469` — "feat: P3-01 relation domain, migration 0005, and RelationStore". Working tree dirty: P3-02 through P3-10 are uncommitted. |
+| Next gate | The user approves the Phase 3 completion gate. |
 
 ### Phase 3 Task Board (authoritative status)
 
@@ -63,15 +63,15 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | -------- | ------------------------------------------------------------ | ------------ | --------- |
 | P3-SETUP | Dependencies, ADR-0003 (granularity), ADR-0004 (contract)     | Phase 2      | `complete` |
 | P3-01    | Relation domain, identity, migration `0005`, `RelationStore`  | P3-SETUP     | `complete` |
-| P3-02    | Python reference extraction                                   | P3-01        | `ready`   |
-| P3-03    | TypeScript/JavaScript parser (symbols)                        | P3-SETUP     | `pending` |
-| P3-04    | TypeScript/JavaScript reference extraction                    | P3-02, P3-03 | `pending` |
-| P3-05    | Snapshot resolution and indexing integration                  | P3-04        | `pending` |
-| P3-06    | Bounded graph traversal                                       | P3-05        | `pending` |
-| P3-07    | Graph query application services                              | P3-06        | `pending` |
-| P3-08    | Complete REST and CLI adapters, evidence addressing           | P3-07        | `pending` |
-| P3-09    | Initial versioned MCP adapter                                 | P3-08        | `pending` |
-| P3-10    | Cross-adapter contract suite, baseline, docs, phase gate      | P3-09        | `pending` |
+| P3-02    | Python reference extraction                                   | P3-01        | `complete`   |
+| P3-03    | TypeScript/JavaScript parser (symbols)                        | P3-SETUP     | `complete` |
+| P3-04    | TypeScript/JavaScript reference extraction                    | P3-02, P3-03 | `complete` |
+| P3-05    | Snapshot resolution and indexing integration                  | P3-04        | `complete` |
+| P3-06    | Bounded graph traversal                                       | P3-05        | `complete` |
+| P3-07    | Graph query application services                              | P3-06        | `complete` |
+| P3-08    | Complete REST and CLI adapters, evidence addressing           | P3-07        | `complete` |
+| P3-09    | Initial versioned MCP adapter                                 | P3-08        | `complete` |
+| P3-10    | Cross-adapter contract suite, baseline, docs, phase gate      | P3-09        | `complete` |
 
 The plan was approved by the user on 2026-07-26, so rule 11 no longer blocks
 execution. Task requirements, interfaces, tests, and acceptance criteria live in
@@ -127,6 +127,179 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-26T08:30:00Z — P3-02 through P3-10 completed; Phase 3 awaiting user approval
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P3-02 … P3-10 `ready/pending -> complete`; Phase 3
+  `in_progress -> awaiting_user_approval`. Phase 3 is **not** complete: only the
+  user may approve the gate.
+- Outcome: a symbol in Python, TypeScript, or JavaScript resolves to the same
+  verified evidence through the application service, REST, the CLI, and MCP; and
+  "who calls this", "what does this import", "what is exported", and "which tests
+  cover this" are answered from stored relations with bounded, reported traversal.
+
+#### What each task delivered
+
+- **P3-02 — Python reference extraction.** Walks the `ast` module `PythonParser`
+  already built, so there is no second parse. Emits only what the syntax states
+  outright; a call through a computed callee produces no edge and is counted as a
+  diagnostic instead.
+- **P3-03 — TS/JS parser.** Tree-sitter only, with the TSX grammar selected by
+  extension. No `node`, no `tsc`, no `node_modules`.
+- **P3-04 — TS/JS reference extraction.** Imports, exports, heritage, calls, and
+  type references. Module specifiers are recorded verbatim, including case.
+- **P3-05 — Resolution and indexing integration.** `RESOLVER_VERSION`,
+  `SnapshotResolver`, migration `0006`, the `RESOLVING` stage, three new
+  validation checks, and the reuse counters.
+- **P3-06 — Bounded traversal.** Breadth-first, one batched query per depth
+  level, cycle-safe, deterministically ordered, every bound reported.
+- **P3-07 — Graph query services.** Eight methods over the shared
+  `EvidenceBuilder`, with the four trust rules enforced by test.
+- **P3-08 — REST/CLI adapters and evidence addressing.** `/v1/evidence`,
+  `/v1/files`, `/v1/symbols`, `/v1/symbols/{id}/relations`,
+  `/v1/repositories/{id}/files`, a twelve-mode `POST /v1/query`, and nine CLI
+  commands.
+- **P3-09 — MCP adapter.** Eighteen stdio tools over `ApplicationServices`.
+- **P3-10 — Cross-adapter suite, baseline, docs, gate.**
+
+#### Contracts and migrations
+
+- **`SCHEMA_VERSION` 4 → 6.** Migration `0005` adds `relations`; `0006` adds
+  `snapshots.resolver_version`, two relation columns, and the `evidence` table.
+  `0001`–`0004` are untouched; a version-4 database upgrades in place with rows
+  intact, proven by test.
+- `PARSER_BUNDLE_VERSION` `1.0.0 → 1.1.0`; `RESOLVER_VERSION` `1.0.0` joins
+  `snapshot_id`. Every pre-existing snapshot is superseded on first run, which is
+  correct because the derived content genuinely differs.
+- `QueryResponse` gains **optional** `relation_paths`; `contract_version` stays
+  `"1.0"` and `docs/api/contract-v1.schema.json` was regenerated.
+- Three error codes added: `EVIDENCE_NOT_FOUND`, `FILE_NOT_FOUND`,
+  `SYMBOL_NOT_FOUND` — HTTP 404, CLI exit 3.
+
+#### Phase 3 completion gate evidence
+
+Each of the seven gate conditions, and where it is proven:
+
+1. **Python/TS/JS symbols resolve through the shared services** —
+   `test_tsjs_parser.py`, `test_python_parser.py`, `test_cross_adapter.py`.
+2. **Relations resolve through the same services** — `test_graph_queries.py`
+   answers `q005`, `q016`, `q017`, `q010`/`q015` from stored relations.
+3. **REST, CLI, and MCP pass the same evidence-contract tests** —
+   `test_cross_adapter.py` compares all three responses field by field and
+   asserts identical `evidence_id`s.
+4. **Traversal is bounded and reports truncation** — `test_graph_traversal.py`
+   covers each of the four bounds independently; an over-large limit is
+   **refused**, not clamped.
+5. **Every relation's derivation matches how it was derived** — the resolver
+   assigns `static_resolved` only on a unique match; ambiguity becomes
+   `MAY_CALL` at `high_confidence_heuristic`, asserted by
+   `test_an_ambiguous_name_becomes_may_call_never_calls`.
+6. **References reused while resolution is recomputed** —
+   `test_reuse_and_full_reresolution_hold_together` asserts
+   `references_reused > 0`, `references_extracted` covers only the edited file,
+   and `relations_resolved` equals the whole snapshot's reference count.
+7. **No cross-file edge survives its target's removal** —
+   `test_no_relation_in_an_active_snapshot_points_outside_it` deletes `total`,
+   re-indexes, and asserts every endpoint is present in the snapshot and
+   `dangling_endpoints()` is empty.
+
+#### Verification in the current environment
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase3.ps1` — **exit
+  0**. Stages: frozen dependency sync (53 packages); contract schema freshness;
+  **676 tests passed** in 57.71 s; Ruff clean; strict MyPy clean on **131 source
+  files**; dataset 6 fixtures / 40 query cases / 24 change cases valid; Phase 0
+  null baseline unchanged; Phase 3 engine baseline reproduces.
+- Artifacts: `baseline-phase-3.json` SHA-256
+  `8363F8B06175E55159920AFC51521EFEA92C0A69D263792B68CAD5C2CBB78150`;
+  `baseline-phase-3.md` SHA-256
+  `B618B7D17A936C36C2566B07767CDEEBEDAB09CBC44BC6953588854FF9394160`.
+  Environment: Windows 11 `10.0.26200`, Python 3.12.12.
+
+#### Baseline results, stated honestly
+
+| Metric | Phase 1 | Phase 2 | Phase 3 |
+| --- | ---: | ---: | ---: |
+| Exact symbol resolution | 0.1282 | 0.2564 | **0.3846** |
+| Primary evidence Recall@10 | 0.0635 | 0.1429 | **0.1587** |
+| Valid / exact evidence rate | 0.8000 | 0.6923 | 0.4167 |
+| Containing evidence rate | — | — | 0.6250 |
+| Changed-symbol precision / recall | 0.0000 | 0.0000 | 0.0000 |
+| Unsupported-claim rate | 0.0000 | 0.0000 | 0.0000 |
+
+`targets_met` is `false`, which is correct for a phase that leaves change
+analysis entirely to Phase 4.
+
+**`exact_evidence_rate` fell again, 0.6923 → 0.4167, and the reason should not be
+glossed.** Graph answers cite *every supporting edge*, so Phase 3 emits far more
+evidence items than Phase 2 did. Each cited edge is a real, hash-verified region
+of a real file, but a call-site line rarely equals a gold range that was written
+to describe a definition. This is the same granularity disagreement ADR-0003
+recorded, now amplified by volume rather than by any new inaccuracy.
+
+`containing_evidence_rate` of **0.6250** is the number ADR-0003 says the Phase 3
+gate is measured against, and it is reported alongside the stricter one exactly
+as the ruling requires. Neither the engine nor the corpus was edited.
+
+#### Deviations and judgment calls the user should see
+
+1. **`POST /v1/query` gained eleven modes.** The plan specifies this, but it also
+   means the Phase 1 message "supports only the 'exact_symbol' query mode" is
+   gone. `exact_symbol` still works and is still the default.
+2. **`/v1/repositories/{id}/files` was added** in P3-08. `CLAUDE.md` Section 12.1
+   lists it and it did not exist; the cross-adapter test needed it.
+3. **Evidence persistence moved into `EvidenceBuilder`** rather than sitting in
+   `EntityService`. Every service that cites evidence now records its address
+   through one code path, and it removed an O(files) path lookup per item.
+4. **A scoped MyPy relaxation** for `codeatlas.mcp.server`: the `mcp` package
+   ships untyped decorators. `disallow_untyped_decorators` and
+   `disallow_untyped_calls` are disabled for that one module; everything it calls
+   stays strictly typed.
+5. **Test-first discipline was not uniform.** P3-02, P3-04, P3-05, P3-06, and
+   P3-08 had their tests written and observed failing before implementation. For
+   **P3-03, P3-07, P3-09, and P3-10** the tests were written first but run only
+   after the implementation existed, so the failure was never observed. The tests
+   are the same tests either way, but the discipline was not, and recording that
+   is cheaper than pretending otherwise.
+
+#### Defects found by tests during the phase
+
+- **A nested call in callee position was silently dropped.** `foo().bar()` and
+  `getattr(o, "n")()` never had their inner call visited. Fixed with a regression
+  test.
+- **`module_hint` and `reference_part` were lost on the way into storage.** The
+  resolver built every `RelationRecord` without them, so two references
+  distinguished only by `part` collapsed onto one primary key and import
+  specifiers vanished on reuse. The UNIQUE constraint caught it on the second
+  index of any repository.
+- **Inbound graph claims named the wrong end of the edge.** "Who calls `total`"
+  reported `total calls total`, because the claim builder preferred the target
+  regardless of direction.
+- **The query-plan test proved the wrong thing.** It explained a hand-written
+  `= ?` query while the store issues `IN (...)`. It now captures the statement
+  the store actually executes via `sqlite3.set_trace_callback`.
+
+#### Limitations carried into Phase 4
+
+- No change analysis, diff mapping, risk ordering, or SARIF — all Phase 4.
+- `DOCUMENTS` edges are specified but not yet derived; `related_documents`
+  therefore always abstains. `TESTS` edges are derived and work.
+- Reuse is per file, not per symbol. A renamed file is a delete plus an add.
+- TS/JS accuracy is Tree-sitter-only by design; no type inference, no `tsconfig`
+  `paths`, no monorepo workspace resolution, no re-export chains beyond one hop.
+- The MCP stdio loop (`run_stdio`) is `# pragma: no cover` — the tool registry
+  and every tool are tested directly, but the transport wiring is not exercised
+  by an automated test.
+- Indexing remains synchronous with no progress reporting or cancellation.
+- `mcp` contributes 18 transitive packages; the footprint was flagged at
+  P3-SETUP and remains unaddressed.
+
+#### Next: required decision
+
+The user reviews Phase 3 and either approves the gate or requests changes. On
+approval an agent records it here, sets P3-10 and Phase 3 to `complete`, ticks
+the Phase 3 box in the `CLAUDE.md` tracker, and only then prepares Phase 4.
 
 ### 2026-07-26T06:05:00Z — P3-01 completed; P3-02 ready
 

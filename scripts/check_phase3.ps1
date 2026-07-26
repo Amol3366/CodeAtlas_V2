@@ -1,26 +1,18 @@
-# SUPERSEDED by scripts/check_phase3.ps1.
+# Phase 3 release gate. Supersedes scripts/check_phase2.ps1.
 #
-# Kept as the record of the Phase 2 gate. Two of its steps no longer pass, and
-# should not:
+# Runs every quality gate the phase is measured by, in the order a failure is
+# cheapest to diagnose: contract freshness, tests, lint, types, dataset, then the
+# two baselines that must reproduce byte-for-byte.
 #
-#   'Phase 2 engine baseline' — that artifact records what the Phase 2 engine
-#   did. ADR-0003 added exact_evidence_rate and containing_evidence_rate, which
-#   changes the artifact *schema*, and PARSER_BUNDLE_VERSION 1.1.0 changes every
-#   snapshot ID. Re-running it against a later engine exits 5 (stale artifact)
-#   by design. The Phase 2 artifacts are kept unchanged and are NOT regenerated.
-#
-#   'Phase 0 null baseline' — still checked, and still passes. That artifact was
-#   regenerated in P3-SETUP to carry the two new metric fields, both null. No
-#   recorded value changed; only the schema did.
-#
-# Previously: Phase 2 release gate, superseding scripts/check_phase1.ps1.
+# Per ADR-0003 the Phase 3 baseline reports three evidence metrics side by side.
+# Any gate claim must name which one it used.
 [CmdletBinding()]
 param(
     [switch]$SkipSync,
     [string]$Phase0BaselineJson = "docs/evaluation/baseline-phase-0.json",
     [string]$Phase0BaselineMarkdown = "docs/evaluation/baseline-phase-0.md",
-    [string]$Phase2BaselineJson = "docs/evaluation/baseline-phase-2.json",
-    [string]$Phase2BaselineMarkdown = "docs/evaluation/baseline-phase-2.md"
+    [string]$Phase3BaselineJson = "docs/evaluation/baseline-phase-3.json",
+    [string]$Phase3BaselineMarkdown = "docs/evaluation/baseline-phase-3.md"
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,16 +61,16 @@ Invoke-Checked "Phase 0 null baseline" @(
     "--markdown-output", $Phase0BaselineMarkdown,
     "--check"
 )
-# The Phase 1 baseline is a historical record of what the Phase 1 engine did.
-# It is deliberately not re-checked here: the engine has advanced, so demanding
-# it reproduce Phase 1 numbers would be demanding that Phase 2 changed nothing.
+# The Phase 1 and Phase 2 baselines are historical records of what those engines
+# did. They are deliberately not re-checked: the engine has advanced, so demanding
+# they reproduce their old numbers would be demanding that Phase 3 changed nothing.
 
-Invoke-Checked "Phase 2 engine baseline" @(
-    "run", "python", "scripts/run_phase2_baseline.py",
+Invoke-Checked "Phase 3 engine baseline" @(
+    "run", "python", "scripts/run_phase3_baseline.py",
     "--dataset", "tests/evaluation/cases",
-    "--json-output", $Phase2BaselineJson,
-    "--markdown-output", $Phase2BaselineMarkdown,
+    "--json-output", $Phase3BaselineJson,
+    "--markdown-output", $Phase3BaselineMarkdown,
     "--check"
 )
 
-Write-Output "Phase 2 verification completed."
+Write-Output "Phase 3 verification completed."

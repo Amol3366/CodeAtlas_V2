@@ -42,6 +42,7 @@ from codeatlas.domain.errors import (
 from codeatlas.domain.snapshot import Snapshot
 from codeatlas.domain.symbols import SymbolRecord
 from codeatlas.storage.sqlite.stores import (
+    EvidenceStore,
     FileStore,
     RepositoryStore,
     SnapshotStore,
@@ -76,11 +77,12 @@ class ExactSymbolLookupService:
         snapshots: SnapshotStore,
         files: FileStore,
         symbols: SymbolStore,
+        evidence: EvidenceStore | None = None,
     ) -> None:
         self._repositories = repositories
         self._snapshots = snapshots
         self._symbols = symbols
-        self._evidence = EvidenceBuilder(files)
+        self._evidence = EvidenceBuilder(files, evidence)
 
     def lookup(self, request: SymbolLookupRequest) -> QueryResponse:
         """Resolve ``request.query`` or abstain."""

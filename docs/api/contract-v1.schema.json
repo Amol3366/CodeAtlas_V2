@@ -331,6 +331,91 @@
           "title": "EvidenceValidation",
           "type": "string"
         },
+        "RelationKind": {
+          "enum": [
+            "CONTAINS",
+            "IMPORTS",
+            "EXPORTS",
+            "CALLS",
+            "MAY_CALL",
+            "INHERITS",
+            "IMPLEMENTS",
+            "OVERRIDES",
+            "ROUTES_TO",
+            "TESTS",
+            "DOCUMENTS",
+            "READS",
+            "WRITES",
+            "QUERIES",
+            "CONFIGURES",
+            "REFERENCES",
+            "DEPENDS_ON"
+          ],
+          "title": "RelationKind",
+          "type": "string"
+        },
+        "RelationPath": {
+          "additionalProperties": false,
+          "properties": {
+            "steps": {
+              "items": {
+                "$ref": "#/$defs/RelationStep"
+              },
+              "minItems": 1,
+              "title": "Steps",
+              "type": "array"
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "title": "RelationPath",
+          "type": "object"
+        },
+        "RelationStep": {
+          "additionalProperties": false,
+          "description": "One edge of a relation path, citable on its own.\n\nEvery step carries its own evidence, so a path is auditable edge by edge\nrather than as an opaque conclusion a reader has to take on faith.",
+          "properties": {
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "evidence_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Evidence Id",
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/$defs/RelationKind"
+            },
+            "source": {
+              "minLength": 1,
+              "title": "Source",
+              "type": "string"
+            },
+            "target": {
+              "minLength": 1,
+              "title": "Target",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "kind",
+            "target",
+            "derivation",
+            "confidence",
+            "evidence_id"
+          ],
+          "title": "RelationStep",
+          "type": "object"
+        },
         "SnapshotFreshness": {
           "enum": [
             "fresh",
@@ -413,6 +498,13 @@
             "type": "string"
           },
           "title": "Limitations",
+          "type": "array"
+        },
+        "relation_paths": {
+          "items": {
+            "$ref": "#/$defs/RelationPath"
+          },
+          "title": "Relation Paths",
           "type": "array"
         },
         "repository_id": {

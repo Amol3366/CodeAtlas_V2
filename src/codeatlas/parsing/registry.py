@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from codeatlas.domain.relations import SymbolReference
 from codeatlas.domain.symbols import SymbolRecord
 
 # 1.1.0 (Phase 3, ADR-0004): parsers emit references alongside symbols, so every
@@ -43,13 +44,23 @@ class ParseDiagnostic:
 
 @dataclass(frozen=True)
 class ParseResult:
-    """Symbols and diagnostics produced from one file."""
+    """Symbols, references, and diagnostics produced from one file.
+
+    ``references`` are what the file *said*, not what those statements resolve
+    to. Resolution needs the whole snapshot and happens later; keeping the two
+    apart is what lets an unchanged file's references be reused verbatim.
+
+    It defaults to empty so a parser that emits no references — or one written
+    before they existed — stays valid rather than silently reporting a partial
+    set.
+    """
 
     parser_name: str
     parser_version: str
     success: bool
     symbols: tuple[SymbolRecord, ...]
     diagnostics: tuple[ParseDiagnostic, ...]
+    references: tuple[SymbolReference, ...] = ()
 
 
 class LanguageParser(Protocol):
@@ -85,11 +96,13 @@ class ParserRegistry:
 
 
 def default_registry() -> ParserRegistry:
-    """Build the registry: Python source plus documents and configuration."""
+    """Build the registry: Python, TypeScript/JavaScript, documents, config."""
     from codeatlas.parsing.document_parser import DocumentParser
     from codeatlas.parsing.python_parser import PythonParser
+    from codeatlas.parsing.tsjs_parser import TsJsParser
 
     registry = ParserRegistry()
     registry.register(PythonParser())
+    registry.register(TsJsParser())
     registry.register(DocumentParser())
     return registry

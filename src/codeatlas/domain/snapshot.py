@@ -57,3 +57,6 @@ class Snapshot:
     # Empty for any snapshot built before chunking existed, which is what makes
     # such a snapshot ineligible as a reuse source rather than silently trusted.
     chunker_version: str = ""
+    # Same rule for resolution: an empty version means the snapshot predates
+    # relation resolution and its rows must not be copied forward.
+    resolver_version: str = ""

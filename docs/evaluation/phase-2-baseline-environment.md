@@ -45,7 +45,7 @@ independent changes make them irreproducible against the current engine:
    `snapshot_id` and therefore every evidence `snapshot_id` in the report.
 
 `scripts/run_phase2_baseline.py --check` consequently exits 5, and
-`scripts/check_phase2.ps1` is marked superseded. **The Phase 2 artifacts and
+`scripts/check_phase2.ps1` is marked superseded by `scripts/check_phase3.ps1`. **The Phase 2 artifacts and
 their hashes above are deliberately not regenerated** — they record what the
 Phase 2 gate measured, and rewriting them would erase that record.
 

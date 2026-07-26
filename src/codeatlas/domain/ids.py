@@ -107,6 +107,7 @@ def snapshot_id(
     parser_bundle_version: str,
     index_version: str,
     chunker_version: str = "",
+    resolver_version: str = "",
 ) -> str:
     """Identify a snapshot by the inputs that determine its content.
 
@@ -119,6 +120,7 @@ def snapshot_id(
         parser_bundle_version,
         index_version,
         chunker_version,
+        resolver_version,
     )
     return f"snap_{digest}"
 

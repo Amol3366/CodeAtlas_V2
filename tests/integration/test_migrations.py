@@ -60,8 +60,31 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_five() -> None:
-    assert SCHEMA_VERSION == 5
+def test_schema_version_is_six() -> None:
+    assert SCHEMA_VERSION == 6
+
+
+def test_evidence_table_and_resolution_columns_exist(tmp_path: Path) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        snapshot_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(snapshots)").fetchall()
+        }
+        relation_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(relations)").fetchall()
+        }
+
+    assert "evidence" in tables
+    assert "resolver_version" in snapshot_columns
+    assert {"module_hint", "reference_part"} <= relation_columns
 
 
 def test_relation_table_exists(tmp_path: Path) -> None:

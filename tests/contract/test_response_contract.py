@@ -61,6 +61,10 @@ def valid_response_data() -> dict[str, object]:
                 "validation": "valid",
             }
         ],
+        # Added in Phase 3 (ADR-0004). Additive and optional, so
+        # `contract_version` stays "1.0"; it serializes as an empty list for
+        # every response that carries no relation path.
+        "relation_paths": [],
         "warnings": [],
         "limitations": [],
         "timing_ms": {"total": 4.5},

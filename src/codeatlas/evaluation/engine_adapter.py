@@ -20,6 +20,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from codeatlas.application.container import build_services
+from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
 from codeatlas.domain.errors import CodeAtlasError
@@ -34,10 +35,20 @@ from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
 SUPPORTED_INTENT = "EXACT_SYMBOL"
+
+# Phase 3 answers relation intents from stored relations. Each maps to one
+# `GraphQueryService` method; nothing here re-derives a relation.
+GRAPH_INTENTS: dict[str, str] = {
+    "CALLERS": "callers",
+    "DEPENDENCIES": "dependencies",
+    "EXPORTS": "exports",
+    "RELATED_TESTS": "related_tests",
+    "TRACE_FLOW": "trace",
+}
 # Phase 2 adds lexical retrieval, so documents and configuration keys can now be
 # answered. Everything still unimplemented abstains rather than guessing.
 LEXICAL_INTENTS = ("CONFIG_LOOKUP", "DOCUMENT_LOOKUP")
-SUPPORTED_INTENTS = (SUPPORTED_INTENT, *LEXICAL_INTENTS)
+SUPPORTED_INTENTS = (SUPPORTED_INTENT, *LEXICAL_INTENTS, *GRAPH_INTENTS)
 SUPPORTED_FIXTURES = ("python_app", "docs_config", "mixed_app")
 
 
@@ -118,6 +129,18 @@ def _answer(
                     request_id=f"eval_{case.id}",
                 )
             )
+        elif case.intent in GRAPH_INTENTS:
+            method = getattr(
+                services.graph,  # type: ignore[attr-defined]
+                GRAPH_INTENTS[case.intent],
+            )
+            response = method(
+                GraphQueryRequest(
+                    repository_id=repository_id,
+                    symbol=_query_term(case),
+                    request_id=f"eval_{case.id}",
+                )
+            )
         else:
             # Document and configuration questions are answered lexically. The
             # results are labeled `high_confidence_heuristic` by the service, so
@@ -151,7 +174,10 @@ def _answer(
             )
             for item in response.evidence
         ],
-        relation_paths=[],
+        relation_paths=[
+            " -> ".join(step.target for step in path.steps)
+            for path in response.relation_paths
+        ],
         claims=[claim.text for claim in response.answer.claims],
         abstained=not response.evidence,
         duration_ms=duration_ms,

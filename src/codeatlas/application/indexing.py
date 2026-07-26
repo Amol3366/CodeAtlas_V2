@@ -24,7 +24,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from codeatlas.chunking.chunker import CHUNKER_VERSION, ChunkRequest, CodeChunker
 from codeatlas.chunking.documents import DocumentChunker
-from codeatlas.contracts import RepositoryRelativePath
+from codeatlas.contracts import RelationKind, RepositoryRelativePath
 from codeatlas.domain.chunks import LogicalChunk
 from codeatlas.domain.errors import (
     CodeAtlasError,
@@ -33,9 +33,11 @@ from codeatlas.domain.errors import (
     RepositoryNotFoundError,
 )
 from codeatlas.domain.ids import snapshot_id as build_snapshot_id
+from codeatlas.domain.relations import SymbolReference
 from codeatlas.domain.repository import FileRecord, ScanLimits
 from codeatlas.domain.snapshot import Snapshot, SnapshotState
 from codeatlas.domain.symbols import SymbolRecord
+from codeatlas.extraction.resolution import RESOLVER_VERSION, SnapshotResolver
 from codeatlas.parsing.registry import (
     PARSER_BUNDLE_VERSION,
     ParseDiagnostic,
@@ -50,6 +52,7 @@ from codeatlas.storage.sqlite.stores import (
     ChunkStore,
     FileStore,
     IndexJobStore,
+    RelationStore,
     RepositoryStore,
     SearchStore,
     SnapshotStore,
@@ -81,6 +84,9 @@ class ReuseStats:
     symbols_reused: int = 0
     chunks_reused: int = 0
     chunks_recomputed: int = 0
+    references_reused: int = 0
+    references_extracted: int = 0
+    relations_resolved: int = 0
 
 
 @dataclass(frozen=True)
@@ -107,6 +113,7 @@ class IndexRepositoryService:
         jobs: IndexJobStore,
         chunks: ChunkStore,
         search: SearchStore,
+        relations: RelationStore,
         scanner: RepositoryScanner,
         git: GitAdapter,
         registry: ParserRegistry,
@@ -121,6 +128,8 @@ class IndexRepositoryService:
         self._jobs = jobs
         self._chunks = chunks
         self._search = search
+        self._relations = relations
+        self._resolver = SnapshotResolver()
         self._code_chunker = CodeChunker()
         self._document_chunker = DocumentChunker()
         self._scanner = scanner
@@ -165,6 +174,7 @@ class IndexRepositoryService:
             PARSER_BUNDLE_VERSION,
             INDEX_VERSION,
             CHUNKER_VERSION,
+            RESOLVER_VERSION,
         )
 
         # Reuse is only sound against the previous *active* snapshot, and only
@@ -230,6 +240,7 @@ class IndexRepositoryService:
             created_at=self._clock(),
             activated_at=None,
             chunker_version=CHUNKER_VERSION,
+            resolver_version=RESOLVER_VERSION,
         )
 
         reuse = self._stage(
@@ -237,6 +248,7 @@ class IndexRepositoryService:
             files=scan.files,
             symbols=parsed.symbols,
             chunks=chunked,
+            references=parsed.references,
             previous=previous,
             reusable=reusable,
         )
@@ -273,6 +285,9 @@ class IndexRepositoryService:
                     "symbols_reused": reuse.symbols_reused,
                     "chunks_reused": reuse.chunks_reused,
                     "chunks_recomputed": reuse.chunks_recomputed,
+                    "references_reused": reuse.references_reused,
+                    "references_extracted": reuse.references_extracted,
+                    "relations_resolved": reuse.relations_resolved,
                 },
             },
         )
@@ -300,6 +315,7 @@ class IndexRepositoryService:
         skip: frozenset[str],
     ) -> _ParseOutcome:
         symbols: list[SymbolRecord] = []
+        references: list[SymbolReference] = []
         diagnostics: list[ParseDiagnostic] = []
         contents: dict[str, bytes] = {}
         parsed_file_count = 0
@@ -340,11 +356,13 @@ class IndexRepositoryService:
             if not result.success:
                 parse_error_count += 1
             symbols.extend(result.symbols)
+            references.extend(result.references)
             diagnostics.extend(result.diagnostics)
             contents[record.file_id] = content
 
         return _ParseOutcome(
             symbols=tuple(symbols),
+            references=tuple(references),
             diagnostics=tuple(diagnostics),
             contents=contents,
             parsed_file_count=parsed_file_count,
@@ -366,6 +384,8 @@ class IndexRepositoryService:
         if previous.parser_bundle_version != PARSER_BUNDLE_VERSION:
             return frozenset()
         if previous.chunker_version != CHUNKER_VERSION:
+            return frozenset()
+        if previous.resolver_version != RESOLVER_VERSION:
             return frozenset()
 
         earlier = {
@@ -423,6 +443,7 @@ class IndexRepositoryService:
         files: tuple[FileRecord, ...],
         symbols: tuple[SymbolRecord, ...],
         chunks: tuple[LogicalChunk, ...],
+        references: tuple[SymbolReference, ...],
         previous: Snapshot | None,
         reusable: frozenset[str],
     ) -> ReuseStats:
@@ -454,12 +475,69 @@ class IndexRepositoryService:
             self._search.index_files(snapshot.snapshot_id, files)
             self._snapshots.set_state(snapshot.snapshot_id, SnapshotState.INDEXING)
 
+        resolution = self._resolve(
+            snapshot=snapshot,
+            files=files,
+            references=references,
+            previous=previous,
+            reusable=reusable,
+        )
+
         return ReuseStats(
             files_reused=len(reusable),
             files_reparsed=len(files) - len(reusable),
             symbols_reused=reused_symbols,
             chunks_reused=reused_chunks,
             chunks_recomputed=len(chunks),
+            references_reused=resolution.references_reused,
+            references_extracted=len(references),
+            relations_resolved=resolution.relations_resolved,
+        )
+
+    def _resolve(
+        self,
+        *,
+        snapshot: Snapshot,
+        files: tuple[FileRecord, ...],
+        references: tuple[SymbolReference, ...],
+        previous: Snapshot | None,
+        reusable: frozenset[str],
+    ) -> _ResolutionOutcome:
+        """Resolve the whole snapshot's references into relations.
+
+        An unchanged file's *references* are reused — they are a pure function
+        of bytes that did not change. Its *targets* are not: they are recomputed
+        along with everything else, every run. That asymmetry is the whole point
+        of the two-stage design, and it is why an edge can never outlive the
+        symbol it points at.
+        """
+        self._snapshots.set_state(snapshot.snapshot_id, SnapshotState.RESOLVING)
+
+        carried: list[SymbolReference] = []
+        if previous is not None and reusable:
+            carried = [
+                relation.as_reference()
+                for relation in self._relations.list_for_snapshot(
+                    previous.snapshot_id
+                )
+                if relation.file_id in reusable
+                # A `TESTS` edge is derived from other edges rather than stated
+                # by a file, so it is re-derived rather than carried.
+                and relation.kind is not RelationKind.TESTS
+            ]
+
+        symbols = self._symbols.list_for_snapshot(snapshot.snapshot_id)
+        relations, stats = self._resolver.resolve(
+            files, symbols, [*carried, *references]
+        )
+
+        with write_transaction(self._connection):
+            self._relations.add_many(snapshot.snapshot_id, relations)
+            self._snapshots.set_state(snapshot.snapshot_id, SnapshotState.INDEXING)
+
+        return _ResolutionOutcome(
+            references_reused=len(carried),
+            relations_resolved=stats.references,
         )
 
     def _validate_snapshot(self, snapshot_id: str, *, expected_file_count: int) -> None:
@@ -514,6 +592,22 @@ class IndexRepositoryService:
                 "Chunk membership does not cover every chunk."
             )
 
+        if not snapshot.resolver_version:
+            raise SnapshotValidationError("The staged snapshot is missing versions.")
+
+        # Gate condition 7: a cross-file edge cannot survive into a snapshot
+        # whose endpoint symbol no longer exists. Checked here rather than
+        # trusted from resolution, because "cannot happen" is a claim worth
+        # verifying against the database that will actually serve queries.
+        if self._relations.dangling_endpoints(snapshot_id):
+            raise SnapshotValidationError(
+                "A staged relation references a symbol outside the snapshot."
+            )
+        if self._relations.invalid_line_ranges(snapshot_id):
+            raise SnapshotValidationError(
+                "A staged relation has a line range outside its file."
+            )
+
     def get_active_snapshot(self, repository_id_value: str) -> Snapshot | None:
         """Return the repository's active snapshot, if any."""
         return self._snapshots.get_active(repository_id_value)
@@ -540,8 +634,15 @@ def _skipped_by_reason(skipped: tuple[SkippedFile, ...]) -> dict[str, int]:
 
 
 @dataclass(frozen=True)
+class _ResolutionOutcome:
+    references_reused: int
+    relations_resolved: int
+
+
+@dataclass(frozen=True)
 class _ParseOutcome:
     symbols: tuple[SymbolRecord, ...]
+    references: tuple[SymbolReference, ...]
     diagnostics: tuple[ParseDiagnostic, ...]
     contents: dict[str, bytes]
     parsed_file_count: int

@@ -16,7 +16,11 @@ from typing import Any
 
 from codeatlas.contracts import Derivation, RelationKind, SymbolKind
 from codeatlas.domain.chunks import ChunkRole, LogicalChunk
-from codeatlas.domain.relations import RelationRecord, ResolutionState
+from codeatlas.domain.relations import (
+    RelationRecord,
+    ResolutionState,
+    StoredEvidence,
+)
 from codeatlas.domain.repository import FileClassification, FileRecord, Repository
 from codeatlas.domain.search import ChunkSearchHit, FileSearchHit
 from codeatlas.domain.snapshot import Snapshot, SnapshotState
@@ -96,8 +100,9 @@ class SnapshotStore:
             " snapshot_id, repository_id, state, git_head, git_branch, git_dirty,"
             " working_tree_fingerprint, file_count, parsed_file_count,"
             " skipped_file_count, parse_error_count, parser_bundle_version,"
-            " index_version, created_at, activated_at, chunker_version"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " index_version, created_at, activated_at, chunker_version,"
+            " resolver_version"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 snapshot.snapshot_id,
                 snapshot.repository_id,
@@ -115,6 +120,7 @@ class SnapshotStore:
                 to_utc_text(snapshot.created_at),
                 to_utc_text(snapshot.activated_at) if snapshot.activated_at else None,
                 snapshot.chunker_version,
+                snapshot.resolver_version,
             ),
         )
 
@@ -359,6 +365,22 @@ class SymbolStore:
             if rows:
                 return tuple(_symbol_from_row(row) for row in rows)
         return ()
+
+    def list_for_snapshot(self, snapshot_id: str) -> tuple[SymbolRecord, ...]:
+        """Every symbol a snapshot holds, in stable file-then-position order.
+
+        Resolution needs the whole set at once, because deciding what a name
+        means is exactly the question a per-file view cannot answer.
+        """
+        rows = self._connection.execute(
+            "SELECT symbols.* FROM symbols"
+            " JOIN files ON files.snapshot_id = symbols.snapshot_id"
+            "   AND files.file_id = symbols.file_id"
+            " WHERE symbols.snapshot_id = ?"
+            " ORDER BY files.relative_path, symbols.start_line, symbols.symbol_id",
+            (snapshot_id,),
+        ).fetchall()
+        return tuple(_symbol_from_row(row) for row in rows)
 
     def copy_from_snapshot(
         self,
@@ -846,6 +868,7 @@ def _snapshot_from_row(row: sqlite3.Row) -> Snapshot:
         created_at=from_utc_text(row["created_at"]),
         activated_at=from_utc_text(activated_at) if activated_at else None,
         chunker_version=row["chunker_version"],
+        resolver_version=row["resolver_version"],
     )
 
 
@@ -899,8 +922,8 @@ class RelationStore:
             "INSERT INTO relations ("
             " snapshot_id, relation_id, source_symbol_id, target_symbol_id,"
             " file_id, kind, target_hint, resolution, derivation, confidence,"
-            " start_line, end_line, candidate_count"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " start_line, end_line, candidate_count, module_hint, reference_part"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     snapshot_id,
@@ -916,6 +939,8 @@ class RelationStore:
                     relation.start_line,
                     relation.end_line,
                     relation.candidate_count,
+                    relation.module_hint,
+                    relation.reference_part,
                 )
                 for relation in relations
             ],
@@ -996,6 +1021,25 @@ class RelationStore:
         ).fetchall()
         return tuple(str(row[0]) for row in rows)
 
+    def invalid_line_ranges(self, snapshot_id: str) -> tuple[str, ...]:
+        """Return IDs of relations citing a line their file does not have.
+
+        An edge with no citable site is not evidence, so this is checked before
+        activation rather than discovered when a reader clicks a citation.
+        """
+        rows = self._connection.execute(
+            "SELECT relations.relation_id FROM relations"
+            " JOIN files ON files.snapshot_id = relations.snapshot_id"
+            "   AND files.file_id = relations.file_id"
+            " WHERE relations.snapshot_id = ?"
+            "   AND (relations.start_line < 1"
+            "     OR relations.end_line < relations.start_line"
+            "     OR relations.end_line > files.line_count)"
+            " ORDER BY relations.relation_id",
+            (snapshot_id,),
+        ).fetchall()
+        return tuple(str(row[0]) for row in rows)
+
     def delete_for_snapshot(self, snapshot_id: str) -> None:
         self._connection.execute(
             "DELETE FROM relations WHERE snapshot_id = ?", (snapshot_id,)
@@ -1029,6 +1073,66 @@ class RelationStore:
         return tuple(_relation_from_row(row) for row in rows)
 
 
+class EvidenceStore:
+    """Addressable evidence: identity, location, and hash — never the excerpt.
+
+    Evidence IDs are content-derived hashes and are not reversible, so serving
+    `GET /v1/evidence/{id}` needs them persisted. What is *not* persisted matters
+    just as much: the excerpt is re-read from disk and re-verified on every
+    fetch, so a stored row can never become a second, staler source of truth
+    about a file's contents.
+    """
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def upsert_many(
+        self, snapshot_id: str, records: Sequence[StoredEvidence]
+    ) -> None:
+        self._connection.executemany(
+            "INSERT INTO evidence ("
+            " snapshot_id, evidence_id, file_id, start_line, end_line,"
+            " content_hash, derivation"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(snapshot_id, evidence_id) DO NOTHING",
+            [
+                (
+                    snapshot_id,
+                    record.evidence_id,
+                    record.file_id,
+                    record.start_line,
+                    record.end_line,
+                    record.content_hash,
+                    record.derivation.value,
+                )
+                for record in records
+            ],
+        )
+
+    def get(self, snapshot_id: str, evidence_id: str) -> StoredEvidence | None:
+        row = self._connection.execute(
+            "SELECT * FROM evidence WHERE snapshot_id = ? AND evidence_id = ?",
+            (snapshot_id, evidence_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return StoredEvidence(
+            evidence_id=row["evidence_id"],
+            file_id=row["file_id"],
+            start_line=int(row["start_line"]),
+            end_line=int(row["end_line"]),
+            content_hash=row["content_hash"],
+            derivation=Derivation(row["derivation"]),
+        )
+
+    def count_for_snapshot(self, snapshot_id: str) -> int:
+        row = self._connection.execute(
+            "SELECT COUNT(*) FROM evidence WHERE snapshot_id = ?",
+            (snapshot_id,),
+        ).fetchone()
+        return int(row[0])
+
+
 def _relation_from_row(row: sqlite3.Row) -> RelationRecord:
     return RelationRecord(
         relation_id=row["relation_id"],
@@ -1043,6 +1147,8 @@ def _relation_from_row(row: sqlite3.Row) -> RelationRecord:
         start_line=int(row["start_line"]),
         end_line=int(row["end_line"]),
         candidate_count=int(row["candidate_count"]),
+        module_hint=row["module_hint"],
+        reference_part=int(row["reference_part"]),
     )
 
 
