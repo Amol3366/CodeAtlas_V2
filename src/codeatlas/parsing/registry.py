@@ -15,7 +15,9 @@ from typing import Protocol
 
 from codeatlas.domain.symbols import SymbolRecord
 
-PARSER_BUNDLE_VERSION: str = "1.0.0"
+# 1.1.0 (Phase 3, ADR-0004): parsers emit references alongside symbols, so every
+# symbol version derived by the 1.0.0 bundle is stale.
+PARSER_BUNDLE_VERSION: str = "1.1.0"
 
 
 @dataclass(frozen=True)

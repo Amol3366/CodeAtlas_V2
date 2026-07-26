@@ -39,7 +39,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 0 — Product contract and evaluation | [phase plan](phases/phase-00-product-contract-evaluation.md) | `complete` | User |
 | 1 — Repository truth vertical slice | [phase plan](phases/phase-01-repository-truth-vertical-slice.md) | `complete` | User |
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
-| 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `awaiting_user_approval` (plan) | User |
+| 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `in_progress` (plan approved 2026-07-26) | User |
 | 4 — Change assurance | Created after Phase 3 approval | `pending` | User |
 | 5 — Persistent web application | Created after Phase 4 approval | `pending` | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
@@ -50,19 +50,19 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | [Phase 3 — Polyglot graph and delivery contracts](phases/phase-03-polyglot-graph-and-delivery-contracts.md) |
-| Active task | None — the Phase 3 plan itself awaits user approval (rule 11) |
-| Task status | P3-SETUP is `pending` and MUST NOT move to `in_progress` |
+| Active task | P3-01 — relation domain, identity, migration `0005`, `RelationStore` |
+| Task status | P3-SETUP is `complete`; P3-01 is `ready` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-26T05:10:00Z |
-| Git state | Branch `main` at `bc4897f` — "docs: record Phase 1 commit SHA in the handoff log". Working tree dirty: all Phase 2 implementation and the Phase 3 plan are uncommitted. |
-| Next gate | The user approves the Phase 3 plan. The evidence-granularity question is **decided** (score containment separately) and folded into P3-SETUP. |
+| Started UTC | 2026-07-26T05:40:00Z |
+| Git state | Branch `main` at `ed3c8de` — "feat: Phase 2 snapshots, stable chunks, and lexical retrieval". Working tree dirty: P3-SETUP is uncommitted. |
+| Next gate | None pending. Phase 3 executes P3-01 through P3-10; the user approves the phase gate at the end. |
 
 ### Phase 3 Task Board (authoritative status)
 
 | Task     | Deliverable                                                  | Dependencies | Status    |
 | -------- | ------------------------------------------------------------ | ------------ | --------- |
-| P3-SETUP | Dependencies, ADR-0003 (granularity), ADR-0004 (contract)     | Phase 2      | `pending` |
-| P3-01    | Relation domain, identity, migration `0005`, `RelationStore`  | P3-SETUP     | `pending` |
+| P3-SETUP | Dependencies, ADR-0003 (granularity), ADR-0004 (contract)     | Phase 2      | `complete` |
+| P3-01    | Relation domain, identity, migration `0005`, `RelationStore`  | P3-SETUP     | `ready`   |
 | P3-02    | Python reference extraction                                   | P3-01        | `pending` |
 | P3-03    | TypeScript/JavaScript parser (symbols)                        | P3-SETUP     | `pending` |
 | P3-04    | TypeScript/JavaScript reference extraction                    | P3-02, P3-03 | `pending` |
@@ -73,10 +73,9 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P3-09    | Initial versioned MCP adapter                                 | P3-08        | `pending` |
 | P3-10    | Cross-adapter contract suite, baseline, docs, phase gate      | P3-09        | `pending` |
 
-Every task is `pending` because the phase plan has not been approved. Rule 11
-forbids moving any of them to `in_progress` until it is. Task requirements,
-interfaces, tests, and acceptance criteria live in the
-[Phase 3 plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md).
+The plan was approved by the user on 2026-07-26, so rule 11 no longer blocks
+execution. Task requirements, interfaces, tests, and acceptance criteria live in
+the [Phase 3 plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md).
 
 ### Phase 2 Task Board (completed 2026-07-26)
 
@@ -128,6 +127,93 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-26T05:40:00Z — Phase 3 plan approved; P3-SETUP completed; P3-01 ready
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: Phase 3 `awaiting_user_approval (plan) -> in_progress`; P3-SETUP
+  `pending -> complete`; P3-01 `pending -> ready`.
+- Approval record, quoted verbatim so the log does not overstate it: after being
+  shown the Phase 3 plan summary, its planned migrations and version bumps, and
+  the open items carried from the Phase 2 gate, the user instructed **"start
+  executing phase 3"**. Direction to begin execution is taken as approval of the
+  plan under rule 11. No amendments were requested.
+- Outcome: the two blocking decisions are recorded as ADRs, the evaluation
+  runner reports evidence agreement at two granularities, all three new
+  dependencies are pinned and load, and the version constants that change
+  snapshot identity are bumped before any task depends on them.
+- Files: `docs/adr/0003-evidence-granularity.md` (new),
+  `docs/adr/0004-relation-model-and-contract-additions.md` (new),
+  `src/codeatlas/evaluation/runner.py`, `tests/evaluation/test_runner.py`,
+  `src/codeatlas/parsing/registry.py`, `src/codeatlas/domain/snapshot.py`,
+  `pyproject.toml`, `uv.lock`, `scripts/check_phase2.ps1` (marked superseded),
+  `docs/evaluation/phase-2-baseline-environment.md`,
+  `docs/evaluation/baseline-phase-0.json` and `.md` (regenerated, below).
+- Contracts/migrations: **none in this task.** No schema change, no API change,
+  `SCHEMA_VERSION` stays 4. `AggregateMetrics` gains two optional fields, which
+  is additive for every consumer that reads `valid_evidence_rate`.
+- Version constants: `PARSER_BUNDLE_VERSION` `1.0.0 -> 1.1.0` per ADR-0004, so
+  every snapshot ID changes on first run after this task. `SnapshotState`
+  gains `RESOLVING`. The `snapshots.state` column is plain `TEXT` with no `CHECK`
+  constraint, verified directly against migration `0001`, so the new state needs
+  no migration.
+- **Deviation from the plan, with reasoning:** the P3-SETUP file list names
+  `resolver_version` on `snapshot.py` alongside the `RESOLVING` state. Only the
+  state was added. `resolver_version` requires migration `0006`, which belongs to
+  a later task, and adding a dataclass field with no column behind it would
+  create a value that is silently always the default. It lands with its
+  migration.
+- **Judgment call the user should see: the Phase 0 null baseline was
+  regenerated.** ADR-0003 changes the baseline artifact schema, so
+  `baseline-phase-0.json` no longer matched and its `--check` exited 5. A null
+  baseline records "the engine does nothing", and that statement is unchanged, so
+  the artifact was regenerated rather than left stale. The diff was inspected and
+  is **exactly two added `null` fields** — no recorded value changed. The
+  **Phase 2** artifacts were deliberately *not* regenerated, per ADR-0003 and the
+  phase plan; they remain the record of that gate.
+- Test-first: all ten new runner tests were written before the implementation and
+  observed failing — the containment cases with `AttributeError` on the missing
+  field, the markdown case on the missing rows. The case that carries the
+  decision is `test_a_containing_prediction_scores_on_containment_but_not_exactness`:
+  a prediction of lines 1-20 against an expectation of 3-11 scores 0 exact and 1
+  containing.
+- Design point worth recording: containment is directional and file-scoped, and
+  a merely **overlapping** prediction satisfies neither metric. Counting overlap
+  would let a citation that omits half the answer score as a hit.
+  `test_a_merely_overlapping_prediction_scores_on_neither_metric` pins that.
+- **Supply-chain observation, not a blocker:** `mcp` resolves to 1.28.1 and pulls
+  18 transitive packages including `cryptography`, `pyjwt`, `python-multipart`,
+  `sse-starlette`, `pydantic-settings`, and `jsonschema`. That is a material
+  increase in dependency surface for a local-first product, and MCP is not used
+  until P3-09. It was added now because the plan specifies pinning all
+  dependencies in P3-SETUP. Recorded in ADR-0004's security section. If the
+  footprint is unwelcome, deferring the `mcp` dependency to P3-09 costs nothing.
+- Verification in the current environment, each run and its exit code:
+  `uv add` + `uv sync --all-groups --frozen` — **exit 0**, lockfile reproducible;
+  grammar load check (Python, JavaScript, TypeScript, **and TSX**) — all four
+  parse a trivial source with `has_error=False`;
+  `uv run pytest tests/evaluation/test_runner.py -q` — 10 failed before
+  implementation, **22 passed** after;
+  `uv run pytest -q` — **487 passed** in 40.79 s (477 before, plus the 10 new);
+  `uv run python scripts/export_contract_schema.py --check` — exit 0;
+  `uv run ruff check src tests scripts apps` — exit 0;
+  `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **102 source files**;
+  `uv run python scripts/run_evaluation.py validate` — exit 0, 6 fixtures / 40
+  query cases / 24 change cases valid;
+  Phase 0 null baseline `--check` — exit 0 after regeneration;
+  Phase 2 engine baseline `--check` — **exit 5, as designed**, confirming the
+  supersession rather than hiding it.
+- Limitations: no relation, parser, or graph behavior exists yet — this task
+  changed decisions, metrics, and version constants only. The TS/JS grammars are
+  proven to load and parse but nothing consumes them until P3-03. The dual
+  evidence metrics are computed and reported but no baseline yet exercises them
+  against real engine output; that arrives with the Phase 3 baseline in P3-10.
+  `_unmet_targets` was deliberately left unchanged, so the release gate still
+  tests `valid_evidence_rate` at 1.0 — the stricter reading — rather than being
+  quietly loosened to the containing rate.
+- Next: P3-01 — relation domain, `relation_id`, migration `0005`, and
+  `RelationStore`.
 
 ### 2026-07-26T05:10:00Z — Phase 3 plan created; awaiting plan approval
 

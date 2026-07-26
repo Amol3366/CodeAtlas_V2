@@ -115,6 +115,7 @@ class QueryScore(ContractModel):
     symbols: RankedMetrics
     evidence: RankedMetrics
     valid_evidence_count: int = Field(ge=0)
+    containing_evidence_count: int = Field(ge=0)
     predicted_evidence_count: int = Field(ge=0)
     relation_path_correctness: Confidence
     forbidden_claim_count: int = Field(ge=0)
@@ -131,6 +132,7 @@ class ChangeScore(ContractModel):
     finding_precision: Confidence
     evidence_recall: Confidence
     valid_evidence_count: int = Field(ge=0)
+    containing_evidence_count: int = Field(ge=0)
     predicted_evidence_count: int = Field(ge=0)
     forbidden_claim_count: int = Field(ge=0)
     claim_count: int = Field(ge=0)
@@ -147,6 +149,12 @@ class AggregateMetrics(ContractModel):
     ndcg_at_10: MetricValue
     primary_evidence_recall_at_10: MetricValue
     valid_evidence_rate: MetricValue
+    # ADR-0003. `valid_evidence_rate` is retained and equals
+    # `exact_evidence_rate`, so no historical number changes meaning. The two
+    # rates are reported side by side because the gap between them is itself
+    # the measurement: it says how precisely CodeAtlas can point at an answer.
+    exact_evidence_rate: MetricValue
+    containing_evidence_rate: MetricValue
     relation_path_correctness: MetricValue
     changed_symbol_precision: MetricValue
     changed_symbol_recall: MetricValue
@@ -235,6 +243,9 @@ def score_query_case(
     valid_evidence = sum(
         item in set(evidence_required) for item in evidence_ranked
     )
+    containing_evidence = _containing_count(
+        prediction.ranked_evidence, case.expected_evidence
+    )
     expected_relations = set(case.expected_relations)
     predicted_relations = set(prediction.relation_paths)
     relation_correctness = _precision(predicted_relations, expected_relations)
@@ -254,6 +265,7 @@ def score_query_case(
         symbols=symbol_metrics,
         evidence=evidence_metrics,
         valid_evidence_count=valid_evidence,
+        containing_evidence_count=containing_evidence,
         predicted_evidence_count=len(evidence_ranked),
         relation_path_correctness=relation_correctness,
         forbidden_claim_count=forbidden_count,
@@ -315,6 +327,9 @@ def score_change_case(
         valid_evidence_count=sum(
             item in expected_evidence for item in predicted_evidence
         ),
+        containing_evidence_count=_containing_count(
+            prediction.evidence, case.expected_evidence
+        ),
         predicted_evidence_count=len(predicted_evidence),
         forbidden_claim_count=forbidden_count,
         claim_count=len(prediction.claims),
@@ -330,6 +345,8 @@ def null_baseline(dataset: Dataset) -> EvaluationReport:
         ndcg_at_10=0.0,
         primary_evidence_recall_at_10=0.0,
         valid_evidence_rate=None,
+        exact_evidence_rate=None,
+        containing_evidence_rate=None,
         relation_path_correctness=0.0,
         changed_symbol_precision=0.0,
         changed_symbol_recall=0.0,
@@ -374,6 +391,14 @@ def render_markdown(report: EvaluationReport) -> str:
         (
             "Valid evidence rate",
             _format_metric(report.metrics.valid_evidence_rate),
+        ),
+        (
+            "Exact evidence rate",
+            _format_metric(report.metrics.exact_evidence_rate),
+        ),
+        (
+            "Containing evidence rate",
+            _format_metric(report.metrics.containing_evidence_rate),
         ),
         (
             "Changed-symbol precision",
@@ -506,6 +531,9 @@ def _aggregate(
     valid_evidence = sum(
         score.valid_evidence_count for score in query_scores
     ) + sum(score.valid_evidence_count for score in change_scores)
+    containing_evidence = sum(
+        score.containing_evidence_count for score in query_scores
+    ) + sum(score.containing_evidence_count for score in change_scores)
     claim_count = sum(score.claim_count for score in query_scores) + sum(
         score.claim_count for score in change_scores
     )
@@ -526,6 +554,16 @@ def _aggregate(
         ),
         valid_evidence_rate=(
             valid_evidence / predicted_evidence
+            if predicted_evidence
+            else None
+        ),
+        exact_evidence_rate=(
+            valid_evidence / predicted_evidence
+            if predicted_evidence
+            else None
+        ),
+        containing_evidence_rate=(
+            containing_evidence / predicted_evidence
             if predicted_evidence
             else None
         ),
@@ -621,6 +659,38 @@ def _evidence_key(item: _EvidenceLike) -> str:
 def _prediction_evidence_key(item: EvidencePrediction) -> str:
     return (
         f"{item.snapshot_id}:{item.file_path}:{item.start_line}:{item.end_line}"
+    )
+
+
+def _contains(predicted: _EvidenceLike, expected: _EvidenceLike) -> bool:
+    """Whether ``predicted`` fully covers ``expected`` in the same file.
+
+    ADR-0003. Containment is directional and file-scoped. A prediction that
+    merely overlaps — clipping either end of the expected range — satisfies
+    neither metric, because a citation that omits part of the answer has not
+    proven it.
+    """
+    return (
+        predicted.snapshot_id == expected.snapshot_id
+        and predicted.file_path == expected.file_path
+        and predicted.start_line <= expected.start_line
+        and predicted.end_line >= expected.end_line
+    )
+
+
+def _containing_count(
+    predicted: Iterable[_EvidenceLike],
+    expected: Iterable[_EvidenceLike],
+) -> int:
+    """Count predictions that contain at least one expected range.
+
+    Exact agreement implies containment, so this is never below the exact
+    count for the same inputs.
+    """
+    expected_items = list(expected)
+    return sum(
+        any(_contains(item, target) for target in expected_items)
+        for item in predicted
     )
 
 

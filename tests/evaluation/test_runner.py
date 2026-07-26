@@ -236,6 +236,163 @@ def test_evaluate_predictions_marks_unmet_release_targets() -> None:
     assert report.metrics.relation_path_correctness == 0.0
 
 
+# --- ADR-0003: evidence granularity is measured, not chosen -------------------
+#
+# `q001` expects `src/payments/service.py` lines 3-11 in snapshot `python-v1`.
+# Each case below varies the predicted range against that one expectation, so
+# the two metrics can be told apart by construction rather than by aggregate
+# drift.
+
+
+def _q001_prediction(
+    *,
+    file_path: str = "src/payments/service.py",
+    snapshot_id: str = "python-v1",
+    start_line: int,
+    end_line: int,
+) -> QueryPrediction:
+    return QueryPrediction(
+        case_id="q001",
+        ranked_symbols=["PaymentService"],
+        ranked_evidence=[
+            EvidencePrediction(
+                evidence_id="predicted-1",
+                snapshot_id=snapshot_id,
+                file_path=file_path,
+                start_line=start_line,
+                end_line=end_line,
+            )
+        ],
+        relation_paths=[],
+        claims=[],
+        abstained=False,
+        duration_ms=0.0,
+    )
+
+
+def test_a_containing_prediction_scores_on_containment_but_not_exactness() -> None:
+    """The case that motivated ADR-0003: right file, wider range."""
+    case = load_dataset(DATASET_ROOT).query_cases[0]
+
+    score = score_query_case(case, _q001_prediction(start_line=1, end_line=20))
+
+    assert score.valid_evidence_count == 0
+    assert score.containing_evidence_count == 1
+
+
+def test_an_exact_prediction_scores_on_both_metrics() -> None:
+    case = load_dataset(DATASET_ROOT).query_cases[0]
+
+    score = score_query_case(case, _q001_prediction(start_line=3, end_line=11))
+
+    assert score.valid_evidence_count == 1
+    assert score.containing_evidence_count == 1
+
+
+def test_a_merely_overlapping_prediction_scores_on_neither_metric() -> None:
+    """Overlap is not containment: half an answer has not proven the claim."""
+    case = load_dataset(DATASET_ROOT).query_cases[0]
+
+    score = score_query_case(case, _q001_prediction(start_line=5, end_line=20))
+
+    assert score.valid_evidence_count == 0
+    assert score.containing_evidence_count == 0
+
+
+def test_containment_does_not_cross_files() -> None:
+    case = load_dataset(DATASET_ROOT).query_cases[0]
+
+    score = score_query_case(
+        case, _q001_prediction(file_path="src/other.py", start_line=1, end_line=20)
+    )
+
+    assert score.containing_evidence_count == 0
+
+
+def test_containment_does_not_cross_snapshots() -> None:
+    case = load_dataset(DATASET_ROOT).query_cases[0]
+
+    score = score_query_case(
+        case, _q001_prediction(snapshot_id="stale-snapshot", start_line=1, end_line=20)
+    )
+
+    assert score.containing_evidence_count == 0
+
+
+def test_aggregate_reports_exact_and_containing_rates_separately() -> None:
+    dataset = load_dataset(DATASET_ROOT)
+    predictions = PredictionFile(
+        query_predictions=[_q001_prediction(start_line=1, end_line=20)]
+    )
+
+    report = evaluate_predictions(dataset, predictions)
+
+    assert report.metrics.exact_evidence_rate == 0.0
+    assert report.metrics.containing_evidence_rate == 1.0
+    # Retained as the stricter of the two so no historical number changes
+    # meaning.
+    assert report.metrics.valid_evidence_rate == report.metrics.exact_evidence_rate
+
+
+def test_containing_rate_is_never_below_the_exact_rate() -> None:
+    dataset = load_dataset(DATASET_ROOT)
+    predictions = PredictionFile(
+        query_predictions=[
+            _q001_prediction(start_line=3, end_line=11),
+        ]
+    )
+
+    report = evaluate_predictions(dataset, predictions)
+    exact = report.metrics.exact_evidence_rate
+    containing = report.metrics.containing_evidence_rate
+    assert exact is not None and containing is not None
+    assert containing >= exact
+
+
+def test_change_scoring_counts_containment_separately() -> None:
+    dataset = load_dataset(DATASET_ROOT)
+    case = dataset.change_cases[0]
+    expected = case.expected_evidence[0]
+    prediction = ChangePrediction(
+        case_id=case.id,
+        changed_symbols=[],
+        impact_paths=[],
+        findings=[],
+        evidence=[
+            EvidencePrediction(
+                evidence_id="predicted-1",
+                snapshot_id=expected.snapshot_id,
+                file_path=expected.file_path,
+                start_line=max(1, expected.start_line - 1),
+                end_line=expected.end_line + 1,
+            )
+        ],
+        claims=[],
+        duration_ms=0.0,
+    )
+
+    score = score_change_case(case, prediction)
+
+    assert score.valid_evidence_count == 0
+    assert score.containing_evidence_count == 1
+
+
+def test_both_evidence_rates_are_not_applicable_without_predictions() -> None:
+    report = null_baseline(load_dataset(DATASET_ROOT))
+
+    assert report.metrics.exact_evidence_rate is None
+    assert report.metrics.containing_evidence_rate is None
+
+
+def test_markdown_report_names_both_evidence_metrics() -> None:
+    report = null_baseline(load_dataset(DATASET_ROOT))
+
+    rendered = render_markdown(report)
+
+    assert "Exact evidence rate" in rendered
+    assert "Containing evidence rate" in rendered
+
+
 def test_prediction_file_round_trips_versioned_json() -> None:
     predictions = PredictionFile()
 

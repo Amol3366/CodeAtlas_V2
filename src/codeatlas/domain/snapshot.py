@@ -24,6 +24,10 @@ class SnapshotState(StrEnum):
     SCANNING = "scanning"
     PARSING = "parsing"
     CHUNKING = "chunking"
+    # Resolution turns per-file references into snapshot-wide relations. It is a
+    # distinct stage because it is the first one that needs every file, so a
+    # snapshot stuck here failed differently from one stuck in CHUNKING.
+    RESOLVING = "resolving"
     INDEXING = "indexing"
     VALIDATING = "validating"
     ACTIVE = "active"

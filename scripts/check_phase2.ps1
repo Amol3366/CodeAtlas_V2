@@ -1,4 +1,19 @@
-# Phase 2 release gate. Supersedes scripts/check_phase1.ps1.
+# SUPERSEDED by the Phase 3 gate (scripts/check_phase3.ps1, added in P3-10).
+#
+# Kept as the record of the Phase 2 gate. Two of its steps no longer pass, and
+# should not:
+#
+#   'Phase 2 engine baseline' — that artifact records what the Phase 2 engine
+#   did. ADR-0003 added exact_evidence_rate and containing_evidence_rate, which
+#   changes the artifact *schema*, and PARSER_BUNDLE_VERSION 1.1.0 changes every
+#   snapshot ID. Re-running it against a later engine exits 5 (stale artifact)
+#   by design. The Phase 2 artifacts are kept unchanged and are NOT regenerated.
+#
+#   'Phase 0 null baseline' — still checked, and still passes. That artifact was
+#   regenerated in P3-SETUP to carry the two new metric fields, both null. No
+#   recorded value changed; only the schema did.
+#
+# Previously: Phase 2 release gate, superseding scripts/check_phase1.ps1.
 [CmdletBinding()]
 param(
     [switch]$SkipSync,
