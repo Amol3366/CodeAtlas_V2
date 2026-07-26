@@ -123,6 +123,33 @@ def snapshot_id(
     return f"snap_{digest}"
 
 
+def relation_id(
+    source_symbol_id_value: str,
+    kind: str,
+    target_hint: str,
+    start_line: int,
+    part: int = 0,
+) -> str:
+    """Identify one relation by the call site that produced it.
+
+    The ID is stable across snapshots for an unchanged call site, which is what
+    makes relation reuse observable and what will let change analysis say "this
+    edge is new" rather than "these two edge sets differ somewhere".
+
+    ``part`` separates two otherwise identical references on one line, as in
+    ``f(f(x))``; without it the second occurrence would collide with the first
+    and one real edge would be silently lost.
+    """
+    digest = stable_hash(
+        source_symbol_id_value,
+        kind,
+        target_hint,
+        str(start_line),
+        str(part),
+    )
+    return f"rel_{digest}"
+
+
 def evidence_id(
     snapshot_id_value: str,
     file_id_value: str,

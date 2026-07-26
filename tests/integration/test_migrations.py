@@ -60,8 +60,39 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_four() -> None:
-    assert SCHEMA_VERSION == 4
+def test_schema_version_is_five() -> None:
+    assert SCHEMA_VERSION == 5
+
+
+def test_relation_table_exists(tmp_path: Path) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        rows = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+        ).fetchall()
+    assert "relations" in {row[0] for row in rows}
+
+
+def test_upgrading_an_existing_version_4_database_preserves_data(
+    tmp_path: Path,
+) -> None:
+    """Migration 0005 is additive; a version-4 database keeps its rows."""
+    database = tmp_path / "db.sqlite"
+    with connect(database) as connection:
+        _apply_through_version(connection, 4)
+        assert current_version(connection) == 4
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+
+    with connect(database) as connection:
+        assert apply_migrations(connection) == SCHEMA_VERSION
+        repositories = connection.execute(
+            "SELECT COUNT(*) FROM repositories"
+        ).fetchone()[0]
+        relations = connection.execute("SELECT COUNT(*) FROM relations").fetchone()[0]
+
+    assert repositories == 1
+    assert relations == 0
 
 
 def test_chunk_tables_and_fts_projections_exist(tmp_path: Path) -> None:
@@ -78,11 +109,16 @@ def test_chunk_tables_and_fts_projections_exist(tmp_path: Path) -> None:
 
 def _apply_only_version_one(connection: sqlite3.Connection) -> None:
     """Bring a database to schema version 1 exactly, as a pre-Phase-2 install."""
+    _apply_through_version(connection, 1)
+
+
+def _apply_through_version(connection: sqlite3.Connection, version: int) -> None:
+    """Bring a database to an exact schema version, as an older install would be."""
     from codeatlas.storage.sqlite.migrations import _apply_one, _load_migrations
 
     current_version(connection)  # creates the bookkeeping table
     for migration in _load_migrations():
-        if migration.version == 1:
+        if migration.version <= version:
             _apply_one(connection, migration)
 
 

@@ -14,8 +14,9 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from codeatlas.contracts import SymbolKind
+from codeatlas.contracts import Derivation, RelationKind, SymbolKind
 from codeatlas.domain.chunks import ChunkRole, LogicalChunk
+from codeatlas.domain.relations import RelationRecord, ResolutionState
 from codeatlas.domain.repository import FileClassification, FileRecord, Repository
 from codeatlas.domain.search import ChunkSearchHit, FileSearchHit
 from codeatlas.domain.snapshot import Snapshot, SnapshotState
@@ -36,6 +37,10 @@ _CHUNK_SELECT = (
     "   AND files.file_id = chunks.file_id"
 )
 _CHUNK_ORDER = "ORDER BY files.relative_path, chunks.start_line, chunks.part_index"
+
+# Relations are ordered by call site so traversal is reproducible: the same
+# snapshot must always produce the same answer in the same order.
+_RELATION_ORDER = "ORDER BY start_line, end_line, kind, relation_id"
 
 
 class RepositoryStore:
@@ -872,6 +877,172 @@ def _chunk_from_row(row: sqlite3.Row) -> LogicalChunk:
         retrieval_text=row["retrieval_text"],
         part_index=int(row["part_index"]),
         part_count=int(row["part_count"]),
+    )
+
+
+class RelationStore:
+    """Resolved edges between symbols, scoped to one snapshot.
+
+    ``outgoing`` and ``incoming`` take a *sequence* of symbol IDs so traversal
+    expands a whole frontier in one statement. A per-node query would be the N+1
+    pattern ``CLAUDE.md`` Section 10.3 forbids, and traversal is the hottest path
+    in this phase.
+    """
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def add_many(
+        self, snapshot_id: str, relations: Sequence[RelationRecord]
+    ) -> None:
+        self._connection.executemany(
+            "INSERT INTO relations ("
+            " snapshot_id, relation_id, source_symbol_id, target_symbol_id,"
+            " file_id, kind, target_hint, resolution, derivation, confidence,"
+            " start_line, end_line, candidate_count"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    snapshot_id,
+                    relation.relation_id,
+                    relation.source_symbol_id,
+                    relation.target_symbol_id,
+                    relation.file_id,
+                    relation.kind.value,
+                    relation.target_hint,
+                    relation.resolution.value,
+                    relation.derivation.value,
+                    relation.confidence,
+                    relation.start_line,
+                    relation.end_line,
+                    relation.candidate_count,
+                )
+                for relation in relations
+            ],
+        )
+
+    def list_for_snapshot(self, snapshot_id: str) -> tuple[RelationRecord, ...]:
+        rows = self._connection.execute(
+            f"SELECT * FROM relations WHERE snapshot_id = ? {_RELATION_ORDER}",
+            (snapshot_id,),
+        ).fetchall()
+        return tuple(_relation_from_row(row) for row in rows)
+
+    def list_for_file(
+        self, snapshot_id: str, file_id: str
+    ) -> tuple[RelationRecord, ...]:
+        rows = self._connection.execute(
+            "SELECT * FROM relations WHERE snapshot_id = ? AND file_id = ?"
+            f" {_RELATION_ORDER}",
+            (snapshot_id, file_id),
+        ).fetchall()
+        return tuple(_relation_from_row(row) for row in rows)
+
+    def outgoing(
+        self,
+        snapshot_id: str,
+        symbol_ids: Sequence[str],
+        kinds: Sequence[RelationKind] | None = None,
+    ) -> tuple[RelationRecord, ...]:
+        """Edges leaving any of ``symbol_ids`` — callees, imports, bases."""
+        return self._frontier(snapshot_id, "source_symbol_id", symbol_ids, kinds)
+
+    def incoming(
+        self,
+        snapshot_id: str,
+        symbol_ids: Sequence[str],
+        kinds: Sequence[RelationKind] | None = None,
+    ) -> tuple[RelationRecord, ...]:
+        """Edges arriving at any of ``symbol_ids`` — callers, dependents."""
+        return self._frontier(snapshot_id, "target_symbol_id", symbol_ids, kinds)
+
+    def count_for_snapshot(self, snapshot_id: str) -> int:
+        row = self._connection.execute(
+            "SELECT COUNT(*) FROM relations WHERE snapshot_id = ?",
+            (snapshot_id,),
+        ).fetchone()
+        return int(row[0])
+
+    def dangling_endpoints(self, snapshot_id: str) -> tuple[str, ...]:
+        """Return IDs of relations whose source or resolved target is absent.
+
+        A NULL ``target_symbol_id`` is *not* dangling: it means no repository
+        symbol answers the reference, which is a valid recorded state. Only a
+        target that claims to name a symbol, and does not, is a defect.
+
+        Returns relation IDs rather than symbol IDs so a validation failure names
+        the row to inspect, matching ``ChunkStore.invalid_line_ranges``.
+        """
+        rows = self._connection.execute(
+            "SELECT relation_id FROM relations AS r"
+            " WHERE r.snapshot_id = ?"
+            "   AND ("
+            "     NOT EXISTS ("
+            "       SELECT 1 FROM symbols AS s"
+            "       WHERE s.snapshot_id = r.snapshot_id"
+            "         AND s.symbol_id = r.source_symbol_id"
+            "     )"
+            "     OR ("
+            "       r.target_symbol_id IS NOT NULL"
+            "       AND NOT EXISTS ("
+            "         SELECT 1 FROM symbols AS s"
+            "         WHERE s.snapshot_id = r.snapshot_id"
+            "           AND s.symbol_id = r.target_symbol_id"
+            "       )"
+            "     )"
+            "   )"
+            " ORDER BY relation_id",
+            (snapshot_id,),
+        ).fetchall()
+        return tuple(str(row[0]) for row in rows)
+
+    def delete_for_snapshot(self, snapshot_id: str) -> None:
+        self._connection.execute(
+            "DELETE FROM relations WHERE snapshot_id = ?", (snapshot_id,)
+        )
+
+    def _frontier(
+        self,
+        snapshot_id: str,
+        column: str,
+        symbol_ids: Sequence[str],
+        kinds: Sequence[RelationKind] | None,
+    ) -> tuple[RelationRecord, ...]:
+        if not symbol_ids:
+            return ()
+
+        # `column` is chosen by this class, never by a caller, so the two
+        # literal names below are the only values it can ever hold.
+        symbol_placeholders = ", ".join("?" for _ in symbol_ids)
+        sql = (
+            f"SELECT * FROM relations WHERE snapshot_id = ?"
+            f" AND {column} IN ({symbol_placeholders})"
+        )
+        parameters: list[Any] = [snapshot_id, *symbol_ids]
+        if kinds:
+            kind_placeholders = ", ".join("?" for _ in kinds)
+            sql += f" AND kind IN ({kind_placeholders})"
+            parameters.extend(kind.value for kind in kinds)
+        rows = self._connection.execute(
+            f"{sql} {_RELATION_ORDER}", parameters
+        ).fetchall()
+        return tuple(_relation_from_row(row) for row in rows)
+
+
+def _relation_from_row(row: sqlite3.Row) -> RelationRecord:
+    return RelationRecord(
+        relation_id=row["relation_id"],
+        source_symbol_id=row["source_symbol_id"],
+        target_symbol_id=row["target_symbol_id"],
+        file_id=row["file_id"],
+        kind=RelationKind(row["kind"]),
+        target_hint=row["target_hint"],
+        resolution=ResolutionState(row["resolution"]),
+        derivation=Derivation(row["derivation"]),
+        confidence=float(row["confidence"]),
+        start_line=int(row["start_line"]),
+        end_line=int(row["end_line"]),
+        candidate_count=int(row["candidate_count"]),
     )
 
 

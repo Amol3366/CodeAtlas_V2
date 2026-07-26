@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | [Phase 3 — Polyglot graph and delivery contracts](phases/phase-03-polyglot-graph-and-delivery-contracts.md) |
-| Active task | P3-01 — relation domain, identity, migration `0005`, `RelationStore` |
-| Task status | P3-SETUP is `complete`; P3-01 is `ready` |
+| Active task | P3-02 — Python reference extraction |
+| Task status | P3-01 is `complete`; P3-02 is `ready` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-26T05:40:00Z |
-| Git state | Branch `main` at `ed3c8de` — "feat: Phase 2 snapshots, stable chunks, and lexical retrieval". Working tree dirty: P3-SETUP is uncommitted. |
+| Started UTC | 2026-07-26T06:05:00Z |
+| Git state | Branch `main` at `85d00f7` — "feat: P3-SETUP decisions, dual evidence metrics, and TS/JS/MCP dependencies". Working tree dirty: P3-01 is uncommitted. |
 | Next gate | None pending. Phase 3 executes P3-01 through P3-10; the user approves the phase gate at the end. |
 
 ### Phase 3 Task Board (authoritative status)
@@ -62,8 +62,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Task     | Deliverable                                                  | Dependencies | Status    |
 | -------- | ------------------------------------------------------------ | ------------ | --------- |
 | P3-SETUP | Dependencies, ADR-0003 (granularity), ADR-0004 (contract)     | Phase 2      | `complete` |
-| P3-01    | Relation domain, identity, migration `0005`, `RelationStore`  | P3-SETUP     | `ready`   |
-| P3-02    | Python reference extraction                                   | P3-01        | `pending` |
+| P3-01    | Relation domain, identity, migration `0005`, `RelationStore`  | P3-SETUP     | `complete` |
+| P3-02    | Python reference extraction                                   | P3-01        | `ready`   |
 | P3-03    | TypeScript/JavaScript parser (symbols)                        | P3-SETUP     | `pending` |
 | P3-04    | TypeScript/JavaScript reference extraction                    | P3-02, P3-03 | `pending` |
 | P3-05    | Snapshot resolution and indexing integration                  | P3-04        | `pending` |
@@ -127,6 +127,82 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-26T06:05:00Z — P3-01 completed; P3-02 ready
+
+- Agent: Claude Code `claude-opus-5`
+- Transition: P3-01 `ready -> complete`; P3-02 `pending -> ready`.
+- Outcome: a relation can be stored, read back with every field intact, scoped
+  to its snapshot, expanded in either direction for a whole frontier in one
+  query, and validated for dangling endpoints. Nothing produces relations yet —
+  that is P3-02 onward.
+- Files: `src/codeatlas/domain/relations.py` (new), `src/codeatlas/domain/ids.py`
+  (`relation_id`),
+  `src/codeatlas/storage/sqlite/migrations/0005_phase3_relations.sql` (new),
+  `src/codeatlas/storage/sqlite/migrations.py` (`SCHEMA_VERSION = 5`),
+  `src/codeatlas/storage/sqlite/stores.py` (`RelationStore`),
+  `tests/unit/test_relation_ids.py` (new),
+  `tests/integration/test_relation_store.py` (new),
+  `tests/integration/test_migrations.py`.
+- Contracts/migrations: **`SCHEMA_VERSION = 5`.** Migration `0005` is additive
+  and forward-only; `0001`–`0004` are untouched. A version-4 database upgrades in
+  place with its rows intact, proven by
+  `test_upgrading_an_existing_version_4_database_preserves_data`, which applies
+  migrations through 4 exactly, writes a repository and a snapshot, reopens the
+  database, upgrades to 5, and asserts the rows survive. No API or response
+  contract changed.
+- Test-first: both new test files were written before any implementation and
+  observed failing with `ModuleNotFoundError: No module named
+  'codeatlas.domain.relations'`.
+- Design decision, recorded because it is load-bearing for validation:
+  `target_symbol_id` is nullable and is NULL for every resolution state except
+  `RESOLVED`. `dangling_endpoints` therefore treats NULL as **valid**, not
+  broken — an import of `react` genuinely has no repository symbol to name — and
+  flags only a target that claims to name a symbol and does not, plus any
+  relation whose *source* symbol is absent. Both directions have a test.
+- `dangling_endpoints` returns **relation** IDs rather than symbol IDs, so a
+  validation failure names the row to inspect. This mirrors
+  `ChunkStore.invalid_line_ranges`, which returns chunk IDs rather than ranges.
+- `outgoing`/`incoming` take a sequence of symbol IDs and issue one statement, so
+  traversal expands a frontier without the N+1 pattern `CLAUDE.md` Section 10.3
+  forbids. `test_outgoing_expands_a_whole_frontier_in_one_call` pins it.
+- **Test-side correction made during the cycle, worth recording:** the
+  query-plan test initially asserted the plan of a hand-written `column = ?`
+  query, while the store actually issues `column IN (...)`. That would have
+  proven an index is usable without proving the store uses it. The test now
+  captures the statement the store really executes via
+  `sqlite3.set_trace_callback` and runs `EXPLAIN QUERY PLAN` on that exact text,
+  so the assertion cannot drift from the implementation. Three cases are covered:
+  outgoing with a kind filter, incoming with a kind filter, and an unfiltered
+  frontier — the last because dropping the optional filter must not fall back to
+  a scan. All three report `SEARCH relations USING INDEX relations_by_source` or
+  `..._by_target`, and each asserts `SCAN relations` is absent.
+- One MyPy fix, not a product defect: the test imported `SymbolKind` from
+  `codeatlas.domain.symbols`, which re-exports it without declaring it public.
+  It now imports from `codeatlas.contracts`, the declaring module.
+- Verification in the current environment, all exit code 0:
+  `uv run pytest tests/unit/test_relation_ids.py
+  tests/integration/test_relation_store.py tests/integration/test_migrations.py -q`
+  — 41 passed;
+  `uv run pytest -q` — **513 passed** in 42.24 s (487 before, plus 26 new);
+  `uv run ruff check src tests scripts apps` — all checks passed;
+  `uv run mypy --no-incremental src tests scripts apps` — no issues in **105
+  source files**.
+- Acceptance, against the plan's three criteria: relations round-trip with every
+  field intact including `resolution` and `candidate_count`; deleting a snapshot
+  removes its relations by cascade
+  (`test_deleting_a_snapshot_cascades_to_its_relations`); both traversal
+  directions use an index, proven by query-plan assertion against the real query.
+- Limitations: the store trusts its caller to supply consistent rows — it
+  validates nothing about whether a `RESOLVED` relation actually has a
+  non-NULL target, because that consistency is resolution's contract and is
+  enforced at activation via `dangling_endpoints` in P3-05. Relations are not yet
+  written by indexing, not yet copied on reuse, and not yet traversed. Ordering
+  is by call site (`start_line, end_line, kind, relation_id`), which is stable
+  but not yet the `(depth, file path, start line, relation kind)` ordering the
+  traversal in P3-06 requires; that ordering is applied by the traversal, not the
+  store.
+- Next: P3-02 — Python reference extraction.
 
 ### 2026-07-26T05:40:00Z — Phase 3 plan approved; P3-SETUP completed; P3-01 ready
 

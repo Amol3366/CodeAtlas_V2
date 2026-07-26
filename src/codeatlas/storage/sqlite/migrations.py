@@ -19,7 +19,7 @@ from importlib.resources import files
 
 from codeatlas.storage.sqlite.connection import to_utc_text
 
-SCHEMA_VERSION: int = 4
+SCHEMA_VERSION: int = 5
 
 _MIGRATION_PACKAGE = "codeatlas.storage.sqlite"
 _MIGRATION_DIRECTORY = "migrations"
