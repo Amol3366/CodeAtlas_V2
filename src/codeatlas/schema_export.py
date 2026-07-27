@@ -8,6 +8,7 @@ from typing import Any
 
 from codeatlas.contracts import (
     CONTRACT_VERSION,
+    ChangeAnalysisReport,
     ErrorEnvelope,
     Finding,
     QueryResponse,
@@ -21,6 +22,9 @@ def build_schema_bundle() -> dict[str, Any]:
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "contract_version": CONTRACT_VERSION,
         "schemas": {
+            "change_analysis_report": ChangeAnalysisReport.model_json_schema(
+                mode="serialization"
+            ),
             "error_envelope": ErrorEnvelope.model_json_schema(
                 mode="serialization"
             ),

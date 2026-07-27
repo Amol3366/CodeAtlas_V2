@@ -2,6 +2,676 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "contract_version": "1.0",
   "schemas": {
+    "change_analysis_report": {
+      "$defs": {
+        "AnalysisSide": {
+          "description": "Which side of a change a piece of evidence belongs to.\n\nBase-side evidence is hash-verified at analysis time and historical by\nconstruction; it is labeled as base so a reader never mistakes it for the\ncurrent snapshot's content.",
+          "enum": [
+            "base",
+            "target"
+          ],
+          "title": "AnalysisSide",
+          "type": "string"
+        },
+        "AnalysisStateRef": {
+          "additionalProperties": false,
+          "description": "One side of a change: the ref the caller asked for and what it resolved\nto.\n\nThe base side carries no snapshot ID — it is reconstructed in memory or read\nfrom Git objects, never a stored active snapshot. The target side carries\nthe active snapshot ID it was analyzed against, so a reader can tell exactly\nwhich snapshot the analysis is bound to.",
+          "properties": {
+            "commit": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Commit"
+            },
+            "freshness": {
+              "$ref": "#/$defs/SnapshotFreshness"
+            },
+            "ref": {
+              "minLength": 1,
+              "title": "Ref",
+              "type": "string"
+            },
+            "snapshot_id": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Snapshot Id"
+            }
+          },
+          "required": [
+            "ref",
+            "commit",
+            "snapshot_id",
+            "freshness"
+          ],
+          "title": "AnalysisStateRef",
+          "type": "object"
+        },
+        "ChangeAnalysisKind": {
+          "description": "Which form of diff an analysis compares.",
+          "enum": [
+            "working_tree",
+            "commit_range"
+          ],
+          "title": "ChangeAnalysisKind",
+          "type": "string"
+        },
+        "ChangeAnalysisStatus": {
+          "description": "Lifecycle of one change analysis.",
+          "enum": [
+            "analyzing",
+            "completed",
+            "failed"
+          ],
+          "title": "ChangeAnalysisStatus",
+          "type": "string"
+        },
+        "ChangeEvidenceItem": {
+          "additionalProperties": false,
+          "description": "One piece of analysis-scoped evidence, explicitly base- or target-side.\n\nUnlike :class:`Evidence`, the analysis evidence model carries a ``side``\nrather than a repository-wide ``snapshot_id``: the base side of a working\ntree has no stored snapshot, only a commit, and pretending otherwise would\nhide the historical nature of base-side citations.",
+          "properties": {
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "content_hash": {
+              "minLength": 1,
+              "title": "Content Hash",
+              "type": "string"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "end_line": {
+              "minimum": 1,
+              "title": "End Line",
+              "type": "integer"
+            },
+            "evidence_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Evidence Id",
+              "type": "string"
+            },
+            "file_path": {
+              "maxLength": 4096,
+              "title": "File Path",
+              "type": "string"
+            },
+            "side": {
+              "$ref": "#/$defs/AnalysisSide"
+            },
+            "start_line": {
+              "minimum": 1,
+              "title": "Start Line",
+              "type": "integer"
+            },
+            "symbol": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Symbol"
+            }
+          },
+          "required": [
+            "evidence_id",
+            "side",
+            "file_path",
+            "start_line",
+            "end_line",
+            "content_hash",
+            "derivation",
+            "confidence"
+          ],
+          "title": "ChangeEvidenceItem",
+          "type": "object"
+        },
+        "ChangeKind": {
+          "description": "What happened to one symbol across a change.",
+          "enum": [
+            "added",
+            "deleted",
+            "modified",
+            "moved",
+            "dependency"
+          ],
+          "title": "ChangeKind",
+          "type": "string"
+        },
+        "ChangedFile": {
+          "additionalProperties": false,
+          "description": "One file in the file-level diff.",
+          "properties": {
+            "base_path": {
+              "anyOf": [
+                {
+                  "maxLength": 4096,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Base Path"
+            },
+            "change_kind": {
+              "$ref": "#/$defs/FileChangeKind"
+            },
+            "content_hash_changed": {
+              "default": false,
+              "title": "Content Hash Changed",
+              "type": "boolean"
+            },
+            "path": {
+              "maxLength": 4096,
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "change_kind"
+          ],
+          "title": "ChangedFile",
+          "type": "object"
+        },
+        "ChangedSymbol": {
+          "additionalProperties": false,
+          "description": "One symbol that differs between the base and target states.\n\nA deleted or moved-from symbol carries base line range and a base file path;\nan added symbol carries target range; a modified symbol carries target\nrange and, when its content also moved, a base file path. The two are kept\nconsistent: base lines without a base file is a contradiction the contract\nrefuses, because a citation with no file is not a citation.",
+          "properties": {
+            "base_end_line": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Base End Line"
+            },
+            "base_file_path": {
+              "anyOf": [
+                {
+                  "maxLength": 4096,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Base File Path"
+            },
+            "base_start_line": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Base Start Line"
+            },
+            "change_kind": {
+              "$ref": "#/$defs/ChangeKind"
+            },
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "file_path": {
+              "maxLength": 4096,
+              "title": "File Path",
+              "type": "string"
+            },
+            "public": {
+              "title": "Public",
+              "type": "boolean"
+            },
+            "qualified_name": {
+              "minLength": 1,
+              "title": "Qualified Name",
+              "type": "string"
+            },
+            "signature_changed": {
+              "title": "Signature Changed",
+              "type": "boolean"
+            },
+            "symbol_kind": {
+              "$ref": "#/$defs/SymbolKind"
+            },
+            "target_end_line": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target End Line"
+            },
+            "target_start_line": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Start Line"
+            }
+          },
+          "required": [
+            "qualified_name",
+            "symbol_kind",
+            "change_kind",
+            "file_path",
+            "signature_changed",
+            "public",
+            "derivation",
+            "confidence"
+          ],
+          "title": "ChangedSymbol",
+          "type": "object"
+        },
+        "Derivation": {
+          "enum": [
+            "deterministic",
+            "static_resolved",
+            "high_confidence_heuristic",
+            "low_confidence_heuristic",
+            "semantic_candidate",
+            "model_generated",
+            "unsupported"
+          ],
+          "title": "Derivation",
+          "type": "string"
+        },
+        "FileChangeKind": {
+          "description": "The file-level diff classification.",
+          "enum": [
+            "added",
+            "deleted",
+            "modified",
+            "renamed"
+          ],
+          "title": "FileChangeKind",
+          "type": "string"
+        },
+        "Finding": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "minLength": 1,
+              "title": "Code",
+              "type": "string"
+            },
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "description": {
+              "minLength": 1,
+              "title": "Description",
+              "type": "string"
+            },
+            "evidence_ids": {
+              "items": {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "title": "Evidence Ids",
+              "type": "array"
+            },
+            "limitations": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Limitations",
+              "type": "array"
+            },
+            "remediation": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Remediation"
+            },
+            "severity": {
+              "$ref": "#/$defs/Severity"
+            },
+            "title": {
+              "minLength": 1,
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "severity",
+            "title",
+            "description",
+            "derivation",
+            "confidence",
+            "evidence_ids"
+          ],
+          "title": "Finding",
+          "type": "object"
+        },
+        "ImpactEdge": {
+          "additionalProperties": false,
+          "description": "One edge in the impact graph, labeled but not cited.\n\nAn impact edge is a graph fact with a derivation and a confidence; it is\nnot a citable region of source. Keeping evidence off the edge is what keeps\nthe response's evidence list minimal and the exact/containing metrics\nmeaningful, per ADR-0003 and ADR-0005.",
+          "properties": {
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "kind": {
+              "$ref": "#/$defs/RelationKind"
+            },
+            "source": {
+              "minLength": 1,
+              "title": "Source",
+              "type": "string"
+            },
+            "target": {
+              "minLength": 1,
+              "title": "Target",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "target",
+            "kind",
+            "derivation",
+            "confidence"
+          ],
+          "title": "ImpactEdge",
+          "type": "object"
+        },
+        "OverallRisk": {
+          "description": "The highest severity present in an analysis, or none.\n\nExtends :class:`Severity` with one ``NONE`` value so an analysis with no\nfindings can still name its overall risk honestly rather than being absent.",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info",
+            "none"
+          ],
+          "title": "OverallRisk",
+          "type": "string"
+        },
+        "RelationKind": {
+          "enum": [
+            "CONTAINS",
+            "IMPORTS",
+            "EXPORTS",
+            "CALLS",
+            "MAY_CALL",
+            "INHERITS",
+            "IMPLEMENTS",
+            "OVERRIDES",
+            "ROUTES_TO",
+            "TESTS",
+            "DOCUMENTS",
+            "READS",
+            "WRITES",
+            "QUERIES",
+            "CONFIGURES",
+            "REFERENCES",
+            "DEPENDS_ON"
+          ],
+          "title": "RelationKind",
+          "type": "string"
+        },
+        "Severity": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "SnapshotFreshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "partial",
+            "unknown"
+          ],
+          "title": "SnapshotFreshness",
+          "type": "string"
+        },
+        "SymbolKind": {
+          "enum": [
+            "MODULE",
+            "PACKAGE",
+            "CLASS",
+            "INTERFACE",
+            "ENUM",
+            "FUNCTION",
+            "METHOD",
+            "CONSTRUCTOR",
+            "PROPERTY",
+            "FIELD",
+            "CONSTANT",
+            "TYPE_ALIAS",
+            "ROUTE",
+            "TEST",
+            "FIXTURE",
+            "CONFIG_KEY",
+            "DATABASE_TABLE",
+            "DATABASE_COLUMN",
+            "SQL_QUERY",
+            "DOCUMENT_SECTION"
+          ],
+          "title": "SymbolKind",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "The persisted, machine-readable rendering of one change analysis.",
+      "properties": {
+        "analysis_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Analysis Id",
+          "type": "string"
+        },
+        "base": {
+          "$ref": "#/$defs/AnalysisStateRef"
+        },
+        "changed_files": {
+          "items": {
+            "$ref": "#/$defs/ChangedFile"
+          },
+          "title": "Changed Files",
+          "type": "array"
+        },
+        "changed_symbols": {
+          "items": {
+            "$ref": "#/$defs/ChangedSymbol"
+          },
+          "title": "Changed Symbols",
+          "type": "array"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        },
+        "contract_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/ChangeEvidenceItem"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "impact_edges": {
+          "items": {
+            "$ref": "#/$defs/ImpactEdge"
+          },
+          "title": "Impact Edges",
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChangeAnalysisKind"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "overall_risk": {
+          "$ref": "#/$defs/OverallRisk"
+        },
+        "repository_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Repository Id",
+          "type": "string"
+        },
+        "request_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ChangeAnalysisStatus"
+        },
+        "target": {
+          "$ref": "#/$defs/AnalysisStateRef"
+        },
+        "test_gaps": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Test Gaps",
+          "type": "array"
+        },
+        "timing_ms": {
+          "additionalProperties": {
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "title": "Timing Ms",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "analysis_id",
+        "request_id",
+        "repository_id",
+        "kind",
+        "status",
+        "overall_risk",
+        "base",
+        "target",
+        "created_at"
+      ],
+      "title": "ChangeAnalysisReport",
+      "type": "object"
+    },
     "error_envelope": {
       "$defs": {
         "ErrorDetail": {

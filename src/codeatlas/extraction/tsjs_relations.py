@@ -25,7 +25,15 @@ from tree_sitter import Node
 
 from codeatlas.contracts import RelationKind
 from codeatlas.domain.relations import SymbolReference
+from codeatlas.extraction.routes import ROUTE_HINT, normalize_route
 from codeatlas.parsing.registry import ParseDiagnostic
+
+# Receivers whose calls address an HTTP path rather than a repository symbol.
+# Deliberately a closed list: any member call could be given a path-shaped
+# string, and treating every one as a route would fabricate edges.
+_HTTP_CLIENTS: Final[frozenset[str]] = frozenset({"axios", "fetch"})
+
+_STRING_TYPES: Final[frozenset[str]] = frozenset({"string", "template_string"})
 
 _CONTAINER_TYPES: Final[frozenset[str]] = frozenset(
     {
@@ -176,6 +184,7 @@ def _walk(
             qualified_name = f"{current_prefix}{declared}"
             if qualified_name in collector.symbol_ids:
                 child_scope = qualified_name
+                _visit_initializer(current, qualified_name, collector)
 
         _visit(current, current_scope, current_class, collector)
 
@@ -317,12 +326,34 @@ def _visit_heritage(
                 )
 
 
+def _visit_initializer(
+    node: Node, scope: str, collector: _Collector
+) -> None:
+    """Record a route literal a constant holds.
+
+    ``const healthPath = "/health"`` states a path without calling anything. The
+    constant is not a caller, so what this records is only that the two name the
+    same path; resolution decides what kind of edge that justifies.
+    """
+    route = _literal_route(node.child_by_field_name("value"))
+    if route is not None:
+        collector.add(
+            source=scope,
+            kind=RelationKind.ROUTES_TO,
+            target_hint=route,
+            module_hint=ROUTE_HINT,
+            node=node,
+        )
+
+
 def _visit_call(
     node: Node, scope: str, class_name: str, collector: _Collector
 ) -> None:
     callee = node.child_by_field_name("function")
     if callee is None:
         return
+
+    _visit_route_call(node, callee, scope, collector)
 
     if callee.type == "identifier":
         name = _text(callee)
@@ -362,6 +393,56 @@ def _visit_call(
         # A subscript, a parenthesized expression, or another call. No name is
         # written at this site, so no edge can be recorded honestly.
         collector.dynamic_calls += 1
+
+
+def _visit_route_call(
+    node: Node, callee: Node, scope: str, collector: _Collector
+) -> None:
+    """Record the path an HTTP client call addresses, when it is written down.
+
+    ``fetch(url)`` records nothing: the path is in a variable, and following it
+    would mean evaluating the program.
+    """
+    if not _is_http_client(callee):
+        return
+    route = _literal_route(_first_argument(node))
+    if route is not None:
+        collector.add(
+            source=scope,
+            kind=RelationKind.ROUTES_TO,
+            target_hint=route,
+            module_hint=ROUTE_HINT,
+            node=node,
+        )
+
+
+def _is_http_client(callee: Node) -> bool:
+    if callee.type == "identifier":
+        return _text(callee) in _HTTP_CLIENTS
+    if callee.type == "member_expression":
+        _, receiver = _member_parts(callee)
+        return receiver in _HTTP_CLIENTS
+    return False
+
+
+def _first_argument(node: Node) -> Node | None:
+    arguments = node.child_by_field_name("arguments")
+    if arguments is None:
+        return None
+    for child in arguments.children:
+        if child.is_named:
+            return child
+    return None
+
+
+def _literal_route(node: Node | None) -> str | None:
+    """Read a string or template literal as a normalized route, or ``None``."""
+    if node is None or node.type not in _STRING_TYPES:
+        return None
+    raw = _text(node)
+    if len(raw) >= 2 and raw[0] in "\"'`" and raw[-1] == raw[0]:
+        raw = raw[1:-1]
+    return normalize_route(raw)
 
 
 def _visit_new(node: Node, scope: str, collector: _Collector) -> None:

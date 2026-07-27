@@ -44,12 +44,15 @@ packages = ["src/codeatlas"]
 addopts = "-ra -p no:cacheprovider --basetemp=.test-tmp"
 pythonpath = ["src", "."]
 testpaths = ["tests"]
-norecursedirs = ["tests/evaluation/cases/fixtures"]
+norecursedirs = [
+    "tests/evaluation/cases/fixtures",
+    "tests/evaluation/cases/variants",
+]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-exclude = ["tests/evaluation/cases/fixtures"]
+exclude = ["tests/evaluation/cases/fixtures", "tests/evaluation/cases/variants"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
@@ -58,7 +61,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 python_version = "3.12"
 strict = true
 files = ["src", "tests", "scripts", "apps"]
-exclude = ["tests/evaluation/cases/fixtures/"]
+# Corpus fixtures and the P4-02 variant overlays are data, not code. They are
+# deliberately duplicated across overlays — two variants may each carry their own
+# `processor.py` — so type checking them is both meaningless and ambiguous.
+exclude = ["tests/evaluation/cases/fixtures/", "tests/evaluation/cases/variants/"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

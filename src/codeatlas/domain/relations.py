@@ -21,8 +21,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Final
 
 from codeatlas.contracts import Derivation, RelationKind
+
+# `module_hint` normally carries the receiver or module a reference was written
+# against. These three values mark references that carry something else, and
+# they live here because they are part of the reference vocabulary itself:
+# extraction writes them, resolution reads them, and indexing depends on the
+# last one. Each contains a character that cannot appear in an expression, so
+# none can collide with a real receiver.
+ROUTE_HINT: Final[str] = "<route>"
+"""``target_hint`` is a normalized URL path, not a symbol name."""
+
+MENTION_HINT: Final[str] = "<mention>"
+"""``target_hint`` is a word a document used, not a symbol name."""
+
+DERIVED_HINT: Final[str] = "<derived>"
+"""The edge was combined from several references and must be re-derived."""
 
 
 @dataclass(frozen=True)
@@ -113,18 +129,43 @@ class RelationRecord:
     module_hint: str = ""
     reference_part: int = 0
 
+    @property
+    def is_derived(self) -> bool:
+        """Whether this edge was combined from several references.
+
+        A derived edge cannot be turned back into the reference that stated it,
+        because no single reference did. Indexing recomputes these rather than
+        carrying them forward: the other references they were derived from may
+        have changed even when this file did not.
+        """
+        return (
+            self.kind is RelationKind.TESTS or self.module_hint == DERIVED_HINT
+        )
+
     def as_reference(self) -> SymbolReference:
         """Recover the reference this relation was resolved from."""
         return SymbolReference(
             source_symbol_id=self.source_symbol_id,
             file_id=self.file_id,
-            kind=(
-                # `MAY_CALL` is a resolution outcome, not something a file says.
-                RelationKind.CALLS if self.kind is RelationKind.MAY_CALL else self.kind
-            ),
+            kind=_stated_kind(self.kind, self.module_hint),
             target_hint=self.target_hint,
             module_hint=self.module_hint,
             start_line=self.start_line,
             end_line=self.end_line,
             part=self.reference_part,
         )
+
+
+def _stated_kind(kind: RelationKind, module_hint: str) -> RelationKind:
+    """The kind the *file* stated, undoing what resolution concluded.
+
+    Two kinds are resolution outcomes rather than syntax. ``MAY_CALL`` is what an
+    ambiguous call becomes, and a route literal held in a constant becomes
+    ``REFERENCES`` because a constant calls nothing. Both must round-trip to what
+    was written, or re-resolving a reused file would resolve a different fact.
+    """
+    if kind is RelationKind.MAY_CALL:
+        return RelationKind.CALLS
+    if kind is RelationKind.REFERENCES and module_hint == ROUTE_HINT:
+        return RelationKind.ROUTES_TO
+    return kind

@@ -24,7 +24,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from codeatlas.chunking.chunker import CHUNKER_VERSION, ChunkRequest, CodeChunker
 from codeatlas.chunking.documents import DocumentChunker
-from codeatlas.contracts import RelationKind, RepositoryRelativePath
+from codeatlas.contracts import RepositoryRelativePath
 from codeatlas.domain.chunks import LogicalChunk
 from codeatlas.domain.errors import (
     CodeAtlasError,
@@ -521,9 +521,10 @@ class IndexRepositoryService:
                     previous.snapshot_id
                 )
                 if relation.file_id in reusable
-                # A `TESTS` edge is derived from other edges rather than stated
-                # by a file, so it is re-derived rather than carried.
-                and relation.kind is not RelationKind.TESTS
+                # A derived edge — `TESTS`, or a document edge combined from
+                # several references — was never stated by one file, so there is
+                # no reference to carry. It is re-derived instead.
+                and not relation.is_derived
             ]
 
         symbols = self._symbols.list_for_snapshot(snapshot.snapshot_id)

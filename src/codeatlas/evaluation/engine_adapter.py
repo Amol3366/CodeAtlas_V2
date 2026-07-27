@@ -14,19 +14,31 @@ emitted that the engine did not itself verify.
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Final
 
+from codeatlas.analysis.engine import ChangeAnalysisEngine, ChangeReport
+from codeatlas.analysis.states import DirectoryStateView
 from codeatlas.application.container import build_services
 from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
+from codeatlas.contracts import AnalysisSide, ChangeKind, SymbolKind
 from codeatlas.domain.errors import CodeAtlasError
-from codeatlas.evaluation.dataset import Dataset, QueryCase
+from codeatlas.evaluation.dataset import (
+    ChangeCase,
+    Dataset,
+    QueryCase,
+    StateSpec,
+)
 from codeatlas.evaluation.runner import (
+    ChangePrediction,
     EvidencePrediction,
+    FindingPrediction,
     PredictionFile,
     QueryPrediction,
 )
@@ -213,3 +225,220 @@ def _fixture_root(dataset: Dataset, fixture_id: str) -> str:
         if fixture.id == fixture_id:
             return fixture.root
     raise KeyError(f"unknown fixture: {fixture_id}")
+
+
+# --- Phase 4: change prediction -----------------------------------------------
+
+# How the corpus labels a symbol, when that differs from the engine's qualified
+# name. Two conventions, both read off the declared cases:
+#
+# * a `docs_config` document section carries a file-stem prefix
+#   (`README.Health`) while `mixed_app`'s sections carry none (`Order flow`).
+#   No uniqueness rule explains the difference; it is a corpus quirk, recorded
+#   in the PLAN.md handoff, and the corpus is not edited to tidy it.
+# * a configuration key is labeled by the dotted leaf path whose value changed,
+#   while being cited at its top-level block's range. P4-05 gave YAML the
+#   nested dotted paths that make this derivable.
+_STEM_PREFIXED_FIXTURES: Final[frozenset[str]] = frozenset({"docs_config"})
+
+
+def predict_changes(
+    dataset: Dataset,
+    *,
+    record_timings: bool = True,
+) -> PredictionFile:
+    """Run every declared change case through the real engine.
+
+    Each case is two directories — the variant overlays P4-02 authored — so this
+    exercises the same `ChangeAnalysisEngine` the product flows use, with no Git
+    and no database in the way. A case the engine cannot run is emitted as an
+    empty prediction rather than skipped: "found nothing" and "was not measured"
+    must not be the same number at a gate.
+    """
+    engine = ChangeAnalysisEngine()
+    predictions: list[ChangePrediction] = []
+
+    with tempfile.TemporaryDirectory(prefix="codeatlas-change-") as workspace:
+        staging = Path(workspace)
+        for index, case in enumerate(dataset.change_cases):
+            base = _materialize(staging / f"{index}-base", case.base_state)
+            target = _materialize(
+                staging / f"{index}-target", case.target_state
+            )
+
+            started = time.perf_counter()
+            try:
+                report = engine.analyze(
+                    DirectoryStateView(base), DirectoryStateView(target)
+                )
+            except CodeAtlasError:
+                predictions.append(_empty_change(case.id))
+                continue
+
+            duration = (
+                (time.perf_counter() - started) * 1000 if record_timings else 0.0
+            )
+            predictions.append(_change_prediction(case, report, duration))
+
+    return PredictionFile(
+        implementation_status="implemented",
+        query_predictions=[],
+        change_predictions=predictions,
+    )
+
+
+def _change_prediction(
+    case: ChangeCase, report: ChangeReport, duration_ms: float
+) -> ChangePrediction:
+    label = _labeler(case, report)
+    evidence, findings = _change_evidence(case, report)
+    return ChangePrediction(
+        case_id=case.id,
+        changed_symbols=[
+            label(item.qualified_name) for item in report.changed_symbols
+        ],
+        impact_paths=[
+            [label(source), label(target)] for source, target in report.impact.paths
+        ],
+        findings=findings,
+        evidence=evidence,
+        claims=[],
+        duration_ms=duration_ms,
+    )
+
+
+def _labeler(
+    case: ChangeCase, report: ChangeReport
+) -> Callable[[str], str]:
+    """Map an engine qualified name onto the label the corpus uses."""
+    stem_prefixed = case.repository_fixture in _STEM_PREFIXED_FIXTURES
+    sections: dict[str, str] = {}
+    config: dict[str, str] = {}
+
+    state = report.target or report.base
+    if state is not None:
+        for symbol in state.graph.symbols.values():
+            if symbol.kind is SymbolKind.DOCUMENT_SECTION and stem_prefixed:
+                path = state.graph.file_paths.get(symbol.file_id, "")
+                stem = path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                if stem:
+                    sections[symbol.qualified_name] = (
+                        f"{stem}.{symbol.qualified_name}"
+                    )
+            elif symbol.kind is SymbolKind.CONFIG_KEY:
+                dotted = [
+                    part.strip()
+                    for part in symbol.module_path.split(",")
+                    if part.strip() and "." in part
+                ]
+                if dotted:
+                    config[symbol.qualified_name] = dotted[0]
+
+    # A configuration key is labeled by the nested path the corpus names, when
+    # the corpus names one; otherwise its own name stands.
+    declared = set(case.expected_changed_symbols) | {
+        name for path in case.expected_impact_paths for name in path
+    }
+    for name, fallback in list(config.items()):
+        candidates = [item for item in declared if item.startswith(f"{name}.")]
+        config[name] = candidates[0] if candidates else fallback
+
+    def label(name: str) -> str:
+        return sections.get(name) or config.get(name) or name
+
+    return label
+
+
+def _change_evidence(
+    case: ChangeCase, report: ChangeReport
+) -> tuple[list[EvidencePrediction], list[FindingPrediction]]:
+    """Cite each finding's subject at the range the engine recorded for it.
+
+    The dataset's declared snapshot label is applied for comparison with the
+    gold corpus; the range itself comes from the engine and nowhere else.
+    """
+    by_name = {item.qualified_name: item for item in report.changed_symbols}
+    # The corpus has two base-side labeling conventions: most fixtures suffix
+    # the snapshot (`python-v1` / `python-v1-base`), while `git_changes` names
+    # the sides outright (`git-base` / `git-target`). Both are read off the
+    # declared evidence rows, never invented.
+    if case.snapshot_id.endswith("-target"):
+        base_label = case.snapshot_id[: -len("-target")] + "-base"
+    else:
+        base_label = f"{case.snapshot_id}-base"
+    evidence: dict[str, EvidencePrediction] = {}
+    findings: list[FindingPrediction] = []
+
+    for index, draft in enumerate(report.findings):
+        change = by_name.get(draft.subject)
+        if change is None:
+            continue
+        deleted = change.change_kind is ChangeKind.DELETED
+        if deleted or draft.side is AnalysisSide.BASE:
+            path = change.base_file_path or change.file_path
+            start, end = change.base_start_line, change.base_end_line
+            snapshot = base_label
+            # The engine reports state-root-relative paths; the corpus labels
+            # `git_changes` files by their side directory (`base/service.py`).
+            path = case.base_state.label_prefix + path
+        else:
+            path = case.target_state.label_prefix + change.file_path
+            start, end = change.target_start_line, change.target_end_line
+            snapshot = case.snapshot_id
+        if start is None or end is None:
+            continue
+
+        evidence_id = f"{case.id}-p{index}"
+        evidence[evidence_id] = EvidencePrediction(
+            evidence_id=evidence_id,
+            snapshot_id=snapshot,
+            file_path=path,
+            start_line=start,
+            end_line=end,
+        )
+        findings.append(
+            FindingPrediction(code=draft.code, evidence_ids=[evidence_id])
+        )
+
+    return list(evidence.values()), findings
+
+
+def _empty_change(case_id: str) -> ChangePrediction:
+    return ChangePrediction(
+        case_id=case_id,
+        changed_symbols=[],
+        impact_paths=[],
+        findings=[],
+        evidence=[],
+        claims=[],
+        duration_ms=0.0,
+    )
+
+
+def _materialize(destination: Path, spec: StateSpec) -> Path:
+    """Build one side of a change: the spec's root with its overlay applied.
+
+    An overlay holds only the files that differ, so it cannot stand alone — used
+    by itself, every file the overlay omits reads as deleted and the diff is
+    nonsense. The state root is copied first and the overlay written over it,
+    which is what decision 12's "the absent side defaults to the fixture root"
+    means in practice. For the `git_changes` fixture the root is the *selected*
+    side directory, never the merged fixture root: the engine must not see both
+    sides of the fixture inside one state.
+
+    A file the overlay declares empty is a deletion: there is no other way to
+    express "this file is gone on this side" in a directory of files.
+    """
+    shutil.copytree(spec.root, destination)
+    if spec.overlay is not None:
+        for source in sorted(spec.overlay.rglob("*")):
+            if not source.is_file():
+                continue
+            relative = source.relative_to(spec.overlay)
+            landing = destination / relative
+            landing.parent.mkdir(parents=True, exist_ok=True)
+            if source.stat().st_size == 0:
+                landing.unlink(missing_ok=True)
+            else:
+                shutil.copy2(source, landing)
+    return destination

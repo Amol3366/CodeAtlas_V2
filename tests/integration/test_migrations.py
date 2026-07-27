@@ -60,8 +60,8 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_six() -> None:
-    assert SCHEMA_VERSION == 6
+def test_schema_version_is_seven() -> None:
+    assert SCHEMA_VERSION == 7
 
 
 def test_evidence_table_and_resolution_columns_exist(tmp_path: Path) -> None:
@@ -356,3 +356,70 @@ def test_timestamps_round_trip_as_utc(tmp_path: Path) -> None:
 
     moment = datetime(2026, 7, 25, 18, 30, 15, tzinfo=UTC)
     assert from_utc_text(to_utc_text(moment)) == moment
+
+
+def test_upgrading_an_existing_version_6_database_preserves_data(
+    tmp_path: Path,
+) -> None:
+    """Migration 0007 is additive; a version-6 database keeps its rows."""
+    database = tmp_path / "v6.sqlite"
+    with connect(database) as connection:
+        _apply_through_version(connection, 6)
+        assert current_version(connection) == 6
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+
+    with connect(database) as connection:
+        assert apply_migrations(connection) == SCHEMA_VERSION
+        repositories = connection.execute(
+            "SELECT COUNT(*) FROM repositories"
+        ).fetchone()[0]
+        analyses = connection.execute(
+            "SELECT COUNT(*) FROM change_analyses"
+        ).fetchone()[0]
+
+    assert repositories == 1
+    assert analyses == 0
+
+
+def test_change_analysis_tables_exist(tmp_path: Path) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        rows = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    names = {row[0] for row in rows}
+    assert {
+        "change_analyses",
+        "change_changed_symbols",
+        "change_findings",
+        "change_evidence",
+    } <= names
+
+
+def test_an_analysis_is_not_deleted_when_its_snapshot_is(tmp_path: Path) -> None:
+    """An audit record outlives the snapshot it examined.
+
+    Deleting a snapshot is routine — every re-index supersedes one — and an
+    analysis that vanished with it could never be produced as evidence of what
+    CodeAtlas said at the time.
+    """
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+        connection.execute(
+            "INSERT INTO change_analyses ("
+            " analysis_id, repository_id, kind, status, overall_risk,"
+            " base_ref, target_ref, target_snapshot_id, created_at"
+            ") VALUES ('a1', 'repo_1', 'working_tree', 'completed', 'none',"
+            " 'HEAD', 'working-tree', 'snap_1', '2026-07-27T00:00:00Z')"
+        )
+
+        connection.execute("DELETE FROM snapshots WHERE snapshot_id = 'snap_1'")
+
+        remaining = connection.execute(
+            "SELECT COUNT(*) FROM change_analyses"
+        ).fetchone()[0]
+
+    assert remaining == 1

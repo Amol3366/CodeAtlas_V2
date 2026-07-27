@@ -25,11 +25,19 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from codeatlas.contracts import SymbolKind
+from codeatlas.contracts import RelationKind, SymbolKind
 from codeatlas.domain.errors import PathSafetyError
 from codeatlas.domain.ids import symbol_id, symbol_version_id
 from codeatlas.domain.paths import validate_relative_path
+from codeatlas.domain.relations import SymbolReference
 from codeatlas.domain.symbols import SymbolRecord
+from codeatlas.extraction.routes import (
+    MAX_MENTIONS_PER_SECTION,
+    MENTION_HINT,
+    ROUTE_HINT,
+    mention_words,
+    routes_in_text,
+)
 from codeatlas.parsing.registry import (
     PARSER_BUNDLE_VERSION,
     ParseDiagnostic,
@@ -80,10 +88,17 @@ class DocumentParser:
         text = request.content.decode("utf-8-sig")
         if request.language == "markdown":
             sections = _markdown_sections(text)
+            symbols = _section_symbols(request, sections)
             return self._result(
                 request,
-                symbols=_section_symbols(request, sections),
+                symbols=symbols,
                 success=True,
+                references=_document_references(
+                    file_id=request.file_id,
+                    text=text,
+                    sections=sections,
+                    symbols=symbols,
+                ),
             )
 
         keys, diagnostics = _configuration_keys(request.language, text)
@@ -129,6 +144,7 @@ class DocumentParser:
         symbols: tuple[SymbolRecord, ...],
         success: bool,
         extra: Sequence[ParseDiagnostic] = (),
+        references: tuple[SymbolReference, ...] = (),
     ) -> ParseResult:
         return ParseResult(
             parser_name=self.name,
@@ -136,6 +152,7 @@ class DocumentParser:
             success=success,
             symbols=symbols,
             diagnostics=tuple(extra),
+            references=references,
         )
 
     def _failed(self, request: ParseRequest, code: str, message: str) -> ParseResult:
@@ -220,6 +237,57 @@ def _referenced_paths(body: str) -> tuple[str, ...]:
         if validated not in seen:
             seen.append(validated)
     return tuple(seen)
+
+
+def _document_references(
+    *,
+    file_id: str,
+    text: str,
+    sections: Sequence[DocumentSection],
+    symbols: Sequence[SymbolRecord],
+) -> tuple[SymbolReference, ...]:
+    """Record the paths and words each section names.
+
+    None of this is an edge. A document that writes ``/health`` has stated a
+    path, and a document that writes "port" has used a word; whether either one
+    names something in this repository cannot be known from one file. Resolution
+    answers that, and labels whatever it concludes as the heuristic it is.
+
+    Mentions are capped per section because a document is untrusted input of
+    unbounded length, and one reference per word would let a file dictate how
+    much work resolution does.
+    """
+    lines = text.splitlines()
+    references: list[SymbolReference] = []
+
+    for section, symbol in zip(sections, symbols, strict=True):
+        routes: dict[str, int] = {}
+        words: dict[str, int] = {}
+        body = lines[section.start_line - 1 : section.end_line]
+        for offset, line in enumerate(body, start=section.start_line):
+            for route in routes_in_text(line):
+                routes.setdefault(route, offset)
+            for word in mention_words(line):
+                if len(words) >= MAX_MENTIONS_PER_SECTION and word not in words:
+                    break
+                words.setdefault(word, offset)
+
+        for hint, (target, line_number) in (
+            *((ROUTE_HINT, item) for item in routes.items()),
+            *((MENTION_HINT, item) for item in words.items()),
+        ):
+            references.append(
+                SymbolReference(
+                    source_symbol_id=symbol.symbol_id,
+                    file_id=file_id,
+                    kind=RelationKind.DOCUMENTS,
+                    target_hint=target,
+                    module_hint=hint,
+                    start_line=line_number,
+                    end_line=line_number,
+                )
+            )
+    return tuple(references)
 
 
 @dataclass(frozen=True)
@@ -378,10 +446,46 @@ def _yaml_keys(
                 name=name,
                 start_line=line_number,
                 end_line=max(end_line, line_number),
-                nested_paths=(),
+                nested_paths=_yaml_nested_paths(
+                    name, lines[line_number : max(end_line, line_number)]
+                ),
             )
         )
     return tuple(keys), ()
+
+
+def _yaml_nested_paths(prefix: str, body: Sequence[str]) -> tuple[str, ...]:
+    """Dotted paths under one top-level YAML key, read by indentation.
+
+    This is the same bounded summary JSON and TOML already carry. It is what
+    lets a reader name ``service.port`` rather than the whole ``service`` block,
+    while the citation still points at the block, because a key without its
+    value is half a fact.
+
+    A line the scanner cannot read unambiguously is skipped rather than guessed
+    at; the top-level key is already recorded, so nothing is silently lost.
+    """
+    paths: list[str] = []
+    stack: list[tuple[int, str]] = []
+
+    for line in body:
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "-")):
+            continue
+        match = _YAML_KEY.match(stripped)
+        if match is None:
+            continue
+        indent = len(line) - len(line.lstrip())
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        parent = stack[-1][1] if stack else prefix
+        path = f"{parent}.{match.group('key')}"
+        stack.append((indent, path))
+        if path not in paths:
+            paths.append(path)
+        if len(paths) >= MAX_NESTED_KEY_PATHS:
+            break
+    return tuple(paths)
 
 
 def _nested_paths(prefix: str, value: Any) -> tuple[str, ...]:

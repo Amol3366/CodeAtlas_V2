@@ -14,7 +14,25 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from codeatlas.contracts import Derivation, RelationKind, SymbolKind
+from codeatlas.contracts import (
+    AnalysisSide,
+    AnalysisStateRef,
+    ChangeAnalysisKind,
+    ChangeAnalysisReport,
+    ChangeAnalysisStatus,
+    ChangedFile,
+    ChangedSymbol,
+    ChangeEvidenceItem,
+    ChangeKind,
+    Derivation,
+    Finding,
+    OverallRisk,
+    RelationKind,
+    Severity,
+    SnapshotFreshness,
+    SymbolKind,
+)
+from codeatlas.contracts import ImpactEdge as ContractImpactEdge
 from codeatlas.domain.chunks import ChunkRole, LogicalChunk
 from codeatlas.domain.relations import (
     RelationRecord,
@@ -1170,3 +1188,268 @@ def _symbol_from_row(row: sqlite3.Row) -> SymbolRecord:
         content_hash=row["content_hash"],
         visibility=visibility,
     )
+
+
+class ChangeAnalysisStore:
+    """Persisted change analyses, kept as audit records rather than as a cache.
+
+    An analysis outlives the snapshot it examined. "What did CodeAtlas say about
+    this change, and on what evidence" has to stay answerable after the tree has
+    moved on, so nothing here is keyed to snapshot lifetime; the target snapshot
+    ID is carried as a plain value for provenance.
+
+    The report is stored decomposed — findings and evidence in their own tables,
+    the rest as bounded JSON columns — so a finding can be read back by rank
+    without rehydrating a whole document, while the parts with no query pattern
+    of their own stay in one place.
+    """
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def save(self, report: ChangeAnalysisReport) -> None:
+        """Write one analysis and everything it cites, replacing any prior row."""
+        self._connection.execute(
+            "DELETE FROM change_analyses WHERE analysis_id = ?",
+            (report.analysis_id,),
+        )
+        self._connection.execute(
+            "INSERT INTO change_analyses ("
+            " analysis_id, repository_id, kind, status, overall_risk,"
+            " base_ref, target_ref, base_commit, target_commit,"
+            " target_snapshot_id, changed_file_count, changed_symbol_count,"
+            " finding_count, changed_files_json, impact_edges_json,"
+            " test_gaps_json, warnings_json, limitations_json, timing_json,"
+            " created_at, completed_at"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                report.analysis_id,
+                report.repository_id,
+                report.kind.value,
+                report.status.value,
+                report.overall_risk.value,
+                report.base.ref,
+                report.target.ref,
+                report.base.commit,
+                report.target.commit,
+                report.target.snapshot_id,
+                len(report.changed_files),
+                len(report.changed_symbols),
+                len(report.findings),
+                _dump_models(report.changed_files),
+                _dump_models(report.impact_edges),
+                json.dumps(list(report.test_gaps)),
+                json.dumps(list(report.warnings)),
+                json.dumps(list(report.limitations)),
+                json.dumps(dict(report.timing_ms)),
+                to_utc_text(report.created_at),
+                to_utc_text(report.completed_at) if report.completed_at else None,
+            ),
+        )
+        self._connection.executemany(
+            "INSERT INTO change_changed_symbols ("
+            " analysis_id, ordinal, qualified_name, symbol_kind, change_kind,"
+            " file_path, base_file_path, base_start_line, base_end_line,"
+            " target_start_line, target_end_line, signature_changed, public,"
+            " derivation, confidence"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    report.analysis_id,
+                    ordinal,
+                    item.qualified_name,
+                    item.symbol_kind.value,
+                    item.change_kind.value,
+                    item.file_path,
+                    item.base_file_path,
+                    item.base_start_line,
+                    item.base_end_line,
+                    item.target_start_line,
+                    item.target_end_line,
+                    int(item.signature_changed),
+                    int(item.public),
+                    item.derivation.value,
+                    item.confidence,
+                )
+                for ordinal, item in enumerate(report.changed_symbols)
+            ],
+        )
+        self._connection.executemany(
+            "INSERT INTO change_findings ("
+            " analysis_id, finding_id, rank, code, severity, title, description,"
+            " derivation, confidence, evidence_ids_json, remediation,"
+            " limitations_json"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    report.analysis_id,
+                    f"{report.analysis_id}_f{rank}",
+                    rank,
+                    item.code,
+                    item.severity.value,
+                    item.title,
+                    item.description,
+                    item.derivation.value,
+                    item.confidence,
+                    json.dumps(list(item.evidence_ids)),
+                    item.remediation,
+                    json.dumps(list(item.limitations)),
+                )
+                for rank, item in enumerate(report.findings)
+            ],
+        )
+        self._connection.executemany(
+            "INSERT INTO change_evidence ("
+            " analysis_id, evidence_id, side, file_path, symbol, start_line,"
+            " end_line, content_hash, derivation, confidence"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    report.analysis_id,
+                    item.evidence_id,
+                    item.side.value,
+                    item.file_path,
+                    item.symbol,
+                    item.start_line,
+                    item.end_line,
+                    item.content_hash,
+                    item.derivation.value,
+                    item.confidence,
+                )
+                for item in report.evidence
+            ],
+        )
+
+    def get(self, analysis_id: str) -> ChangeAnalysisReport | None:
+        """Read one analysis back exactly as it was written, or ``None``."""
+        row = self._connection.execute(
+            "SELECT * FROM change_analyses WHERE analysis_id = ?",
+            (analysis_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return ChangeAnalysisReport(
+            analysis_id=row["analysis_id"],
+            request_id=row["analysis_id"],
+            repository_id=row["repository_id"],
+            kind=ChangeAnalysisKind(row["kind"]),
+            status=ChangeAnalysisStatus(row["status"]),
+            overall_risk=OverallRisk(row["overall_risk"]),
+            base=AnalysisStateRef(
+                ref=row["base_ref"],
+                commit=row["base_commit"],
+                snapshot_id=None,
+                freshness=SnapshotFreshness.STALE,
+            ),
+            target=AnalysisStateRef(
+                ref=row["target_ref"],
+                commit=row["target_commit"],
+                snapshot_id=row["target_snapshot_id"],
+                freshness=SnapshotFreshness.FRESH,
+            ),
+            changed_files=[
+                ChangedFile.model_validate(item)
+                for item in json.loads(row["changed_files_json"])
+            ],
+            changed_symbols=self._changed_symbols(analysis_id),
+            impact_edges=[
+                ContractImpactEdge.model_validate(item)
+                for item in json.loads(row["impact_edges_json"])
+            ],
+            findings=self._findings(analysis_id),
+            evidence=self._evidence(analysis_id),
+            test_gaps=json.loads(row["test_gaps_json"]),
+            warnings=json.loads(row["warnings_json"]),
+            limitations=json.loads(row["limitations_json"]),
+            timing_ms=json.loads(row["timing_json"]),
+            created_at=from_utc_text(row["created_at"]),
+            completed_at=(
+                from_utc_text(row["completed_at"])
+                if row["completed_at"]
+                else None
+            ),
+        )
+
+    def list_for_repository(
+        self, repository_id: str, limit: int = 50
+    ) -> tuple[str, ...]:
+        """Analysis IDs for one repository, newest first."""
+        rows = self._connection.execute(
+            "SELECT analysis_id FROM change_analyses"
+            " WHERE repository_id = ?"
+            " ORDER BY created_at DESC, analysis_id"
+            " LIMIT ?",
+            (repository_id, limit),
+        ).fetchall()
+        return tuple(row["analysis_id"] for row in rows)
+
+    def _changed_symbols(self, analysis_id: str) -> list[ChangedSymbol]:
+        rows = self._connection.execute(
+            "SELECT * FROM change_changed_symbols"
+            " WHERE analysis_id = ? ORDER BY ordinal",
+            (analysis_id,),
+        ).fetchall()
+        return [
+            ChangedSymbol(
+                qualified_name=row["qualified_name"],
+                symbol_kind=SymbolKind(row["symbol_kind"]),
+                change_kind=ChangeKind(row["change_kind"]),
+                file_path=row["file_path"],
+                base_file_path=row["base_file_path"],
+                base_start_line=row["base_start_line"],
+                base_end_line=row["base_end_line"],
+                target_start_line=row["target_start_line"],
+                target_end_line=row["target_end_line"],
+                signature_changed=bool(row["signature_changed"]),
+                public=bool(row["public"]),
+                derivation=Derivation(row["derivation"]),
+                confidence=row["confidence"],
+            )
+            for row in rows
+        ]
+
+    def _findings(self, analysis_id: str) -> list[Finding]:
+        rows = self._connection.execute(
+            "SELECT * FROM change_findings WHERE analysis_id = ? ORDER BY rank",
+            (analysis_id,),
+        ).fetchall()
+        return [
+            Finding(
+                code=row["code"],
+                severity=Severity(row["severity"]),
+                title=row["title"],
+                description=row["description"],
+                derivation=Derivation(row["derivation"]),
+                confidence=row["confidence"],
+                evidence_ids=json.loads(row["evidence_ids_json"]),
+                remediation=row["remediation"],
+                limitations=json.loads(row["limitations_json"]),
+            )
+            for row in rows
+        ]
+
+    def _evidence(self, analysis_id: str) -> list[ChangeEvidenceItem]:
+        rows = self._connection.execute(
+            "SELECT * FROM change_evidence"
+            " WHERE analysis_id = ? ORDER BY evidence_id",
+            (analysis_id,),
+        ).fetchall()
+        return [
+            ChangeEvidenceItem(
+                evidence_id=row["evidence_id"],
+                side=AnalysisSide(row["side"]),
+                file_path=row["file_path"],
+                symbol=row["symbol"],
+                start_line=row["start_line"],
+                end_line=row["end_line"],
+                content_hash=row["content_hash"],
+                derivation=Derivation(row["derivation"]),
+                confidence=row["confidence"],
+            )
+            for row in rows
+        ]
+
+
+def _dump_models(items: Sequence[Any]) -> str:
+    """Serialize contract models to the JSON stored in a bounded column."""
+    return json.dumps([item.model_dump(mode="json") for item in items])

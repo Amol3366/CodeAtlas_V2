@@ -1,8 +1,9 @@
 {
   "contract_version": "1.0",
   "fixtures_root": "fixtures",
+  "variants_root": "variants",
   "fixtures": [
-    {"id":"python_app","root":"python_app","kind":"python","snapshots":[{"id":"python-v1","members":["src/payments/service.py","src/payments/idempotency.py","tests/test_service.py"]}]},
+    {"id":"python_app","root":"python_app","kind":"python","snapshots":[{"id":"python-v1","members":["src/payments/service.py","src/payments/idempotency.py","tests/test_service.py"]},{"id":"python-v1-base","members":["src/payments/service.py","src/payments/idempotency.py","tests/test_service.py"]}]},
     {"id":"tsjs_app","root":"tsjs_app","kind":"typescript-javascript","snapshots":[{"id":"tsjs-v1","members":["src/orders.ts","src/client.js"]}]},
     {"id":"docs_config","root":"docs_config","kind":"documents-config","snapshots":[{"id":"docs-v1","members":["README.md","config/settings.yaml","package.json","app.toml"]}]},
     {"id":"mixed_app","root":"mixed_app","kind":"mixed-language","snapshots":[{"id":"mixed-v1","members":["backend.py","frontend.ts","docs/flow.md"]}]},
