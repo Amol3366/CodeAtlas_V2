@@ -41,8 +41,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
 | 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `complete` | User |
-| 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `awaiting_user_approval` | User |
-| 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
+| 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `complete` | User |
+| 6 — Continuous freshness and hardening | [phase plan (draft)](phases/phase-06-freshness-and-hardening.md) | `pending` (plan drafted 2026-07-28; awaits user approval) | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
 
 ## Active Work
@@ -50,9 +50,9 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active phase gate | Phase 5 — `awaiting_user_approval` (every task complete; gate run 2026-07-28) |
-| Active task | none — the Phase 5 gate awaits the user's decision |
-| Task status | P5-SETUP … P5-10 all `complete` |
+| Active phase | Phase 6 — Continuous freshness and hardening (plan drafted 2026-07-28; **not yet approved**, so every task stays `pending` per rule 11) |
+| Active task | none — the Phase 6 plan awaits the user's approval |
+| Task status | Phases 0–5 `complete`; P6-SETUP … P6-08 `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -164,6 +164,25 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T02:30:00Z — Phase 5 gate approved; Phase 6 plan drafted
+
+- Agent: Claude Code `claude-fable-5`, recording per rule 10.
+- **The user approved the Phase 5 gate on 2026-07-28** ("yes I approved"), with
+  three of the eight conditions reported as only partly met — conditions 1, 2,
+  and 7, all of which fail for the same reason: **there are no Playwright
+  end-to-end suites.** The approval was given with that stated, so the gap is
+  accepted rather than resolved, and it carries into Phase 6 as declared work
+  rather than being quietly dropped.
+- Phase 5 is `complete`. Phases 0–5 are all complete.
+- Transition: none for any task. The Phase 6 plan is **drafted, not approved**;
+  per rule 11 every P6 task stays `pending` until the user approves the plan.
+- Phase 6 plan created at `phases/phase-06-freshness-and-hardening.md`. It
+  opens with the inherited Playwright gap as P6-01 rather than as an appendix,
+  because a gap accepted at one gate becomes a debt the next phase either pays
+  or re-declares.
+- Next: **the user approves or amends the Phase 6 plan.** Nothing may start
+  before that.
 
 ### 2026-07-28T02:10:00Z — P5-06 … P5-10 completed; Phase 5 `awaiting_user_approval`
 

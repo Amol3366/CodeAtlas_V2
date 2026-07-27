@@ -1,9 +1,8 @@
 # Phase 5 — Persistent ChatGPT-Style Web Application
 
-Status: `awaiting_user_approval` (every task complete; gate run 2026-07-28.
-Two of the eight gate conditions are met only in part — no Playwright suites
-exist — and that is reported as missed rather than glossed. See the PLAN.md
-handoff.)
+Status: `complete` (gate approved by the user 2026-07-28, with three of the
+eight conditions reported as only partly met — no Playwright suites exist —
+and accepted on that basis. The gap carries into Phase 6.)
 Gate authority: user
 Prerequisites: Phase 4 approved; `AGENTS.md` Sections 8.2, 11, 12.2, 14, 15;
 the blueprint

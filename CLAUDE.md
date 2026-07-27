@@ -913,7 +913,7 @@ have been satisfied with current verification evidence.
 - [X] [Phase 2 — Snapshots, stable chunks, and lexical retrieval](#phase-2--snapshots-stable-chunks-and-lexical-retrieval)
 - [X] [Phase 3 — Polyglot graph and delivery contracts](#phase-3--polyglot-graph-and-delivery-contracts)
 - [X] [Phase 4 — Change assurance](#phase-4--change-assurance)
-- [ ] [Phase 5 — Persistent ChatGPT-style web application](#phase-5--persistent-chatgpt-style-web-application)
+- [X] [Phase 5 — Persistent ChatGPT-style web application](#phase-5--persistent-chatgpt-style-web-application)
 - [ ] [Phase 6 — Continuous freshness and hardening](#phase-6--continuous-freshness-and-hardening)
 - [ ] [Phase 7 — Measured semantic uplift](#phase-7--measured-semantic-uplift)
 
