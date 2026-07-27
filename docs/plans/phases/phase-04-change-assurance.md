@@ -1,8 +1,8 @@
 # Phase 4 — Change Assurance
 
-Status: `awaiting_user_approval` (all tasks complete; gate run 2026-07-27;
-one target missed and explained — changed-symbol precision 0.9375 vs ≥0.95,
-see `docs/evaluation/phase-4-baseline-environment.md`)
+Status: `complete` (gate approved by the user 2026-07-27, with the
+changed-symbol precision miss — 0.9375 vs ≥0.95, structural, explained in
+`docs/evaluation/phase-4-baseline-environment.md` — reported and accepted)
 Gate authority: user
 Prerequisites: Phase 3 approved; `AGENTS.md`; the blueprint
 Activation gate: satisfied. The user approved this plan on 2026-07-26, recorded

@@ -40,8 +40,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 1 — Repository truth vertical slice | [phase plan](phases/phase-01-repository-truth-vertical-slice.md) | `complete` | User |
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
-| 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `awaiting_user_approval` | User |
-| 5 — Persistent web application | [phase plan (draft)](phases/phase-05-persistent-web-application.md) | `pending` (plan drafted 2026-07-27 at user request; awaits Phase 4 gate approval and its own plan approval per rule 11) | User |
+| 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `complete` | User |
+| 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `in_progress` (plan approved by the user 2026-07-27) | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
 
@@ -49,13 +49,29 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 4 — Change assurance, `awaiting_user_approval` (all tasks complete, gate run 2026-07-27) |
-| Active task | none — the Phase 4 gate awaits the user's decision |
-| Task status | P4-SETUP … P4-10 all `complete` |
+| Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
+| Active task | P5-SETUP — ADR-0006, error codes, contract models, schema regen |
+| Task status | P5-SETUP `in_progress`; P5-01 … P5-10 `pending` |
 | Agent | Claude Code `claude-fable-5` |
-| Started UTC | 2026-07-27T15:50:00Z |
-| Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). `main` was pushed to `origin` at the user's request 2026-07-27. |
-| Next gate | User approval of the Phase 4 gate (one target missed and explained: changed-symbol precision 0.9375 vs ≥0.95), then user approval of the drafted Phase 5 plan. |
+| Started UTC | 2026-07-27T18:20:00Z |
+| Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
+| Next gate | Phase 5 completion gate after P5-10; only the user may approve it. |
+
+### Phase 5 Task Board
+
+| Task | Deliverable | Dependencies | Status |
+| --- | --- | --- | --- |
+| P5-SETUP | ADR-0006, error codes, contract models, schema regen | Phase 4 | `in_progress` |
+| P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `pending` |
+| P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `pending` |
+| P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `pending` |
+| P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `pending` |
+| P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `pending` |
+| P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `pending` |
+| P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `pending` |
+| P5-08 | Thread view: submit, stream, cancel/retry, sanitized rendering | P5-04, P5-07 | `pending` |
+| P5-09 | Citations, evidence drawer, change preflight | P5-08 | `pending` |
+| P5-10 | Settings, accessibility, responsive, Playwright, docs, phase gate | P5-06, P5-09 | `pending` |
 
 ### Phase 4 Task Board
 
@@ -147,6 +163,24 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-27T18:20:00Z — Phase 4 gate approved; Phase 5 activated; P5-SETUP started
+
+- Agent: Claude Code `claude-fable-5`, recording per rule 10.
+- **The user approved the Phase 4 gate on 2026-07-27** ("I approve the Phase 4
+  gate, start Phase 5"), with the changed-symbol precision miss (0.9375 vs
+  ≥0.95, structural three-case overlap, explained in
+  `docs/evaluation/phase-4-baseline-environment.md`) reported and accepted.
+  Phase 4 is `complete`.
+- **The Phase 5 plan is approved by the same instruction** and is active. Its
+  three open questions default to the plan as written (the decision-5
+  dependency surface, soft delete without a purge control, `serve --web`
+  built in Phase 5); the user may override any of them later.
+- Transition: P5-SETUP `pending -> in_progress`. All other Phase 5 tasks stay
+  `pending` until their dependencies complete.
+- Next: P5-SETUP — ADR-0006, six error codes with HTTP/CLI mappings, additive
+  conversation/message/run/stream-event contract models, schema regeneration,
+  contract tests.
 
 ### 2026-07-27T17:50:00Z — P4-10 completed; Phase 4 `awaiting_user_approval`
 

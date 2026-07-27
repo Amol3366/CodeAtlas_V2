@@ -1,8 +1,8 @@
 # Phase 5 — Persistent ChatGPT-Style Web Application
 
-Status: `draft` (authored 2026-07-27 at user request while P4-10 was still
-`in_progress`; PLAN.md rule 11 — no Phase 5 task may leave `pending` until
-**both** the Phase 4 gate and this plan are explicitly approved by the user)
+Status: `in_progress` (Phase 4 gate and this plan both approved by the user
+2026-07-27; recorded in the PLAN.md handoff log. The three open questions
+default to the plan as written unless the user overrides them.)
 Gate authority: user
 Prerequisites: Phase 4 approved; `AGENTS.md` Sections 8.2, 11, 12.2, 14, 15;
 the blueprint
