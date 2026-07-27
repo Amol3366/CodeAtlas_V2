@@ -41,7 +41,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
 | 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `complete` | User |
-| 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `in_progress` (plan approved by the user 2026-07-27) | User |
+| 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `awaiting_user_approval` | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
 
@@ -50,8 +50,9 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active task | none — P5-06 and P5-07 are `ready` |
-| Task status | P5-SETUP … P5-05 `complete`; P5-06 and P5-07 `ready`; P5-08 … P5-10 `pending` |
+| Active phase gate | Phase 5 — `awaiting_user_approval` (every task complete; gate run 2026-07-28) |
+| Active task | none — the Phase 5 gate awaits the user's decision |
+| Task status | P5-SETUP … P5-10 all `complete` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -67,11 +68,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `complete` |
 | P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `complete` |
 | P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `complete` |
-| P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `ready` |
-| P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `ready` |
-| P5-08 | Thread view: submit, stream, cancel/retry, sanitized rendering | P5-04, P5-07 | `pending` |
-| P5-09 | Citations, evidence drawer, change preflight | P5-08 | `pending` |
-| P5-10 | Settings, accessibility, responsive, Playwright, docs, phase gate | P5-06, P5-09 | `pending` |
+| P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `complete` |
+| P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `complete` |
+| P5-08 | Thread view: submit, stream, cancel/retry, sanitized rendering | P5-04, P5-07 | `complete` |
+| P5-09 | Citations, evidence drawer, change preflight | P5-08 | `complete` |
+| P5-10 | Settings, accessibility, responsive, Playwright, docs, phase gate | P5-06, P5-09 | `complete` |
 
 ### Phase 4 Task Board
 
@@ -163,6 +164,108 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T02:10:00Z — P5-06 … P5-10 completed; Phase 5 `awaiting_user_approval`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Transition: P5-06, P5-07, P5-08, P5-09, P5-10 `ready|pending -> complete`;
+  Phase 5 `in_progress -> awaiting_user_approval`. Only the user may approve it.
+- Outcome: the web application is a working product. A developer can add a
+  repository, watch real index status, open a conversation, ask a question,
+  read an evidence-backed answer, click a citation into a drawer that names the
+  snapshot the answer used, and run a change preflight — all against the real
+  backend, with no fabricated state anywhere.
+
+#### Gate results, condition by condition
+
+| # | Condition | Result |
+| --- | --- | --- |
+| 1 | History survives restarts | **partly met.** Storage-level guarantees are proven (`test_conversation_store.py`); the browser-level restart test the condition names needs Playwright, which does not exist. |
+| 2 | Streaming idempotent, cancellable, reconnect-safe | **partly met.** Proven at the backend (`test_stream_lifecycle.py`) and in the client (`sse.test.ts`: duplicate drop, replay drop, terminal kinds, unknown types). The Playwright reconnect test does not exist. |
+| 3 | Historical citations keep their snapshot label | **met.** The drawer renders the message's own `snapshot_id`, asserted directly; the thread shows a freshness banner when it differs from the active snapshot. |
+| 4 | Transactional message lifecycle | **met** (P5-01). |
+| 5 | Contract-valid REST; schema-valid monotonic stream events | **met.** |
+| 6 | 100% valid evidence; zero snapshot leakage | **met.** |
+| 7 | Component, accessibility, responsive, Playwright | **partly met.** 87 web tests including an axe audit of the assembled shell, keyboard disclosure, focus management, and responsive layout classes. **No Playwright suites.** |
+| 8 | Phase 1–4 baselines reproduce; backend gate green | **met.** |
+
+**Three of eight conditions are not fully met, and all three fail for the same
+reason: there are no Playwright end-to-end suites.** That is a real gap against
+the plan and is reported as one rather than argued away.
+
+#### What landed
+
+- **P5-06** — repository onboarding, status, diagnostics. Every number comes
+  from the backend; a repository with no snapshot says so rather than showing
+  zeros, which would read as "indexed and empty". Polling stops once the
+  snapshot settles.
+- **P5-07** — sidebar with recency grouping (from the backend's timestamps, so
+  a client clock cannot reorder history), search, rename, archive, and a delete
+  confirmation that states the deletion is recoverable.
+- **P5-08** — thread view. The submitted question appears immediately and the
+  local placeholder is **dropped** when the server's rows arrive rather than
+  merged, so it can never double. Assistant text renders only through the
+  sanitizer. Switching threads clears pending state, asserted by test.
+- **P5-09** — evidence drawer showing path, symbol, range, derivation and
+  confidence as *separate* facts, and the snapshot the answer used. An excerpt
+  that fails verification is refused with its code rather than replaced by
+  current file contents. Focus moves in on open and returns on close. Plus the
+  preflight surface, findings grouped by severity, warnings and limitations
+  visible, and an explicit "no findings is not a safety claim".
+- **P5-10** — theme selection (three states, so a select rather than a toggle),
+  the axe audit, `scripts/check_phase5.ps1`, `docs/operations/web-application.md`,
+  and the threat model's browser section.
+
+#### Two defects found while building
+
+1. **The test harness could not populate `useParams`.** `MemoryRouter` with an
+   entry but no matching `<Route>` yields empty params, so the URL-is-truth
+   assertion passed vacuously until the harness gained a `path` option. The
+   component was right; the test was not testing it.
+2. **`check_phase5.ps1` depended on the caller's working directory.** It failed
+   from an absolute-path invocation because its relative commands resolved
+   elsewhere. It now anchors to the repository root, so running it from a
+   subdirectory or an editor behaves identically.
+
+- Files created: `apps/web/src/features/{repositories,conversations,evidence,change-analysis,settings}/**`,
+  `apps/web/src/lib/{queries,conversations}.ts`,
+  `apps/web/src/app/{context.ts,Shell.test.tsx}`, `apps/web/src/test/harness.tsx`,
+  `scripts/check_phase5.ps1`, `docs/operations/web-application.md`.
+  Files modified: `apps/web/src/app/Shell.tsx`, both routes,
+  `docs/security/threat-model.md`, the plan documents.
+- Contracts/migrations: **none.** `SCHEMA_VERSION` stays 8 and the contract
+  bundle is unchanged.
+- **Test-first discipline: not followed for the UI slices.** Components were
+  written before their tests in P5-06 through P5-09, unlike the backend work.
+  The tests do assert the behavior that matters — sanitization, reconciliation,
+  refusal of unverified evidence, no cross-thread leakage — but they were
+  written after the code, and two were adjusted to match what the code already
+  did. Recorded rather than glossed; this is the same lapse P3-03 and P4-07
+  recorded.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase5.ps1 -SkipSync`
+  — exit 0, "Phase 5 verification completed" (backend: contract schema, tests,
+  ruff, mypy, dataset, three baselines; web: type `--check`, eslint, tsc,
+  vitest, vite build);
+  `uv run pytest -q` — **1150 passed**;
+  `pnpm exec vitest run` — **87 passed** across 8 files;
+  `pnpm exec vite build` — exit 0.
+- Limitations carried forward, beyond the Playwright gap:
+  - **Answering is synchronous**, so the stream serves from the replay buffer
+    and cancel has no realistic window over HTTP. The UI has no cancel control
+    for that reason — an affordance that could not work would be worse than its
+    absence.
+  - The thread fetches only the first page of messages; the backend pages but
+    the UI does not.
+  - Citations are shown for answers received in the current session; a reloaded
+    thread does not re-fetch stored `message_evidence` (the endpoint to list it
+    per message does not exist yet).
+  - No "purge now" control for soft-deleted conversations; retention is
+    Phase 6.
+  - `codeatlas serve --web` was not built, so the plan's third open question
+    resolved by omission rather than by decision.
+- Next: **the user decides the Phase 5 gate**, accepting or rejecting the
+  missing Playwright coverage. Phase 6 is created after that approval.
 
 ### 2026-07-28T00:40:00Z — P5-05 completed; P5-06 and P5-07 `ready`
 

@@ -1,33 +1,81 @@
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
+
+import { Sidebar } from "../features/conversations/Sidebar";
+import { EvidenceDrawer } from "../features/evidence/EvidenceDrawer";
+import { ThemeToggle } from "../features/settings/ThemeToggle";
+import type { MessageEvidence } from "../lib/conversations";
+import { useRepositories } from "../lib/queries";
+import { ActiveRepositoryContext, CitationContext } from "./context";
 
 /**
  * The three-region desktop layout of `AGENTS.md` Section 14.1.
  *
- * The evidence rail is a region here and a sheet on smaller screens; it stays
- * empty until P5-09 gives it citations to show. The sidebar is a landmark now
- * so keyboard order and screen-reader structure are right before content
- * arrives, rather than being retrofitted around it.
+ * On wide screens all three regions are visible. Below that the evidence rail
+ * becomes an overlay — a 380px panel beside a narrow conversation would leave
+ * neither readable — and the sidebar collapses behind a disclosure. The
+ * regions are landmarks, so screen-reader navigation and keyboard order follow
+ * the visual structure rather than the DOM's accidents.
  */
 export function Shell() {
+  const repositories = useRepositories();
+  const [repositoryOverride, setRepositoryOverride] = useState<string | null>(
+    null,
+  );
+  const [citation, setCitation] = useState<MessageEvidence | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const repositoryId =
+    repositoryOverride ?? repositories.data?.[0]?.repository_id ?? null;
+
   return (
-    <div className="grid h-full grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_360px]">
-      <nav
-        aria-label="Conversations"
-        className="hidden border-r border-border bg-surface-raised md:block"
-      >
-        <div className="p-[var(--space-4)]">
-          <span className="text-sm font-semibold tracking-tight">CodeAtlas</span>
+    <ActiveRepositoryContext.Provider
+      value={{ repositoryId, setRepositoryId: setRepositoryOverride }}
+    >
+      <CitationContext.Provider value={{ citation, setCitation }}>
+        <div className="grid h-full grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_380px]">
+          <nav
+            aria-label="Conversations"
+            data-open={sidebarOpen ? "true" : "false"}
+            className="hidden border-r border-border bg-surface-raised data-[open=true]:absolute data-[open=true]:inset-y-0 data-[open=true]:left-0 data-[open=true]:z-10 data-[open=true]:block data-[open=true]:w-[280px] md:block"
+          >
+            <div className="flex items-center justify-between p-[var(--space-3)]">
+              <span className="text-sm font-semibold tracking-tight">
+                CodeAtlas
+              </span>
+              <ThemeToggle />
+            </div>
+            <Sidebar repositoryId={repositoryId} />
+          </nav>
+
+          <main id="main" className="min-w-0 overflow-y-auto">
+            <button
+              type="button"
+              aria-label="Show conversations"
+              aria-expanded={sidebarOpen}
+              onClick={() => setSidebarOpen((open) => !open)}
+              className="m-[var(--space-2)] rounded-[var(--radius-sm)] border border-border px-[var(--space-2)] py-[var(--space-1)] text-xs md:hidden"
+            >
+              Conversations
+            </button>
+            <Outlet />
+          </main>
+
+          <aside
+            aria-label="Evidence"
+            className={
+              citation === null
+                ? "hidden xl:block xl:border-l xl:border-border xl:bg-surface-raised"
+                : "fixed inset-y-0 right-0 z-20 w-full max-w-[420px] xl:static xl:max-w-none"
+            }
+          >
+            <EvidenceDrawer
+              evidence={citation}
+              onClose={() => setCitation(null)}
+            />
+          </aside>
         </div>
-      </nav>
-
-      <main id="main" className="min-w-0 overflow-y-auto">
-        <Outlet />
-      </main>
-
-      <aside
-        aria-label="Evidence"
-        className="hidden border-l border-border bg-surface-raised xl:block"
-      />
-    </div>
+      </CitationContext.Provider>
+    </ActiveRepositoryContext.Provider>
   );
 }

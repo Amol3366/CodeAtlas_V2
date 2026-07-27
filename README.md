@@ -31,11 +31,12 @@ Every answer is bound to a snapshot. If a file changed after indexing, CodeAtlas
 withholds the evidence and says so rather than citing content that no longer
 matches. If nothing matches, it abstains rather than guessing.
 
-The web application in `apps/web` is under construction (Phase 5): the
-conversation backend, its typed event stream, and the application shell
-exist; the chat, evidence, and preflight surfaces do not yet. Not built at
-all: the filesystem watcher and packaging (Phase 6), and embeddings or any
-model provider (Phase 7). See `docs/plans/PLAN.md` for the phase order.
+The web application in `apps/web` adds persistent conversations, an evidence
+drawer, and change preflight — see `docs/operations/web-application.md`. It
+answers deterministically: there is no LLM, and an unanswerable question
+produces an explicit abstention. Not built: the filesystem watcher and
+packaging (Phase 6), and embeddings or any model provider (Phase 7). See
+`docs/plans/PLAN.md` for the phase order.
 
 ## Windows development
 
@@ -45,8 +46,7 @@ the web application in `apps/web`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
-powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync
-cd apps/web; pnpm lint; pnpm typecheck; pnpm test; pnpm build
+powershell -ExecutionPolicy Bypass -File scripts/check_phase5.ps1 -SkipSync
 ```
 
 The quality command validates the tracked contract schema, tests, lint, types,
@@ -57,5 +57,6 @@ fixtures are untrusted data and are never imported, built, or executed.
 - `docs/operations/development-windows-phase1.md` — CLI, API, and Windows behavior
 - `docs/operations/relations-and-graph.md` — the relation graph and traversal
 - `docs/operations/change-analysis.md` — change preflight and its limits
+- `docs/operations/web-application.md` — the web app, its rules, and its limits
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers
 - `docs/security/threat-model.md` — controls and their enforcement status

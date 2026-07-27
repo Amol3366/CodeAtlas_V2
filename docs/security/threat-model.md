@@ -99,6 +99,22 @@ named below.
 | Injection-marker prose in changed documents | enforced | matched content is *labeled* (`UNTRUSTED_CONTENT_CHANGED` + `REPOSITORY_CONTENT_IS_DATA`), never obeyed; the marker list only labels, it never gates safety |
 | Analysis audit integrity | enforced | stored analyses are decomposed rows with persisted rank; findings without citable evidence are dropped rather than emitted uncited |
 
+## Phase 5 Enforcement Additions (browser surface)
+
+As of 2026-07-28 the web application adds these controls, covered by the
+component suites in `apps/web/src/**/*.test.tsx`.
+
+| Control | Status | Where it is enforced |
+| --- | --- | --- |
+| Markdown/HTML injection | enforced | `components/Markdown.tsx` uses `rehype-sanitize` with an allowlist and **no `rehype-raw`**, so raw HTML never enters the tree; ten tests cover script tags, inline `onerror`, `<style>`, `<iframe>`, raw HTML, and a fenced block containing a script |
+| Unsafe link protocols | enforced | only `http`/`https`/`mailto` survive sanitization; `javascript:` and `data:` are stripped, asserted by test |
+| Reverse tabnabbing | enforced | every rendered link carries `rel="noopener noreferrer nofollow"` |
+| Evidence excerpt injection | enforced | excerpts render inside `<pre><code>` as text and are never passed through the Markdown renderer, asserted by test |
+| Unverified evidence display | enforced | a failed hash verification or missing row renders an explicit refusal with its error code; current file contents are never substituted under an old citation |
+| Error detail leakage to the browser | enforced | the client renders only the Section 12.6 envelope's `code` and `message`; the error boundary logs nothing, because an exception can carry a path or repository content |
+| Local API exposure | unchanged | the API still binds to loopback with no CORS middleware; the Vite dev proxy — not a relaxed server policy — is what lets the browser reach it in development |
+| Browser storage of secrets | not applicable | the only stored value is the theme preference; no credential or repository content is written to `localStorage` |
+
 ## Provider Opt-In Gate
 
 Provider use is prohibited until all of the following are recorded for the

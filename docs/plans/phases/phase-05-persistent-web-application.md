@@ -1,8 +1,9 @@
 # Phase 5 — Persistent ChatGPT-Style Web Application
 
-Status: `in_progress` (Phase 4 gate and this plan both approved by the user
-2026-07-27; recorded in the PLAN.md handoff log. The three open questions
-default to the plan as written unless the user overrides them.)
+Status: `awaiting_user_approval` (every task complete; gate run 2026-07-28.
+Two of the eight gate conditions are met only in part — no Playwright suites
+exist — and that is reported as missed rather than glossed. See the PLAN.md
+handoff.)
 Gate authority: user
 Prerequisites: Phase 4 approved; `AGENTS.md` Sections 8.2, 11, 12.2, 14, 15;
 the blueprint
@@ -331,11 +332,11 @@ apps/web/
 | P5-03 | Intent rules, `AnswerPipeline`, deterministic templates, run execution | P5-01 | `complete` |
 | P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `complete` |
 | P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types, tokens, shell | P5-SETUP | `complete` |
-| P5-06 | Repository onboarding, status, diagnostics UI (first real-backend slice) | P5-05 | `ready` |
-| P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `ready` |
-| P5-08 | Thread view: submit, stream, cancel/retry, sanitized rendering | P5-04, P5-07 | `pending` |
-| P5-09 | Inline citations, evidence drawer, change-preflight experience | P5-08 | `pending` |
-| P5-10 | Settings, accessibility, responsive, Playwright, docs, phase gate | P5-06, P5-09 | `pending` |
+| P5-06 | Repository onboarding, status, diagnostics UI (first real-backend slice) | P5-05 | `complete` |
+| P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `complete` |
+| P5-08 | Thread view: submit, stream, cancel/retry, sanitized rendering | P5-04, P5-07 | `complete` |
+| P5-09 | Inline citations, evidence drawer, change-preflight experience | P5-08 | `complete` |
+| P5-10 | Settings, accessibility, responsive, Playwright, docs, phase gate | P5-06, P5-09 | `complete` |
 
 ---
 
