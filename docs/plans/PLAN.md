@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active task | none — P5-01 and P5-05 are both `ready` (independent; either may start) |
-| Task status | P5-SETUP `complete`; P5-01 and P5-05 `ready`; P5-02 … P5-04, P5-06 … P5-10 `pending` |
+| Active task | none — P5-02, P5-03, and P5-05 are `ready` |
+| Task status | P5-SETUP and P5-01 `complete`; P5-02, P5-03, P5-05 `ready`; the rest `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -62,9 +62,9 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Task | Deliverable | Dependencies | Status |
 | --- | --- | --- | --- |
 | P5-SETUP | ADR-0006, error codes, contract models, schema regen | Phase 4 | `complete` |
-| P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `ready` |
-| P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `pending` |
-| P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `pending` |
+| P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `complete` |
+| P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `ready` |
+| P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `ready` |
 | P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `pending` |
 | P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `ready` |
 | P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `pending` |
@@ -163,6 +163,91 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-27T20:05:00Z — P5-01 completed; P5-02, P5-03, P5-05 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Transition: P5-01 `ready -> complete`; P5-02 and P5-03 `pending -> ready`
+  (both depend only on P5-01); P5-05 stays `ready`.
+- Outcome: chat history is now storable. A conversation, its turns, every
+  attempt at answering them, and each answer's citations survive a restart,
+  and the guarantees a user would actually notice are pinned by tests: thread
+  order, all-or-nothing turns, deletion that stays deleted, and citations that
+  still say what they said after the snapshot moved on.
+
+#### Migration `0008` (`SCHEMA_VERSION` 7 → 8, additive, forward-only)
+
+Five tables: `conversations`, `messages`, `message_runs`, `message_evidence`,
+`message_feedback`. Two decisions are load-bearing and are stated in the SQL
+itself:
+
+- **Nothing references `snapshots`.** `message_evidence` stores the evidence
+  *fields* (path, symbol, range, hash, snapshot ID) rather than pointing at
+  live index rows. A join to a pruned snapshot would either erase an old
+  citation or silently re-resolve it against a tree the answer never examined;
+  both contradict "reopening history must not relabel old evidence as
+  current". Same audit rule as migration `0007`.
+- **Deleting a repository cascades; deleting a conversation is soft.**
+  Section 8.2 demands an explicit policy for a repository's conversations —
+  conversations are derived content about a repository, so removing the
+  repository removes them. A conversation deletion sets `deleted_at` and stays
+  recoverable until Phase 6 defines retention.
+
+`sequence_number` is `UNIQUE(conversation_id, sequence_number)` because it both
+orders the thread and is the stream's resume key; `citation_ordinal` is part of
+`message_evidence`'s primary key because two citations sharing a number make
+"[1]" ambiguous to a reader.
+
+#### `ConversationStore` and the domain records
+
+- `src/codeatlas/domain/conversations.py`: `ConversationRecord`,
+  `MessageRecord`, `RunRecord`, `MessageEvidenceRow`, a generic `Page[T]`, and
+  the two size bounds (64 KiB content, 8 KiB warnings) that keep the repository
+  corpus out of chat rows.
+- `ConversationStore` in `storage/sqlite/stores.py`. **The caller supplies the
+  transaction**, because the application service usually has more to commit
+  alongside; the store's job is to make each unit *fit* in one. `create_user_turn`
+  writes question + pending answer + run; `complete_assistant` writes answer
+  text + citations + run completion. A retry **adds** a run rather than
+  replacing one, so the record of what already failed survives.
+- Conversation listing pages by `(activity, conversation_id)` rather than by
+  offset, so inserting a newer conversation cannot shift a page boundary and
+  duplicate a row across pages.
+- `get_conversation` treats a soft-deleted row as **not found**: deletion is a
+  user-visible fact, and returning the row because it physically survives would
+  contradict what the user was told.
+- Files created: `src/codeatlas/storage/sqlite/migrations/0008_phase5_conversations.sql`,
+  `src/codeatlas/domain/conversations.py`,
+  `tests/integration/test_conversation_store.py` (18 tests).
+  Files modified: `src/codeatlas/storage/sqlite/migrations.py`
+  (`SCHEMA_VERSION = 8`), `src/codeatlas/storage/sqlite/stores.py`,
+  `tests/integration/test_migrations.py` (v7→v8 upgrade, table existence, and
+  the version pin moved 7 → 8 — a deliberate contract change, not a drive-by
+  edit).
+- Contracts: no public contract change; the models landed in P5-SETUP.
+- **Test-first discipline: followed.** Both test files were written first and
+  observed failing (collection `ImportError` for `ConversationStore` and the
+  domain module; the migration tests failing on missing tables).
+- Atomicity is proven by *forcing* a mid-unit failure rather than by asserting
+  the happy path: `create_user_turn` is given a run whose message does not
+  exist (foreign-key violation) and `complete_assistant` is given two citations
+  sharing an ordinal (primary-key violation). In both cases the test asserts
+  nothing landed — no orphan message, no answer text without its citations.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  — exit 0, "Phase 4 verification completed";
+  `uv run pytest -q` — **1056 passed** in 104.30 s (1037 after P5-SETUP, plus
+  the 18 store tests and 2 migration tests, minus none);
+  `uv run ruff check src tests scripts apps` — exit 0;
+  `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **177 source files**.
+- Limitations: nothing *serves* a conversation yet — no REST surface, no
+  pipeline, no run execution. `pinned_snapshot_policy` is stored but unused
+  until a policy exists to put in it. The store is not wired into
+  `ApplicationServices`; P5-02 does that when it needs it.
+- Next: **P5-02** (conversation and history REST), **P5-03** (intent rules,
+  `AnswerPipeline`, run execution), or **P5-05** (web scaffold) — all three
+  `ready`; only one may be `in_progress` at a time.
 
 ### 2026-07-27T19:10:00Z — P5-SETUP completed; P5-01 and P5-05 `ready`
 

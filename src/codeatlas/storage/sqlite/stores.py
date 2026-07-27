@@ -26,14 +26,26 @@ from codeatlas.contracts import (
     ChangeKind,
     Derivation,
     Finding,
+    MessageRole,
+    MessageStatus,
     OverallRisk,
     RelationKind,
+    RunStatus,
     Severity,
     SnapshotFreshness,
     SymbolKind,
 )
 from codeatlas.contracts import ImpactEdge as ContractImpactEdge
 from codeatlas.domain.chunks import ChunkRole, LogicalChunk
+from codeatlas.domain.conversations import (
+    MAX_MESSAGE_CONTENT_BYTES,
+    MAX_WARNINGS_BYTES,
+    ConversationRecord,
+    MessageEvidenceRow,
+    MessageRecord,
+    Page,
+    RunRecord,
+)
 from codeatlas.domain.relations import (
     RelationRecord,
     ResolutionState,
@@ -1453,3 +1465,461 @@ class ChangeAnalysisStore:
 def _dump_models(items: Sequence[Any]) -> str:
     """Serialize contract models to the JSON stored in a bounded column."""
     return json.dumps([item.model_dump(mode="json") for item in items])
+
+
+class ConversationStore:
+    """Persisted chat history: conversations, messages, runs, and citations.
+
+    Two rules drive the shape of this class.
+
+    **A turn is one fact.** Creating a user message, its queued assistant
+    message, and the run that will answer it happens in one transaction, as does
+    completing an answer with its citations. A half-written turn would show a
+    question with no answer coming, and answer text without its citations is
+    exactly the uncited claim the evidence contract forbids. The caller supplies
+    the transaction, because the application service usually has more to commit
+    alongside.
+
+    **History is a record, not a cache.** A retry adds a run rather than
+    replacing one, deletion is soft, and evidence rows carry their own fields so
+    a citation still says what it said after its snapshot is superseded.
+    """
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    # -- conversations ----------------------------------------------------
+
+    def create_conversation(self, record: ConversationRecord) -> None:
+        self._connection.execute(
+            "INSERT INTO conversations ("
+            " conversation_id, repository_id, title, pinned_snapshot_policy,"
+            " created_at, updated_at, last_message_at, archived_at, deleted_at"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.conversation_id,
+                record.repository_id,
+                record.title,
+                record.pinned_snapshot_policy,
+                to_utc_text(record.created_at),
+                to_utc_text(record.updated_at),
+                _optional_utc(record.last_message_at),
+                _optional_utc(record.archived_at),
+                _optional_utc(record.deleted_at),
+            ),
+        )
+
+    def get_conversation(self, conversation_id: str) -> ConversationRecord | None:
+        """Load one conversation, or ``None`` if it is absent or deleted.
+
+        A soft-deleted row is *not found* here: deletion is a user-visible fact,
+        and returning the row because it physically survives would contradict
+        what the user was told.
+        """
+        row = self._connection.execute(
+            "SELECT * FROM conversations"
+            " WHERE conversation_id = ? AND deleted_at IS NULL",
+            (conversation_id,),
+        ).fetchone()
+        return _conversation_from_row(row) if row is not None else None
+
+    def list_conversations(
+        self,
+        repository_id: str,
+        *,
+        cursor: str | None,
+        limit: int,
+        include_archived: bool = False,
+    ) -> Page[ConversationRecord]:
+        """List a repository's conversations, newest activity first.
+
+        The cursor carries the ordering key of the last row returned, so
+        inserting a newer conversation cannot shift a page boundary and
+        duplicate a row across pages.
+        """
+        clauses = ["repository_id = ?", "deleted_at IS NULL"]
+        parameters: list[Any] = [repository_id]
+        if not include_archived:
+            clauses.append("archived_at IS NULL")
+        if cursor is not None:
+            clauses.append(
+                "(COALESCE(last_message_at, created_at), conversation_id) < (?, ?)"
+            )
+            activity, _, identifier = cursor.partition("|")
+            parameters.extend([activity, identifier])
+
+        where = " AND ".join(clauses)
+        rows = self._connection.execute(
+            "SELECT * FROM conversations"
+            f" WHERE {where}"
+            " ORDER BY COALESCE(last_message_at, created_at) DESC,"
+            " conversation_id DESC"
+            " LIMIT ?",
+            (*parameters, limit + 1),
+        ).fetchall()
+
+        items = [_conversation_from_row(row) for row in rows[:limit]]
+        next_cursor = None
+        if len(rows) > limit and items:
+            last = items[-1]
+            activity_at = last.last_message_at or last.created_at
+            next_cursor = f"{to_utc_text(activity_at)}|{last.conversation_id}"
+        return Page(items=tuple(items), next_cursor=next_cursor)
+
+    def rename(
+        self, conversation_id: str, *, title: str, updated_at: datetime
+    ) -> None:
+        self._connection.execute(
+            "UPDATE conversations SET title = ?, updated_at = ?"
+            " WHERE conversation_id = ? AND deleted_at IS NULL",
+            (title, to_utc_text(updated_at), conversation_id),
+        )
+
+    def archive(self, conversation_id: str, *, archived_at: datetime) -> None:
+        self._connection.execute(
+            "UPDATE conversations SET archived_at = ?, updated_at = ?"
+            " WHERE conversation_id = ? AND deleted_at IS NULL",
+            (to_utc_text(archived_at), to_utc_text(archived_at), conversation_id),
+        )
+
+    def soft_delete(self, conversation_id: str, *, deleted_at: datetime) -> None:
+        """Hide a conversation while keeping it recoverable.
+
+        Phase 6 defines retention and the purge path; until then a deletion is
+        reversible, which is why the rows stay.
+        """
+        self._connection.execute(
+            "UPDATE conversations SET deleted_at = ?, updated_at = ?"
+            " WHERE conversation_id = ?",
+            (to_utc_text(deleted_at), to_utc_text(deleted_at), conversation_id),
+        )
+
+    # -- messages and runs ------------------------------------------------
+
+    def next_sequence_number(self, conversation_id: str) -> int:
+        """The position the next message takes. Starts at 1."""
+        row = self._connection.execute(
+            "SELECT MAX(sequence_number) FROM messages WHERE conversation_id = ?",
+            (conversation_id,),
+        ).fetchone()
+        highest = row[0] if row is not None else None
+        return int(highest) + 1 if highest is not None else 1
+
+    def create_user_turn(
+        self,
+        user: MessageRecord,
+        assistant: MessageRecord,
+        run: RunRecord,
+    ) -> None:
+        """Insert the question, the pending answer, and its first run together."""
+        self._insert_message(user)
+        self._insert_message(assistant)
+        self._insert_run(run)
+        self._touch_conversation(user.conversation_id, user.created_at)
+
+    def complete_assistant(
+        self,
+        *,
+        message_id: str,
+        content: str,
+        evidence: Sequence[MessageEvidenceRow],
+        run_id: str,
+        latency_ms: float,
+        completed_at: datetime,
+    ) -> None:
+        """Commit an answer and its citations as one fact."""
+        _check_content_bound(content)
+        self._connection.execute(
+            "UPDATE messages SET status = ?, content = ?, completed_at = ?,"
+            " error_code = NULL WHERE message_id = ?",
+            (
+                MessageStatus.COMPLETE.value,
+                content,
+                to_utc_text(completed_at),
+                message_id,
+            ),
+        )
+        self._connection.execute(
+            "DELETE FROM message_evidence WHERE message_id = ?", (message_id,)
+        )
+        self._connection.executemany(
+            "INSERT INTO message_evidence ("
+            " message_id, citation_ordinal, evidence_id, file_path, symbol,"
+            " start_line, end_line, content_hash, derivation, confidence,"
+            " snapshot_id, claim_ids_json"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    message_id,
+                    item.citation_ordinal,
+                    item.evidence_id,
+                    item.file_path,
+                    item.symbol,
+                    item.start_line,
+                    item.end_line,
+                    item.content_hash,
+                    item.derivation.value,
+                    item.confidence,
+                    item.snapshot_id,
+                    json.dumps(list(item.claim_ids)),
+                )
+                for item in evidence
+            ],
+        )
+        self._connection.execute(
+            "UPDATE message_runs SET status = ?, latency_ms = ?, completed_at = ?"
+            " WHERE run_id = ?",
+            (
+                RunStatus.COMPLETE.value,
+                latency_ms,
+                to_utc_text(completed_at),
+                run_id,
+            ),
+        )
+        self._touch_message_conversation(message_id, completed_at)
+
+    def fail_or_cancel(
+        self,
+        *,
+        message_id: str,
+        run_id: str,
+        status: MessageStatus,
+        error_code: str | None,
+        completed_at: datetime,
+    ) -> None:
+        """Record a terminal, non-successful outcome.
+
+        The message stays visible: a failure the user cannot see is a failure
+        they cannot retry.
+        """
+        self._connection.execute(
+            "UPDATE messages SET status = ?, error_code = ?, completed_at = ?"
+            " WHERE message_id = ?",
+            (status.value, error_code, to_utc_text(completed_at), message_id),
+        )
+        run_status = (
+            RunStatus.CANCELLED
+            if status is MessageStatus.CANCELLED
+            else RunStatus.FAILED
+        )
+        self._connection.execute(
+            "UPDATE message_runs SET status = ?, completed_at = ? WHERE run_id = ?",
+            (run_status.value, to_utc_text(completed_at), run_id),
+        )
+
+    def create_retry_run(self, message_id: str, run: RunRecord) -> None:
+        """Queue another attempt, preserving every prior one."""
+        self._connection.execute(
+            "UPDATE messages SET status = ?, error_code = NULL, completed_at = NULL"
+            " WHERE message_id = ?",
+            (MessageStatus.QUEUED.value, message_id),
+        )
+        self._insert_run(run)
+
+    def list_messages(
+        self,
+        conversation_id: str,
+        *,
+        cursor: str | None,
+        limit: int,
+    ) -> Page[MessageRecord]:
+        """Page a thread in sequence order."""
+        clauses = ["conversation_id = ?"]
+        parameters: list[Any] = [conversation_id]
+        if cursor is not None:
+            clauses.append("sequence_number > ?")
+            parameters.append(int(cursor))
+
+        where = " AND ".join(clauses)
+        rows = self._connection.execute(
+            "SELECT * FROM messages"
+            f" WHERE {where}"
+            " ORDER BY sequence_number LIMIT ?",
+            (*parameters, limit + 1),
+        ).fetchall()
+
+        items = [_message_from_row(row) for row in rows[:limit]]
+        next_cursor = (
+            str(items[-1].sequence_number) if len(rows) > limit and items else None
+        )
+        return Page(items=tuple(items), next_cursor=next_cursor)
+
+    def get_message(self, message_id: str) -> MessageRecord | None:
+        row = self._connection.execute(
+            "SELECT * FROM messages WHERE message_id = ?", (message_id,)
+        ).fetchone()
+        return _message_from_row(row) if row is not None else None
+
+    def list_runs(self, message_id: str) -> tuple[RunRecord, ...]:
+        """Every attempt at this message, oldest first."""
+        rows = self._connection.execute(
+            "SELECT * FROM message_runs WHERE message_id = ?"
+            " ORDER BY created_at, run_id",
+            (message_id,),
+        ).fetchall()
+        return tuple(_run_from_row(row) for row in rows)
+
+    def get_evidence(self, message_id: str) -> tuple[MessageEvidenceRow, ...]:
+        rows = self._connection.execute(
+            "SELECT * FROM message_evidence WHERE message_id = ?"
+            " ORDER BY citation_ordinal",
+            (message_id,),
+        ).fetchall()
+        return tuple(
+            MessageEvidenceRow(
+                evidence_id=row["evidence_id"],
+                citation_ordinal=row["citation_ordinal"],
+                file_path=row["file_path"],
+                symbol=row["symbol"],
+                start_line=row["start_line"],
+                end_line=row["end_line"],
+                content_hash=row["content_hash"],
+                derivation=Derivation(row["derivation"]),
+                confidence=row["confidence"],
+                snapshot_id=row["snapshot_id"],
+                claim_ids=tuple(json.loads(row["claim_ids_json"])),
+            )
+            for row in rows
+        )
+
+    def save_feedback(
+        self,
+        message_id: str,
+        *,
+        rating: str,
+        reason_code: str | None,
+        created_at: datetime,
+        comment: str | None = None,
+    ) -> None:
+        """Store the user's current opinion, replacing any earlier one."""
+        self._connection.execute(
+            "INSERT INTO message_feedback"
+            " (message_id, rating, reason_code, comment, created_at)"
+            " VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT(message_id) DO UPDATE SET"
+            " rating = excluded.rating, reason_code = excluded.reason_code,"
+            " comment = excluded.comment, created_at = excluded.created_at",
+            (message_id, rating, reason_code, comment, to_utc_text(created_at)),
+        )
+
+    # -- internals --------------------------------------------------------
+
+    def _insert_message(self, record: MessageRecord) -> None:
+        _check_content_bound(record.content)
+        self._connection.execute(
+            "INSERT INTO messages ("
+            " message_id, conversation_id, role, status, sequence_number,"
+            " content, error_code, created_at, completed_at"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.message_id,
+                record.conversation_id,
+                record.role.value,
+                record.status.value,
+                record.sequence_number,
+                record.content,
+                record.error_code,
+                to_utc_text(record.created_at),
+                _optional_utc(record.completed_at),
+            ),
+        )
+
+    def _insert_run(self, record: RunRecord) -> None:
+        warnings = json.dumps(list(record.warnings))
+        if len(warnings.encode("utf-8")) > MAX_WARNINGS_BYTES:
+            raise ValueError("run warnings exceed the stored bound")
+        self._connection.execute(
+            "INSERT INTO message_runs ("
+            " run_id, message_id, repository_id, snapshot_id, normalized_query,"
+            " intent, retrieval_policy_version, status, latency_ms,"
+            " warnings_json, created_at, completed_at"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.run_id,
+                record.message_id,
+                record.repository_id,
+                record.snapshot_id,
+                record.normalized_query,
+                record.intent,
+                record.retrieval_policy_version,
+                record.status.value,
+                record.latency_ms,
+                warnings,
+                to_utc_text(record.created_at),
+                _optional_utc(record.completed_at),
+            ),
+        )
+
+    def _touch_conversation(self, conversation_id: str, moment: datetime) -> None:
+        self._connection.execute(
+            "UPDATE conversations SET last_message_at = ?, updated_at = ?"
+            " WHERE conversation_id = ?",
+            (to_utc_text(moment), to_utc_text(moment), conversation_id),
+        )
+
+    def _touch_message_conversation(self, message_id: str, moment: datetime) -> None:
+        self._connection.execute(
+            "UPDATE conversations SET last_message_at = ?, updated_at = ?"
+            " WHERE conversation_id = ("
+            "  SELECT conversation_id FROM messages WHERE message_id = ?"
+            " )",
+            (to_utc_text(moment), to_utc_text(moment), message_id),
+        )
+
+
+def _check_content_bound(content: str) -> None:
+    if len(content.encode("utf-8")) > MAX_MESSAGE_CONTENT_BYTES:
+        raise ValueError("message content exceeds the stored bound")
+
+
+def _optional_utc(moment: datetime | None) -> str | None:
+    return to_utc_text(moment) if moment is not None else None
+
+
+def _conversation_from_row(row: sqlite3.Row) -> ConversationRecord:
+    return ConversationRecord(
+        conversation_id=row["conversation_id"],
+        repository_id=row["repository_id"],
+        title=row["title"],
+        pinned_snapshot_policy=row["pinned_snapshot_policy"],
+        created_at=from_utc_text(row["created_at"]),
+        updated_at=from_utc_text(row["updated_at"]),
+        last_message_at=_optional_from_text(row["last_message_at"]),
+        archived_at=_optional_from_text(row["archived_at"]),
+        deleted_at=_optional_from_text(row["deleted_at"]),
+    )
+
+
+def _message_from_row(row: sqlite3.Row) -> MessageRecord:
+    return MessageRecord(
+        message_id=row["message_id"],
+        conversation_id=row["conversation_id"],
+        role=MessageRole(row["role"]),
+        status=MessageStatus(row["status"]),
+        sequence_number=row["sequence_number"],
+        content=row["content"],
+        error_code=row["error_code"],
+        created_at=from_utc_text(row["created_at"]),
+        completed_at=_optional_from_text(row["completed_at"]),
+    )
+
+
+def _run_from_row(row: sqlite3.Row) -> RunRecord:
+    return RunRecord(
+        run_id=row["run_id"],
+        message_id=row["message_id"],
+        repository_id=row["repository_id"],
+        snapshot_id=row["snapshot_id"],
+        normalized_query=row["normalized_query"],
+        intent=row["intent"],
+        retrieval_policy_version=row["retrieval_policy_version"],
+        status=RunStatus(row["status"]),
+        latency_ms=row["latency_ms"],
+        warnings=tuple(json.loads(row["warnings_json"])),
+        created_at=from_utc_text(row["created_at"]),
+        completed_at=_optional_from_text(row["completed_at"]),
+    )
+
+
+def _optional_from_text(value: str | None) -> datetime | None:
+    return from_utc_text(value) if value else None

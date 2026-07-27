@@ -60,8 +60,10 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_seven() -> None:
-    assert SCHEMA_VERSION == 7
+def test_schema_version_is_eight() -> None:
+    """Phase 5's migration 0008 adds the conversation tables. The pin is
+    deliberate: a version bump is a contract change someone must review."""
+    assert SCHEMA_VERSION == 8
 
 
 def test_evidence_table_and_resolution_columns_exist(tmp_path: Path) -> None:
@@ -423,3 +425,43 @@ def test_an_analysis_is_not_deleted_when_its_snapshot_is(tmp_path: Path) -> None
         ).fetchone()[0]
 
     assert remaining == 1
+
+
+def test_upgrading_an_existing_version_7_database_preserves_data(
+    tmp_path: Path,
+) -> None:
+    """Migration 0008 is additive; a version-7 database keeps its rows."""
+    database = tmp_path / "v7.sqlite"
+    with connect(database) as connection:
+        _apply_through_version(connection, 7)
+        assert current_version(connection) == 7
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+
+    with connect(database) as connection:
+        assert apply_migrations(connection) == SCHEMA_VERSION
+        repositories = connection.execute(
+            "SELECT COUNT(*) FROM repositories"
+        ).fetchone()[0]
+        conversations = connection.execute(
+            "SELECT COUNT(*) FROM conversations"
+        ).fetchone()[0]
+
+    assert repositories == 1
+    assert conversations == 0
+
+
+def test_conversation_tables_exist(tmp_path: Path) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        rows = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    names = {row[0] for row in rows}
+    assert {
+        "conversations",
+        "messages",
+        "message_runs",
+        "message_evidence",
+        "message_feedback",
+    } <= names
