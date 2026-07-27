@@ -19,6 +19,7 @@ from codeatlas.application.lookup import ExactSymbolLookupService
 from codeatlas.application.recovery import SnapshotRecoveryService
 from codeatlas.application.registration import RegisterRepositoryService
 from codeatlas.application.status import RepositoryStatusService
+from codeatlas.conversations.events import EventHub
 from codeatlas.conversations.pipeline import AnswerPipeline
 from codeatlas.parsing.registry import default_registry
 from codeatlas.repositories.git_diff import GitDiffAdapter
@@ -56,8 +57,18 @@ class ApplicationServices:
     conversations: ConversationService
 
 
-def build_services(connection: Connection) -> ApplicationServices:
-    """Construct the application services for one database connection."""
+def build_services(
+    connection: Connection, *, hub: EventHub | None = None
+) -> ApplicationServices:
+    """Construct the application services for one database connection.
+
+    ``hub`` must be supplied by any adapter that serves more than one request
+    against the same process. Services are built per request, so a hub created
+    here would be a *different* hub for the request that starts a run and the
+    request that streams it — the stream would find nothing. The API owns one
+    hub for the application's lifetime and passes it in; a one-shot caller
+    (the CLI, a test) can let this default and never notice.
+    """
     repositories = RepositoryStore(connection)
     snapshots = SnapshotStore(connection)
     files = FileStore(connection)
@@ -153,6 +164,7 @@ def build_services(connection: Connection) -> ApplicationServices:
             # `/v1/query` answer the same answer rather than two that agree
             # by coincidence.
             pipeline=AnswerPipeline(lookup=lookup, graph=graph, search=search),
+            hub=hub if hub is not None else EventHub(),
         ),
         change_analysis=ChangeAnalysisService(
             repositories=repositories,

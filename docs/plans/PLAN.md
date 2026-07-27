@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active task | none — P5-04 and P5-05 are `ready` |
-| Task status | P5-SETUP … P5-03 `complete`; P5-04 and P5-05 `ready`; the rest `pending` |
+| Active task | none — P5-05 is `ready` (the whole backend half of Phase 5 is done) |
+| Task status | P5-SETUP … P5-04 `complete`; P5-05 `ready`; P5-06 … P5-10 `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -65,7 +65,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `complete` |
 | P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `complete` |
 | P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `complete` |
-| P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `ready` |
+| P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `complete` |
 | P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `ready` |
 | P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `pending` |
 | P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `pending` |
@@ -163,6 +163,97 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T00:15:00Z — P5-04 completed; P5-05 `ready` (backend half of Phase 5 done)
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Transition: P5-04 `ready -> complete`. P5-05 stays `ready`; every remaining
+  Phase 5 task is frontend work.
+- Outcome: a client can watch a run. Events are typed, numbered, replayable
+  from `Last-Event-ID`, and terminate on completion, failure, or cancellation;
+  a run that has aged out of the buffer is told to read the persisted message
+  rather than handed a partial history.
+
+#### What landed
+
+- **`conversations/events.py`** — `EventBuffer` (numbering + bounded replay),
+  `RunChannel` (buffer + subscribers + cancel token), `EventHub` (live runs,
+  pruned on completion), `format_sse`, and the async `stream_events` generator
+  with heartbeats.
+- **`api/routers/stream.py`** — `GET /v1/conversations/{id}/stream` and
+  `POST /v1/message-runs/{run_id}/cancel`.
+- **Event emission wired through `ConversationService._execute_run`**, with a
+  `_STREAM_STAGES` table mapping the pipeline's stage names onto the published
+  Section 11.2 vocabulary — so a renamed internal stage cannot silently change
+  what a client receives.
+
+#### Decisions worth recording
+
+1. **Events are never persisted.** Streaming text is provisional and the stored
+   message is authoritative; a second record of one answer could disagree with
+   the first, and reconciling two records of one answer is a problem worth
+   never having.
+2. **`answer.completed` is published only after the message is committed.** A
+   client must never be told a run finished before the answer it can fetch
+   exists.
+3. **Outside the replay window the stream closes with
+   `stream.closed / fetch_final_message`.** A partial replay would look
+   complete to a client that had no way to know events were missing.
+4. **A malformed `Last-Event-ID` replays from the beginning** rather than
+   erroring. Stranding a client that mangled a header is worse than resending
+   events it already has, and duplicates are dropped by sequence.
+5. **Cancel returns 202, not 204.** Cancellation is cooperative, so the
+   response acknowledges the request; the run's own terminal event is what says
+   it stopped. A UI must never paint a cancelled state ahead of the server.
+6. **All three terminal kinds close the buffer** — a client waiting only for
+   `answer.completed` would hang forever on a failed or cancelled run.
+
+#### A real defect this task found
+
+**`build_services` runs per request, so the `EventHub` was being rebuilt per
+request.** The request that starts a run and the request that streams it would
+have looked in two different registries, and the stream would have found
+nothing — every time, silently. Fixed by making the hub an explicit
+`build_services(connection, hub=...)` parameter that the API owns for the
+application's lifetime;
+`test_the_stream_survives_service_rebuilding_between_requests` is the
+regression guard. Worth recording because the symptom (an empty stream) looks
+exactly like "the run produced no events".
+
+- Files created: `src/codeatlas/conversations/events.py`,
+  `src/codeatlas/api/routers/stream.py`,
+  `tests/contract/test_stream_events.py`,
+  `tests/integration/test_stream_lifecycle.py` (23 tests together).
+  Files modified: `src/codeatlas/application/conversation_service.py`,
+  `src/codeatlas/application/container.py`, `src/codeatlas/api/app.py`.
+- Contracts/migrations: **none.** `StreamEvent` and `StreamEventType` landed in
+  P5-SETUP; `SCHEMA_VERSION` stays 8 and the schema bundle is unchanged.
+- **Test-first discipline: followed.** Both test files were written first and
+  observed failing before their modules existed.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  — exit 0, "Phase 4 verification completed";
+  `uv run pytest -q` — **1148 passed** in 104.38 s (1125 after P5-03, plus 23);
+  `uv run ruff check src tests scripts apps` — exit 0;
+  `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **192 source files**.
+- Limitations, stated plainly:
+  - **Answering is still synchronous**, so every run is already finished when
+    `POST …/messages` returns and the stream always serves from the replay
+    buffer. The live path (`asyncio` queue wakeups, heartbeats on a running
+    stream) is implemented and unit-tested but is not exercised end to end,
+    because nothing yet leaves a run in flight. A background executor is the
+    change that would exercise it; the plan does not require one before the UI
+    needs it, and P5-08 is where a slow answer becomes visible.
+  - **Cancel therefore has a narrow window in practice.** `cancel_run` works
+    and is tested through the service and the route, but over HTTP a run
+    completes within its own request, so the route's realistic answer today is
+    `RUN_NOT_CANCELLABLE`. That is honest rather than broken — and it is
+    exactly what a UI must handle anyway.
+  - Heartbeats are covered by unit tests only; asserting a 15-second interval
+    end to end would make the suite sleep.
+- Next: **P5-05** — the web scaffold. This is where Node 20 and pnpm enter the
+  repository, so the plan's first open question stops being hypothetical.
 
 ### 2026-07-27T21:40:00Z — P5-03 completed; P5-04 and P5-05 `ready`
 

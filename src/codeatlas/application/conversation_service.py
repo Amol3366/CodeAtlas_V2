@@ -29,7 +29,9 @@ from codeatlas.contracts import (
     MessageRole,
     MessageStatus,
     RunStatus,
+    StreamEventType,
 )
+from codeatlas.conversations.events import EventHub
 from codeatlas.conversations.pipeline import (
     AnswerPipeline,
     AnswerRequest,
@@ -51,6 +53,7 @@ from codeatlas.domain.errors import (
     InvalidRequestError,
     MessageNotFoundError,
     RepositoryNotFoundError,
+    RunNotCancellableError,
     RunNotRetryableError,
 )
 from codeatlas.storage.sqlite.connection import write_transaction
@@ -67,6 +70,15 @@ DEFAULT_TITLE: str = "New conversation"
 
 MAX_PAGE_LIMIT: int = 100
 DEFAULT_PAGE_LIMIT: int = 50
+
+# Pipeline stage names mapped onto the published Section 11.2 vocabulary. The
+# pipeline names its own stages; this table is where they become a contract, so
+# a renamed stage cannot silently change what a client receives.
+_STREAM_STAGES: dict[str, StreamEventType] = {
+    "retrieval.started": StreamEventType.RETRIEVAL_STARTED,
+    "retrieval.progress": StreamEventType.RETRIEVAL_PROGRESS,
+    "generation.delta": StreamEventType.GENERATION_DELTA,
+}
 
 
 def derive_title(text: str) -> str:
@@ -117,11 +129,18 @@ class ConversationService:
         conversations: ConversationStore,
         connection: Connection,
         pipeline: AnswerPipeline | None = None,
+        hub: EventHub | None = None,
     ) -> None:
         self._repositories = repositories
         self._conversations = conversations
         self._connection = connection
         self._pipeline = pipeline
+        self._hub = hub
+
+    @property
+    def hub(self) -> EventHub | None:
+        """The live-run registry, for the stream adapter."""
+        return self._hub
 
     def create(
         self,
@@ -363,6 +382,20 @@ class ConversationService:
                 created_at=datetime.now(UTC),
             )
 
+    def cancel_run(self, run_id: str) -> None:
+        """Ask an in-flight run to stop at its next checkpoint.
+
+        Cancellation is cooperative, so this returns as soon as the flag is
+        set. The run's own terminal event is what tells a client it stopped —
+        the UI must never paint a cancelled state ahead of the server.
+        """
+        channel = self._hub.get(run_id) if self._hub else None
+        if channel is None or channel.terminal:
+            raise RunNotCancellableError(
+                "That run is not in flight.", details={"run_id": run_id}
+            )
+        channel.cancel.cancel()
+
     def _execute_run(
         self,
         *,
@@ -380,7 +413,27 @@ class ConversationService:
         if self._pipeline is None:  # pragma: no cover - wiring guard
             raise InvalidRequestError("Answering is not available.")
 
-        events: list[PipelineEvent] = []
+        channel = None
+        if self._hub is not None:
+            channel = self._hub.open(
+                run_id=run_id,
+                request_id=request_id,
+                conversation_id=conversation.conversation_id,
+                message_id=message_id,
+            )
+            channel.publish(
+                StreamEventType.RUN_ACCEPTED,
+                {"run_id": run_id, "intent": intent},
+            )
+            # A caller-supplied token wins; otherwise the channel's token is
+            # the one `cancel_run` can reach.
+            cancel = cancel or channel.cancel
+
+        def relay(event: PipelineEvent) -> None:
+            if channel is None:
+                return
+            channel.publish(_STREAM_STAGES[event.stage], dict(event.payload))
+
         try:
             result = self._pipeline.execute(
                 AnswerRequest(
@@ -388,10 +441,12 @@ class ConversationService:
                     question=question,
                     request_id=request_id,
                 ),
-                on_event=events.append,
+                on_event=relay,
                 cancel=cancel,
             )
         except CancelledError:
+            if channel is not None:
+                channel.publish(StreamEventType.RUN_CANCELLED, {"run_id": run_id})
             return self._terminate(
                 conversation_id=conversation.conversation_id,
                 user_message_id=user_message_id,
@@ -405,6 +460,11 @@ class ConversationService:
         except CodeAtlasError as error:
             # A retrieval failure is the answer's outcome, not the request's:
             # the turn stays visible and retryable rather than vanishing.
+            if channel is not None:
+                channel.publish(
+                    StreamEventType.RUN_FAILED,
+                    {"run_id": run_id, "error_code": error.code.value},
+                )
             return self._terminate(
                 conversation_id=conversation.conversation_id,
                 user_message_id=user_message_id,
@@ -443,6 +503,21 @@ class ConversationService:
                 completed_at=completed_at,
             )
             self._conversations.set_run_snapshot(run_id, snapshot_id)
+
+        if channel is not None:
+            channel.publish(
+                StreamEventType.EVIDENCE_AVAILABLE,
+                {"count": len(evidence)},
+            )
+            for warning in result.response.warnings:
+                channel.publish(StreamEventType.RUN_WARNING, {"warning": warning})
+            # Published only after the message is committed: the persisted
+            # answer is the authoritative one, so a client must never be told
+            # the run completed before that answer exists.
+            channel.publish(
+                StreamEventType.ANSWER_COMPLETED,
+                {"message_id": message_id, "snapshot_id": snapshot_id},
+            )
 
         return SubmissionResult(
             conversation_id=conversation.conversation_id,

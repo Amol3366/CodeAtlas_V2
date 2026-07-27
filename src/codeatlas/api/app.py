@@ -29,8 +29,10 @@ from codeatlas.api.routers import (
     query,
     repositories,
     search,
+    stream,
 )
 from codeatlas.application.container import ApplicationServices, build_services
+from codeatlas.conversations.events import EventHub
 from codeatlas.domain.errors import CodeAtlasError, ErrorCode
 from codeatlas.storage.sqlite.connection import default_database_path
 
@@ -63,6 +65,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     app.include_router(graph.router)
     app.include_router(change_analysis.router)
     app.include_router(conversations.router)
+    app.include_router(stream.router)
 
     @app.exception_handler(CodeAtlasError)
     async def handle_codeatlas_error(
@@ -115,7 +118,14 @@ def _services_factory(
         if connection is None:
             connection = _open(database_path)
             app.state.connection = connection
-        return build_services(connection)
+        # One hub for the application's lifetime. Services are rebuilt per
+        # request, so a per-call hub would leave the request that streams a run
+        # looking in a different registry from the one that started it.
+        hub: EventHub | None = getattr(app.state, "event_hub", None)
+        if hub is None:
+            hub = EventHub()
+            app.state.event_hub = hub
+        return build_services(connection, hub=hub)
 
     return factory
 
