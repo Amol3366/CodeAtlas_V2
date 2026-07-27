@@ -41,7 +41,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
 | 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `in_progress` | User |
-| 5 — Persistent web application | Created after Phase 4 approval | `pending` | User |
+| 5 — Persistent web application | [phase plan (draft)](phases/phase-05-persistent-web-application.md) | `pending` (plan drafted 2026-07-27 at user request; awaits Phase 4 gate approval and its own plan approval per rule 11) | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
 
@@ -147,6 +147,67 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-27T15:45:00Z — Phase 5 plan drafted at user request; P4-10 paused mid-task
+
+- Agent: Claude Code `claude-fable-5`, working in worktree branch
+  `worktree-p4-10-completion` (based on `main` at `d71f408`, carrying the full
+  uncommitted Phase 4 working state; WIP commit `3ec98ff`).
+- Transition: **none.** P4-10 stays `in_progress`. The user interrupted P4-10
+  and asked for the Phase 5 plan; per rule 11 the plan is a `draft` and no
+  Phase 5 task may start until the user approves both the Phase 4 gate and the
+  plan itself.
+
+#### Phase 5 plan
+
+- Created `docs/plans/phases/phase-05-persistent-web-application.md`: outcome,
+  an 8-condition completion gate, decisions 1–10 (migration `0008`
+  conversation persistence with soft delete and cascade, transactional
+  message/run lifecycle, a deterministic `AnswerPipeline` sharing the existing
+  application services with `/v1/query` parity as a contract test, hand-rolled
+  typed SSE with a 256-event replay buffer, the Vite/React/Tailwind/TanStack
+  Query/Radix/openapi-typescript frontend stack, six new error codes,
+  `SCHEMA_VERSION` 7 → 8), a task board P5-SETUP + P5-01…P5-10 mapping the
+  eight blueprint slices, and three open questions for the user (dependency
+  surface, soft-delete retention, `serve --web` timing).
+
+#### P4-10 progress made before the interruption (recovery notes, rule 9)
+
+- **c011 fixed at root cause.** The base-side call to `total` resolves by
+  same-package name search and the target-side call through the explicit
+  import, producing byte-identical `CALLS` edges; the binding lives on the
+  `MODULE` symbol the diff excludes. `_dependency_changed` now carries each
+  file's import bindings onto the referencing symbol's edge keys
+  (`_import_bindings` in `analysis/symbol_diff.py`). Two new unit tests pin
+  the rule and its converse guard; written first, observed failing.
+- **Orphaned dependents of a deleted container.** `_unresolved_dependents` in
+  `analysis/impact.py` now walks the deleted symbol's base-graph `CONTAINS`
+  subtree, because folding rule 1 collapses member deletions into the
+  container and their dependents were being lost.
+  `tests/integration/test_engine.py`'s two deletion tests were the failing
+  tests (pre-existing failures, present before this session's changes); the
+  first test's member-deletion assertion was stale against folding rule 1 /
+  c006 and now asserts the folded semantics.
+- **`scripts/run_phase4_baseline.py` created** (query + change predictions in
+  one artifact) and `docs/evaluation/baseline-phase-4.json`/`.md` generated:
+  changed-symbol precision 0.9375, recall 1.0000, direct-impact recall 1.0000.
+- Verification at the WIP commit: `uv run pytest -q` — **1012 passed**;
+  targeted suites for both fixes green.
+- **What P4-10 still needs**, measured, in order:
+  1. Finding precision scores 0.00 on c002/c011/c017/c020/c022/c023 because
+     the adapter cites whole-symbol ranges while the corpus declares
+     changed-statement-level ranges (e.g. c002 predicted
+     `service.py:7:11` vs declared `10:11`); c017 additionally emits no
+     finding; c020–c022 predict both sides of the `git_changes` fixture
+     (`legacy` **and** `process`) because the two-sided root is merged rather
+     than side-selected — changed-symbol precision 0.9375 vs the ≥0.95 gate.
+     Investigation was mid-flight when interrupted.
+  2. `scripts/measure_phase4_perf.py` + environment doc.
+  3. `docs/operations/change-analysis.md`, threat-model and README updates.
+  4. `scripts/check_phase4.ps1`, the full gate, then `awaiting_user_approval`.
+- Next: on resume, finish P4-10 item 1 (evidence-range convention and
+  `git_changes` side selection in the evaluation adapter), then down the list.
+  Separately: the user decides the Phase 4 gate and the Phase 5 plan.
 
 ### 2026-07-27T06:00:00Z — P4-10 partially complete; still `in_progress`
 
