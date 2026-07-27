@@ -55,6 +55,11 @@ class ApplicationServices:
     entities: EntityService
     change_analysis: ChangeAnalysisService
     conversations: ConversationService
+    # The repository store itself, for the few operations that are settings on a
+    # repository rather than behavior over one — the watch switch is the first.
+    # Wrapping a single boolean column in a service would add a layer that only
+    # forwarded.
+    repositories: RepositoryStore
 
 
 def build_services(
@@ -137,6 +142,7 @@ def build_services(
     )
 
     return ApplicationServices(
+        repositories=repositories,
         registration=RegisterRepositoryService(repositories),
         indexing=indexing,
         lookup=lookup,

@@ -116,6 +116,21 @@ class RepositoryStore:
         ).fetchall()
         return tuple(_repository_from_row(row) for row in rows)
 
+    def set_watch_enabled(self, repository_id: str, *, enabled: bool) -> None:
+        """Turn continuous freshness on or off for one repository."""
+        self._connection.execute(
+            "UPDATE repositories SET watch_enabled = ? WHERE repository_id = ?",
+            (1 if enabled else 0, repository_id),
+        )
+
+    def list_watched(self) -> tuple[Repository, ...]:
+        """Every repository the watcher should be running for."""
+        rows = self._connection.execute(
+            "SELECT * FROM repositories WHERE watch_enabled = 1"
+            " ORDER BY display_name, repository_id"
+        ).fetchall()
+        return tuple(_repository_from_row(row) for row in rows)
+
 
 class SnapshotStore:
     """Snapshot lifecycle persistence."""
@@ -876,6 +891,7 @@ def _repository_from_row(row: sqlite3.Row) -> Repository:
         display_name=row["display_name"],
         canonical_root=row["canonical_root"],
         created_at=from_utc_text(row["created_at"]),
+        watch_enabled=bool(row["watch_enabled"]),
     )
 
 
@@ -1762,10 +1778,18 @@ class ConversationStore:
         return _message_from_row(row) if row is not None else None
 
     def list_runs(self, message_id: str) -> tuple[RunRecord, ...]:
-        """Every attempt at this message, oldest first."""
+        """Every attempt at this message, oldest first.
+
+        `rowid` breaks ties, not `run_id`. Two attempts can share a timestamp —
+        a retry of a run that failed immediately often does — and a run ID is a
+        random hex string, so tie-breaking on it returns the attempts in an
+        arbitrary order. That silently misrepresents the audit trail: it would
+        show a retry as having happened before the attempt it retried. `rowid`
+        is assigned in insertion order, which is the chronology being claimed.
+        """
         rows = self._connection.execute(
             "SELECT * FROM message_runs WHERE message_id = ?"
-            " ORDER BY created_at, run_id",
+            " ORDER BY created_at, rowid",
             (message_id,),
         ).fetchall()
         return tuple(_run_from_row(row) for row in rows)

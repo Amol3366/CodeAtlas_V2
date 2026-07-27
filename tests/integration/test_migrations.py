@@ -60,10 +60,36 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_eight() -> None:
-    """Phase 5's migration 0008 adds the conversation tables. The pin is
+def test_schema_version_is_nine() -> None:
+    """Phase 6's migration 0009 adds the per-repository watch switch. The pin is
     deliberate: a version bump is a contract change someone must review."""
-    assert SCHEMA_VERSION == 8
+    assert SCHEMA_VERSION == 9
+
+
+def test_watch_enabled_defaults_to_on_for_an_existing_repository(
+    tmp_path: Path,
+) -> None:
+    """An installed repository gains the column already switched on.
+
+    A watcher that stayed off until asked would answer "how current is this
+    evidence?" with "stale, and you were not told" — so an upgrade must not
+    quietly opt existing repositories out.
+    """
+    with connect(tmp_path / "db.sqlite") as connection:
+        _apply_through_version(connection, 8)
+        connection.execute(
+            "INSERT INTO repositories"
+            " (repository_id, display_name, canonical_root, created_at)"
+            " VALUES ('repo_1', 'Existing', 'C:/tmp/existing', '2026-01-01T00:00:00Z')"
+        )
+
+        apply_migrations(connection)
+
+        row = connection.execute(
+            "SELECT watch_enabled FROM repositories WHERE repository_id = 'repo_1'"
+        ).fetchone()
+    assert row is not None
+    assert row[0] == 1
 
 
 def test_evidence_table_and_resolution_columns_exist(tmp_path: Path) -> None:

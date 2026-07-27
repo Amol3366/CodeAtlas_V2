@@ -40,6 +40,7 @@ from codeatlas.domain.errors import (
     CodeAtlasError,
     ErrorCode,
     InvalidRequestError,
+    RepositoryNotFoundError,
     SnapshotNotReadyError,
 )
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
@@ -175,6 +176,50 @@ def repo_list(database: DatabaseOption = None, as_json: JsonOption = False) -> N
         f"{item['repository_id']}  {item['display_name']}" for item in payload
     ] or ["No repositories are registered."]
     _emit(payload, "\n".join(lines), as_json=as_json)
+
+
+@repo_app.command("watch")
+def repo_watch(
+    repository_id: Annotated[str, typer.Argument()],
+    enable: Annotated[
+        bool | None,
+        typer.Option(
+            "--enable/--disable",
+            help="Turn continuous freshness on or off. Omit to report it.",
+        ),
+    ] = None,
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Show or change whether a repository is watched for changes.
+
+    Reporting and setting share one command because the question a user has is
+    the same either way: is this repository being kept current?
+    """
+    try:
+        with _services(database) as services:
+            repository = services.repositories.get(repository_id)
+            if repository is None:
+                raise RepositoryNotFoundError("No repository matches that ID.")
+            if enable is not None:
+                services.repositories.set_watch_enabled(
+                    repository_id, enabled=enable
+                )
+                repository = services.repositories.get(repository_id)
+                assert repository is not None
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    state = "enabled" if repository.watch_enabled else "disabled"
+    _emit(
+        {
+            "repository_id": repository_id,
+            "watch_enabled": repository.watch_enabled,
+        },
+        f"Watching is {state} for {repository_id}",
+        as_json=as_json,
+    )
 
 
 @app.command("index")

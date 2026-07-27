@@ -19,8 +19,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from codeatlas.application.container import ApplicationServices
 from codeatlas.application.registration import RegisterRepositoryRequest
+from codeatlas.application.watching import WatchService
 from codeatlas.contracts import SnapshotFreshness, SnapshotReference
-from codeatlas.domain.errors import SnapshotNotReadyError
+from codeatlas.domain.errors import RepositoryNotFoundError, SnapshotNotReadyError
 from codeatlas.domain.repository import Repository, ScanLimits
 
 router = APIRouter(prefix="/v1/repositories", tags=["repositories"])
@@ -254,3 +255,77 @@ def _limits_response(limits: ScanLimits) -> LimitsResponse:
         max_depth=limits.max_depth,
         max_relative_path_length=limits.max_relative_path_length,
     )
+
+
+class WatchResponse(BaseModel):
+    """Whether continuous freshness is on for a repository, and how it is doing.
+
+    `enabled` is the stored decision; `running` is the observed reality. They
+    disagree when a watcher could not start — a vanished directory, exhausted
+    handles — and showing only one of them would hide exactly that case.
+    """
+
+    repository_id: str
+    enabled: bool
+    running: bool
+    pending: bool
+    failure_count: int
+    last_error: str | None
+
+
+class WatchUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
+def _watch_response(
+    repository_id: str, services: ApplicationServices, request: Request
+) -> WatchResponse:
+    repository = services.repositories.get(repository_id)
+    if repository is None:
+        raise RepositoryNotFoundError("No repository matches that ID.")
+
+    watchers: WatchService | None = getattr(request.app.state, "watchers", None)
+    entry = None
+    if watchers is not None:
+        entry = next(
+            (item for item in watchers.status() if item.repository_id == repository_id),
+            None,
+        )
+
+    return WatchResponse(
+        repository_id=repository_id,
+        enabled=repository.watch_enabled,
+        running=entry is not None and entry.running,
+        pending=entry is not None and entry.pending,
+        failure_count=entry.failure_count if entry else 0,
+        last_error=entry.last_error if entry else None,
+    )
+
+
+@router.get("/{repository_id}/watch")
+def get_watch(
+    repository_id: str, services: Services, request: Request
+) -> WatchResponse:
+    """Report the watch switch and what the watcher is actually doing."""
+    return _watch_response(repository_id, services, request)
+
+
+@router.put("/{repository_id}/watch")
+def set_watch(
+    repository_id: str, body: WatchUpdate, services: Services, request: Request
+) -> WatchResponse:
+    """Turn continuous freshness on or off for one repository.
+
+    The decision is persisted, so it survives a restart: turning the watcher off
+    is a statement about the repository, not about this process.
+    """
+    watchers: WatchService | None = getattr(request.app.state, "watchers", None)
+    if watchers is not None:
+        watchers.set_enabled(repository_id, enabled=body.enabled)
+    else:
+        if services.repositories.get(repository_id) is None:
+            raise RepositoryNotFoundError("No repository matches that ID.")
+        services.repositories.set_watch_enabled(repository_id, enabled=body.enabled)
+    return _watch_response(repository_id, services, request)

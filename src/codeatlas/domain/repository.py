@@ -59,3 +59,6 @@ class Repository:
     display_name: str
     canonical_root: str
     created_at: datetime
+    # Defaulted so every existing construction site keeps working, and defaulted
+    # to *on* because an unwatched repository goes stale silently.
+    watch_enabled: bool = True

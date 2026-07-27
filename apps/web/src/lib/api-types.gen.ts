@@ -424,6 +424,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{repository_id}/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Watch
+         * @description Report the watch switch and what the watcher is actually doing.
+         */
+        get: operations["get_watch_v1_repositories__repository_id__watch_get"];
+        /**
+         * Set Watch
+         * @description Turn continuous freshness on or off for one repository.
+         *
+         *     The decision is persisted, so it survives a restart: turning the watcher off
+         *     is a statement about the repository, not about this process.
+         */
+        put: operations["set_watch_v1_repositories__repository_id__watch_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/search/files": {
         parameters: {
             query?: never;
@@ -1322,6 +1349,33 @@ export interface components {
             type: string;
         };
         /**
+         * WatchResponse
+         * @description Whether continuous freshness is on for a repository, and how it is doing.
+         *
+         *     `enabled` is the stored decision; `running` is the observed reality. They
+         *     disagree when a watcher could not start — a vanished directory, exhausted
+         *     handles — and showing only one of them would hide exactly that case.
+         */
+        WatchResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Failure Count */
+            failure_count: number;
+            /** Last Error */
+            last_error: string | null;
+            /** Pending */
+            pending: boolean;
+            /** Repository Id */
+            repository_id: string;
+            /** Running */
+            running: boolean;
+        };
+        /** WatchUpdate */
+        WatchUpdate: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
          * WorkingTreeRequest
          * @description Analyze the working tree against a base ref.
          */
@@ -2190,6 +2244,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_watch_v1_repositories__repository_id__watch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_watch_v1_repositories__repository_id__watch_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchResponse"];
                 };
             };
             /** @description Validation Error */

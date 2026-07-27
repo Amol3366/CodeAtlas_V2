@@ -150,8 +150,8 @@ anything, and refuses rather than half-restoring.
 | --- | --- | --- | --- |
 | P6-SETUP | ADR-0007, error codes, `check_phase6.ps1` skeleton | Phase 5 | `complete` |
 | P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
-| P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `ready` |
-| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `pending` |
+| P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
+| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `ready` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |

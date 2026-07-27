@@ -2147,6 +2147,66 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "WatchResponse": {
+        "description": "Whether continuous freshness is on for a repository, and how it is doing.\n\n`enabled` is the stored decision; `running` is the observed reality. They\ndisagree when a watcher could not start \u2014 a vanished directory, exhausted\nhandles \u2014 and showing only one of them would hide exactly that case.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "failure_count": {
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "repository_id",
+          "enabled",
+          "running",
+          "pending",
+          "failure_count",
+          "last_error"
+        ],
+        "title": "WatchResponse",
+        "type": "object"
+      },
+      "WatchUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "WatchUpdate",
+        "type": "object"
+      },
       "WorkingTreeRequest": {
         "additionalProperties": false,
         "description": "Analyze the working tree against a base ref.",
@@ -3424,6 +3484,100 @@
           }
         },
         "summary": "Repository Status",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/watch": {
+      "get": {
+        "description": "Report the watch switch and what the watcher is actually doing.",
+        "operationId": "get_watch_v1_repositories__repository_id__watch_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Watch",
+        "tags": [
+          "repositories"
+        ]
+      },
+      "put": {
+        "description": "Turn continuous freshness on or off for one repository.\n\nThe decision is persisted, so it survives a restart: turning the watcher off\nis a statement about the repository, not about this process.",
+        "operationId": "set_watch_v1_repositories__repository_id__watch_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Watch",
         "tags": [
           "repositories"
         ]

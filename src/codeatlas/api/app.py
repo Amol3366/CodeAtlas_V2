@@ -11,6 +11,7 @@ threat model, and explicit approval.
 
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 import threading
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -33,6 +34,7 @@ from codeatlas.api.routers import (
     stream,
 )
 from codeatlas.application.container import ApplicationServices, build_services
+from codeatlas.application.watching import WatchService
 from codeatlas.conversations.events import EventHub
 from codeatlas.domain.errors import CodeAtlasError, ErrorCode
 from codeatlas.storage.sqlite.connection import default_database_path
@@ -41,16 +43,36 @@ API_TITLE = "CodeAtlas local API"
 API_VERSION = "1.0"
 
 
-def create_app(database_path: Path | None = None) -> FastAPI:
-    """Build the application bound to one database file."""
+def create_app(database_path: Path | None = None, *, watch: bool = True) -> FastAPI:
+    """Build the application bound to one database file.
+
+    ``watch`` starts the filesystem watchers for every repository that has not
+    opted out. It defaults to on because the product's third question is "how
+    current is that evidence?", and a watcher that stays off until asked answers
+    it with "stale, and you were not told" (ADR-0007 decision 2). Turning it off
+    is for callers that want the API without background threads.
+    """
     resolved_path = database_path or default_database_path()
 
     @asynccontextmanager
     async def lifespan(instance: FastAPI) -> AsyncIterator[None]:
-        # Connections are per request and closed with it, so shutdown has no
-        # database handle of its own to release.
-        del instance
-        yield
+        watchers: WatchService | None = None
+        if watch:
+            watchers = WatchService(services_factory=instance.state.services_factory)
+            # A watcher that cannot start must not stop the server from serving:
+            # deterministic answers over a stale index still beat no answers.
+            # The failure is reported through the watch status rather than by
+            # refusing to boot.
+            with contextlib.suppress(OSError):
+                watchers.start_all()
+        instance.state.watchers = watchers
+        try:
+            yield
+        finally:
+            # Connections are per request and closed with them, so shutdown has
+            # no database handle of its own to release — only the watchers.
+            if watchers is not None:
+                watchers.stop_all()
 
     app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
     app.state.database_path = resolved_path

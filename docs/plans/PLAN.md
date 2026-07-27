@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-02 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01 `complete`; P6-02 `ready`; P6-03 … P6-08 `pending` |
+| Active task | none — P6-03 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02 `complete`; P6-03 `ready`; P6-04 … P6-08 `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -163,6 +163,77 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T07:15:00Z — P6-02 completed; P6-03 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Task: P6-02 `ready -> complete`.
+- Outcome: **gate condition 2 is met.** A file changed on disk reaches query
+  results with no index command, proven against real filesystem events, real
+  threads, and a real reindex.
+
+**What was built**
+
+- `src/codeatlas/indexing/debounce.py` — the coalescing policy, with time
+  passed in rather than read. Two bounds for two failure modes: the quiet
+  period turns one save into one refresh; the maximum delay stops a
+  continuously-changing tree from postponing the batch forever, which would
+  stall the refresh exactly while the index went stale fastest.
+- `src/codeatlas/indexing/watcher.py` — one repository's watcher. All policy
+  lives in `note` and `tick`, plain methods with no threads or clock of their
+  own, so the behavior is tested by calling them. `start`/`stop` are a thin
+  watchdog shell. Paths outside the canonical root are refused, ignored paths
+  never become candidates, and a failing reindex is counted rather than fatal —
+  a watcher that died on its first error would leave the index silently stale.
+- `src/codeatlas/application/watching.py` — `WatchService`: start/stop, the
+  persisted per-repository switch, and status. Each unit of work opens its own
+  connection through the injected factory, applying the P6-01 lesson rather
+  than repeating it.
+- Migration `0009`, `SCHEMA_VERSION` 8 → 9: `repositories.watch_enabled`,
+  `DEFAULT 1`. The default is load-bearing — an upgrade must not silently opt
+  existing repositories out of freshness.
+- Adapters: `GET`/`PUT /v1/repositories/{id}/watch`, `codeatlas repo watch`,
+  and watchers started from the API lifespan (`create_app(..., watch=True)` by
+  default, `watch=False` for callers that want no background threads).
+- `ApplicationServices` gained `repositories`. A settings column does not
+  justify a service that only forwards.
+
+**Design note carried forward**
+
+The batch of changed paths is thrown away after it triggers `index`. Passing it
+down would make indexing trust the event stream, which is the one thing ADR-0007
+forbids: events name candidates, the scan and the content hashes decide. A
+concurrent-index collision requeues the batch instead of dropping it, so a
+change arriving mid-index is not lost.
+
+**A latent bug found on the way**
+
+`ConversationStore.list_runs` claimed "oldest first" but tie-broke equal
+timestamps on `run_id`, a random hex string — so two attempts created in the
+same millisecond came back in arbitrary order, which would show a retry as
+having happened before the attempt it retried. Now tie-breaks on `rowid`, which
+is assigned in insertion order. It surfaced as
+`test_a_cancelled_turn_can_be_retried` failing 2 runs in 3; it now passes 5 in 5.
+
+**Verification (all in this environment)**
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync`
+  → exit 0, Playwright included.
+- `uv run pytest -q` → **1196 passed** (1156 before; +40).
+- Web: 91 vitest tests, lint, types, build all clean; 4 end-to-end suites pass.
+- New dependency: `watchdog==6.0.0`, added to `pyproject.toml` and `uv.lock`.
+
+**Limitations**
+
+- **The watcher only reacts to events it is given.** Events lost to a Windows
+  buffer overflow, or changes made while the process was not running, are still
+  missed. That is exactly what P6-03's reconciling scan is for, and until it
+  lands a missed change stays missed until something else touches the
+  repository. This is a known and designed-for gap, not a defect.
+- The web UI has no control for the switch yet; CLI and REST cover it.
+- Debounce windows are constructor parameters, not user configuration. No
+  setting surface exists yet to expose them.
+- Next: **P6-03** — the reconciling scan and lossy-event tests.
 
 ### 2026-07-28T05:40:00Z — P6-01 completed; P6-02 `ready`
 
