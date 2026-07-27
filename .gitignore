@@ -4,6 +4,9 @@
 .ruff_cache/
 .test-tmp/
 .test-output/
+.e2e-tmp/
+test-results/
+playwright-report/
 __pycache__/
 *.py[cod]
 build/

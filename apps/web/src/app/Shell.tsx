@@ -71,6 +71,7 @@ export function Shell() {
           >
             <EvidenceDrawer
               evidence={citation}
+              repositoryId={repositoryId}
               onClose={() => setCitation(null)}
             />
           </aside>

@@ -20,33 +20,41 @@ import type { MessageEvidence } from "../../lib/conversations";
  *   exact substitution the evidence contract forbids.
  */
 
-interface FetchedEvidence {
-  readonly evidence_id: string;
-  readonly file_path: string;
-  readonly symbol: string | null;
-  readonly start_line: number;
-  readonly end_line: number;
-  readonly excerpt: string;
-  readonly derivation: string;
-  readonly confidence: number;
-  readonly validation: string;
-  readonly snapshot_id: string;
+/**
+ * `GET /v1/evidence/{id}` answers with the standard query envelope, not a bare
+ * evidence object, and it requires the repository whose snapshot the ID
+ * belongs to — an evidence ID is only meaningful inside one.
+ */
+interface EvidenceResponse {
+  readonly evidence: readonly {
+    readonly evidence_id: string;
+    readonly excerpt: string;
+    readonly validation: string;
+  }[];
 }
 
 export interface EvidenceDrawerProps {
   readonly evidence: MessageEvidence | null;
+  readonly repositoryId: string | null;
   readonly onClose: () => void;
 }
 
-export function EvidenceDrawer({ evidence, onClose }: EvidenceDrawerProps) {
+export function EvidenceDrawer({
+  evidence,
+  repositoryId,
+  onClose,
+}: EvidenceDrawerProps) {
   const closeButton = useRef<HTMLButtonElement>(null);
   const opener = useRef<Element | null>(null);
 
   const fetched = useQuery({
-    queryKey: ["evidence", evidence?.evidence_id ?? ""],
+    queryKey: ["evidence", repositoryId ?? "", evidence?.evidence_id ?? ""],
     queryFn: () =>
-      api.get<FetchedEvidence>(`/v1/evidence/${evidence?.evidence_id ?? ""}`),
-    enabled: evidence !== null,
+      api.get<EvidenceResponse>(
+        `/v1/evidence/${encodeURIComponent(evidence?.evidence_id ?? "")}` +
+          `?repository_id=${encodeURIComponent(repositoryId ?? "")}`,
+      ),
+    enabled: evidence !== null && repositoryId !== null,
     retry: false,
   });
 
@@ -72,9 +80,16 @@ export function EvidenceDrawer({ evidence, onClose }: EvidenceDrawerProps) {
 
   if (evidence === null) return null;
 
+  // The envelope carries a list; the citation names which member it is. A
+  // response that omits it is as much a failure to verify as an error status —
+  // showing nothing is the only honest option either way.
+  const found = fetched.data?.evidence.find(
+    (item) => item.evidence_id === evidence.evidence_id,
+  );
   const invalid =
     fetched.isError ||
-    (fetched.data !== undefined && fetched.data.validation !== "valid");
+    (fetched.data !== undefined &&
+      (found === undefined || found.validation !== "valid"));
 
   return (
     <div
@@ -133,14 +148,14 @@ export function EvidenceDrawer({ evidence, onClose }: EvidenceDrawerProps) {
             <code className="text-text-muted">
               {fetched.error instanceof ApiError
                 ? fetched.error.code
-                : (fetched.data?.validation ?? "EVIDENCE_INVALID")}
+                : (found?.validation ?? "EVIDENCE_INVALID")}
             </code>
           </p>
         ) : (
           // Raw repository source: rendered as text inside a code block, never
           // parsed as markup.
           <pre className="overflow-x-auto rounded-[var(--radius-md)] bg-surface-sunken p-[var(--space-3)] text-xs">
-            <code data-testid="excerpt">{fetched.data?.excerpt ?? ""}</code>
+            <code data-testid="excerpt">{found?.excerpt ?? ""}</code>
           </pre>
         )}
       </div>
