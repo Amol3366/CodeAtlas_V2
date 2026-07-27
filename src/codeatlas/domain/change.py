@@ -85,3 +85,8 @@ class SymbolChange:
     signature_change_class: SignatureChangeClass = SignatureChangeClass.NONE
     public: bool = False
     body_change_class: BodyChangeClass = BodyChangeClass.NONE
+    # Target-side citation override: the precise span proving the change (the
+    # modified statement slice, or an import binding through its reference).
+    # None means findings cite the whole symbol.
+    evidence_start_line: int | None = None
+    evidence_end_line: int | None = None

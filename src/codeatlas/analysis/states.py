@@ -128,15 +128,23 @@ class GitBlobStateView:
         self._ref = ref
         self._git = git or GitDiffAdapter()
         self._files_by_path: dict[str, StateFile] | None = None
+        self._contents: dict[str, bytes] = {}
 
     def list_files(self) -> tuple[StateFile, ...]:
         if self._files_by_path is None:
-            paths = self._git.list_files(self._root, self._ref)
+            # One `git archive` call replaces two subprocesses per blob; the
+            # per-blob path stays as the fallback when archive cannot serve
+            # (and per-file reads re-verify hashes either way).
+            contents = self._git.archive(self._root, self._ref)
+            if contents is None:
+                contents = {}
+                for path in self._git.list_files(self._root, self._ref):
+                    blob = self._git.read_blob(self._root, self._ref, path)
+                    if blob is not None:
+                        contents[path] = blob
+            self._contents = contents
             files: list[StateFile] = []
-            for path in paths:
-                content = self._git.read_blob(self._root, self._ref, path)
-                if content is None:
-                    continue
+            for path, content in contents.items():
                 classification, language = self._classify(path)
                 files.append(
                     StateFile(
@@ -157,7 +165,9 @@ class GitBlobStateView:
         state_file = self._get(relative_path)
         if state_file is None:
             return None
-        content = self._git.read_blob(self._root, self._ref, relative_path)
+        content = self._contents.get(relative_path)
+        if content is None:
+            content = self._git.read_blob(self._root, self._ref, relative_path)
         if content is None:
             return None
         if _hash_bytes(content) != state_file.content_hash:

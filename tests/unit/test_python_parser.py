@@ -223,3 +223,21 @@ def test_registry_rejects_a_duplicate_language() -> None:
     except ValueError:
         return
     raise AssertionError("registering a duplicate language should fail")
+
+
+def test_an_empty_file_has_no_symbols() -> None:
+    """An empty `__init__.py` has zero lines, so there is nothing to cite: a
+    module symbol claiming line 1 would be invalid evidence and fails
+    snapshot validation."""
+    result = PythonParser().parse(
+        ParseRequest(
+            repository_id="repo_1",
+            snapshot_id="snap_1",
+            file_id="file_1",
+            relative_path="src/pkg/__init__.py",
+            language="python",
+            content=b"",
+        )
+    )
+    assert result.success
+    assert result.symbols == ()

@@ -314,6 +314,10 @@ def test_import_binding_change_is_a_dependency_change() -> None:
 
     assert [c.change_kind for c in changes] == [ChangeKind.DEPENDENCY]
     assert changes[0].qualified_name == "render"
+    # The citation runs from the binding to the reference that resolves
+    # through it (c011: the import line through the call line).
+    assert changes[0].evidence_start_line == 1
+    assert changes[0].evidence_end_line == 2
 
 
 def test_unrelated_import_change_is_not_a_dependency_change() -> None:
@@ -630,3 +634,17 @@ def test_heuristic_edges_do_not_create_dependency_changes() -> None:
     )
 
     assert changes == ()
+
+
+def test_keyword_only_marker_is_not_a_parameter() -> None:
+    """c022: gaining `*, strict: bool = False` is only-optional-added; the
+    bare `*` is a separator, not a parameter."""
+    from codeatlas.analysis.symbol_diff import _signature_change_class
+
+    assert (
+        _signature_change_class(
+            "def process(value: str) -> str",
+            "def process(value: str, *, strict: bool = False) -> str",
+        )
+        is SignatureChangeClass.ONLY_OPTIONAL_PARAMETERS_ADDED
+    )

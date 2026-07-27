@@ -75,7 +75,12 @@ class CodeChunker:
     def chunk(self, request: ChunkRequest) -> tuple[LogicalChunk, ...]:
         text = request.content.decode("utf-8-sig", errors="replace")
         lines = text.splitlines()
-        line_count = max(len(lines), 1)
+        if not lines:
+            # An empty file has no line any chunk could cite (the parsers
+            # emit no symbols for it either); a summary claiming line 1
+            # would fail snapshot validation.
+            return ()
+        line_count = len(lines)
 
         ordered = sorted(
             request.symbols, key=lambda item: (item.start_line, item.qualified_name)
@@ -379,7 +384,9 @@ def _definition_header(lines: Sequence[str], start_line: int, end_line: int) -> 
     closes it, bounded so a pathological definition cannot pull in a body.
     """
     collected: list[str] = []
-    for offset in range(start_line, min(end_line, start_line + 20) + 1):
+    # An empty file still parses to a module symbol claiming line 1, so the
+    # range is clamped to the lines that exist rather than trusted.
+    for offset in range(start_line, min(end_line, start_line + 20, len(lines)) + 1):
         line = lines[offset - 1]
         collected.append(line)
         if line.rstrip().endswith(":"):

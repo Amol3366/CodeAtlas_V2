@@ -14,9 +14,11 @@ Security rules mirror ``codeatlas.repositories.git_state``:
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import re
 import subprocess
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -244,6 +246,61 @@ class GitDiffAdapter:
                 paths.append(validated)
         paths.sort()
         return tuple(paths)
+
+    def archive(self, root: Path, ref: str) -> dict[str, bytes] | None:
+        """Every blob at ``ref`` from one subprocess, or ``None`` to fall back.
+
+        ``read_blob`` costs two Git invocations per file, which makes a
+        whole-tree read O(files) subprocesses; ``git archive`` delivers the
+        same bytes in one. Entry names are untrusted output and are validated
+        exactly like ``ls-tree`` paths. An entry over the size limit raises the
+        same :class:`ScanLimitExceededError` the per-blob path raises, so the
+        two paths refuse the same trees rather than silently diverging.
+        """
+        self._validate_ref(ref)
+        # `git archive` applies worktree text conversion by default; the
+        # per-blob path reads raw blob bytes, and the two must be
+        # byte-identical or the same tree would hash two different ways.
+        stdout, failure = self._run_bytes(
+            root,
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "core.eol=lf",
+            "archive",
+            "--format=tar",
+            ref,
+        )
+        if failure is not None or stdout is None:
+            return None
+
+        contents: dict[str, bytes] = {}
+        try:
+            with tarfile.open(fileobj=io.BytesIO(stdout)) as archive:
+                for member in archive:
+                    if not member.isfile():
+                        continue
+                    if member.size > self._limits.max_file_bytes:
+                        raise ScanLimitExceededError(
+                            "The blob exceeds the configured maximum file size.",
+                            details={
+                                "relative_path": member.name,
+                                "size_bytes": str(member.size),
+                                "max_file_bytes": str(
+                                    self._limits.max_file_bytes
+                                ),
+                            },
+                        )
+                    path = self._validate_output_path(member.name)
+                    if path is None:
+                        continue
+                    handle = archive.extractfile(member)
+                    if handle is None:
+                        continue
+                    contents[path] = handle.read()
+        except tarfile.TarError:
+            return None
+        return contents
 
     def _validate_ref(self, ref: str) -> None:
         """Raise when a ref is not safe to pass to Git."""

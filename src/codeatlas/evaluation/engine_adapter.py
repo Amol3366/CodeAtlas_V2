@@ -27,7 +27,12 @@ from codeatlas.application.container import build_services
 from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
-from codeatlas.contracts import AnalysisSide, ChangeKind, SymbolKind
+from codeatlas.contracts import (
+    AnalysisSide,
+    ChangeKind,
+    FileChangeKind,
+    SymbolKind,
+)
 from codeatlas.domain.errors import CodeAtlasError
 from codeatlas.evaluation.dataset import (
     ChangeCase,
@@ -370,6 +375,59 @@ def _change_evidence(
     findings: list[FindingPrediction] = []
 
     for index, draft in enumerate(report.findings):
+        if draft.code == "FILE_RENAMED":
+            # The rename's proof is the pairing symbol seen on both sides.
+            pair = next(
+                (
+                    item
+                    for item in report.changed_files
+                    if item.kind is FileChangeKind.RENAMED
+                    and item.path == draft.subject
+                ),
+                None,
+            )
+            mover = next(
+                (
+                    item
+                    for item in report.changed_symbols
+                    if pair is not None
+                    and item.file_path == pair.path
+                    and item.base_file_path == pair.base_path
+                ),
+                None,
+            )
+            if (
+                mover is None
+                or mover.base_file_path is None
+                or mover.base_start_line is None
+                or mover.base_end_line is None
+                or mover.target_start_line is None
+                or mover.target_end_line is None
+            ):
+                continue
+            base_id = f"{case.id}-p{index}a"
+            target_id = f"{case.id}-p{index}b"
+            evidence[base_id] = EvidencePrediction(
+                evidence_id=base_id,
+                snapshot_id=base_label,
+                file_path=case.base_state.label_prefix + mover.base_file_path,
+                start_line=mover.base_start_line,
+                end_line=mover.base_end_line,
+            )
+            evidence[target_id] = EvidencePrediction(
+                evidence_id=target_id,
+                snapshot_id=case.snapshot_id,
+                file_path=case.target_state.label_prefix + mover.file_path,
+                start_line=mover.target_start_line,
+                end_line=mover.target_end_line,
+            )
+            findings.append(
+                FindingPrediction(
+                    code=draft.code, evidence_ids=[base_id, target_id]
+                )
+            )
+            continue
+
         change = by_name.get(draft.subject)
         if change is None:
             continue
@@ -384,6 +442,16 @@ def _change_evidence(
         else:
             path = case.target_state.label_prefix + change.file_path
             start, end = change.target_start_line, change.target_end_line
+            # The precise span proves the statement-level classes and the
+            # binding change; a signature or export finding is about the whole
+            # definition and keeps the full symbol range (c003 vs c002).
+            if change.evidence_start_line is not None and draft.code in {
+                "RETURN_VALUE_CHANGED",
+                "ERROR_BEHAVIOR_CHANGED",
+                "DEPENDENCY_CHANGED",
+            }:
+                start = change.evidence_start_line
+                end = change.evidence_end_line
             snapshot = case.snapshot_id
         if start is None or end is None:
             continue

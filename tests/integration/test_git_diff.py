@@ -151,3 +151,19 @@ def test_changed_files_output_is_deterministically_ordered(
     first = GitDiffAdapter().changed_files(git_repo_with_history, "HEAD~1", "HEAD")
     second = GitDiffAdapter().changed_files(git_repo_with_history, "HEAD~1", "HEAD")
     assert first == second
+
+
+def test_archive_returns_the_same_bytes_as_per_blob_reads(
+    git_repo_with_history: Path,
+) -> None:
+    """`archive` is a performance path, never a different truth: every file it
+    returns is byte-identical to what `read_blob` reads."""
+    adapter = GitDiffAdapter()
+    head = adapter.resolve_ref(git_repo_with_history, "HEAD")
+
+    contents = adapter.archive(git_repo_with_history, head)
+
+    assert contents is not None
+    assert set(contents) == set(adapter.list_files(git_repo_with_history, head))
+    for path, blob in contents.items():
+        assert blob == adapter.read_blob(git_repo_with_history, head, path)

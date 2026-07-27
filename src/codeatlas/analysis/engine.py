@@ -34,11 +34,12 @@ from codeatlas.analysis.impact import (
     analyze_impact,
 )
 from codeatlas.analysis.risk import order_findings, overall_risk
-from codeatlas.analysis.statement_diff import classify_body_change
+from codeatlas.analysis.statement_diff import classify_body
 from codeatlas.analysis.states import StateView
 from codeatlas.analysis.symbol_diff import SymbolDiffInput, compute_symbol_changes
 from codeatlas.contracts import (
     ChangeKind,
+    FileChangeKind,
     OverallRisk,
     RelationKind,
     SymbolKind,
@@ -131,6 +132,7 @@ class ChangeAnalysisEngine:
             changes = compute_symbol_changes(
                 _diff_input(base_state), _diff_input(target_state)
             )
+            files = _promote_renames(files, changes)
             changes = self._classify_bodies(changes, base, target, target_state)
 
         with _timed(timings, "impact"):
@@ -278,7 +280,10 @@ class ChangeAnalysisEngine:
 
         classified: list[SymbolChange] = []
         for change in changes:
-            if change.change_kind is not ChangeKind.MODIFIED or _is_data(change):
+            if (
+                change.change_kind not in {ChangeKind.MODIFIED, ChangeKind.MOVED}
+                or _is_data(change)
+            ):
                 classified.append(change)
                 continue
             base_content = base.read_file(change.base_file_path or change.file_path)
@@ -295,12 +300,26 @@ class ChangeAnalysisEngine:
                 classified.append(change)
                 continue
 
-            body = classify_body_change(
+            base_range = (change.base_start_line, change.base_end_line)
+            target_range = (change.target_start_line, change.target_end_line)
+            if change.change_kind is ChangeKind.MOVED:
+                # A moved symbol's definition line differs whenever its
+                # signature does; classifying it would call every signature
+                # change a body change. Compare the bodies alone, so F5's
+                # "body unchanged" condition is a real condition (c020 vs
+                # c022).
+                base_range = (base_range[0] + 1, base_range[1])
+                target_range = (target_range[0] + 1, target_range[1])
+                if base_range[0] > base_range[1] or target_range[0] > target_range[1]:
+                    classified.append(change)
+                    continue
+
+            body = classify_body(
                 base_content,
                 target_content,
                 _language_of(change.file_path),
-                (change.base_start_line, change.base_end_line),
-                (change.target_start_line, change.target_end_line),
+                base_range,
+                target_range,
                 is_route_adjacent=change.qualified_name in routed,
             )
             classified.append(
@@ -316,10 +335,73 @@ class ChangeAnalysisEngine:
                     target_end_line=change.target_end_line,
                     signature_change_class=change.signature_change_class,
                     public=change.public,
-                    body_change_class=body,
+                    body_change_class=body.body_class,
+                    evidence_start_line=(
+                        body.evidence_span[0] if body.evidence_span else None
+                    ),
+                    evidence_end_line=(
+                        body.evidence_span[1] if body.evidence_span else None
+                    ),
                 )
             )
         return tuple(classified)
+
+
+def _promote_renames(
+    files: tuple[FileChange, ...],
+    changes: Sequence[SymbolChange],
+) -> tuple[FileChange, ...]:
+    """Pair a deleted and an added file that share a moved symbol (decision 3).
+
+    Content-hash equality already produced `renamed` entries in the file diff;
+    this is the fallback for a rename *with* edits, where the hash cannot
+    speak but a uniquely moved symbol identity can. The pairing must be
+    unambiguous in both directions — a guess is never emitted. The moved
+    symbols themselves stay `moved`; the finding rules already report a move
+    inside a renamed file through the rename plus the symbol's own signature
+    and body rules, never as a second move fact.
+    """
+    deleted = {item.path for item in files if item.kind is FileChangeKind.DELETED}
+    added = {item.path for item in files if item.kind is FileChangeKind.ADDED}
+
+    forward: dict[str, set[str]] = {}
+    backward: dict[str, set[str]] = {}
+    for change in changes:
+        if change.change_kind is not ChangeKind.MOVED:
+            continue
+        source = change.base_file_path
+        if source in deleted and change.file_path in added:
+            forward.setdefault(source, set()).add(change.file_path)
+            backward.setdefault(change.file_path, set()).add(source)
+
+    pairs = {
+        (source, next(iter(targets)))
+        for source, targets in forward.items()
+        if len(targets) == 1 and len(backward[next(iter(targets))]) == 1
+    }
+    if not pairs:
+        return files
+
+    paired_sources = {source for source, _ in pairs}
+    paired_targets = {target for _, target in pairs}
+    promoted = [
+        item
+        for item in files
+        if not (
+            (item.kind is FileChangeKind.DELETED and item.path in paired_sources)
+            or (item.kind is FileChangeKind.ADDED and item.path in paired_targets)
+        )
+    ]
+    promoted.extend(
+        FileChange(
+            path=target,
+            kind=FileChangeKind.RENAMED,
+            base_path=source,
+            content_hash_changed=True,
+        )
+        for source, target in sorted(pairs)
+    )
+    return tuple(sorted(promoted, key=lambda item: item.path))
 
 
 def _diff_input(state: AnalyzedState) -> SymbolDiffInput:

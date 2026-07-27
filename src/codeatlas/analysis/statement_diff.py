@@ -37,6 +37,21 @@ class _Statement:
     is_constructor: bool = False
 
 
+@dataclass(frozen=True)
+class BodyClassification:
+    """A body change class plus the target-side span that cites it.
+
+    ``evidence_span`` is set only when the classification can point at the
+    precise statements a reviewer needs — a modified return or raise on the
+    Python ``ast`` path, cited together with the body statements sharing its
+    names. ``None`` means the citation is the whole symbol, which is always
+    honest and never wrong, only wider.
+    """
+
+    body_class: BodyChangeClass
+    evidence_span: tuple[int, int] | None = None
+
+
 def classify_body_change(
     base_content: bytes,
     target_content: bytes,
@@ -46,7 +61,27 @@ def classify_body_change(
     *,
     is_route_adjacent: bool = False,
 ) -> BodyChangeClass:
-    """Classify what kind of statement-level change occurred in a body.
+    """Classify what kind of statement-level change occurred in a body."""
+    return classify_body(
+        base_content,
+        target_content,
+        language,
+        base_range,
+        target_range,
+        is_route_adjacent=is_route_adjacent,
+    ).body_class
+
+
+def classify_body(
+    base_content: bytes,
+    target_content: bytes,
+    language: str,
+    base_range: tuple[int, int],
+    target_range: tuple[int, int],
+    *,
+    is_route_adjacent: bool = False,
+) -> BodyClassification:
+    """Classify a body change and locate the span that proves it.
 
     If ``is_route_adjacent`` is true, the result is always
     :attr:`BodyChangeClass.PUBLIC_CONTRACT_CHANGED`, because a route-adjacent
@@ -54,19 +89,24 @@ def classify_body_change(
     statements changed.
     """
     if is_route_adjacent:
-        return BodyChangeClass.PUBLIC_CONTRACT_CHANGED
+        return BodyClassification(BodyChangeClass.PUBLIC_CONTRACT_CHANGED)
 
     base_text = _decode(base_content)
     target_text = _decode(target_content)
 
-    changed_lines = _changed_line_numbers(
+    changed_lines, deleted_only = _changed_line_numbers(
         base_text,
         target_text,
         base_range,
         target_range,
     )
     if not changed_lines:
-        return BodyChangeClass.NONE
+        if deleted_only:
+            # A pure deletion leaves no target-side changed line, but the body
+            # is different (c017). The citation is the whole symbol: the
+            # deleted statement has no target line to point at.
+            return BodyClassification(BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED)
+        return BodyClassification(BodyChangeClass.NONE)
 
     if language == "python":
         statements = _python_statements(target_text, target_range)
@@ -75,9 +115,10 @@ def classify_body_change(
         statements = _tsjs_statements(target_text, target_range)
         base_statements = _tsjs_statements(base_text, base_range)
     else:
-        return BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED
+        return BodyClassification(BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED)
 
     classes: set[BodyChangeClass] = set()
+    precise_lines: list[int] = []
     for line in changed_lines:
         if _inside_constructor(statements, line):
             classes.add(BodyChangeClass.STATE_INITIALIZATION_CHANGED)
@@ -91,11 +132,13 @@ def classify_body_change(
         if stmt.type is _StatementType.RETURN:
             if is_modified:
                 classes.add(BodyChangeClass.RETURN_VALUE_CHANGED)
+                precise_lines.append(line)
             else:
                 classes.add(BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED)
         elif stmt.type in {_StatementType.RAISE, _StatementType.THROW}:
             if is_modified:
                 classes.add(BodyChangeClass.ERROR_BEHAVIOR_CHANGED)
+                precise_lines.append(line)
             else:
                 classes.add(BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED)
         elif stmt.is_constructor:
@@ -104,12 +147,106 @@ def classify_body_change(
             classes.add(BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED)
 
     if BodyChangeClass.RETURN_VALUE_CHANGED in classes:
-        return BodyChangeClass.RETURN_VALUE_CHANGED
-    if BodyChangeClass.ERROR_BEHAVIOR_CHANGED in classes:
-        return BodyChangeClass.ERROR_BEHAVIOR_CHANGED
-    if BodyChangeClass.STATE_INITIALIZATION_CHANGED in classes:
-        return BodyChangeClass.STATE_INITIALIZATION_CHANGED
-    return BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED
+        body_class = BodyChangeClass.RETURN_VALUE_CHANGED
+    elif BodyChangeClass.ERROR_BEHAVIOR_CHANGED in classes:
+        body_class = BodyChangeClass.ERROR_BEHAVIOR_CHANGED
+    elif BodyChangeClass.STATE_INITIALIZATION_CHANGED in classes:
+        body_class = BodyChangeClass.STATE_INITIALIZATION_CHANGED
+    else:
+        body_class = BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED
+
+    span: tuple[int, int] | None = None
+    if (
+        language == "python"
+        and precise_lines
+        and body_class
+        in {
+            BodyChangeClass.RETURN_VALUE_CHANGED,
+            BodyChangeClass.ERROR_BEHAVIOR_CHANGED,
+        }
+    ):
+        span = _python_name_slice(target_text, target_range, precise_lines)
+    return BodyClassification(body_class, span)
+
+
+def _python_name_slice(
+    text: str,
+    line_range: tuple[int, int],
+    changed_lines: list[int],
+) -> tuple[int, int] | None:
+    """The changed statements plus the body statements sharing their names.
+
+    A modified return or raise is only judgeable next to the statements that
+    produce the values it mentions: `return f"...{token}"` needs `token = ...`
+    in view, and a raise guarded by a condition needs the condition's inputs.
+    The slice is name-based and stays inside the function body — a syntactic
+    judgment, deliberately not a data-flow analysis.
+    """
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return None
+
+    function = _enclosing_function(tree, changed_lines, line_range)
+    if function is None:
+        return None
+
+    body: list[tuple[ast.stmt, int, int]] = []
+    for stmt in function.body:
+        end_line = stmt.end_lineno
+        if end_line is None:
+            continue
+        body.append((stmt, stmt.lineno, end_line))
+
+    changed_stmts = [
+        entry
+        for entry in body
+        if any(entry[1] <= line <= entry[2] for line in changed_lines)
+    ]
+    if not changed_stmts:
+        return None
+
+    wanted: set[str] = set()
+    for stmt, _, _ in changed_stmts:
+        wanted |= {
+            node.id for node in ast.walk(stmt) if isinstance(node, ast.Name)
+        }
+
+    included = list(changed_stmts)
+    for entry in body:
+        if entry in included:
+            continue
+        names = {
+            node.id for node in ast.walk(entry[0]) if isinstance(node, ast.Name)
+        }
+        if names & wanted:
+            included.append(entry)
+
+    start = min(entry[1] for entry in included)
+    end = max(entry[2] for entry in included)
+    return (start, end)
+
+
+def _enclosing_function(
+    tree: ast.AST,
+    changed_lines: list[int],
+    line_range: tuple[int, int],
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    """The smallest function whose span holds every changed line."""
+    best: ast.FunctionDef | ast.AsyncFunctionDef | None = None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        end = getattr(node, "end_lineno", node.lineno)
+        if node.lineno < line_range[0] or end > line_range[1]:
+            continue
+        if not all(node.lineno <= line <= end for line in changed_lines):
+            continue
+        if best is None or (end - node.lineno) < (
+            getattr(best, "end_lineno", best.lineno) - best.lineno
+        ):
+            best = node
+    return best
 
 
 def _decode(content: bytes) -> str:
@@ -124,7 +261,12 @@ def _changed_line_numbers(
     target_text: str,
     base_range: tuple[int, int],
     target_range: tuple[int, int],
-) -> tuple[int, ...]:
+) -> tuple[tuple[int, ...], bool]:
+    """Target-side changed lines, plus whether any base line was deleted.
+
+    A pure deletion contributes no target-side line, so the flag is the only
+    way the caller can tell "nothing changed" from "something was removed".
+    """
     base_lines = base_text.splitlines()
     target_lines = target_text.splitlines()
 
@@ -133,12 +275,15 @@ def _changed_line_numbers(
 
     matcher = difflib.SequenceMatcher(a=base_slice, b=target_slice, autojunk=False)
     changed: set[int] = set()
-    for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
+    deleted = False
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag in {"replace", "insert", "delete"}:
             for index in range(j1, j2):
                 changed.add(target_range[0] + index)
+        if tag in {"replace", "delete"} and i2 > i1:
+            deleted = True
 
-    return tuple(sorted(changed))
+    return tuple(sorted(changed)), deleted
 
 
 def _python_statements(

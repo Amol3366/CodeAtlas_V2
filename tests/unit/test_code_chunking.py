@@ -260,3 +260,12 @@ def test_a_file_without_symbols_still_gets_a_summary() -> None:
     chunks = _chunk(b"# just a comment\n", "src/empty.py")
     roles = {item.role for item in chunks}
     assert ChunkRole.FILE_SUMMARY in roles
+
+
+def test_an_empty_file_chunks_without_error() -> None:
+    """An empty `__init__.py` still parses to a module symbol claiming line 1;
+    the chunker must not read a line that does not exist."""
+    chunks = _chunk(b"", "src/pkg/__init__.py")
+
+    for chunk in chunks:
+        assert chunk.end_line >= chunk.start_line >= 1

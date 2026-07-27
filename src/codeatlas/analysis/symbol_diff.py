@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
 from codeatlas.contracts import ChangeKind, RelationKind, SymbolKind
@@ -80,6 +80,7 @@ def compute_symbol_changes(
         lifecycle_names=lifecycle_names,
         base_bindings=_import_bindings(base.relations),
         target_bindings=_import_bindings(target.relations),
+        target_binding_lines=_import_binding_lines(target.relations),
     )
 
     changes: list[SymbolChange] = []
@@ -126,6 +127,7 @@ class _DependencyContext:
     lifecycle_names: set[str]
     base_bindings: dict[tuple[str, str], str]
     target_bindings: dict[tuple[str, str], str]
+    target_binding_lines: dict[tuple[str, str], int] = field(default_factory=dict)
 
 
 def _import_bindings(
@@ -140,6 +142,22 @@ def _import_bindings(
     """
     return {
         (relation.file_id, relation.target_hint): relation.module_hint or "<import>"
+        for relation in relations
+        if relation.kind is RelationKind.IMPORTS and not relation.is_derived
+    }
+
+
+def _import_binding_lines(
+    relations: Sequence[RelationRecord],
+) -> dict[tuple[str, str], int]:
+    """Where each import binding is written, for citation only.
+
+    Kept apart from :func:`_import_bindings` on purpose: an import that merely
+    moved to another line is not a dependency change, so the line may never
+    participate in the edge comparison.
+    """
+    return {
+        (relation.file_id, relation.target_hint): relation.start_line
         for relation in relations
         if relation.kind is RelationKind.IMPORTS and not relation.is_derived
     }
@@ -211,6 +229,9 @@ def _classify_one_to_one(
                         target_symbol,
                         base_path,
                         target_path,
+                        span=_binding_span(
+                            base_symbol, target_symbol, target.relations, context
+                        ),
                     ),
                 )
             return ()
@@ -320,6 +341,7 @@ def _dependency(
     target_symbol: SymbolRecord,
     base_path: str | None,
     target_path: str | None,
+    span: tuple[int, int] | None = None,
 ) -> SymbolChange:
     _, qualified_name = key
     return SymbolChange(
@@ -333,7 +355,40 @@ def _dependency(
         target_start_line=target_symbol.start_line,
         target_end_line=target_symbol.end_line,
         public=target_symbol.visibility == "public",
+        evidence_start_line=span[0] if span else None,
+        evidence_end_line=span[1] if span else None,
     )
+
+
+def _binding_span(
+    base_symbol: SymbolRecord,
+    target_symbol: SymbolRecord,
+    target_relations: Sequence[RelationRecord],
+    context: _DependencyContext,
+) -> tuple[int, int] | None:
+    """The citation for a binding-driven dependency change.
+
+    Runs from the import statement to the reference that resolves through it
+    (c011: the added import through the call it now binds). When the change was
+    not binding-driven — a resolution flip with no import involved — there is
+    no single span that proves it, and the whole symbol speaks instead.
+    """
+    lines: list[int] = []
+    for relation in target_relations:
+        if relation.source_symbol_id != target_symbol.symbol_id:
+            continue
+        key = (relation.file_id, relation.target_hint)
+        if context.base_bindings.get(
+            (base_symbol.file_id, relation.target_hint)
+        ) == context.target_bindings.get(key):
+            continue
+        lines.append(relation.start_line)
+        binding_line = context.target_binding_lines.get(key)
+        if binding_line is not None:
+            lines.append(binding_line)
+    if not lines:
+        return None
+    return (min(lines), max(lines))
 
 
 def _dependency_changed(
@@ -553,7 +608,10 @@ def _extract_parameters(signature: str) -> list[str]:
         current.append(char)
     if current:
         params.append("".join(current).strip())
-    return params
+    # `*` and `/` are separators, not parameters: gaining a keyword-only
+    # marker alongside an optional parameter is still "only optional
+    # parameters added" (c022).
+    return [param for param in params if param not in {"*", "/"}]
 
 
 def _is_optional_parameter(param: str) -> bool:

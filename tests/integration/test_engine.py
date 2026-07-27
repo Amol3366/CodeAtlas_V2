@@ -272,3 +272,52 @@ def test_an_unchanged_violation_is_not_reported_again(tmp_path: Path) -> None:
         for finding in report.findings
         if finding.code == "ARCHITECTURE_RULE_VIOLATED"
     ]
+
+
+def test_a_moved_symbol_promotes_the_file_pair_to_a_rename(tmp_path: Path) -> None:
+    """c020-c022: a deleted and an added file sharing a uniquely moved symbol
+    are one renamed file. The move itself is the rename's fact, so the symbol
+    is judged by its signature and body like any modified symbol, and a symbol
+    that vanished in the move is a plain deletion."""
+    report = _run(
+        tmp_path,
+        {
+            "service.py": (
+                "def process(value: str) -> str:\n"
+                "    return value.strip()\n"
+                "\n"
+                "def legacy(value: str) -> str:\n"
+                "    return value\n"
+            )
+        },
+        {
+            "processor.py": (
+                "def process(value: str, *, strict: bool = False) -> str:\n"
+                "    result = value.strip()\n"
+                "    if strict and not result:\n"
+                '        raise ValueError("value is required")\n'
+                "    return result\n"
+            )
+        },
+    )
+
+    from codeatlas.contracts import FileChangeKind
+
+    renames = [
+        change
+        for change in report.changed_files
+        if change.kind is FileChangeKind.RENAMED
+    ]
+    assert [(item.base_path, item.path) for item in renames] == [
+        ("service.py", "processor.py")
+    ]
+
+    by_name = {item.qualified_name: item for item in report.changed_symbols}
+    assert by_name["process"].change_kind is ChangeKind.MOVED
+    assert by_name["legacy"].change_kind is ChangeKind.DELETED
+
+    codes = {finding.code for finding in report.findings}
+    assert "FILE_RENAMED" in codes
+    assert "PUBLIC_SIGNATURE_CHANGED" in codes
+    assert "SYMBOL_DELETED" in codes
+    assert "SYMBOL_MOVED" not in codes

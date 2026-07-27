@@ -92,6 +92,15 @@ class TsJsParser:
 
     def parse(self, request: ParseRequest) -> ParseResult:
         """Parse one TypeScript or JavaScript file into symbols and diagnostics."""
+        if not request.content:
+            # Same rule as the Python parser: zero lines, nothing to cite.
+            return ParseResult(
+                parser_name=self.name,
+                parser_version=self.version,
+                success=True,
+                symbols=(),
+                diagnostics=(),
+            )
         if len(request.content) > MAX_PARSE_BYTES:
             return self._failed(
                 ParseDiagnostic(

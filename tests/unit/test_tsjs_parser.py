@@ -169,3 +169,19 @@ def test_every_symbol_cites_a_real_line() -> None:
     for symbol in _parse(source, "src/orders.ts").symbols:
         assert 1 <= symbol.start_line <= line_count
         assert symbol.start_line <= symbol.end_line <= line_count
+
+
+def test_an_empty_file_has_no_symbols() -> None:
+    """Same rule as the Python parser: zero lines, nothing to cite."""
+    result = TsJsParser().parse(
+        ParseRequest(
+            repository_id="repo_1",
+            snapshot_id="snap_1",
+            file_id="file_1",
+            relative_path="src/empty.ts",
+            language="typescript",
+            content=b"",
+        )
+    )
+    assert result.success
+    assert result.symbols == ()

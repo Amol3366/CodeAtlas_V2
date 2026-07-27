@@ -1,6 +1,8 @@
 # Phase 4 — Change Assurance
 
-Status: `in_progress` (plan approved by the user 2026-07-26; PLAN.md rule 11)
+Status: `awaiting_user_approval` (all tasks complete; gate run 2026-07-27;
+one target missed and explained — changed-symbol precision 0.9375 vs ≥0.95,
+see `docs/evaluation/phase-4-baseline-environment.md`)
 Gate authority: user
 Prerequisites: Phase 3 approved; `AGENTS.md`; the blueprint
 Activation gate: satisfied. The user approved this plan on 2026-07-26, recorded
@@ -490,7 +492,7 @@ Mirror of `docs/plans/PLAN.md`, which is authoritative for live status.
 | P4-07 | Finding rule table, risk ordering, engine assembly | P4-06 | `complete` |
 | P4-08 | Migration `0007`, store, analysis flows, freshness gate | P4-01, P4-07 | `complete` |
 | P4-09 | Reports (JSON/Markdown/SARIF), REST, CLI, MCP, cross-adapter suite | P4-08 | `complete` |
-| P4-10 | Evaluation adapter, baseline, perf, docs, phase gate | P4-02, P4-09 | `in_progress` |
+| P4-10 | Evaluation adapter, baseline, perf, docs, phase gate | P4-02, P4-09 | `complete` |
 
 ---
 

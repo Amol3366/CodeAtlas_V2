@@ -40,7 +40,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 1 — Repository truth vertical slice | [phase plan](phases/phase-01-repository-truth-vertical-slice.md) | `complete` | User |
 | 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete` | User |
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
-| 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `in_progress` | User |
+| 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `awaiting_user_approval` | User |
 | 5 — Persistent web application | [phase plan (draft)](phases/phase-05-persistent-web-application.md) | `pending` (plan drafted 2026-07-27 at user request; awaits Phase 4 gate approval and its own plan approval per rule 11) | User |
 | 6 — Continuous freshness and hardening | Created after Phase 5 approval | `pending` | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
@@ -49,13 +49,13 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 4 — Change assurance (plan approved by the user 2026-07-26) |
-| Active task | P4-10 — evaluation adapter, baseline, perf, docs, phase gate |
-| Task status | P4-SETUP … P4-09 `complete`; P4-10 `in_progress` |
-| Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-27T01:30:00Z |
-| Git state | Branch `main` at `d71f408`. Working tree carries all uncommitted Phase 4 work through P4-05. |
-| Next gate | Phase 4 completion gate after P4-10; only the user may approve it. |
+| Active phase | Phase 4 — Change assurance, `awaiting_user_approval` (all tasks complete, gate run 2026-07-27) |
+| Active task | none — the Phase 4 gate awaits the user's decision |
+| Task status | P4-SETUP … P4-10 all `complete` |
+| Agent | Claude Code `claude-fable-5` |
+| Started UTC | 2026-07-27T15:50:00Z |
+| Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). `main` was pushed to `origin` at the user's request 2026-07-27. |
+| Next gate | User approval of the Phase 4 gate (one target missed and explained: changed-symbol precision 0.9375 vs ≥0.95), then user approval of the drafted Phase 5 plan. |
 
 ### Phase 4 Task Board
 
@@ -71,7 +71,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P4-07    | Finding rule table, risk ordering, engine assembly           | P4-06        | `complete` |
 | P4-08    | Migration `0007`, store, analysis flows, freshness gate      | P4-01, P4-07 | `complete` |
 | P4-09    | Reports, REST, CLI, MCP, cross-adapter suite                 | P4-08        | `complete` |
-| P4-10    | Evaluation adapter, baseline, perf, docs, phase gate         | P4-02, P4-09 | `in_progress` |
+| P4-10    | Evaluation adapter, baseline, perf, docs, phase gate         | P4-02, P4-09 | `complete` |
 
 The plan was approved by the user on 2026-07-26 (handoff entry below).
 P4-SETUP is `ready`; every other task stays `pending` until its dependencies
@@ -147,6 +147,109 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-27T17:50:00Z — P4-10 completed; Phase 4 `awaiting_user_approval`
+
+- Agent: Claude Code `claude-fable-5`, on branch `worktree-p4-10-completion`
+  (PR #1; `main` at `d71f408` was pushed to `origin` at the user's request,
+  replacing GitHub's auto-generated initial commit `f50c5cc`).
+- Transition: P4-10 `in_progress -> complete`; Phase 4 `in_progress ->
+  awaiting_user_approval`. Only the user may approve the gate (rule 10).
+
+#### Gate results, measured
+
+| Gate condition | Result |
+| --- | --- |
+| Changed-symbol recall ≥ 95% | **1.0000 — met** |
+| Changed-symbol precision ≥ 95% | **0.9375 — missed**, structural: c020/c021/c022 split one physical `git_changes` diff into three single-symbol cases; the engine honestly reports both affected symbols per run, so each case counts the other's symbol against precision. All other 21 cases score 1.0. The corpus was not edited (ADR-0003). Full explanation in `docs/evaluation/phase-4-baseline-environment.md`. |
+| Direct-impact recall ≥ 90% | **1.0000 — met** |
+| Per-case finding precision | **1.0000** on all 24 cases (evidence-supported) |
+| Change-side evidence validity | **100%** — every finding's citation exactly matches the declared corpus evidence rows |
+| Unsupported-claim rate < 2% | **0.0000 — met** |
+| Warm preflight p95 ≤ 10 s | **5.151 s — met** (300-module synthetic repo, 20 runs, i7-13700HX/16 GB/Windows 11, method in the environment doc) |
+| Changed-file refresh p95 ≤ 2 s | **1.426 s — met** |
+| Contract-valid REST/MCP responses | contract suite green (full gate below) |
+
+#### What landed since the 15:45Z pause, defect by defect
+
+1. **c017 root cause: a pure statement deletion classified as no body
+   change.** `_changed_line_numbers` collected only target-side lines, so a
+   deleted base statement produced `BodyChangeClass.NONE` and no finding.
+   The differ now reports deletions (`statement_diff.py`), and c017 emits
+   `PUBLIC_BEHAVIOR_CHANGED` citing the whole symbol.
+2. **Statement-span evidence.** `classify_body` (new, alongside the
+   compatible `classify_body_change`) returns the citation span for a
+   modified return/raise on the Python `ast` path: the changed statement
+   plus the body statements sharing its names (c002 → 10:11, c023 → 2:5).
+   TS/JS keeps whole-symbol citations (c009), matching the plan's "the
+   Python `ast` path is more precise". `SymbolChange` gained
+   `evidence_start/end_line`; the adapter applies the span only to
+   `RETURN_VALUE_CHANGED`/`ERROR_BEHAVIOR_CHANGED`/`DEPENDENCY_CHANGED`
+   findings — a signature finding keeps the whole definition (c003 caught
+   the over-application).
+3. **Dependency-change citation** runs from the import binding to the
+   reference resolving through it (c011 → 1:4), via `_binding_span` in
+   `symbol_diff.py`; binding lines live in a separate map so a merely moved
+   import can never *be* the dependency change.
+4. **Rename promotion (decision 3's second half).** `_promote_renames` in
+   `engine.py` pairs a deleted and an added file sharing a uniquely moved
+   symbol (unambiguous both directions) into one `RENAMED` file change; the
+   finding rules then report FILE_RENAMED plus the symbol's own
+   signature/body findings, never `SYMBOL_MOVED` (c020–c022). The adapter
+   cites the pairing symbol on both sides for FILE_RENAMED.
+5. **Moved symbols now get body classification over their body ranges**
+   (definition line excluded — a signature change is not a body change), so
+   F5's "body unchanged" condition is real: c020 fires
+   `PUBLIC_SIGNATURE_CHANGED` (body changed), c022 fires `PARAMETER_ADDED`
+   (body identical).
+6. **`*`/`/` are separators, not parameters** in signature comparison, so
+   `(value)` → `(value, *, strict=False)` is only-optional-added (c022).
+7. **Two real product bugs found by the performance work, fixed test-first:**
+   an empty `__init__.py` **crashed indexing** (chunker IndexError; then
+   snapshot validation refusal) — parsers and chunker now emit nothing for a
+   zero-line file, because there is no line to cite (`python_parser.py`,
+   `tsjs_parser.py`, `chunker.py`); and `GitBlobStateView` cost **two Git
+   subprocesses per blob per stage** — a single `git archive` prefetch
+   (text conversion disabled, byte-identical to `read_blob`, asserted by
+   test; oversized entries refuse identically) took a 30-module preflight
+   from 8.0 s to 0.5 s and makes the 300-module gate numbers possible
+   (`git_diff.py`, `states.py`).
+- Files created: `scripts/measure_phase4_perf.py`, `scripts/check_phase4.ps1`,
+  `docs/evaluation/phase-4-baseline-environment.md`,
+  `docs/operations/change-analysis.md`.
+- Files modified: `src/codeatlas/analysis/{statement_diff,symbol_diff,engine}.py`,
+  `src/codeatlas/domain/change.py`, `src/codeatlas/evaluation/engine_adapter.py`,
+  `src/codeatlas/repositories/git_diff.py`, `src/codeatlas/analysis/states.py`,
+  `src/codeatlas/parsing/{python_parser,tsjs_parser}.py`,
+  `src/codeatlas/chunking/chunker.py`, `docs/evaluation/baseline-phase-4.{json,md}`,
+  `docs/security/threat-model.md` (Phase 4 enforcement table), `README.md`,
+  plus the corresponding test suites (statement diff, symbol diff, engine,
+  chunking, parsers, git diff).
+- Contracts/migrations: **none.** `SCHEMA_VERSION` stays 7; `contract_version`
+  stays `"1.0"`; the schema export is unchanged and `--check` passes.
+- Test-first discipline: every behavior change above started from a failing
+  test observed failing (statement deletion, spans, binding span, rename
+  promotion, keyword-only marker, empty file, archive equivalence). The
+  `_promote_renames` engine test was written before the implementation; the
+  adapter's FILE_RENAMED citation and span-gating changes were driven by the
+  corpus evidence table, which is the test for them.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  — exit 0, "Phase 4 verification completed" (contract schema `--check`,
+  `pytest -q` **1022 passed**, ruff exit 0, mypy exit 0 no issues in **173
+  files**, dataset validation, phase-0 null baseline `--check`, phase-3
+  baseline `--check`, phase-4 baseline `--check`);
+  `uv run python scripts/measure_phase4_perf.py --modules 300 --runs 20` —
+  exit 0, numbers recorded above and in the environment doc.
+- Limitations, stated: the engine parses both full states per analysis
+  (O(repository)); commit-range never reuses the active snapshot;
+  `ARCHITECTURE_RULE_VIOLATED` has no corpus case; TS/JS statement
+  classification is coarser than Python's; changed-symbol precision misses
+  its target for the structural reason above.
+- Next: the user decides (a) the Phase 4 gate — accepting or rejecting the
+  explained precision miss — and (b) the drafted Phase 5 plan
+  (`phases/phase-05-persistent-web-application.md`). No task may start
+  before both.
 
 ### 2026-07-27T15:45:00Z — Phase 5 plan drafted at user request; P4-10 paused mid-task
 

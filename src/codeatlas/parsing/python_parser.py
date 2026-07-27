@@ -63,6 +63,17 @@ class PythonParser:
 
     def parse(self, request: ParseRequest) -> ParseResult:
         """Parse one Python file into symbols and diagnostics."""
+        if not request.content:
+            # An empty file has zero lines, so there is no line a module
+            # symbol could cite; claiming line 1 is invalid evidence and
+            # fails snapshot validation.
+            return ParseResult(
+                parser_name=self.name,
+                parser_version=self.version,
+                success=True,
+                symbols=(),
+                diagnostics=(),
+            )
         if len(request.content) > MAX_PARSE_BYTES:
             return self._failed(
                 ParseDiagnostic(

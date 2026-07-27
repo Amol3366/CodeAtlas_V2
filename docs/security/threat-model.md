@@ -82,6 +82,23 @@ As of 2026-07-25 the following controls are implemented and covered by tests in
 | Markdown/HTML injection, editor opening | not applicable yet | no UI exists |
 | Content logging | not applicable yet | no logging framework exists and no logs are written |
 
+## Phase 4 Enforcement Additions
+
+As of 2026-07-27 the change-assurance surface adds these controls, covered by
+`tests/security/test_git_diff_injection.py` and the unit/integration suites
+named below.
+
+| Control | Status | Where it is enforced |
+| --- | --- | --- |
+| Git ref injection (`--upload-pack=...`, `-c ...`, `;`, `..` outside a range, NUL) | enforced | `repositories/git_diff.py` `_validate_ref` grammar before any ref becomes an argument; hostile refs raise `GIT_REF_UNRESOLVABLE`, asserted by `test_git_diff_injection.py` |
+| Paths from Git output escaping the root | enforced | every `ls-tree`, `name-status`, and archive entry name passes `validate_relative_path` before use; failures are dropped, never followed |
+| Oversized blobs | enforced | `read_blob` and `archive` raise `ScanLimitExceededError` at the configured byte limit; the archive path refuses the same trees the per-blob path refuses |
+| Archive/per-blob equivalence | enforced | `git archive` runs with text conversion disabled and is asserted byte-identical to raw blob reads, so one tree cannot hash two different ways |
+| Hostile `.codeatlas/rules.toml` | enforced | stdlib `tomllib` only; schema-validated, bounded rule count, unknown fields refused with `ANALYSIS_RULES_INVALID`; rule text never becomes a command or a path outside the root |
+| Repository text in reports | enforced | Markdown rendering escapes per construct (tables, code spans, control characters stripped); SARIF emits repository-relative URIs only; asserted by the renderer test suites |
+| Injection-marker prose in changed documents | enforced | matched content is *labeled* (`UNTRUSTED_CONTENT_CHANGED` + `REPOSITORY_CONTENT_IS_DATA`), never obeyed; the marker list only labels, it never gates safety |
+| Analysis audit integrity | enforced | stored analyses are decomposed rows with persisted rank; findings without citable evidence are dropped rather than emitted uncited |
+
 ## Provider Opt-In Gate
 
 Provider use is prohibited until all of the following are recorded for the
