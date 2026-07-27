@@ -38,6 +38,10 @@ class ErrorCode(StrEnum):
     RUN_NOT_RETRYABLE = "RUN_NOT_RETRYABLE"
     CONVERSATION_ARCHIVED = "CONVERSATION_ARCHIVED"
     QUERY_TOO_LONG = "QUERY_TOO_LONG"
+    WATCHER_UNAVAILABLE = "WATCHER_UNAVAILABLE"
+    BACKUP_FAILED = "BACKUP_FAILED"
+    RESTORE_INCOMPATIBLE = "RESTORE_INCOMPATIBLE"
+    INTEGRITY_CHECK_FAILED = "INTEGRITY_CHECK_FAILED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -224,3 +228,50 @@ class QueryTooLongError(CodeAtlasError):
     """
 
     code = ErrorCode.QUERY_TOO_LONG
+
+
+class WatcherUnavailableError(CodeAtlasError):
+    """The filesystem watcher could not start or could not keep watching.
+
+    Retryable because the usual causes — exhausted handles, a directory that
+    momentarily vanished — clear on their own. Indexing is unaffected: the
+    watcher is a trigger, never an authority, so its absence costs freshness
+    rather than correctness.
+    """
+
+    code = ErrorCode.WATCHER_UNAVAILABLE
+    retryable = True
+
+
+class BackupFailedError(CodeAtlasError):
+    """A backup did not complete, so no backup was produced.
+
+    Retryable: a busy database is the common cause. A partial file is never
+    left behind — a backup a user believes in but cannot restore from is worse
+    than no backup at all.
+    """
+
+    code = ErrorCode.BACKUP_FAILED
+    retryable = True
+
+
+class RestoreIncompatibleError(CodeAtlasError):
+    """The backup cannot be restored into this build.
+
+    A database written by a newer schema version cannot be migrated backwards.
+    Refusing is the only safe answer; retrying would fail identically, so this
+    is not retryable.
+    """
+
+    code = ErrorCode.RESTORE_INCOMPATIBLE
+
+
+class IntegrityCheckFailedError(CodeAtlasError):
+    """The database failed its integrity check.
+
+    Not retryable: a corrupted file does not repair itself. The operation stops
+    rather than reading from it, because answering from a corrupted index would
+    produce evidence that cannot be trusted and would not announce itself.
+    """
+
+    code = ErrorCode.INTEGRITY_CHECK_FAILED

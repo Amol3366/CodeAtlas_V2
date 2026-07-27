@@ -42,7 +42,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
 | 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `complete` | User |
 | 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `complete` | User |
-| 6 — Continuous freshness and hardening | [phase plan (draft)](phases/phase-06-freshness-and-hardening.md) | `pending` (plan drafted 2026-07-28; awaits user approval) | User |
+| 6 — Continuous freshness and hardening | [phase plan](phases/phase-06-freshness-and-hardening.md) | `in_progress` (plan approved 2026-07-28) | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
 
 ## Active Work
@@ -50,9 +50,9 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active phase | Phase 6 — Continuous freshness and hardening (plan drafted 2026-07-28; **not yet approved**, so every task stays `pending` per rule 11) |
-| Active task | none — the Phase 6 plan awaits the user's approval |
-| Task status | Phases 0–5 `complete`; P6-SETUP … P6-08 `pending` |
+| Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
+| Active task | none — P6-01 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP `complete`; P6-01 `ready`; P6-02 … P6-08 `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -164,6 +164,63 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T03:05:00Z — Phase 6 plan approved; P6-SETUP completed; P6-01 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- **The user approved the Phase 6 plan on 2026-07-28** ("defaults are fine,
+  start P6-SETUP"), accepting the stated default for each of the four open
+  questions. The defaults are now recorded in the phase plan **with their
+  reasoning**, not merely as choices — a default accepted by a single word is
+  the kind that gets re-litigated later, and the reasoning is what makes that
+  conversation short.
+- Transition: P6-SETUP `pending -> complete`; P6-01 `pending -> ready`.
+
+#### The four defaults, as resolved
+
+1. **PyInstaller**, one executable serving the API on loopback and the built
+   SPA from `StaticFiles`. No installer framework, no elevated privilege.
+2. **Watcher on by default**, disableable per repository. The product's third
+   question is "how current is that evidence?"; a watcher off until asked
+   answers it with "stale, and you were not told".
+3. **Retention: purge action plus a 30-day sweep** of soft-deleted
+   conversations. Neither touches an undeleted one.
+4. **Playwright: the three deferred suites only** — restart persistence, stream
+   reconnection, and onboard-to-citation. The wider Section 14 set is worth
+   having but is not the debt Phase 5 incurred.
+
+#### What landed
+
+- **ADR-0007** records decisions 1–8 with the failure modes that drive them:
+  silent staleness, silent corruption, silent loss. The load-bearing one is
+  that **the watcher is a trigger, never an authority** — on Windows a
+  `ReadDirectoryChangesW` buffer overflow drops events *silently*, so a watcher
+  trusted as truth would produce exactly the staleness this phase exists to
+  prevent. The periodic reconciling scan is therefore not optional and not
+  configurable to zero.
+- **Four error codes** with HTTP/CLI mappings, tests written first and observed
+  failing: `WATCHER_UNAVAILABLE` (409/3, retryable), `BACKUP_FAILED`
+  (409/6, retryable), `RESTORE_INCOMPATIBLE` (422/2), `INTEGRITY_CHECK_FAILED`
+  (409/3). **The retryable ones are the transient ones** — marking a corrupted
+  database retryable would send a user in a circle, and one test asserts
+  exactly that split.
+- **`scripts/check_phase6.ps1`**, which differs from its predecessor in one
+  deliberate way: **Playwright runs inside the gate** rather than beside it.
+  Closing the Phase 5 coverage debt means the browser suites must be part of
+  what "the gate passed" asserts. `-SkipE2E` exists for a fast inner loop.
+- Contracts/migrations: **none.** `SCHEMA_VERSION` stays 8 and the contract
+  bundle is unchanged.
+- **Test-first discipline: followed.** `tests/contract/test_hardening_errors.py`
+  was written first and observed failing on collection.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync -SkipE2E`
+  — exit 0, "Phase 6 verification completed (end-to-end skipped)";
+  `uv run pytest -q` — **1154 passed** (1150 after Phase 5, plus the 4 new);
+  web: eslint, tsc, **87 vitest tests**, and `vite build` all exit 0.
+- Limitations: the gate's Playwright step has never run, because no suites and
+  no browser binaries exist yet — `-SkipE2E` is currently the only way it
+  passes. P6-01 is what makes that step meaningful, which is why it is first.
+- Next: **P6-01** — the Playwright harness and the three deferred suites.
 
 ### 2026-07-28T02:30:00Z — Phase 5 gate approved; Phase 6 plan drafted
 

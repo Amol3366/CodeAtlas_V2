@@ -78,6 +78,12 @@ _EXIT_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.RUN_NOT_RETRYABLE: EXIT_UNAVAILABLE,
     ErrorCode.CONVERSATION_ARCHIVED: EXIT_UNAVAILABLE,
     ErrorCode.QUERY_TOO_LONG: EXIT_INVALID_INPUT,
+    ErrorCode.WATCHER_UNAVAILABLE: EXIT_UNAVAILABLE,
+    ErrorCode.RESTORE_INCOMPATIBLE: EXIT_INVALID_INPUT,
+    ErrorCode.INTEGRITY_CHECK_FAILED: EXIT_UNAVAILABLE,
+    # A backup that did not complete is an internal failure of an operation the
+    # user asked for, not a bad request and not an unavailable resource.
+    ErrorCode.BACKUP_FAILED: EXIT_INTERNAL_FAILURE,
     ErrorCode.PATH_NOT_ALLOWED: EXIT_POLICY_FAILURE,
     ErrorCode.PATH_OUTSIDE_ROOT: EXIT_POLICY_FAILURE,
     ErrorCode.SCAN_LIMIT_EXCEEDED: EXIT_POLICY_FAILURE,

@@ -1,7 +1,7 @@
 # Phase 6 — Continuous Freshness and Hardening
 
-Status: `draft` (authored 2026-07-28 after the Phase 5 gate approval; PLAN.md
-rule 11 — no task may leave `pending` until the user approves this plan)
+Status: `in_progress` (plan approved by the user 2026-07-28, who accepted the
+stated defaults for all four open questions; see "Resolved Defaults" below)
 Gate authority: user
 Prerequisites: Phase 5 approved; `AGENTS.md` Sections 9, 15, 17, 18, 19; the
 blueprint
@@ -129,8 +129,8 @@ anything, and refuses rather than half-restoring.
 
 | Task | Deliverable | Dependencies | Status |
 | --- | --- | --- | --- |
-| P6-SETUP | ADR-0007, error codes, `check_phase6.ps1` skeleton | Phase 5 | `pending` |
-| P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `pending` |
+| P6-SETUP | ADR-0007, error codes, `check_phase6.ps1` skeleton | Phase 5 | `complete` |
+| P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `ready` |
 | P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `pending` |
 | P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `pending` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
@@ -139,18 +139,30 @@ anything, and refuses rather than half-restoring.
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
 | P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
 
-## Open Questions for the User
+## Resolved Defaults
 
-1. **Packaging tool.** PyInstaller is assumed. If you prefer an MSI/WiX
-   installer or a different bundler, that changes P6-06 substantially.
-2. **Watcher default.** Should the watcher be on by default for a registered
-   repository, or opt-in per repository? On-by-default is friendlier; opt-in is
-   more predictable about background CPU.
-3. **Retention.** Phase 5 left soft-deleted conversations recoverable forever
-   with no purge control. Phase 6 should decide the policy: a purge action, a
-   time-based sweep, or both.
-4. **Scope of the Playwright suites.** The gate lists three. Confirm whether
-   the full Section 14 workflow set is wanted now or only the deferred three.
+The user approved this plan on 2026-07-28 accepting the defaults. Each is
+recorded with the reasoning, because a default chosen by silence is the kind
+that gets re-litigated later.
+
+1. **Packaging: PyInstaller.** A single executable serving the API on loopback
+   and the built SPA from `StaticFiles`. Chosen because it needs no installer
+   framework and no elevated privilege — an MSI would add both for a
+   single-user local tool that writes only to its own data directory. Revisit
+   if per-machine installation is ever required.
+2. **Watcher: on by default, with a per-repository off switch.** The product's
+   third question is "how current is that evidence?"; a watcher that is off
+   until asked answers it with "stale, and you were not told". The debounce and
+   reconciliation design is what bounds the cost, so the friendlier default is
+   also the affordable one. A repository can disable it individually.
+3. **Retention: both a purge action and a time-based sweep**, the sweep
+   defaulting to **30 days** after deletion. An explicit purge lets a user act
+   now; the sweep means an unattended install does not accumulate deleted
+   conversations forever. Neither touches an undeleted conversation.
+4. **Playwright: the three deferred suites only** — restart persistence,
+   stream reconnection, and the critical onboard-to-citation workflow. The
+   wider Section 14 set is worth having but is not the debt Phase 5 incurred,
+   and P6-08 can propose it once the harness exists.
 
 ## Verification Commands
 
