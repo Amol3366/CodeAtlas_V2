@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active task | none — P5-02, P5-03, and P5-05 are `ready` |
-| Task status | P5-SETUP and P5-01 `complete`; P5-02, P5-03, P5-05 `ready`; the rest `pending` |
+| Active task | none — P5-03 and P5-05 are `ready` |
+| Task status | P5-SETUP, P5-01, P5-02 `complete`; P5-03 and P5-05 `ready`; the rest `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -63,7 +63,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | --- | --- | --- | --- |
 | P5-SETUP | ADR-0006, error codes, contract models, schema regen | Phase 4 | `complete` |
 | P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `complete` |
-| P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `ready` |
+| P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `complete` |
 | P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `ready` |
 | P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `pending` |
 | P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `ready` |
@@ -163,6 +163,76 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-27T20:45:00Z — P5-02 completed; P5-03 and P5-05 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Transition: P5-02 `ready -> complete`. P5-03 and P5-05 stay `ready`.
+- Outcome: conversation history is now servable. A client can create a thread
+  against a repository, list threads newest-activity-first with a cursor, read
+  and rename one, archive it, delete it, and page its messages — all through
+  `/v1/conversations`, all bound to a repository that exists.
+
+#### What landed
+
+- **`ConversationService`** (`application/conversation_service.py`) — the
+  lifecycle half only. Submitting a message and running the pipeline are P5-03,
+  and keeping them out means this surface cannot fail for retrieval reasons.
+- **Six routes** (`api/routers/conversations.py`), thin over the service:
+  `POST /v1/conversations`, `GET /v1/conversations`,
+  `GET|PATCH|DELETE /v1/conversations/{id}`,
+  `GET /v1/conversations/{id}/messages`.
+- Wired into `ApplicationServices` and the app.
+
+#### Decisions worth recording
+
+1. **The repository binding is checked at creation, not at first question.**
+   A conversation is bound to one repository for its whole life; a thread whose
+   repository never existed would otherwise only reveal the problem once a user
+   had typed something into it, and the typing would be lost.
+2. **A soft-deleted conversation is 404 on every path** — read, rename,
+   archive, and message listing. Storage keeps the row so Phase 6 can define
+   recovery, but reporting it because it physically survives would contradict
+   what the user was told. Asserted directly by
+   `test_renaming_a_deleted_conversation_is_not_found`.
+3. **Request bodies are `extra="forbid"`.** A typo'd field fails loudly rather
+   than being silently dropped, so a client can never believe it set something
+   it did not.
+4. **Unarchiving is deliberately absent.** Nothing in Phase 5 needs it, and an
+   unused write path is an untested one. `PATCH {"archived": true}` archives;
+   there is no `false` branch to get wrong.
+5. **Titles are deterministic** (ADR-0006 decision 8). `derive_title` truncates
+   the first message at a word boundary; a thread with no message yet is named
+   "New conversation". Nothing here can invent a claim about the repository.
+- Files created: `src/codeatlas/application/conversation_service.py`,
+  `src/codeatlas/api/routers/conversations.py`,
+  `tests/contract/test_conversations_api.py` (14 tests).
+  Files modified: `src/codeatlas/application/container.py`,
+  `src/codeatlas/api/app.py`.
+- Contracts/migrations: **none.** The models and error codes landed in
+  P5-SETUP; `SCHEMA_VERSION` stays 8.
+- **Test-first discipline: followed.** All 14 contract tests were written first
+  and observed failing (14 failed) before the service or router existed.
+- The cursor test asserts the property that matters rather than an exact page:
+  across two pages every conversation appears exactly once and none is lost,
+  which is what a cursor is *for* — an offset would duplicate a row whenever a
+  newer thread arrived between requests.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  — exit 0, "Phase 4 verification completed";
+  `uv run pytest -q` — **1070 passed** in 111.29 s (1056 after P5-01, plus 14);
+  `uv run ruff check src tests scripts apps` — exit 0 (one line-length fix in
+  the new test file);
+  `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **180 source files**.
+- Limitations: no message can be *submitted* yet, so `list_messages` always
+  returns an empty page in practice — P5-03 is what makes it non-trivial. The
+  CLI and MCP have no conversation commands; the plan does not ask for them in
+  Phase 5, and adding an adapter with nothing to answer would be surface
+  without value. `pinned_snapshot_policy` remains stored and unused.
+- Next: **P5-03** (intent rules, `AnswerPipeline`, deterministic templates, run
+  execution) or **P5-05** (web scaffold — the task that brings Node 20 and pnpm
+  into the repository, where the plan's first open question becomes real).
 
 ### 2026-07-27T20:05:00Z — P5-01 completed; P5-02, P5-03, P5-05 `ready`
 

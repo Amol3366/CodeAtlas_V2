@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from codeatlas.api.errors import codeatlas_error_response, error_response
 from codeatlas.api.routers import (
     change_analysis,
+    conversations,
     entities,
     graph,
     query,
@@ -61,6 +62,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     app.include_router(entities.router)
     app.include_router(graph.router)
     app.include_router(change_analysis.router)
+    app.include_router(conversations.router)
 
     @app.exception_handler(CodeAtlasError)
     async def handle_codeatlas_error(

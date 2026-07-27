@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from sqlite3 import Connection
 
 from codeatlas.application.change_analysis import ChangeAnalysisService
+from codeatlas.application.conversation_service import ConversationService
 from codeatlas.application.entities import EntityService
 from codeatlas.application.graph_queries import GraphQueryService
 from codeatlas.application.indexing import IndexRepositoryService
@@ -26,6 +27,7 @@ from codeatlas.retrieval.lexical import LexicalSearchService
 from codeatlas.storage.sqlite.stores import (
     ChangeAnalysisStore,
     ChunkStore,
+    ConversationStore,
     EvidenceStore,
     FileStore,
     IndexJobStore,
@@ -50,6 +52,7 @@ class ApplicationServices:
     graph: GraphQueryService
     entities: EntityService
     change_analysis: ChangeAnalysisService
+    conversations: ConversationService
 
 
 def build_services(connection: Connection) -> ApplicationServices:
@@ -64,6 +67,7 @@ def build_services(connection: Connection) -> ApplicationServices:
     relations = RelationStore(connection)
     evidence = EvidenceStore(connection)
     analyses = ChangeAnalysisStore(connection)
+    conversations = ConversationStore(connection)
 
     recovery = SnapshotRecoveryService(
         repositories=repositories,
@@ -117,6 +121,11 @@ def build_services(connection: Connection) -> ApplicationServices:
             files=files,
             symbols=symbols,
             evidence=evidence,
+        ),
+        conversations=ConversationService(
+            repositories=repositories,
+            conversations=conversations,
+            connection=connection,
         ),
         change_analysis=ChangeAnalysisService(
             repositories=repositories,
