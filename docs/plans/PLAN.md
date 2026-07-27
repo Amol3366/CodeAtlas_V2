@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active task | P5-SETUP — ADR-0006, error codes, contract models, schema regen |
-| Task status | P5-SETUP `in_progress`; P5-01 … P5-10 `pending` |
+| Active task | none — P5-01 and P5-05 are both `ready` (independent; either may start) |
+| Task status | P5-SETUP `complete`; P5-01 and P5-05 `ready`; P5-02 … P5-04, P5-06 … P5-10 `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -61,12 +61,12 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Task | Deliverable | Dependencies | Status |
 | --- | --- | --- | --- |
-| P5-SETUP | ADR-0006, error codes, contract models, schema regen | Phase 4 | `in_progress` |
-| P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `pending` |
+| P5-SETUP | ADR-0006, error codes, contract models, schema regen | Phase 4 | `complete` |
+| P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `ready` |
 | P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `pending` |
 | P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `pending` |
 | P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `pending` |
-| P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `pending` |
+| P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `ready` |
 | P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `pending` |
 | P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `pending` |
 | P5-08 | Thread view: submit, stream, cancel/retry, sanitized rendering | P5-04, P5-07 | `pending` |
@@ -163,6 +163,87 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-27T19:10:00Z — P5-SETUP completed; P5-01 and P5-05 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Transition: P5-SETUP `in_progress -> complete`; P5-01 `pending -> ready`;
+  P5-05 `pending -> ready`. The two are independent (storage vs. web scaffold,
+  both depending only on P5-SETUP), so either may be taken next — but per rule
+  3 only one may be `in_progress` at a time.
+- Outcome: Phase 5's public surface exists before any of its behavior does.
+  Six error codes, seven contract models, and the exported schema are in place,
+  so P5-01's storage layer and P5-05's generated TypeScript types both have a
+  fixed contract to build against rather than inventing one.
+
+#### What landed
+
+- **ADR-0006** (`docs/adr/0006-web-application-design.md`) records decisions
+  1–10: the `0008` persistence model with soft delete and repository cascade;
+  the transactional message/run lifecycle; one pipeline shared with `/v1/query`
+  and **no LLM in Phase 5**; typed SSE with a 256-event ring buffer and *no*
+  event persistence (a second record of an answer can disagree with the first);
+  the frontend stack including the Node 20 + pnpm dependency-surface expansion;
+  the six error codes; strict additive contract models; deterministic titles;
+  the loopback serving model; and the browser trust boundary. Four rejected
+  alternatives are recorded with reasons.
+- **Six error codes** with classes and both adapter mappings:
+  `CONVERSATION_NOT_FOUND` (404/3), `MESSAGE_NOT_FOUND` (404/3),
+  `RUN_NOT_CANCELLABLE` (409/3, **the only retryable one** — a run may finish
+  between the client's decision and its request), `RUN_NOT_RETRYABLE` (409/3),
+  `CONVERSATION_ARCHIVED` (409/3), `QUERY_TOO_LONG` (422/2). A soft-deleted
+  conversation reports `CONVERSATION_NOT_FOUND`: reporting the row because it
+  physically survives would contradict what the user was told.
+- **Seven contract models** — `Conversation`, `Message`, `MessageRun`,
+  `MessageEvidenceItem`, `StreamEvent`, `ConversationPage`, `MessagePage` —
+  plus `MessageRole`, `MessageStatus`, `RunStatus`, `StreamEventType`. All
+  frozen with `extra="forbid"`. Two validators encode rules the storage layer
+  will depend on: a `complete` message must carry content (a completed answer
+  with no text is the silent-success failure the evidence contract exists to
+  prevent) and a `failed` message must carry an error code. Sequence numbers
+  start at 1 so 0 can mean "nothing yet" to the stream resume key.
+  `MessageEvidenceItem` snapshots its evidence fields rather than referencing
+  live index rows, which is what lets a historical message keep telling the
+  truth it told after its snapshot is superseded.
+- **Schema bundle regenerated**: 5 schemas → **12**. `contract_version` stays
+  `"1.0"`; every addition is additive, so a Phase 4 client is unaffected.
+- Files created: `docs/adr/0006-web-application-design.md`,
+  `tests/contract/test_conversation_errors.py`,
+  `tests/contract/test_conversation_contract.py`.
+  Files modified: `src/codeatlas/domain/errors.py`,
+  `src/codeatlas/api/errors.py`, `src/codeatlas/cli/main.py`,
+  `src/codeatlas/contracts.py`, `src/codeatlas/schema_export.py`,
+  `docs/api/contract-v1.schema.json`, `tests/contract/test_schema_export.py`.
+- Contracts/migrations: **no migration.** `SCHEMA_VERSION` stays 7; `0008`
+  lands in P5-01. The contract grows additively as described above.
+- **Test-first discipline: followed.** Both new test files were written first
+  and observed failing on collection (`ImportError` for the error classes, then
+  for the contract models) before any implementation existed.
+- **A defect the type gate caught in my own tests**: three `MessageEvidenceItem`
+  constructions passed `derivation="deterministic"` as a bare string. Pydantic
+  coerces it, so the tests passed while asserting something weaker than the
+  contract — strict MyPy rejected it, and the tests now use
+  `Derivation.DETERMINISTIC`. Recorded because a test that passes for the wrong
+  reason is worse than one that fails.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  — exit 0, "Phase 4 verification completed" (contract schema `--check`, tests,
+  ruff, mypy, dataset validation, phase-0/3/4 baselines all `--check`);
+  `uv run pytest -q` — **1037 passed** in 101.82 s (1022 after P4-10, plus the
+  15 new contract and error-code tests);
+  `uv run ruff check src tests scripts apps` — exit 0;
+  `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **175 source files**.
+  Note: `check_phase4.ps1` remains the standing gate until P5-10 adds
+  `check_phase5.ps1` with the frontend sections.
+- Limitations: nothing conversational is *stored or served* yet — these are
+  contract shapes only. The plan's three open questions still default to the
+  plan as written (frontend dependency surface as specified, soft delete with
+  no purge control in Phase 5, `serve --web` built in Phase 5); the user may
+  override any of them before the tasks that depend on them.
+- Next: **P5-01** (migration `0008`, conversation domain, `ConversationStore`)
+  or **P5-05** (web scaffold and generated types) — both `ready`, neither
+  blocked by the other.
 
 ### 2026-07-27T18:20:00Z — Phase 4 gate approved; Phase 5 activated; P5-SETUP started
 

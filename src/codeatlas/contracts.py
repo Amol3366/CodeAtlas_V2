@@ -522,3 +522,195 @@ class ChangeAnalysisReport(ContractModel):
                 "changed_files cannot be empty when changed_symbols is not"
             )
         return self
+
+
+# ---------------------------------------------------------------------------
+# Conversations (Phase 5, ADR-0006).
+#
+# Additive: `contract_version` stays "1.0" and a client written against Phase 4
+# keeps working against a backend that never serves a conversation. Chat history
+# is first-class persistent application data (`AGENTS.md` Section 8.2), so these
+# models describe stored rows, not view state: the backend owns them and the web
+# client consumes them.
+# ---------------------------------------------------------------------------
+
+
+class MessageRole(StrEnum):
+    """Who produced a message."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM_EVENT = "system_event"
+
+
+class MessageStatus(StrEnum):
+    """Where a message is in its lifecycle.
+
+    A failed or cancelled message stays visible and retryable; the states are
+    explicit rather than a boolean so partial and failed work can be told apart
+    from work that never started.
+    """
+
+    QUEUED = "queued"
+    RETRIEVING = "retrieving"
+    GENERATING = "generating"
+    COMPLETE = "complete"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class RunStatus(StrEnum):
+    """Where one attempt at answering a message is in its lifecycle."""
+
+    QUEUED = "queued"
+    RETRIEVING = "retrieving"
+    GENERATING = "generating"
+    COMPLETE = "complete"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class StreamEventType(StrEnum):
+    """The Section 11.2 event vocabulary.
+
+    Clients must ignore unknown future types; the ones named here are the
+    published set a Phase 5 client may rely on.
+    """
+
+    RUN_ACCEPTED = "run.accepted"
+    RETRIEVAL_STARTED = "retrieval.started"
+    RETRIEVAL_PROGRESS = "retrieval.progress"
+    EVIDENCE_AVAILABLE = "evidence.available"
+    GENERATION_DELTA = "generation.delta"
+    ANSWER_COMPLETED = "answer.completed"
+    RUN_WARNING = "run.warning"
+    RUN_FAILED = "run.failed"
+    RUN_CANCELLED = "run.cancelled"
+    HEARTBEAT = "heartbeat"
+
+
+class Conversation(ContractModel):
+    """One persisted thread, always bound to a single repository.
+
+    A conversation never changes repository: switching requires a new thread
+    (Section 14.5), so a historical answer can never be reinterpreted against a
+    repository it did not examine.
+    """
+
+    conversation_id: OpaqueId
+    repository_id: OpaqueId
+    title: NonEmptyText
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+    last_message_at: UtcDatetime | None = None
+    archived_at: UtcDatetime | None = None
+
+
+class Message(ContractModel):
+    """One turn in a conversation.
+
+    ``sequence_number`` starts at 1 and orders the thread; it is also the
+    stream's resume key, so 0 is reserved to mean "nothing yet".
+    """
+
+    message_id: OpaqueId
+    conversation_id: OpaqueId
+    role: MessageRole
+    status: MessageStatus
+    sequence_number: Annotated[int, Field(ge=1)]
+    content: str = ""
+    error_code: NonEmptyText | None = None
+    created_at: UtcDatetime
+    completed_at: UtcDatetime | None = None
+
+    @model_validator(mode="after")
+    def validate_lifecycle(self) -> Message:
+        if self.status is MessageStatus.COMPLETE and not self.content.strip():
+            # A completed answer with no text is the silent-success failure
+            # mode the evidence contract exists to prevent.
+            raise ValueError("a complete message must carry content")
+        if self.status is MessageStatus.FAILED and not self.error_code:
+            raise ValueError("a failed message must carry an error code")
+        return self
+
+
+class MessageRun(ContractModel):
+    """One attempt at answering a message, with the snapshot it answered
+    against.
+
+    The snapshot ID is what lets a historical message keep its own freshness
+    label forever: reopening history must not relabel old evidence as current
+    (Section 14.5).
+    """
+
+    run_id: OpaqueId
+    message_id: OpaqueId
+    repository_id: OpaqueId
+    snapshot_id: OpaqueId
+    normalized_query: str
+    intent: NonEmptyText
+    retrieval_policy_version: NonEmptyText
+    status: RunStatus
+    created_at: UtcDatetime
+    completed_at: UtcDatetime | None = None
+    latency_ms: NonNegativeDuration | None = None
+    warnings: list[NonEmptyText] = Field(default_factory=list)
+
+
+class MessageEvidenceItem(ContractModel):
+    """One citation attached to an assistant message.
+
+    The evidence fields are snapshotted rather than joined live: a historical
+    message must keep telling the truth it told after its snapshot is
+    superseded, which is the same audit rule change analyses follow.
+    """
+
+    evidence_id: OpaqueId
+    citation_ordinal: Annotated[int, Field(ge=1)]
+    file_path: RepositoryRelativePath
+    symbol: NonEmptyText | None = None
+    start_line: PositiveLine
+    end_line: PositiveLine
+    content_hash: NonEmptyText
+    derivation: Derivation
+    confidence: Confidence
+    snapshot_id: OpaqueId
+    claim_ids: list[NonEmptyText] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_range(self) -> MessageEvidenceItem:
+        if self.end_line < self.start_line:
+            raise ValueError("end_line must not precede start_line")
+        return self
+
+
+class StreamEvent(ContractModel):
+    """One typed event on a conversation stream.
+
+    The envelope is :class:`StreamEventMetadata`'s fields plus a typed
+    discriminator and payload. Streaming text is provisional; the persisted
+    message is authoritative (Section 11.2).
+    """
+
+    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    request_id: OpaqueId
+    conversation_id: OpaqueId
+    message_id: OpaqueId
+    sequence: Annotated[int, Field(ge=0)]
+    timestamp: UtcDatetime
+    event: StreamEventType
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConversationPage(ContractModel):
+    """One page of conversations, newest activity first."""
+
+    items: list[Conversation] = Field(default_factory=list)
+    next_cursor: OpaqueId | None = None
+
+
+class MessagePage(ContractModel):
+    """One page of messages, in sequence order."""
+
+    items: list[Message] = Field(default_factory=list)
+    next_cursor: OpaqueId | None = None

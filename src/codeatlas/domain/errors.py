@@ -32,6 +32,12 @@ class ErrorCode(StrEnum):
     GIT_REF_UNRESOLVABLE = "GIT_REF_UNRESOLVABLE"
     CHANGE_ANALYSIS_NOT_FOUND = "CHANGE_ANALYSIS_NOT_FOUND"
     ANALYSIS_RULES_INVALID = "ANALYSIS_RULES_INVALID"
+    CONVERSATION_NOT_FOUND = "CONVERSATION_NOT_FOUND"
+    MESSAGE_NOT_FOUND = "MESSAGE_NOT_FOUND"
+    RUN_NOT_CANCELLABLE = "RUN_NOT_CANCELLABLE"
+    RUN_NOT_RETRYABLE = "RUN_NOT_RETRYABLE"
+    CONVERSATION_ARCHIVED = "CONVERSATION_ARCHIVED"
+    QUERY_TOO_LONG = "QUERY_TOO_LONG"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -159,3 +165,62 @@ class AnalysisRulesInvalidError(CodeAtlasError):
     """
 
     code = ErrorCode.ANALYSIS_RULES_INVALID
+
+
+class ConversationNotFoundError(CodeAtlasError):
+    """No conversation matches the supplied ID.
+
+    A soft-deleted conversation is *not found* to every caller that did not ask
+    for deleted rows: deletion is a user-visible fact, and reporting the row
+    because it physically survives would contradict what the user was told.
+    """
+
+    code = ErrorCode.CONVERSATION_NOT_FOUND
+
+
+class MessageNotFoundError(CodeAtlasError):
+    """No message matches the supplied ID within its conversation."""
+
+    code = ErrorCode.MESSAGE_NOT_FOUND
+
+
+class RunNotCancellableError(CodeAtlasError):
+    """The run has already reached a terminal state.
+
+    Retryable because the answer depends on when the question is asked: a run
+    that finished between the client's decision and its request was cancellable
+    a moment earlier, and the client's next poll sees the terminal state.
+    """
+
+    code = ErrorCode.RUN_NOT_CANCELLABLE
+    retryable = True
+
+
+class RunNotRetryableError(CodeAtlasError):
+    """The message has no failed or cancelled run to retry.
+
+    Retrying a running or completed message would create a second answer for
+    one question, which the persisted-answer contract does not allow.
+    """
+
+    code = ErrorCode.RUN_NOT_RETRYABLE
+
+
+class ConversationArchivedError(CodeAtlasError):
+    """The conversation is archived and accepts no new messages.
+
+    Archiving is the user's statement that a thread is finished. Silently
+    reopening it on a new message would discard that statement.
+    """
+
+    code = ErrorCode.CONVERSATION_ARCHIVED
+
+
+class QueryTooLongError(CodeAtlasError):
+    """The submitted question exceeds the maximum query length.
+
+    Every request carries a bounded input size (`AGENTS.md` Section 10.3);
+    truncating instead would answer a question the user did not ask.
+    """
+
+    code = ErrorCode.QUERY_TOO_LONG

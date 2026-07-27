@@ -9,9 +9,16 @@ from typing import Any
 from codeatlas.contracts import (
     CONTRACT_VERSION,
     ChangeAnalysisReport,
+    Conversation,
+    ConversationPage,
     ErrorEnvelope,
     Finding,
+    Message,
+    MessageEvidenceItem,
+    MessagePage,
+    MessageRun,
     QueryResponse,
+    StreamEvent,
     StreamEventMetadata,
 )
 
@@ -25,13 +32,26 @@ def build_schema_bundle() -> dict[str, Any]:
             "change_analysis_report": ChangeAnalysisReport.model_json_schema(
                 mode="serialization"
             ),
+            "conversation": Conversation.model_json_schema(
+                mode="serialization"
+            ),
+            "conversation_page": ConversationPage.model_json_schema(
+                mode="serialization"
+            ),
             "error_envelope": ErrorEnvelope.model_json_schema(
                 mode="serialization"
             ),
             "finding": Finding.model_json_schema(mode="serialization"),
+            "message": Message.model_json_schema(mode="serialization"),
+            "message_evidence_item": MessageEvidenceItem.model_json_schema(
+                mode="serialization"
+            ),
+            "message_page": MessagePage.model_json_schema(mode="serialization"),
+            "message_run": MessageRun.model_json_schema(mode="serialization"),
             "query_response": QueryResponse.model_json_schema(
                 mode="serialization"
             ),
+            "stream_event": StreamEvent.model_json_schema(mode="serialization"),
             "stream_event_metadata": StreamEventMetadata.model_json_schema(
                 mode="serialization"
             ),
