@@ -328,8 +328,8 @@ apps/web/
 | P5-SETUP | ADR-0006, error codes, contract models, schema regen | Phase 4 approval + this plan approved | `complete` |
 | P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `complete` |
 | P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `complete` |
-| P5-03 | Intent rules, `AnswerPipeline`, deterministic templates, run execution | P5-01 | `ready` |
-| P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `pending` |
+| P5-03 | Intent rules, `AnswerPipeline`, deterministic templates, run execution | P5-01 | `complete` |
+| P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `ready` |
 | P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types, tokens, shell | P5-SETUP | `ready` |
 | P5-06 | Repository onboarding, status, diagnostics UI (first real-backend slice) | P5-05 | `pending` |
 | P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `pending` |

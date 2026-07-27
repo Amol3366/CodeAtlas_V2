@@ -10,19 +10,23 @@ P5-04. Keeping them out means this surface cannot fail for retrieval reasons.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from codeatlas.api.errors import request_id_for
 from codeatlas.api.routers.repositories import Services
 from codeatlas.application.conversation_service import (
     DEFAULT_PAGE_LIMIT,
     MAX_PAGE_LIMIT,
+    SubmissionResult,
 )
 from codeatlas.contracts import (
     Conversation,
     ConversationPage,
     Message,
+    MessageEvidenceItem,
     MessagePage,
+    MessageSubmission,
 )
 from codeatlas.domain.conversations import ConversationRecord, MessageRecord
 
@@ -107,6 +111,57 @@ def delete_conversation(services: Services, conversation_id: str) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+class SubmitMessageRequest(StrictModel):
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class FeedbackRequest(StrictModel):
+    rating: str
+    reason_code: str | None = None
+
+
+@router.post(
+    "/{conversation_id}/messages", status_code=status.HTTP_201_CREATED
+)
+def submit_message(
+    request: Request,
+    services: Services,
+    conversation_id: str,
+    body: SubmitMessageRequest,
+) -> MessageSubmission:
+    """Ask a question and return the finished turn.
+
+    Phase 5 answers deterministically and synchronously, so the answer is ready
+    when this returns. P5-04 adds the streamed view of the same run; the
+    persisted message stays the authoritative one either way.
+    """
+    result = services.conversations.submit(
+        conversation_id, body.content, request_id=request_id_for(request)
+    )
+    return _submission(result)
+
+
+@router.post("/messages/{message_id}/retry", status_code=status.HTTP_201_CREATED)
+def retry_message(
+    request: Request, services: Services, message_id: str
+) -> MessageSubmission:
+    return _submission(
+        services.conversations.retry(message_id, request_id=request_id_for(request))
+    )
+
+
+@router.post(
+    "/messages/{message_id}/feedback", status_code=status.HTTP_204_NO_CONTENT
+)
+def submit_feedback(
+    services: Services, message_id: str, body: FeedbackRequest
+) -> Response:
+    services.conversations.save_feedback(
+        message_id, rating=body.rating, reason_code=body.reason_code
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{conversation_id}/messages")
 def list_messages(
     services: Services,
@@ -120,6 +175,39 @@ def list_messages(
     return MessagePage(
         items=[_message(item) for item in page.items],
         next_cursor=page.next_cursor,
+    )
+
+
+def _submission(result: SubmissionResult) -> MessageSubmission:
+    return MessageSubmission(
+        conversation_id=result.conversation_id,
+        user_message_id=result.user_message_id or result.message_id,
+        message_id=result.message_id,
+        run_id=result.run_id,
+        status=result.status,
+        sequence_number=result.sequence_number,
+        content=result.content,
+        snapshot_id=result.snapshot_id,
+        intent=result.intent,
+        evidence=[
+            MessageEvidenceItem(
+                evidence_id=item.evidence_id,
+                citation_ordinal=item.citation_ordinal,
+                file_path=item.file_path,
+                symbol=item.symbol,
+                start_line=item.start_line,
+                end_line=item.end_line,
+                content_hash=item.content_hash,
+                derivation=item.derivation,
+                confidence=item.confidence,
+                snapshot_id=item.snapshot_id,
+            )
+            for item in result.evidence
+        ],
+        warnings=list(result.warnings),
+        limitations=list(result.limitations),
+        error_code=result.error_code,
+        latency_ms=result.latency_ms,
     )
 
 

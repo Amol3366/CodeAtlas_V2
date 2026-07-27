@@ -24,6 +24,7 @@ def test_schema_bundle_contains_versioned_public_contracts() -> None:
         "message_evidence_item",
         "message_page",
         "message_run",
+        "message_submission",
         "query_response",
         "stream_event",
         "stream_event_metadata",

@@ -1707,6 +1707,17 @@ class ConversationStore:
             (run_status.value, to_utc_text(completed_at), run_id),
         )
 
+    def set_run_snapshot(self, run_id: str, snapshot_id: str) -> None:
+        """Record which snapshot actually answered.
+
+        A queued run has not resolved one yet; writing it on completion is what
+        binds the stored answer to the tree it examined, permanently.
+        """
+        self._connection.execute(
+            "UPDATE message_runs SET snapshot_id = ? WHERE run_id = ?",
+            (snapshot_id, run_id),
+        )
+
     def create_retry_run(self, message_id: str, run: RunRecord) -> None:
         """Queue another attempt, preserving every prior one."""
         self._connection.execute(

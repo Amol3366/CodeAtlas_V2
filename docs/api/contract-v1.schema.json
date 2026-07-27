@@ -1434,6 +1434,248 @@
       "title": "MessageRun",
       "type": "object"
     },
+    "message_submission": {
+      "$defs": {
+        "Derivation": {
+          "enum": [
+            "deterministic",
+            "static_resolved",
+            "high_confidence_heuristic",
+            "low_confidence_heuristic",
+            "semantic_candidate",
+            "model_generated",
+            "unsupported"
+          ],
+          "title": "Derivation",
+          "type": "string"
+        },
+        "MessageEvidenceItem": {
+          "additionalProperties": false,
+          "description": "One citation attached to an assistant message.\n\nThe evidence fields are snapshotted rather than joined live: a historical\nmessage must keep telling the truth it told after its snapshot is\nsuperseded, which is the same audit rule change analyses follow.",
+          "properties": {
+            "citation_ordinal": {
+              "minimum": 1,
+              "title": "Citation Ordinal",
+              "type": "integer"
+            },
+            "claim_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "title": "Claim Ids",
+              "type": "array"
+            },
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "content_hash": {
+              "minLength": 1,
+              "title": "Content Hash",
+              "type": "string"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "end_line": {
+              "minimum": 1,
+              "title": "End Line",
+              "type": "integer"
+            },
+            "evidence_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Evidence Id",
+              "type": "string"
+            },
+            "file_path": {
+              "maxLength": 4096,
+              "title": "File Path",
+              "type": "string"
+            },
+            "snapshot_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Snapshot Id",
+              "type": "string"
+            },
+            "start_line": {
+              "minimum": 1,
+              "title": "Start Line",
+              "type": "integer"
+            },
+            "symbol": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Symbol"
+            }
+          },
+          "required": [
+            "evidence_id",
+            "citation_ordinal",
+            "file_path",
+            "start_line",
+            "end_line",
+            "content_hash",
+            "derivation",
+            "confidence",
+            "snapshot_id"
+          ],
+          "title": "MessageEvidenceItem",
+          "type": "object"
+        },
+        "MessageStatus": {
+          "description": "Where a message is in its lifecycle.\n\nA failed or cancelled message stays visible and retryable; the states are\nexplicit rather than a boolean so partial and failed work can be told apart\nfrom work that never started.",
+          "enum": [
+            "queued",
+            "retrieving",
+            "generating",
+            "complete",
+            "failed",
+            "cancelled"
+          ],
+          "title": "MessageStatus",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "The result of submitting one question.\n\nPhase 5 answers deterministically and synchronously, so the submission\nalready carries the finished answer. The IDs are returned regardless of\noutcome: a failed or cancelled turn is still a turn the client must be able\nto display and retry.",
+      "properties": {
+        "content": {
+          "default": "",
+          "title": "Content",
+          "type": "string"
+        },
+        "contract_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "conversation_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/MessageEvidenceItem"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "intent": {
+          "minLength": 1,
+          "title": "Intent",
+          "type": "string"
+        },
+        "latency_ms": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latency Ms"
+        },
+        "limitations": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "message_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Message Id",
+          "type": "string"
+        },
+        "run_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "sequence_number": {
+          "minimum": 1,
+          "title": "Sequence Number",
+          "type": "integer"
+        },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Id"
+        },
+        "status": {
+          "$ref": "#/$defs/MessageStatus"
+        },
+        "user_message_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "User Message Id",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "user_message_id",
+        "message_id",
+        "run_id",
+        "status",
+        "sequence_number",
+        "intent"
+      ],
+      "title": "MessageSubmission",
+      "type": "object"
+    },
     "query_response": {
       "$defs": {
         "Answer": {

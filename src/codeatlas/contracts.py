@@ -714,3 +714,29 @@ class MessagePage(ContractModel):
 
     items: list[Message] = Field(default_factory=list)
     next_cursor: OpaqueId | None = None
+
+
+class MessageSubmission(ContractModel):
+    """The result of submitting one question.
+
+    Phase 5 answers deterministically and synchronously, so the submission
+    already carries the finished answer. The IDs are returned regardless of
+    outcome: a failed or cancelled turn is still a turn the client must be able
+    to display and retry.
+    """
+
+    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    conversation_id: OpaqueId
+    user_message_id: OpaqueId
+    message_id: OpaqueId
+    run_id: OpaqueId
+    status: MessageStatus
+    sequence_number: Annotated[int, Field(ge=1)]
+    content: str = ""
+    snapshot_id: OpaqueId | None = None
+    intent: NonEmptyText
+    evidence: list[MessageEvidenceItem] = Field(default_factory=list)
+    warnings: list[NonEmptyText] = Field(default_factory=list)
+    limitations: list[NonEmptyText] = Field(default_factory=list)
+    error_code: NonEmptyText | None = None
+    latency_ms: NonNegativeDuration | None = None

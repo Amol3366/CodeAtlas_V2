@@ -19,6 +19,7 @@ from codeatlas.application.lookup import ExactSymbolLookupService
 from codeatlas.application.recovery import SnapshotRecoveryService
 from codeatlas.application.registration import RegisterRepositoryService
 from codeatlas.application.status import RepositoryStatusService
+from codeatlas.conversations.pipeline import AnswerPipeline
 from codeatlas.parsing.registry import default_registry
 from codeatlas.repositories.git_diff import GitDiffAdapter
 from codeatlas.repositories.git_state import GitAdapter
@@ -97,16 +98,37 @@ def build_services(connection: Connection) -> ApplicationServices:
         connection=connection,
     )
 
+    # Hoisted because the conversation pipeline answers through these exact
+    # services. Constructing a second set would let the chat surface and
+    # `/v1/query` drift apart while both looked correct in isolation.
+    lookup = ExactSymbolLookupService(
+        repositories=repositories,
+        snapshots=snapshots,
+        files=files,
+        symbols=symbols,
+        evidence=evidence,
+    )
+    graph = GraphQueryService(
+        repositories=repositories,
+        snapshots=snapshots,
+        files=files,
+        symbols=symbols,
+        relations=relations,
+        evidence=evidence,
+    )
+    search = LexicalSearchService(
+        repositories=repositories,
+        snapshots=snapshots,
+        files=files,
+        symbols=symbols,
+        search=search_store,
+        evidence=evidence,
+    )
+
     return ApplicationServices(
         registration=RegisterRepositoryService(repositories),
         indexing=indexing,
-        lookup=ExactSymbolLookupService(
-            repositories=repositories,
-            snapshots=snapshots,
-            files=files,
-            symbols=symbols,
-            evidence=evidence,
-        ),
+        lookup=lookup,
         status=RepositoryStatusService(
             repositories=repositories,
             snapshots=snapshots,
@@ -126,6 +148,11 @@ def build_services(connection: Connection) -> ApplicationServices:
             repositories=repositories,
             conversations=conversations,
             connection=connection,
+            # The pipeline is handed the same services every other adapter
+            # uses. That is what makes the conversation answer and the
+            # `/v1/query` answer the same answer rather than two that agree
+            # by coincidence.
+            pipeline=AnswerPipeline(lookup=lookup, graph=graph, search=search),
         ),
         change_analysis=ChangeAnalysisService(
             repositories=repositories,
@@ -136,20 +163,6 @@ def build_services(connection: Connection) -> ApplicationServices:
             diff=GitDiffAdapter(),
             connection=connection,
         ),
-        graph=GraphQueryService(
-            repositories=repositories,
-            snapshots=snapshots,
-            files=files,
-            symbols=symbols,
-            relations=relations,
-            evidence=evidence,
-        ),
-        search=LexicalSearchService(
-            repositories=repositories,
-            snapshots=snapshots,
-            files=files,
-            symbols=symbols,
-            search=search_store,
-            evidence=evidence,
-        ),
+        graph=graph,
+        search=search,
     )

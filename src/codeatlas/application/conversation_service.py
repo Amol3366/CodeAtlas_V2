@@ -20,14 +20,38 @@ Two rules shape everything here:
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from sqlite3 import Connection
 
-from codeatlas.domain.conversations import ConversationRecord, MessageRecord, Page
+from codeatlas.contracts import (
+    Derivation,
+    MessageRole,
+    MessageStatus,
+    RunStatus,
+)
+from codeatlas.conversations.pipeline import (
+    AnswerPipeline,
+    AnswerRequest,
+    CancelledError,
+    CancelToken,
+    PipelineEvent,
+)
+from codeatlas.domain.conversations import (
+    ConversationRecord,
+    MessageEvidenceRow,
+    MessageRecord,
+    Page,
+    RunRecord,
+)
 from codeatlas.domain.errors import (
+    CodeAtlasError,
+    ConversationArchivedError,
     ConversationNotFoundError,
     InvalidRequestError,
+    MessageNotFoundError,
     RepositoryNotFoundError,
+    RunNotRetryableError,
 )
 from codeatlas.storage.sqlite.connection import write_transaction
 from codeatlas.storage.sqlite.stores import ConversationStore, RepositoryStore
@@ -64,6 +88,26 @@ def derive_title(text: str) -> str:
     return f"{clipped.rstrip()}…"
 
 
+@dataclass(frozen=True)
+class SubmissionResult:
+    """One completed turn: the IDs, the answer, and everything it cites."""
+
+    conversation_id: str
+    user_message_id: str
+    message_id: str
+    run_id: str
+    status: MessageStatus
+    sequence_number: int
+    content: str
+    intent: str
+    snapshot_id: str | None = None
+    evidence: tuple[MessageEvidenceRow, ...] = ()
+    warnings: tuple[str, ...] = ()
+    limitations: tuple[str, ...] = ()
+    error_code: str | None = None
+    latency_ms: float | None = None
+
+
 class ConversationService:
     """Create and manage conversation threads for a registered repository."""
 
@@ -72,10 +116,12 @@ class ConversationService:
         repositories: RepositoryStore,
         conversations: ConversationStore,
         connection: Connection,
+        pipeline: AnswerPipeline | None = None,
     ) -> None:
         self._repositories = repositories
         self._conversations = conversations
         self._connection = connection
+        self._pipeline = pipeline
 
     def create(
         self,
@@ -161,6 +207,308 @@ class ConversationService:
         return self._conversations.list_messages(
             conversation_id, cursor=cursor, limit=self._validate_limit(limit)
         )
+
+    def submit(
+        self,
+        conversation_id: str,
+        content: str,
+        *,
+        request_id: str = "",
+        on_event: object = None,
+        cancel: CancelToken | None = None,
+    ) -> SubmissionResult:
+        """Record a question, answer it, and commit both.
+
+        The turn is written before retrieval starts, so a failure mid-answer
+        leaves a visible question with a failed answer attached rather than
+        losing what the user typed. The answer and its citations are committed
+        together afterwards.
+        """
+        conversation = self.get(conversation_id)
+        if conversation.archived_at is not None:
+            raise ConversationArchivedError(
+                "This conversation is archived and accepts no new messages.",
+                details={"conversation_id": conversation_id},
+            )
+        question = content.strip()
+        if not question:
+            raise InvalidRequestError("A message cannot be empty.")
+
+        now = datetime.now(UTC)
+        sequence = self._conversations.next_sequence_number(conversation_id)
+        user_message_id = f"msg_{uuid.uuid4().hex}"
+        assistant_message_id = f"msg_{uuid.uuid4().hex}"
+        run_id = f"run_{uuid.uuid4().hex}"
+        resolved_request_id = request_id or f"conv_{uuid.uuid4().hex}"
+
+        # Classification happens before the turn is written so an unanswerable
+        # question (too long, empty) is refused without leaving a turn behind.
+        from codeatlas.conversations.intent import classify
+
+        classification = classify(question)
+
+        with write_transaction(self._connection):
+            if conversation.title == DEFAULT_TITLE:
+                self._conversations.rename(
+                    conversation_id, title=derive_title(question), updated_at=now
+                )
+            self._conversations.create_user_turn(
+                MessageRecord(
+                    message_id=user_message_id,
+                    conversation_id=conversation_id,
+                    role=MessageRole.USER,
+                    status=MessageStatus.COMPLETE,
+                    sequence_number=sequence,
+                    content=question,
+                    created_at=now,
+                    completed_at=now,
+                ),
+                MessageRecord(
+                    message_id=assistant_message_id,
+                    conversation_id=conversation_id,
+                    role=MessageRole.ASSISTANT,
+                    status=MessageStatus.QUEUED,
+                    sequence_number=sequence + 1,
+                    content="",
+                    created_at=now,
+                ),
+                RunRecord(
+                    run_id=run_id,
+                    message_id=assistant_message_id,
+                    repository_id=conversation.repository_id,
+                    # Replaced with the answering snapshot on completion; a
+                    # queued run has not resolved one yet.
+                    snapshot_id="pending",
+                    normalized_query=question.lower(),
+                    intent=classification.intent.value,
+                    retrieval_policy_version=classification.policy_version,
+                    status=RunStatus.QUEUED,
+                    created_at=now,
+                ),
+            )
+
+        return self._execute_run(
+            conversation=conversation,
+            user_message_id=user_message_id,
+            message_id=assistant_message_id,
+            run_id=run_id,
+            question=question,
+            sequence=sequence + 1,
+            request_id=resolved_request_id,
+            intent=classification.intent.value,
+            cancel=cancel,
+        )
+
+    def retry(self, message_id: str, *, request_id: str = "") -> SubmissionResult:
+        """Answer a failed or cancelled message again, preserving the old run."""
+        message = self._conversations.get_message(message_id)
+        if message is None:
+            raise MessageNotFoundError(
+                "No message matches that ID.", details={"message_id": message_id}
+            )
+        if message.status not in {MessageStatus.FAILED, MessageStatus.CANCELLED}:
+            raise RunNotRetryableError(
+                "Only a failed or cancelled message can be retried.",
+                details={"message_id": message_id, "status": message.status.value},
+            )
+        conversation = self.get(message.conversation_id)
+        question = self._question_for(message)
+
+        from codeatlas.conversations.intent import classify
+
+        classification = classify(question)
+        run_id = f"run_{uuid.uuid4().hex}"
+        with write_transaction(self._connection):
+            self._conversations.create_retry_run(
+                message_id,
+                RunRecord(
+                    run_id=run_id,
+                    message_id=message_id,
+                    repository_id=conversation.repository_id,
+                    snapshot_id="pending",
+                    normalized_query=question.lower(),
+                    intent=classification.intent.value,
+                    retrieval_policy_version=classification.policy_version,
+                    status=RunStatus.QUEUED,
+                    created_at=datetime.now(UTC),
+                ),
+            )
+
+        return self._execute_run(
+            conversation=conversation,
+            user_message_id="",
+            message_id=message_id,
+            run_id=run_id,
+            question=question,
+            sequence=message.sequence_number,
+            request_id=request_id or f"conv_{uuid.uuid4().hex}",
+            intent=classification.intent.value,
+            cancel=None,
+        )
+
+    def save_feedback(
+        self, message_id: str, *, rating: str, reason_code: str | None = None
+    ) -> None:
+        if self._conversations.get_message(message_id) is None:
+            raise MessageNotFoundError(
+                "No message matches that ID.", details={"message_id": message_id}
+            )
+        if rating not in {"up", "down"}:
+            raise InvalidRequestError("rating must be 'up' or 'down'.")
+        with write_transaction(self._connection):
+            self._conversations.save_feedback(
+                message_id,
+                rating=rating,
+                reason_code=reason_code,
+                created_at=datetime.now(UTC),
+            )
+
+    def _execute_run(
+        self,
+        *,
+        conversation: ConversationRecord,
+        user_message_id: str,
+        message_id: str,
+        run_id: str,
+        question: str,
+        sequence: int,
+        request_id: str,
+        intent: str,
+        cancel: CancelToken | None,
+    ) -> SubmissionResult:
+        """Run the pipeline and commit whatever outcome it reaches."""
+        if self._pipeline is None:  # pragma: no cover - wiring guard
+            raise InvalidRequestError("Answering is not available.")
+
+        events: list[PipelineEvent] = []
+        try:
+            result = self._pipeline.execute(
+                AnswerRequest(
+                    repository_id=conversation.repository_id,
+                    question=question,
+                    request_id=request_id,
+                ),
+                on_event=events.append,
+                cancel=cancel,
+            )
+        except CancelledError:
+            return self._terminate(
+                conversation_id=conversation.conversation_id,
+                user_message_id=user_message_id,
+                message_id=message_id,
+                run_id=run_id,
+                sequence=sequence,
+                intent=intent,
+                status=MessageStatus.CANCELLED,
+                error_code=None,
+            )
+        except CodeAtlasError as error:
+            # A retrieval failure is the answer's outcome, not the request's:
+            # the turn stays visible and retryable rather than vanishing.
+            return self._terminate(
+                conversation_id=conversation.conversation_id,
+                user_message_id=user_message_id,
+                message_id=message_id,
+                run_id=run_id,
+                sequence=sequence,
+                intent=intent,
+                status=MessageStatus.FAILED,
+                error_code=error.code.value,
+            )
+
+        snapshot_id = result.response.snapshot.snapshot_id
+        evidence = tuple(
+            MessageEvidenceRow(
+                evidence_id=item.evidence_id,
+                citation_ordinal=ordinal,
+                file_path=item.file_path,
+                symbol=item.symbol,
+                start_line=item.start_line,
+                end_line=item.end_line,
+                content_hash=item.content_hash,
+                derivation=Derivation(item.derivation),
+                confidence=item.confidence,
+                snapshot_id=item.snapshot_id,
+            )
+            for ordinal, item in enumerate(result.response.evidence, start=1)
+        )
+        completed_at = datetime.now(UTC)
+        with write_transaction(self._connection):
+            self._conversations.complete_assistant(
+                message_id=message_id,
+                content=result.markdown,
+                evidence=evidence,
+                run_id=run_id,
+                latency_ms=result.latency_ms,
+                completed_at=completed_at,
+            )
+            self._conversations.set_run_snapshot(run_id, snapshot_id)
+
+        return SubmissionResult(
+            conversation_id=conversation.conversation_id,
+            user_message_id=user_message_id,
+            message_id=message_id,
+            run_id=run_id,
+            status=MessageStatus.COMPLETE,
+            sequence_number=sequence,
+            content=result.markdown,
+            intent=result.intent.value,
+            snapshot_id=snapshot_id,
+            evidence=evidence,
+            warnings=tuple(result.response.warnings),
+            limitations=tuple(result.response.limitations),
+            latency_ms=result.latency_ms,
+        )
+
+    def _terminate(
+        self,
+        *,
+        conversation_id: str,
+        user_message_id: str,
+        message_id: str,
+        run_id: str,
+        sequence: int,
+        intent: str,
+        status: MessageStatus,
+        error_code: str | None,
+    ) -> SubmissionResult:
+        with write_transaction(self._connection):
+            self._conversations.fail_or_cancel(
+                message_id=message_id,
+                run_id=run_id,
+                status=status,
+                error_code=error_code,
+                completed_at=datetime.now(UTC),
+            )
+        return SubmissionResult(
+            conversation_id=conversation_id,
+            user_message_id=user_message_id,
+            message_id=message_id,
+            run_id=run_id,
+            status=status,
+            sequence_number=sequence,
+            content="",
+            intent=intent,
+            error_code=error_code,
+        )
+
+    def _question_for(self, message: MessageRecord) -> str:
+        """The user message immediately preceding an assistant message."""
+        page = self._conversations.list_messages(
+            message.conversation_id, cursor=None, limit=MAX_PAGE_LIMIT
+        )
+        preceding = [
+            item
+            for item in page.items
+            if item.role is MessageRole.USER
+            and item.sequence_number < message.sequence_number
+        ]
+        if not preceding:
+            raise RunNotRetryableError(
+                "This message has no question to answer again.",
+                details={"message_id": message.message_id},
+            )
+        return preceding[-1].content
 
     def _require_repository(self, repository_id: str) -> None:
         if self._repositories.get(repository_id) is None:

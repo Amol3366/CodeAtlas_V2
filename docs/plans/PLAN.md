@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active task | none — P5-03 and P5-05 are `ready` |
-| Task status | P5-SETUP, P5-01, P5-02 `complete`; P5-03 and P5-05 `ready`; the rest `pending` |
+| Active task | none — P5-04 and P5-05 are `ready` |
+| Task status | P5-SETUP … P5-03 `complete`; P5-04 and P5-05 `ready`; the rest `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -64,8 +64,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P5-SETUP | ADR-0006, error codes, contract models, schema regen | Phase 4 | `complete` |
 | P5-01 | Migration `0008`, conversation domain, `ConversationStore` | P5-SETUP | `complete` |
 | P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `complete` |
-| P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `ready` |
-| P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `pending` |
+| P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `complete` |
+| P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `ready` |
 | P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `ready` |
 | P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `pending` |
 | P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `pending` |
@@ -163,6 +163,105 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-27T21:40:00Z — P5-03 completed; P5-04 and P5-05 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Transition: P5-03 `ready -> complete`; P5-04 `pending -> ready`. P5-05 stays
+  `ready`.
+- Outcome: **CodeAtlas can hold a conversation.** A question submitted to a
+  thread is classified, answered through the existing deterministic services,
+  rendered, and committed with its citations — and a contract test proves the
+  answer is the same answer `/v1/query` gives. No LLM is involved; every
+  assistant message is a template filled with verified values or an explicit
+  abstention.
+
+#### What landed
+
+- **`conversations/intent.py`** — ordered, versioned rules
+  (`RETRIEVAL_POLICY_VERSION = "5.0"`). Relationship phrasing is matched before
+  bare symbols, because "who calls capture" *contains* "capture" and would
+  otherwise resolve as a lookup of the symbol the user was asking **about**
+  rather than **for**. The fallback is lexical search — a real channel, not an
+  apology. Over-long input raises `QUERY_TOO_LONG` rather than being truncated,
+  since truncating answers a question the user did not ask.
+- **`conversations/templates.py`** — deterministic rendering. One absolute
+  rule: repository text appears inside an escaped code span and nowhere else.
+  Prose around it is written by us.
+- **`conversations/pipeline.py`** — `AnswerPipeline`, which classifies, calls
+  **one existing service**, and renders. Cancellation is cooperative and
+  checked between stages (pre-emption could leave a SQLite connection in a
+  state the next request inherits).
+- **`ConversationService.submit` / `.retry` / `.save_feedback`** and three
+  routes (`POST …/messages`, `…/messages/{id}/retry`, `…/messages/{id}/feedback`).
+- **`MessageSubmission`** added to the contract (additive; bundle 12 → 13
+  schemas, `contract_version` still `"1.0"`).
+- **`ConversationStore.set_run_snapshot`** — a queued run stores `"pending"`
+  and is rewritten with the snapshot that actually answered, which is what
+  binds a stored answer to the tree it examined.
+
+#### Decisions worth recording
+
+1. **The turn is written before retrieval starts.** A failure mid-answer leaves
+   a visible question with a failed answer attached, rather than losing what
+   the user typed. Asserted by the cancellation test, which checks the question
+   survives.
+2. **Classification runs before the turn is written.** An unanswerable question
+   (empty, too long) is refused with nothing persisted, so a rejected question
+   does not leave a half-thread to clean up.
+3. **Abstention is a `complete` outcome, not a failure.** The pipeline ran and
+   honestly found nothing; marking it failed would invite a retry that can only
+   produce the same honest nothing.
+4. **`Intent.CHANGE` resolves the named subject rather than running a
+   preflight.** A conversational change analysis needs a base ref the question
+   does not carry, and guessing one would analyze a change nobody asked about.
+   P5-09 gives it the explicit preflight action instead. Recorded because the
+   intent exists and does something narrower than its name suggests.
+5. **`lookup`, `graph`, and `search` are hoisted in the container** and handed
+   to the pipeline. Constructing a second set would let the chat surface and
+   `/v1/query` drift apart while both looked correct in isolation.
+- Files created: `src/codeatlas/conversations/{__init__,intent,templates,pipeline}.py`,
+  `tests/unit/test_intent_rules.py`, `tests/unit/test_answer_templates.py`,
+  `tests/integration/test_answer_pipeline.py`,
+  `tests/contract/test_conversation_query_parity.py`.
+  Files modified: `src/codeatlas/application/conversation_service.py`,
+  `src/codeatlas/api/routers/conversations.py`,
+  `src/codeatlas/application/container.py`, `src/codeatlas/contracts.py`,
+  `src/codeatlas/schema_export.py`, `src/codeatlas/storage/sqlite/stores.py`,
+  `docs/api/contract-v1.schema.json`, `tests/contract/test_schema_export.py`.
+- **Test-first discipline: followed.** All four test files were written first
+  and observed failing before their modules existed.
+- **A wrong assertion in my own test, caught and corrected.** The hostile-symbol
+  test asserted that `**bold**` was absent from the rendered answer. That is
+  the wrong property: markup *inside* a code span is inert, so the real
+  guarantee is that a repository value cannot **close** the span it sits in.
+  The test now counts backticks on the line and requires them balanced. The
+  first version would have passed for the wrong reason if the escaping had been
+  written differently.
+- The parity suite separately asserts it is **not vacuous** — two empty answers
+  would compare equal and prove nothing.
+- Verification in the current environment, each run and its exit code:
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  — exit 0, "Phase 4 verification completed";
+  `uv run pytest -q` — **1125 passed** in 105.78 s (1070 after P5-02, plus 55);
+  `uv run ruff check src tests scripts apps` — exit 0;
+  `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **188 source files**.
+- Limitations, stated plainly:
+  - **Answering is synchronous.** `submit` returns the finished turn; there is
+    no queue and no background worker yet. The plan's `asyncio` run executor
+    and the `queued → retrieving → generating` transitions a client can observe
+    arrive with the stream in P5-04. Today a client sees `queued` only if it
+    reads the row mid-call, which nothing does.
+  - **Cancellation has no route.** `CancelToken` works and is tested, but
+    `POST /v1/message-runs/{run_id}/cancel` needs a run that outlives its
+    request — P5-04.
+  - Feedback is stored and never read; that is the plan's intent.
+  - Retry re-reads the preceding user message, so a conversation whose user
+    message was somehow removed cannot retry — it raises `RUN_NOT_RETRYABLE`
+    rather than inventing a question.
+- Next: **P5-04** (typed SSE, the replay buffer, cancel and reconnect routes) or
+  **P5-05** (web scaffold; Node 20 and pnpm enter the repository there).
 
 ### 2026-07-27T20:45:00Z — P5-02 completed; P5-03 and P5-05 `ready`
 

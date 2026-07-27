@@ -17,6 +17,7 @@ from codeatlas.contracts import (
     MessageEvidenceItem,
     MessagePage,
     MessageRun,
+    MessageSubmission,
     QueryResponse,
     StreamEvent,
     StreamEventMetadata,
@@ -48,6 +49,9 @@ def build_schema_bundle() -> dict[str, Any]:
             ),
             "message_page": MessagePage.model_json_schema(mode="serialization"),
             "message_run": MessageRun.model_json_schema(mode="serialization"),
+            "message_submission": MessageSubmission.model_json_schema(
+                mode="serialization"
+            ),
             "query_response": QueryResponse.model_json_schema(
                 mode="serialization"
             ),
