@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STREAM_EVENT_TYPES,
   SequenceTracker,
   isTerminal,
   parseEvent,
@@ -23,18 +24,47 @@ function event(overrides: Partial<StreamEvent> = {}): StreamEvent {
   };
 }
 
-/** A minimal EventSource stand-in; the real one needs a network. */
+/**
+ * A minimal EventSource stand-in; the real one needs a network.
+ *
+ * It dispatches by event *name*, which is the detail that matters. An earlier
+ * version called `onmessage` for every frame, so the client appeared to work
+ * while it could not have received a single real frame: the server names every
+ * event, and a named event never reaches `onmessage`. A fake that is more
+ * permissive than the real thing tests nothing.
+ */
 class FakeEventSource {
   static readonly CLOSED = 2;
   onmessage: ((message: MessageEvent<string>) => void) | null = null;
   onerror: (() => void) | null = null;
   readyState = 1;
   closed = false;
+  readonly listeners = new Map<string, Set<EventListener>>();
 
   constructor(readonly url: string) {}
 
+  addEventListener(type: string, listener: EventListener): void {
+    const existing = this.listeners.get(type) ?? new Set<EventListener>();
+    existing.add(listener);
+    this.listeners.set(type, existing);
+  }
+
+  /** Deliver one frame under its own event name, as the browser would. */
   emit(payload: StreamEvent): void {
-    this.onmessage?.({ data: JSON.stringify(payload) } as MessageEvent<string>);
+    const message = {
+      data: JSON.stringify(payload),
+    } as MessageEvent<string>;
+    for (const listener of this.listeners.get(payload.event) ?? []) {
+      listener(message as unknown as Event);
+    }
+  }
+
+  /** Deliver a named frame that carries no sequenced payload. */
+  emitNamed(type: string, data: string): void {
+    const message = { data } as MessageEvent<string>;
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener(message as unknown as Event);
+    }
   }
 
   close(): void {
@@ -161,11 +191,15 @@ describe("subscribeToConversation", () => {
     expect(onEvent).toHaveBeenCalledTimes(2);
   });
 
-  it("passes unknown event types through for the caller to ignore", () => {
+  it("ignores an event type it has never heard of", () => {
+    // Section 11.2: clients must safely ignore unknown future event types.
+    // With named SSE frames that happens at the transport — no listener is
+    // registered, so nothing is delivered and nothing throws. It also cannot
+    // advance the sequence, so a reconnect replays it and it is ignored again.
     let source: FakeEventSource | null = null;
     const onEvent = vi.fn();
 
-    subscribeToConversation(
+    const subscription = subscribeToConversation(
       "conv_1",
       { onEvent },
       (url) => (source = new FakeEventSource(url)) as unknown as EventSource,
@@ -175,7 +209,47 @@ describe("subscribeToConversation", () => {
       event({ sequence: 0, event: "something.new" }),
     );
 
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(subscription.lastSequence()).toBe(-1);
+  });
+
+  it("subscribes to every named event the server can send", () => {
+    // A frame named by the server reaches only a listener registered for that
+    // name. Missing one would silently drop that event type forever.
+    let source: FakeEventSource | null = null;
+
+    subscribeToConversation(
+      "conv_1",
+      { onEvent: vi.fn() },
+      (url) => (source = new FakeEventSource(url)) as unknown as EventSource,
+    );
+
+    const fake = source as unknown as FakeEventSource;
+    for (const type of STREAM_EVENT_TYPES) {
+      expect(fake.listeners.has(type)).toBe(true);
+    }
+  });
+
+  it("treats the server's stream.closed directive as a clean close", () => {
+    // Sent when no run is live: the persisted message is the answer, so the
+    // caller must stop waiting and go read it.
+    let source: FakeEventSource | null = null;
+    const onEvent = vi.fn();
+    const onClose = vi.fn();
+
+    subscribeToConversation(
+      "conv_1",
+      { onEvent, onClose },
+      (url) => (source = new FakeEventSource(url)) as unknown as EventSource,
+    );
+
+    (source as unknown as FakeEventSource).emitNamed(
+      "stream.closed",
+      '{"reason":"no_active_run","action":"fetch_final_message"}',
+    );
+
+    expect(onClose).toHaveBeenCalledWith("closed");
+    expect(onEvent).not.toHaveBeenCalled();
   });
 
   it("closes only once even when asked twice", () => {

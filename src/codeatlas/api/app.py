@@ -12,8 +12,9 @@ threat model, and explicit approval.
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+import threading
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import AbstractContextManager, asynccontextmanager, contextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -46,13 +47,10 @@ def create_app(database_path: Path | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(instance: FastAPI) -> AsyncIterator[None]:
+        # Connections are per request and closed with it, so shutdown has no
+        # database handle of its own to release.
+        del instance
         yield
-        connection: sqlite3.Connection | None = getattr(
-            instance.state, "connection", None
-        )
-        if connection is not None:
-            connection.close()
-            instance.state.connection = None
 
     app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
     app.state.database_path = resolved_path
@@ -105,27 +103,53 @@ def create_app(database_path: Path | None = None) -> FastAPI:
 
 def _services_factory(
     app: FastAPI, database_path: Path
-) -> Callable[[], ApplicationServices]:
-    """Return a factory that reuses one connection for this application.
+) -> Callable[[], AbstractContextManager[ApplicationServices]]:
+    """Return a factory yielding services bound to one request's connection.
 
-    Phase 1 is a single-user local service with a single writer, so one
-    connection with WAL and a busy timeout is the correct shape. A connection
-    pool would add contention handling that nothing yet needs.
+    **One connection per request, not one per application.** A
+    `sqlite3.Connection` is not safe to use from two threads at once, and
+    `check_same_thread=False` removes the check rather than the hazard. FastAPI
+    runs synchronous handlers on a thread pool and a browser opening the
+    application issues several requests at once, so a shared connection puts two
+    threads inside `execute` together. That surfaces as ``InterfaceError: bad
+    parameter or other API misuse`` and — worse — as one request reading
+    another's result columns, which is wrong data rather than a loud failure.
+
+    Per *thread* is not enough either, and the reason is easy to miss: a
+    synchronous dependency and the endpoint that consumes it are dispatched to
+    the thread pool separately, so the services built in one thread are used in
+    another. Only the request bounds both.
+
+    Opening a SQLite connection is cheap, WAL lets readers run while a writer
+    works, and the busy timeout absorbs writer contention — so for a
+    single-user local service this costs little and removes a whole class of
+    corruption.
     """
+    hub_lock = threading.Lock()
 
-    def factory() -> ApplicationServices:
-        connection: sqlite3.Connection | None = getattr(app.state, "connection", None)
-        if connection is None:
-            connection = _open(database_path)
-            app.state.connection = connection
+    def hub() -> EventHub:
         # One hub for the application's lifetime. Services are rebuilt per
         # request, so a per-call hub would leave the request that streams a run
-        # looking in a different registry from the one that started it.
-        hub: EventHub | None = getattr(app.state, "event_hub", None)
-        if hub is None:
-            hub = EventHub()
-            app.state.event_hub = hub
-        return build_services(connection, hub=hub)
+        # looking in a different registry from the one that started it. The
+        # lock matters for the same reason the connection does: two concurrent
+        # first requests would otherwise build two hubs and keep only one.
+        existing: EventHub | None = getattr(app.state, "event_hub", None)
+        if existing is not None:
+            return existing
+        with hub_lock:
+            existing = getattr(app.state, "event_hub", None)
+            if existing is None:
+                existing = EventHub()
+                app.state.event_hub = existing
+            return existing
+
+    @contextmanager
+    def factory() -> Iterator[ApplicationServices]:
+        connection = _open(database_path)
+        try:
+            yield build_services(connection, hub=hub())
+        finally:
+            connection.close()
 
     return factory
 

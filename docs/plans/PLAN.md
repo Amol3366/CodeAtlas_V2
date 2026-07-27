@@ -49,14 +49,13 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-01 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP `complete`; P6-01 `ready`; P6-02 … P6-08 `pending` |
+| Active task | none — P6-02 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01 `complete`; P6-02 `ready`; P6-03 … P6-08 `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
-| Next gate | Phase 5 completion gate after P5-10; only the user may approve it. |
+| Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
 
 ### Phase 5 Task Board
 
@@ -164,6 +163,92 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T05:40:00Z — P6-01 completed; P6-02 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Task: P6-01 `ready -> complete`.
+- Outcome: the end-to-end harness exists and the Phase 5 gate's Playwright step
+  has now actually run. Four browser suites pass. Three real defects that no
+  unit test could see were found and fixed, one of them serious.
+
+**What was built**
+
+- `scripts/e2e_backend.py` — `seed` and `serve` as separate subcommands. The
+  split is the point: a restart-persistence test must kill the API and start it
+  again against the same database, which is impossible if seeding is part of
+  starting. Explicitly *not* the shipping launcher; `codeatlas serve --web` is
+  still P6-06's deliverable, and building it here would have meant the suites
+  exercised an entry point invented for them.
+- `apps/web/playwright.config.ts`, `e2e/support/{backend,fixtures}.ts` — one
+  worker, no parallelism (the suites share one port, one database, and one of
+  them restarts the server), `vite preview` rather than `vite dev` so the gate
+  tests the assets it just built. The backend fixture is `auto`, because a test
+  that forgets to name it would otherwise load the app against a server that
+  was never started and fail on a missing element — pointing at the UI instead
+  of the cause. Backend request logs are captured beside the fixture database.
+
+**Suites**
+
+| Suite | Gate condition | Status |
+| --- | --- | --- |
+| `onboarding-to-citation` | critical workflow in a browser | passes |
+| `restart-persistence` | history survives a backend restart | passes |
+| `stream-reconnection` | stream resumes without loss or duplication | passes, with a stated limit |
+
+**Defects found by the browser**
+
+1. **Concurrent requests corrupted the shared SQLite connection.** `create_app`
+   held one connection for the process; FastAPI runs sync handlers on a thread
+   pool; a page load fires four requests at once. Result:
+   `InterfaceError: bad parameter or other API misuse`, and — worse — one
+   request reading another's result columns (`IndexError` on a row that had the
+   wrong shape), which is wrong data rather than a loud failure. Fixed by
+   scoping the connection to the *request*. Per-thread was tried first and is
+   not sufficient: a synchronous dependency and its endpoint are dispatched to
+   the pool separately, so services built on one thread are used on another.
+   `tests/integration/test_api_concurrency.py` reproduces both symptoms and was
+   observed failing before the fix.
+2. **The evidence drawer had never rendered a real excerpt.** It called
+   `/v1/evidence/{id}` without the required `repository_id` (422) and parsed a
+   flat object; the endpoint answers with the standard query envelope. Its
+   component test stubbed the same fiction, so it passed. Both corrected, and
+   the stub now spells out the whole contract so it fails when the contract
+   moves.
+3. **The SSE client could not have received a single frame.** The server names
+   every event (`event: run.accepted`); a named frame never reaches
+   `onmessage`, which the client used exclusively. The unit-test fake
+   dispatched everything to `onmessage`, so it was invisible. The client now
+   registers a listener per event name and handles the `stream.closed`
+   directive; the fake models named dispatch.
+
+**Verification (all in this environment)**
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync`
+  → exit 0, Playwright included. **This is the first time the gate's
+  end-to-end step has run at all.**
+- `uv run pytest -q` → **1156 passed** (1154 before; +2 concurrency tests).
+- `pnpm exec vitest run` → **91 passed** (87 before; +4).
+- `pnpm exec playwright test` → **4 passed**, run four consecutive times to
+  confirm the earlier flakiness was the connection defect and not the harness.
+
+**Limitations**
+
+- The stream suite proves the transport contract as a browser sees it — named
+  frames, gapless monotonic sequences, `?after=` resuming exactly what was
+  missed, and a no-run stream directing the client to the persisted message. It
+  does **not** prove the conversation UI reconnects mid-run, and cannot:
+  `POST /v1/conversations/{id}/messages` executes its run inline and returns the
+  finished answer, so no run is ever in flight to attach to, and `Thread` never
+  opens a stream. Closing this needs an accept-then-stream submission contract —
+  a breaking API change that `AGENTS.md` Section 25 puts behind explicit
+  approval. Recorded as Phase 5 debt; **it needs a user decision, not an
+  agent's.**
+- `Thread` still passes `snapshotId={null}`, so the freshness banner cannot
+  appear, and citations are not restored after a reload because no route exposes
+  `ConversationStore.get_evidence`. Both are Phase 5 gaps, neither is in P6-01.
+- Chromium only. Firefox and WebKit are untested.
+- Next: **P6-02** — the filesystem watcher.
 
 ### 2026-07-28T03:05:00Z — Phase 6 plan approved; P6-SETUP completed; P6-01 `ready`
 

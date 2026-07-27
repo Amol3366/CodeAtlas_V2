@@ -11,6 +11,7 @@ or a screenshot can leak.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -78,11 +79,16 @@ class DiagnosticsResponse(StrictModel):
     warnings: list[str]
 
 
-def get_services(request: Request) -> ApplicationServices:
-    """Provide per-request application services."""
+def get_services(request: Request) -> Iterator[ApplicationServices]:
+    """Provide application services bound to this request's connection.
+
+    A generator dependency, so the connection is closed when the request ends
+    rather than living as long as the process. See `_services_factory` for why
+    the lifetime has to be the request and not the application or the thread.
+    """
     factory = request.app.state.services_factory
-    services: ApplicationServices = factory()
-    return services
+    with factory() as services:
+        yield services
 
 
 Services = Annotated[ApplicationServices, Depends(get_services)]

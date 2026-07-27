@@ -35,6 +35,34 @@ export interface StreamEvent {
   readonly payload: Record<string, unknown>;
 }
 
+/**
+ * The event vocabulary, as runtime values.
+ *
+ * This list is load-bearing, not documentation. The server names every frame
+ * with an SSE `event:` field, and a named frame is delivered only to a listener
+ * registered for that name — `onmessage` handles the `message` type alone. A
+ * client that listened only on `onmessage` would sit on a healthy stream and
+ * receive nothing at all.
+ */
+export const STREAM_EVENT_TYPES: readonly StreamEventType[] = [
+  "run.accepted",
+  "retrieval.started",
+  "retrieval.progress",
+  "evidence.available",
+  "generation.delta",
+  "answer.completed",
+  "run.warning",
+  "run.failed",
+  "run.cancelled",
+  "heartbeat",
+];
+
+/**
+ * The server's directive when no run is live: the answer is already persisted,
+ * so read it rather than waiting for events that will never come.
+ */
+const STREAM_CLOSED = "stream.closed";
+
 const TERMINAL: ReadonlySet<string> = new Set([
   "answer.completed",
   "run.failed",
@@ -128,12 +156,25 @@ export function subscribeToConversation(
   const open = () => {
     if (closed) return;
     source = factory(streamUrl(conversationId, tracker.last));
-    source.onmessage = (message: MessageEvent<string>) => {
+
+    const receive = (message: MessageEvent<string>) => {
       const event = parseEvent(message.data);
       if (event === null || !tracker.accept(event)) return;
       handlers.onEvent(event);
       if (isTerminal(event)) finish("terminal");
     };
+
+    // One listener per named type. An event type this client has never heard
+    // of simply matches no listener, which is precisely the required "ignore
+    // unknown future types" behavior — it cannot advance the sequence, so a
+    // reconnect replays it and it is ignored again.
+    for (const type of STREAM_EVENT_TYPES) {
+      source.addEventListener(type, receive as EventListener);
+    }
+    source.addEventListener(STREAM_CLOSED, () => finish("closed"));
+    // Also handle an unnamed frame, so a server that omits `event:` still works.
+    source.onmessage = receive;
+
     source.onerror = () => {
       // The server closes the stream when a run ends; that surfaces here as an
       // error with nothing left to read. Treating it as fatal is correct: the

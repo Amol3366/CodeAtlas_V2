@@ -31,6 +31,25 @@ one gate becomes a debt the next phase either pays or re-declares; paying it
 first also means every later hardening task has an end-to-end harness to prove
 itself against.
 
+### What P6-01 found, and the one part it could not pay
+
+The harness and all three suites landed, and two of the conditions are now met
+in a browser. Along the way the suites exposed three defects invisible to unit
+tests, the serious one being that concurrent requests corrupted the API's
+shared SQLite connection — a browser makes four requests on page load, and the
+result was intermittent 500s and, worse, one request reading another's result
+columns. Fixed by scoping the connection to the request.
+
+**Gate condition 1 remains partly open, and needs a user decision.** Proving a
+stream reconnects *mid-run* is impossible against the current contract:
+`POST /v1/conversations/{id}/messages` runs the answer inline and returns it
+finished, so no run is ever in flight, and `Thread` never opens a stream at all.
+Making it provable means an accept-then-stream submission contract — a breaking
+API change, which Section 25 of `AGENTS.md` puts behind explicit approval. The
+suite proves the transport contract instead and says plainly what it does not
+cover. **This is carried as Phase 5 debt awaiting a decision, not silently
+absorbed.**
+
 ## Completion Gate (from `AGENTS.md` Section 20)
 
 Phase 6 may enter `awaiting_user_approval` only when all of the following hold
@@ -130,8 +149,8 @@ anything, and refuses rather than half-restoring.
 | Task | Deliverable | Dependencies | Status |
 | --- | --- | --- | --- |
 | P6-SETUP | ADR-0007, error codes, `check_phase6.ps1` skeleton | Phase 5 | `complete` |
-| P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `ready` |
-| P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `pending` |
+| P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
+| P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `ready` |
 | P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `pending` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
