@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 5 — Persistent web application (gate for Phase 4 and the Phase 5 plan both approved by the user 2026-07-27) |
-| Active task | none — P5-05 is `ready` (the whole backend half of Phase 5 is done) |
-| Task status | P5-SETUP … P5-04 `complete`; P5-05 `ready`; P5-06 … P5-10 `pending` |
+| Active task | none — P5-06 and P5-07 are `ready` |
+| Task status | P5-SETUP … P5-05 `complete`; P5-06 and P5-07 `ready`; P5-08 … P5-10 `pending` |
 | Agent | Claude Code `claude-fable-5` |
 | Started UTC | 2026-07-27T18:20:00Z |
 | Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
@@ -66,9 +66,9 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P5-02 | Conversation/message REST: CRUD, pagination, rename/archive/delete | P5-01 | `complete` |
 | P5-03 | Intent rules, `AnswerPipeline`, templates, run execution | P5-01 | `complete` |
 | P5-04 | Typed SSE, cancel, retry, reconnect, replay buffer | P5-02, P5-03 | `complete` |
-| P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `ready` |
-| P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `pending` |
-| P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `pending` |
+| P5-05 | Web scaffold: Vite/React/Tailwind/Query/router, generated types | P5-SETUP | `complete` |
+| P5-06 | Repository onboarding, status, diagnostics UI | P5-05 | `ready` |
+| P5-07 | Sidebar + conversation management UI | P5-02, P5-05 | `ready` |
 | P5-08 | Thread view: submit, stream, cancel/retry, sanitized rendering | P5-04, P5-07 | `pending` |
 | P5-09 | Citations, evidence drawer, change preflight | P5-08 | `pending` |
 | P5-10 | Settings, accessibility, responsive, Playwright, docs, phase gate | P5-06, P5-09 | `pending` |
@@ -163,6 +163,100 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T00:40:00Z — P5-05 completed; P5-06 and P5-07 `ready`
+
+- Agent: Claude Code `claude-fable-5`, branch `worktree-p4-10-completion` (PR #1).
+- Transition: P5-05 `ready -> complete`; P5-06 and P5-07 `pending -> ready`.
+- Outcome: the web application exists, builds, and is verified. `apps/web`
+  holds a Vite + React 18 + TypeScript-strict application with design tokens,
+  generated API types, a sanitized Markdown renderer, a stream client, and the
+  three-region shell — the pieces every feature slice will build on.
+
+#### The dependency surface, now real
+
+Node and pnpm are prerequisites from here on. Verified on **Node 22.22.2 LTS**
+and **pnpm 10.12.4**; the documented floor stays Node 20+ per the plan. The
+package set is ADR-0006 decision 5 exactly, plus `openapi-typescript` and
+`@types/node`. `scripts/setup_windows.ps1` gained a `-SkipWeb` switch and
+*checks* for Node and pnpm rather than installing them — a setup script that
+silently installs a language runtime is doing more than it was asked to.
+
+#### What landed
+
+- **Tokens** (`styles/tokens.css`): light/dark through `data-theme` (an
+  explicit user choice must be able to override the system setting, which a
+  media query alone cannot express), one accent, semantic status colors,
+  spacing, radii, motion, a visible focus ring on every interactive element,
+  and a reduced-motion block.
+- **`components/Markdown.tsx`** — the security-critical piece. `react-markdown`
+  with a `rehype-sanitize` allowlist and **no `rehype-raw`**, so raw HTML is
+  inert text rather than markup. Link protocols are limited to
+  `http`/`https`/`mailto` and every link carries `noopener`. **10 tests, each a
+  specific vector**: script tag, raw HTML, inline `onerror`, `javascript:`,
+  `data:`, `<style>`, `<iframe>`, and a fenced block containing a script.
+- **`lib/sse.ts`** — sequence tracking that drops duplicates and replays,
+  terminal detection covering all three kinds, and unknown event types passed
+  through rather than thrown on. 18 tests against a fake `EventSource`.
+- **`lib/api.ts`** — reads the Section 12.6 error envelope into a typed
+  `ApiError`; TanStack Query retries only what the envelope marks retryable.
+- **Shell, theme provider, error boundary, skeleton, routes.** The shell is a
+  landmark structure now, so keyboard order and screen-reader semantics are
+  right *before* content arrives rather than retrofitted around it. The error
+  boundary deliberately logs nothing: an exception can carry a path or a
+  fragment of repository content.
+- **Generated types**: `scripts/export_openapi.py` writes the live schema and
+  `scripts/generate_web_types.ps1 -Check` fails when the checked-in
+  `api-types.gen.ts` no longer matches — the same discipline as the contract
+  schema export. Verified in both modes.
+- `scripts/run_dev.ps1` starts the API and Vite together and stops the API it
+  started; the proxy is what preserves the API's loopback-only, no-CORS posture.
+
+#### A gap this task exposed in P5-04
+
+**`EventSource` cannot set request headers**, so a browser client physically
+cannot send `Last-Event-ID` on its first connection — the resume path shipped
+in P5-04 was unreachable from the only client that will ever use it. The stream
+endpoint now also accepts `?after=`, with the header winning when both are
+present, covered by two new tests. Found by writing the consumer, which is the
+argument for not declaring a producer finished before one exists.
+
+- Files created: `apps/web/**` (33 files including `pnpm-lock.yaml` and the
+  generated `openapi.json`), `scripts/export_openapi.py`,
+  `scripts/generate_web_types.ps1`, `scripts/run_dev.ps1`.
+  Files modified: `src/codeatlas/api/routers/stream.py`,
+  `tests/integration/test_stream_lifecycle.py`, `scripts/setup_windows.ps1`,
+  `README.md`.
+- Contracts/migrations: none. `apps/web/openapi.json` is a generated artifact,
+  committed so the type `--check` has a reference to compare against.
+- **Test-first discipline: followed for both modules with real logic.** The
+  Markdown and SSE test files were written before their implementations.
+- Verification in the current environment, each run and its exit code:
+  `pnpm exec eslint . --max-warnings 0` — exit 0;
+  `pnpm exec tsc --noEmit` — exit 0 (strict, plus `noUncheckedIndexedAccess`
+  and `exactOptionalPropertyTypes`, which caught three real defects in my own
+  code before any test ran);
+  `pnpm exec vitest run` — **28 passed** across 2 files;
+  `pnpm exec vite build` — exit 0, 238 KB JS / 77 KB gzipped;
+  `scripts/generate_web_types.ps1 -Check` — exit 0, "Web API types are current";
+  `scripts/check_phase4.ps1 -SkipSync` — exit 0;
+  `uv run pytest -q` — **1150 passed** (1148 after P5-04, plus the two resume
+  tests).
+- Limitations, stated plainly:
+  - **The web gate is not in `check_phase4.ps1`.** The frontend commands are
+    documented in the README and were run by hand here; folding them into one
+    gate is `check_phase5.ps1`'s job in P5-10, and adding them to the Phase 4
+    script would misname what that script verifies.
+  - **No accessibility assertions yet.** `vitest-axe` is installed but unused:
+    the shell has no interactive content to audit. P5-10 is where the a11y pass
+    has surfaces worth testing.
+  - **Nothing calls the API yet.** `lib/api.ts` and the generated types are
+    exercised by the type checker, not by a test that performs a request; the
+    first real call arrives with repository onboarding in P5-06.
+  - Routes render placeholders. That is the slice boundary, not an oversight.
+- Next: **P5-06** (repository onboarding, status, diagnostics — the first slice
+  that talks to a real backend) or **P5-07** (sidebar and conversation
+  management, which needs P5-02's endpoints and this shell).
 
 ### 2026-07-28T00:15:00Z — P5-04 completed; P5-05 `ready` (backend half of Phase 5 done)
 

@@ -36,16 +36,27 @@ async def stream_conversation(
     request: Request,
     services: Services,
     conversation_id: str,
+    after: int | None = None,
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
 ) -> Response:
-    """Stream the active run's events, resuming after `Last-Event-ID`."""
+    """Stream the active run's events, resuming after the client's position.
+
+    Resume is accepted two ways because the browser leaves no choice:
+    `EventSource` cannot set request headers, so it cannot send
+    `Last-Event-ID` on the initial connection. The header is the standard and
+    wins when both are present; `?after=` is what a browser client can
+    actually use.
+    """
     # Raises CONVERSATION_NOT_FOUND for an unknown or deleted thread, before
     # any streaming response is committed.
     services.conversations.get(conversation_id)
 
     hub = services.conversations.hub
     channel = hub.active_for_conversation(conversation_id) if hub else None
-    after = _parse_last_event_id(last_event_id)
+    resume = _parse_last_event_id(last_event_id)
+    if resume is None and after is not None and after >= 0:
+        resume = after
+    after = resume
 
     if channel is None:
         # No live run. Either it finished and was pruned, or none started; in

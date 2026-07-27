@@ -235,3 +235,41 @@ def test_every_streamed_event_validates_against_the_contract(
         assert event.contract_version == "1.0"
         assert event.conversation_id == conversation
         assert event.message_id
+
+
+def test_resume_is_accepted_as_a_query_parameter(
+    client: TestClient, conversation: str
+) -> None:
+    """`EventSource` cannot set request headers, so a browser client has no way
+    to send `Last-Event-ID` on its first connection. Without the query form the
+    web client could not resume at all."""
+    _ask(client, conversation, "PaymentService.capture")
+    whole = client.get(f"/v1/conversations/{conversation}/stream")
+    everything = _events(whole.text)
+
+    resumed = client.get(
+        f"/v1/conversations/{conversation}/stream",
+        params={"after": everything[1].sequence},
+    )
+
+    assert [item.sequence for item in _events(resumed.text)] == [
+        item.sequence for item in everything[2:]
+    ]
+
+
+def test_the_header_wins_over_the_query_parameter(
+    client: TestClient, conversation: str
+) -> None:
+    """The header is the standard; a stale query string must not override a
+    client that knows exactly where it stopped."""
+    _ask(client, conversation, "PaymentService.capture")
+    whole = client.get(f"/v1/conversations/{conversation}/stream")
+    last = _events(whole.text)[-1].sequence
+
+    resumed = client.get(
+        f"/v1/conversations/{conversation}/stream",
+        params={"after": 0},
+        headers={"Last-Event-ID": str(last)},
+    )
+
+    assert _events(resumed.text) == []

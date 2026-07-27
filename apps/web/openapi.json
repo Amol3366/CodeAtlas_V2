@@ -1,0 +1,3769 @@
+{
+  "components": {
+    "schemas": {
+      "AnalysisSide": {
+        "description": "Which side of a change a piece of evidence belongs to.\n\nBase-side evidence is hash-verified at analysis time and historical by\nconstruction; it is labeled as base so a reader never mistakes it for the\ncurrent snapshot's content.",
+        "enum": [
+          "base",
+          "target"
+        ],
+        "title": "AnalysisSide",
+        "type": "string"
+      },
+      "AnalysisStateRef": {
+        "additionalProperties": false,
+        "description": "One side of a change: the ref the caller asked for and what it resolved\nto.\n\nThe base side carries no snapshot ID \u2014 it is reconstructed in memory or read\nfrom Git objects, never a stored active snapshot. The target side carries\nthe active snapshot ID it was analyzed against, so a reader can tell exactly\nwhich snapshot the analysis is bound to.",
+        "properties": {
+          "commit": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/SnapshotFreshness"
+          },
+          "ref": {
+            "minLength": 1,
+            "title": "Ref",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          }
+        },
+        "required": [
+          "ref",
+          "commit",
+          "snapshot_id",
+          "freshness"
+        ],
+        "title": "AnalysisStateRef",
+        "type": "object"
+      },
+      "Answer": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "summary": {
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "claims"
+        ],
+        "title": "Answer",
+        "type": "object"
+      },
+      "ChangeAnalysisKind": {
+        "description": "Which form of diff an analysis compares.",
+        "enum": [
+          "working_tree",
+          "commit_range"
+        ],
+        "title": "ChangeAnalysisKind",
+        "type": "string"
+      },
+      "ChangeAnalysisReport": {
+        "additionalProperties": false,
+        "description": "The persisted, machine-readable rendering of one change analysis.",
+        "properties": {
+          "analysis_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Analysis Id",
+            "type": "string"
+          },
+          "base": {
+            "$ref": "#/components/schemas/AnalysisStateRef"
+          },
+          "changed_files": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedFile"
+            },
+            "title": "Changed Files",
+            "type": "array"
+          },
+          "changed_symbols": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedSymbol"
+            },
+            "title": "Changed Symbols",
+            "type": "array"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "contract_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeEvidenceItem"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "impact_edges": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactEdge"
+            },
+            "title": "Impact Edges",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChangeAnalysisKind"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "overall_risk": {
+            "$ref": "#/components/schemas/OverallRisk"
+          },
+          "repository_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChangeAnalysisStatus"
+          },
+          "target": {
+            "$ref": "#/components/schemas/AnalysisStateRef"
+          },
+          "test_gaps": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Test Gaps",
+            "type": "array"
+          },
+          "timing_ms": {
+            "additionalProperties": {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "title": "Timing Ms",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "analysis_id",
+          "request_id",
+          "repository_id",
+          "kind",
+          "status",
+          "overall_risk",
+          "base",
+          "target",
+          "created_at"
+        ],
+        "title": "ChangeAnalysisReport",
+        "type": "object"
+      },
+      "ChangeAnalysisStatus": {
+        "description": "Lifecycle of one change analysis.",
+        "enum": [
+          "analyzing",
+          "completed",
+          "failed"
+        ],
+        "title": "ChangeAnalysisStatus",
+        "type": "string"
+      },
+      "ChangeEvidenceItem": {
+        "additionalProperties": false,
+        "description": "One piece of analysis-scoped evidence, explicitly base- or target-side.\n\nUnlike :class:`Evidence`, the analysis evidence model carries a ``side``\nrather than a repository-wide ``snapshot_id``: the base side of a working\ntree has no stored snapshot, only a commit, and pretending otherwise would\nhide the historical nature of base-side citations.",
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "content_hash": {
+            "minLength": 1,
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "end_line": {
+            "minimum": 1.0,
+            "title": "End Line",
+            "type": "integer"
+          },
+          "evidence_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "file_path": {
+            "maxLength": 4096,
+            "title": "File Path",
+            "type": "string"
+          },
+          "side": {
+            "$ref": "#/components/schemas/AnalysisSide"
+          },
+          "start_line": {
+            "minimum": 1.0,
+            "title": "Start Line",
+            "type": "integer"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "side",
+          "file_path",
+          "start_line",
+          "end_line",
+          "content_hash",
+          "derivation",
+          "confidence"
+        ],
+        "title": "ChangeEvidenceItem",
+        "type": "object"
+      },
+      "ChangeKind": {
+        "description": "What happened to one symbol across a change.",
+        "enum": [
+          "added",
+          "deleted",
+          "modified",
+          "moved",
+          "dependency"
+        ],
+        "title": "ChangeKind",
+        "type": "string"
+      },
+      "ChangedFile": {
+        "additionalProperties": false,
+        "description": "One file in the file-level diff.",
+        "properties": {
+          "base_path": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Path"
+          },
+          "change_kind": {
+            "$ref": "#/components/schemas/FileChangeKind"
+          },
+          "content_hash_changed": {
+            "default": false,
+            "title": "Content Hash Changed",
+            "type": "boolean"
+          },
+          "path": {
+            "maxLength": 4096,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "change_kind"
+        ],
+        "title": "ChangedFile",
+        "type": "object"
+      },
+      "ChangedSymbol": {
+        "additionalProperties": false,
+        "description": "One symbol that differs between the base and target states.\n\nA deleted or moved-from symbol carries base line range and a base file path;\nan added symbol carries target range; a modified symbol carries target\nrange and, when its content also moved, a base file path. The two are kept\nconsistent: base lines without a base file is a contradiction the contract\nrefuses, because a citation with no file is not a citation.",
+        "properties": {
+          "base_end_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base End Line"
+          },
+          "base_file_path": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base File Path"
+          },
+          "base_start_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Start Line"
+          },
+          "change_kind": {
+            "$ref": "#/components/schemas/ChangeKind"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "file_path": {
+            "maxLength": 4096,
+            "title": "File Path",
+            "type": "string"
+          },
+          "public": {
+            "title": "Public",
+            "type": "boolean"
+          },
+          "qualified_name": {
+            "minLength": 1,
+            "title": "Qualified Name",
+            "type": "string"
+          },
+          "signature_changed": {
+            "title": "Signature Changed",
+            "type": "boolean"
+          },
+          "symbol_kind": {
+            "$ref": "#/components/schemas/SymbolKind"
+          },
+          "target_end_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target End Line"
+          },
+          "target_start_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Start Line"
+          }
+        },
+        "required": [
+          "qualified_name",
+          "symbol_kind",
+          "change_kind",
+          "file_path",
+          "signature_changed",
+          "public",
+          "derivation",
+          "confidence"
+        ],
+        "title": "ChangedSymbol",
+        "type": "object"
+      },
+      "Claim": {
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Claim Id",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "evidence_ids": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim_id",
+          "text",
+          "derivation",
+          "confidence",
+          "evidence_ids"
+        ],
+        "title": "Claim",
+        "type": "object"
+      },
+      "CommitRangeRequest": {
+        "additionalProperties": false,
+        "description": "Analyze one commit range.",
+        "properties": {
+          "base_ref": {
+            "title": "Base Ref",
+            "type": "string"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "target_ref": {
+            "default": "HEAD",
+            "title": "Target Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository_id",
+          "base_ref"
+        ],
+        "title": "CommitRangeRequest",
+        "type": "object"
+      },
+      "Conversation": {
+        "additionalProperties": false,
+        "description": "One persisted thread, always bound to a single repository.\n\nA conversation never changes repository: switching requires a new thread\n(Section 14.5), so a historical answer can never be reinterpreted against a\nrepository it did not examine.",
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "conversation_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "repository_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "repository_id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Conversation",
+        "type": "object"
+      },
+      "ConversationPage": {
+        "additionalProperties": false,
+        "description": "One page of conversations, newest activity first.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "title": "ConversationPage",
+        "type": "object"
+      },
+      "CreateConversationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "repository_id"
+        ],
+        "title": "CreateConversationRequest",
+        "type": "object"
+      },
+      "Derivation": {
+        "enum": [
+          "deterministic",
+          "static_resolved",
+          "high_confidence_heuristic",
+          "low_confidence_heuristic",
+          "semantic_candidate",
+          "model_generated",
+          "unsupported"
+        ],
+        "title": "Derivation",
+        "type": "string"
+      },
+      "DiagnosticsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "limits": {
+            "$ref": "#/components/schemas/LimitsResponse"
+          },
+          "parse_error_count": {
+            "title": "Parse Error Count",
+            "type": "integer"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "skipped_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped By Reason",
+            "type": "object"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "repository_id",
+          "snapshot_id",
+          "skipped_by_reason",
+          "parse_error_count",
+          "limits",
+          "warnings"
+        ],
+        "title": "DiagnosticsResponse",
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "content_hash": {
+            "minLength": 1,
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "end_line": {
+            "minimum": 1.0,
+            "title": "End Line",
+            "type": "integer"
+          },
+          "evidence_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "maxLength": 16384,
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "file_path": {
+            "maxLength": 4096,
+            "title": "File Path",
+            "type": "string"
+          },
+          "repository_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "start_line": {
+            "minimum": 1.0,
+            "title": "Start Line",
+            "type": "integer"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/EvidenceValidation"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "repository_id",
+          "snapshot_id",
+          "file_path",
+          "start_line",
+          "end_line",
+          "excerpt",
+          "content_hash",
+          "derivation",
+          "confidence",
+          "validation"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "EvidenceValidation": {
+        "enum": [
+          "valid",
+          "invalid"
+        ],
+        "title": "EvidenceValidation",
+        "type": "string"
+      },
+      "FeedbackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "title": "FeedbackRequest",
+        "type": "object"
+      },
+      "FileChangeKind": {
+        "description": "The file-level diff classification.",
+        "enum": [
+          "added",
+          "deleted",
+          "modified",
+          "renamed"
+        ],
+        "title": "FileChangeKind",
+        "type": "string"
+      },
+      "FileClassification": {
+        "description": "How a file participates in repository truth and impact analysis.",
+        "enum": [
+          "source_code",
+          "test_code",
+          "documentation",
+          "architecture_decision",
+          "api_specification",
+          "configuration",
+          "database_schema",
+          "migration",
+          "dependency_manifest",
+          "lockfile",
+          "infrastructure",
+          "generated",
+          "vendor",
+          "binary",
+          "unknown"
+        ],
+        "title": "FileClassification",
+        "type": "string"
+      },
+      "FileDetail": {
+        "description": "One file of the active snapshot, with its snapshot stated.",
+        "properties": {
+          "file": {
+            "$ref": "#/components/schemas/FileRecord"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotReference"
+          }
+        },
+        "required": [
+          "snapshot",
+          "file"
+        ],
+        "title": "FileDetail",
+        "type": "object"
+      },
+      "FileEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "title": "Classification",
+            "type": "string"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "line_count": {
+            "title": "Line Count",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file_id",
+          "path",
+          "language",
+          "classification",
+          "line_count",
+          "size_bytes"
+        ],
+        "title": "FileEntry",
+        "type": "object"
+      },
+      "FileRecord": {
+        "description": "One file admitted into a snapshot.",
+        "properties": {
+          "classification": {
+            "$ref": "#/components/schemas/FileClassification"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "display_path": {
+            "title": "Display Path",
+            "type": "string"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "line_count": {
+            "title": "Line Count",
+            "type": "integer"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file_id",
+          "relative_path",
+          "display_path",
+          "content_hash",
+          "size_bytes",
+          "line_count",
+          "language",
+          "classification"
+        ],
+        "title": "FileRecord",
+        "type": "object"
+      },
+      "FilesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotReference"
+          }
+        },
+        "required": [
+          "repository_id",
+          "snapshot",
+          "files"
+        ],
+        "title": "FilesResponse",
+        "type": "object"
+      },
+      "Finding": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "description": {
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "remediation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remediation"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "title",
+          "description",
+          "derivation",
+          "confidence",
+          "evidence_ids"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ImpactEdge": {
+        "additionalProperties": false,
+        "description": "One edge in the impact graph, labeled but not cited.\n\nAn impact edge is a graph fact with a derivation and a confidence; it is\nnot a citable region of source. Keeping evidence off the edge is what keeps\nthe response's evidence list minimal and the exact/containing metrics\nmeaningful, per ADR-0003 and ADR-0005.",
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelationKind"
+          },
+          "source": {
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "kind",
+          "derivation",
+          "confidence"
+        ],
+        "title": "ImpactEdge",
+        "type": "object"
+      },
+      "IndexResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "parse_error_count": {
+            "title": "Parse Error Count",
+            "type": "integer"
+          },
+          "parsed_file_count": {
+            "title": "Parsed File Count",
+            "type": "integer"
+          },
+          "skipped_file_count": {
+            "title": "Skipped File Count",
+            "type": "integer"
+          },
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job_id",
+          "snapshot_id",
+          "state",
+          "file_count",
+          "parsed_file_count",
+          "skipped_file_count",
+          "parse_error_count",
+          "warnings"
+        ],
+        "title": "IndexResponse",
+        "type": "object"
+      },
+      "LimitsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "max_depth": {
+            "title": "Max Depth",
+            "type": "integer"
+          },
+          "max_file_bytes": {
+            "title": "Max File Bytes",
+            "type": "integer"
+          },
+          "max_files": {
+            "title": "Max Files",
+            "type": "integer"
+          },
+          "max_relative_path_length": {
+            "title": "Max Relative Path Length",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_files",
+          "max_file_bytes",
+          "max_depth",
+          "max_relative_path_length"
+        ],
+        "title": "LimitsResponse",
+        "type": "object"
+      },
+      "Message": {
+        "additionalProperties": false,
+        "description": "One turn in a conversation.\n\n``sequence_number`` starts at 1 and orders the thread; it is also the\nstream's resume key, so 0 is reserved to mean \"nothing yet\".",
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          },
+          "conversation_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "message_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Message Id",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "sequence_number": {
+            "minimum": 1.0,
+            "title": "Sequence Number",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MessageStatus"
+          }
+        },
+        "required": [
+          "message_id",
+          "conversation_id",
+          "role",
+          "status",
+          "sequence_number",
+          "created_at"
+        ],
+        "title": "Message",
+        "type": "object"
+      },
+      "MessageEvidenceItem": {
+        "additionalProperties": false,
+        "description": "One citation attached to an assistant message.\n\nThe evidence fields are snapshotted rather than joined live: a historical\nmessage must keep telling the truth it told after its snapshot is\nsuperseded, which is the same audit rule change analyses follow.",
+        "properties": {
+          "citation_ordinal": {
+            "minimum": 1.0,
+            "title": "Citation Ordinal",
+            "type": "integer"
+          },
+          "claim_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Claim Ids",
+            "type": "array"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "content_hash": {
+            "minLength": 1,
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "end_line": {
+            "minimum": 1.0,
+            "title": "End Line",
+            "type": "integer"
+          },
+          "evidence_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "file_path": {
+            "maxLength": 4096,
+            "title": "File Path",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "start_line": {
+            "minimum": 1.0,
+            "title": "Start Line",
+            "type": "integer"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "citation_ordinal",
+          "file_path",
+          "start_line",
+          "end_line",
+          "content_hash",
+          "derivation",
+          "confidence",
+          "snapshot_id"
+        ],
+        "title": "MessageEvidenceItem",
+        "type": "object"
+      },
+      "MessagePage": {
+        "additionalProperties": false,
+        "description": "One page of messages, in sequence order.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "title": "MessagePage",
+        "type": "object"
+      },
+      "MessageRole": {
+        "description": "Who produced a message.",
+        "enum": [
+          "user",
+          "assistant",
+          "system_event"
+        ],
+        "title": "MessageRole",
+        "type": "string"
+      },
+      "MessageStatus": {
+        "description": "Where a message is in its lifecycle.\n\nA failed or cancelled message stays visible and retryable; the states are\nexplicit rather than a boolean so partial and failed work can be told apart\nfrom work that never started.",
+        "enum": [
+          "queued",
+          "retrieving",
+          "generating",
+          "complete",
+          "failed",
+          "cancelled"
+        ],
+        "title": "MessageStatus",
+        "type": "string"
+      },
+      "MessageSubmission": {
+        "additionalProperties": false,
+        "description": "The result of submitting one question.\n\nPhase 5 answers deterministically and synchronously, so the submission\nalready carries the finished answer. The IDs are returned regardless of\noutcome: a failed or cancelled turn is still a turn the client must be able\nto display and retry.",
+        "properties": {
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          },
+          "contract_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "conversation_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/MessageEvidenceItem"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "intent": {
+            "minLength": 1,
+            "title": "Intent",
+            "type": "string"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "limitations": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "message_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Message Id",
+            "type": "string"
+          },
+          "run_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sequence_number": {
+            "minimum": 1.0,
+            "title": "Sequence Number",
+            "type": "integer"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MessageStatus"
+          },
+          "user_message_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "User Message Id",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "user_message_id",
+          "message_id",
+          "run_id",
+          "status",
+          "sequence_number",
+          "intent"
+        ],
+        "title": "MessageSubmission",
+        "type": "object"
+      },
+      "OverallRisk": {
+        "description": "The highest severity present in an analysis, or none.\n\nExtends :class:`Severity` with one ``NONE`` value so an analysis with no\nfindings can still name its overall risk honestly rather than being absent.",
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low",
+          "info",
+          "none"
+        ],
+        "title": "OverallRisk",
+        "type": "string"
+      },
+      "QueryBody": {
+        "additionalProperties": false,
+        "description": "A bounded query request.",
+        "properties": {
+          "depth": {
+            "default": 2,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Depth",
+            "type": "integer"
+          },
+          "max_results": {
+            "default": 10,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "mode": {
+            "default": "exact_symbol",
+            "title": "Mode",
+            "type": "string"
+          },
+          "query": {
+            "maxLength": 4096,
+            "title": "Query",
+            "type": "string"
+          },
+          "repository_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Repository Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository_id",
+          "query"
+        ],
+        "title": "QueryBody",
+        "type": "object"
+      },
+      "QueryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/Answer"
+          },
+          "contract_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "relation_paths": {
+            "items": {
+              "$ref": "#/components/schemas/RelationPath"
+            },
+            "title": "Relation Paths",
+            "type": "array"
+          },
+          "repository_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "request_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotReference"
+          },
+          "timing_ms": {
+            "additionalProperties": {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            "title": "Timing Ms",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "repository_id",
+          "snapshot",
+          "answer",
+          "evidence"
+        ],
+        "title": "QueryResponse",
+        "type": "object"
+      },
+      "RegisterRepositoryBody": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "RegisterRepositoryBody",
+        "type": "object"
+      },
+      "RelationKind": {
+        "enum": [
+          "CONTAINS",
+          "IMPORTS",
+          "EXPORTS",
+          "CALLS",
+          "MAY_CALL",
+          "INHERITS",
+          "IMPLEMENTS",
+          "OVERRIDES",
+          "ROUTES_TO",
+          "TESTS",
+          "DOCUMENTS",
+          "READS",
+          "WRITES",
+          "QUERIES",
+          "CONFIGURES",
+          "REFERENCES",
+          "DEPENDS_ON"
+        ],
+        "title": "RelationKind",
+        "type": "string"
+      },
+      "RelationPath": {
+        "additionalProperties": false,
+        "properties": {
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/RelationStep"
+            },
+            "minItems": 1,
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "steps"
+        ],
+        "title": "RelationPath",
+        "type": "object"
+      },
+      "RelationStep": {
+        "additionalProperties": false,
+        "description": "One edge of a relation path, citable on its own.\n\nEvery step carries its own evidence, so a path is auditable edge by edge\nrather than as an opaque conclusion a reader has to take on faith.",
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "derivation": {
+            "$ref": "#/components/schemas/Derivation"
+          },
+          "evidence_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelationKind"
+          },
+          "source": {
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "kind",
+          "target",
+          "derivation",
+          "confidence",
+          "evidence_id"
+        ],
+        "title": "RelationStep",
+        "type": "object"
+      },
+      "RepositoryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository_id",
+          "display_name",
+          "created_at"
+        ],
+        "title": "RepositoryResponse",
+        "type": "object"
+      },
+      "Severity": {
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low",
+          "info"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "SnapshotFreshness": {
+        "enum": [
+          "fresh",
+          "stale",
+          "partial",
+          "unknown"
+        ],
+        "title": "SnapshotFreshness",
+        "type": "string"
+      },
+      "SnapshotReference": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "$ref": "#/components/schemas/SnapshotFreshness"
+          },
+          "git_head": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Head"
+          },
+          "semantic_coverage": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Semantic Coverage",
+            "type": "number"
+          },
+          "snapshot_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "working_tree_fingerprint": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Working Tree Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "git_head",
+          "working_tree_fingerprint",
+          "freshness",
+          "semantic_coverage"
+        ],
+        "title": "SnapshotReference",
+        "type": "object"
+      },
+      "StatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "parse_error_count": {
+            "title": "Parse Error Count",
+            "type": "integer"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol_count": {
+            "title": "Symbol Count",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "repository_id",
+          "snapshot",
+          "file_count",
+          "symbol_count",
+          "parse_error_count",
+          "warnings"
+        ],
+        "title": "StatusResponse",
+        "type": "object"
+      },
+      "SubmitMessageRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "SubmitMessageRequest",
+        "type": "object"
+      },
+      "SymbolDetail": {
+        "description": "One symbol of the active snapshot, with its file path resolved.",
+        "properties": {
+          "file_path": {
+            "title": "File Path",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotReference"
+          },
+          "symbol": {
+            "$ref": "#/components/schemas/SymbolRecord"
+          }
+        },
+        "required": [
+          "snapshot",
+          "symbol",
+          "file_path"
+        ],
+        "title": "SymbolDetail",
+        "type": "object"
+      },
+      "SymbolKind": {
+        "enum": [
+          "MODULE",
+          "PACKAGE",
+          "CLASS",
+          "INTERFACE",
+          "ENUM",
+          "FUNCTION",
+          "METHOD",
+          "CONSTRUCTOR",
+          "PROPERTY",
+          "FIELD",
+          "CONSTANT",
+          "TYPE_ALIAS",
+          "ROUTE",
+          "TEST",
+          "FIXTURE",
+          "CONFIG_KEY",
+          "DATABASE_TABLE",
+          "DATABASE_COLUMN",
+          "SQL_QUERY",
+          "DOCUMENT_SECTION"
+        ],
+        "title": "SymbolKind",
+        "type": "string"
+      },
+      "SymbolRecord": {
+        "description": "One symbol definition located in one file of one snapshot.",
+        "properties": {
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "end_byte": {
+            "title": "End Byte",
+            "type": "integer"
+          },
+          "end_line": {
+            "title": "End Line",
+            "type": "integer"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SymbolKind"
+          },
+          "module_path": {
+            "title": "Module Path",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "qualified_name": {
+            "title": "Qualified Name",
+            "type": "string"
+          },
+          "signature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature"
+          },
+          "start_byte": {
+            "title": "Start Byte",
+            "type": "integer"
+          },
+          "start_line": {
+            "title": "Start Line",
+            "type": "integer"
+          },
+          "symbol_id": {
+            "title": "Symbol Id",
+            "type": "string"
+          },
+          "symbol_version_id": {
+            "title": "Symbol Version Id",
+            "type": "string"
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "private"
+            ],
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "symbol_version_id",
+          "file_id",
+          "kind",
+          "name",
+          "qualified_name",
+          "module_path",
+          "signature",
+          "start_line",
+          "end_line",
+          "start_byte",
+          "end_byte",
+          "content_hash",
+          "visibility"
+        ],
+        "title": "SymbolRecord",
+        "type": "object"
+      },
+      "UpdateConversationRequest": {
+        "additionalProperties": false,
+        "description": "Rename, archive, or both. Unarchiving is not offered yet: nothing in\nPhase 5 needs it, and an unused write path is an untested one.",
+        "properties": {
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateConversationRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WorkingTreeRequest": {
+        "additionalProperties": false,
+        "description": "Analyze the working tree against a base ref.",
+        "properties": {
+          "base_ref": {
+            "default": "HEAD",
+            "title": "Base Ref",
+            "type": "string"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository_id"
+        ],
+        "title": "WorkingTreeRequest",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "CodeAtlas local API",
+    "version": "1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/change-analysis/commits": {
+      "post": {
+        "operationId": "analyze_commits_v1_change_analysis_commits_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitRangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeAnalysisReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze Commits",
+        "tags": [
+          "change-analysis"
+        ]
+      }
+    },
+    "/v1/change-analysis/working-tree": {
+      "post": {
+        "operationId": "analyze_working_tree_v1_change_analysis_working_tree_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkingTreeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeAnalysisReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze Working Tree",
+        "tags": [
+          "change-analysis"
+        ]
+      }
+    },
+    "/v1/change-analysis/{analysis_id}": {
+      "get": {
+        "operationId": "get_analysis_v1_change_analysis__analysis_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeAnalysisReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Analysis",
+        "tags": [
+          "change-analysis"
+        ]
+      }
+    },
+    "/v1/change-analysis/{analysis_id}/report": {
+      "get": {
+        "description": "Render a stored analysis. Every format reads the same persisted rows.",
+        "operationId": "get_report_v1_change_analysis__analysis_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "report_format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "markdown",
+                "sarif"
+              ],
+              "title": "Report Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report",
+        "tags": [
+          "change-analysis"
+        ]
+      }
+    },
+    "/v1/conversations": {
+      "get": {
+        "operationId": "list_conversations_v1_conversations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Conversations",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "post": {
+        "operationId": "create_conversation_v1_conversations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConversationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/conversations/messages/{message_id}/feedback": {
+      "post": {
+        "operationId": "submit_feedback_v1_conversations_messages__message_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Feedback",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/conversations/messages/{message_id}/retry": {
+      "post": {
+        "operationId": "retry_message_v1_conversations_messages__message_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSubmission"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Message",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/conversations/{conversation_id}": {
+      "delete": {
+        "operationId": "delete_conversation_v1_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Conversation",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "get": {
+        "operationId": "get_conversation_v1_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Conversation",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "patch": {
+        "operationId": "update_conversation_v1_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConversationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/conversations/{conversation_id}/messages": {
+      "get": {
+        "operationId": "list_messages_v1_conversations__conversation_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Messages",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "post": {
+        "description": "Ask a question and return the finished turn.\n\nPhase 5 answers deterministically and synchronously, so the answer is ready\nwhen this returns. P5-04 adds the streamed view of the same run; the\npersisted message stays the authoritative one either way.",
+        "operationId": "submit_message_v1_conversations__conversation_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSubmission"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Message",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/conversations/{conversation_id}/stream": {
+      "get": {
+        "description": "Stream the active run's events, resuming after the client's position.\n\nResume is accepted two ways because the browser leaves no choice:\n`EventSource` cannot set request headers, so it cannot send\n`Last-Event-ID` on the initial connection. The header is the standard and\nwins when both are present; `?after=` is what a browser client can\nactually use.",
+        "operationId": "stream_conversation_v1_conversations__conversation_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Last-Event-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/evidence/{evidence_id}": {
+      "get": {
+        "description": "Re-verify a stored evidence region against the file on disk.",
+        "operationId": "get_evidence_v1_evidence__evidence_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evidence_id",
+            "required": true,
+            "schema": {
+              "title": "Evidence Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Evidence",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/v1/files/{file_id}": {
+      "get": {
+        "operationId": "get_file_v1_files__file_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "title": "File Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get File",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/v1/message-runs/{run_id}/cancel": {
+      "post": {
+        "description": "Ask a run to stop.\n\n202, not 204: cancellation is cooperative, so this acknowledges the request\nrather than asserting the run has stopped. The run's own terminal event is\nwhat says that.",
+        "operationId": "cancel_run_v1_message_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Run",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/query": {
+      "post": {
+        "operationId": "query_v1_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Query",
+        "tags": [
+          "query"
+        ]
+      }
+    },
+    "/v1/repositories": {
+      "get": {
+        "operationId": "list_repositories_v1_repositories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RepositoryResponse"
+                  },
+                  "title": "Response List Repositories V1 Repositories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Repositories",
+        "tags": [
+          "repositories"
+        ]
+      },
+      "post": {
+        "operationId": "register_repository_v1_repositories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRepositoryBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Repository",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}": {
+      "get": {
+        "operationId": "get_repository_v1_repositories__repository_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Repository",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/diagnostics": {
+      "get": {
+        "operationId": "repository_diagnostics_v1_repositories__repository_id__diagnostics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Repository Diagnostics",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/files": {
+      "get": {
+        "description": "List the files the active snapshot contains.\n\nPaths are repository-relative, as everywhere else: the absolute root is not\nechoed back, so a screenshot or diagnostic bundle cannot leak it.",
+        "operationId": "repository_files_v1_repositories__repository_id__files_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Repository Files",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/index": {
+      "post": {
+        "operationId": "index_repository_v1_repositories__repository_id__index_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Index Repository",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/rollback": {
+      "post": {
+        "description": "Restore the previous snapshot as active.\n\nThe escape hatch for an activation that turned out to be wrong. With no\nprevious snapshot to return to this is a conflict, not a server error.",
+        "operationId": "rollback_v1_repositories__repository_id__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotReference"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rollback",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/snapshots/active": {
+      "get": {
+        "operationId": "active_snapshot_v1_repositories__repository_id__snapshots_active_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotReference"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Active Snapshot",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/status": {
+      "get": {
+        "operationId": "repository_status_v1_repositories__repository_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Repository Status",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/search/files": {
+      "get": {
+        "operationId": "search_files_v1_search_files_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 4096,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Files",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/v1/search/symbols": {
+      "get": {
+        "operationId": "search_symbols_v1_search_symbols_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 4096,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Symbols",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/v1/search/text": {
+      "get": {
+        "operationId": "search_text_v1_search_text_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 4096,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Text",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/v1/symbols/{symbol_id}": {
+      "get": {
+        "operationId": "get_symbol_v1_symbols__symbol_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol_id",
+            "required": true,
+            "schema": {
+              "title": "Symbol Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SymbolDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Symbol",
+        "tags": [
+          "entities"
+        ]
+      }
+    },
+    "/v1/symbols/{symbol}/relations": {
+      "get": {
+        "operationId": "symbol_relations_v1_symbols__symbol__relations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "callers",
+              "enum": [
+                "callers",
+                "callees",
+                "dependencies",
+                "dependents",
+                "exports",
+                "tests",
+                "documents",
+                "trace"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "default": 2,
+              "maximum": 5,
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Symbol Relations",
+        "tags": [
+          "graph"
+        ]
+      }
+    }
+  }
+}

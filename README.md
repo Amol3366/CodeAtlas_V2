@@ -31,17 +31,22 @@ Every answer is bound to a snapshot. If a file changed after indexing, CodeAtlas
 withholds the evidence and says so rather than citing content that no longer
 matches. If nothing matches, it abstains rather than guessing.
 
-Not yet built: chat or web UI (Phase 5), filesystem watcher and packaging
-(Phase 6), embeddings and any model provider (Phase 7). See
-`docs/plans/PLAN.md` for the phase order.
+The web application in `apps/web` is under construction (Phase 5): the
+conversation backend, its typed event stream, and the application shell
+exist; the chat, evidence, and preflight surfaces do not yet. Not built at
+all: the filesystem watcher and packaging (Phase 6), and embeddings or any
+model provider (Phase 7). See `docs/plans/PLAN.md` for the phase order.
 
 ## Windows development
 
-Requirements: Windows 11, PowerShell 7 or Windows PowerShell 5.1, and `uv`.
+Requirements: Windows 11, PowerShell 7 or Windows PowerShell 5.1, `uv`, and
+— from Phase 5 onward — Node.js 20+ with pnpm (`corepack enable pnpm`) for
+the web application in `apps/web`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
 powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync
+cd apps/web; pnpm lint; pnpm typecheck; pnpm test; pnpm build
 ```
 
 The quality command validates the tracked contract schema, tests, lint, types,

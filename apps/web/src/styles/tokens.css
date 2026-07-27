@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/* Design tokens.
+ *
+ * One accent, restrained neutral surfaces, and semantic status colors that are
+ * never the only signal — every status also carries a label or an icon, because
+ * color alone fails for a colorblind reader and in high-contrast modes
+ * (`AGENTS.md` Section 14.4).
+ *
+ * Light is the default and dark is applied by `[data-theme="dark"]`, which the
+ * theme provider sets from the stored preference or the system setting. A media
+ * query alone could not express an explicit user override.
+ */
+
+:root {
+  color-scheme: light;
+
+  --surface: 0 0% 100%;
+  --surface-raised: 220 14% 98%;
+  --surface-sunken: 220 14% 96%;
+  --border: 220 13% 88%;
+  --text: 222 20% 12%;
+  --text-muted: 220 9% 42%;
+
+  --accent: 231 62% 48%;
+  --accent-contrast: 0 0% 100%;
+
+  --status-fresh: 152 55% 32%;
+  --status-stale: 38 88% 38%;
+  --status-error: 0 65% 44%;
+  --status-info: 214 60% 42%;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --shadow-sm: 0 1px 2px hsl(222 20% 12% / 0.06);
+  --shadow-md: 0 4px 12px hsl(222 20% 12% / 0.10);
+
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+
+  /* Reading width for prose; structured reports may exceed it. */
+  --measure: 46rem;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface: 224 20% 9%;
+  --surface-raised: 224 18% 13%;
+  --surface-sunken: 224 22% 7%;
+  --border: 223 14% 24%;
+  --text: 220 18% 94%;
+  --text-muted: 220 10% 68%;
+
+  --accent: 231 74% 70%;
+  --accent-contrast: 224 20% 9%;
+
+  --status-fresh: 152 45% 58%;
+  --status-stale: 38 80% 62%;
+  --status-error: 0 70% 68%;
+  --status-info: 214 70% 70%;
+
+  --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.4);
+  --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.5);
+}
+
+@theme inline {
+  --color-surface: hsl(var(--surface));
+  --color-surface-raised: hsl(var(--surface-raised));
+  --color-surface-sunken: hsl(var(--surface-sunken));
+  --color-border: hsl(var(--border));
+  --color-text: hsl(var(--text));
+  --color-text-muted: hsl(var(--text-muted));
+  --color-accent: hsl(var(--accent));
+  --color-accent-contrast: hsl(var(--accent-contrast));
+  --color-fresh: hsl(var(--status-fresh));
+  --color-stale: hsl(var(--status-stale));
+  --color-danger: hsl(var(--status-error));
+  --color-info: hsl(var(--status-info));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: hsl(var(--surface));
+  color: hsl(var(--text));
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A visible, high-contrast focus ring on every interactive element. Keyboard
+ * users must always be able to see where they are. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--accent));
+  outline-offset: 2px;
+}
+
+/* Motion is a preference, not a decoration. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
