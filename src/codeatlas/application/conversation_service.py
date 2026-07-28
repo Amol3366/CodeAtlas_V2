@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from sqlite3 import Connection
 
 from codeatlas.contracts import (
@@ -59,6 +59,12 @@ from codeatlas.domain.errors import (
 )
 from codeatlas.storage.sqlite.connection import write_transaction
 from codeatlas.storage.sqlite.stores import ConversationStore, RepositoryStore
+
+# ADR-0007 decision 5: an explicit purge lets a user act now, and this sweep
+# means an unattended install does not accumulate deleted conversations
+# forever. Thirty days is long enough that "I deleted the wrong thread" is
+# still recoverable a month later.
+RETENTION_WINDOW = timedelta(days=30)
 
 # A title is a label in a sidebar, not a document. The bound is generous for a
 # sentence and far too small for pasted content.
@@ -221,6 +227,24 @@ class ConversationService:
             self._conversations.soft_delete(
                 conversation_id, deleted_at=datetime.now(UTC)
             )
+
+    def purge_deleted(self, *, older_than: timedelta = RETENTION_WINDOW) -> int:
+        """Permanently remove conversations soft-deleted longer ago than the window.
+
+        Two callers, one behavior: an explicit purge passes a zero window when
+        the user wants it gone now, and the startup sweep passes the default so
+        an unattended install does not accumulate deletions forever (ADR-0007
+        decision 5).
+
+        An undeleted conversation is never touched, whatever the window. That
+        is enforced in the query rather than here, so no caller can widen it.
+        Messages, runs, and evidence links go with their conversation by
+        cascade.
+        """
+        cutoff = datetime.now(UTC) - older_than
+        with write_transaction(self._connection):
+            removed = self._conversations.purge_deleted_before(cutoff)
+        return len(removed)
 
     def list_messages(
         self,

@@ -156,7 +156,15 @@ def build_services(
 
     return ApplicationServices(
         repositories=repositories,
-        registration=RegisterRepositoryService(repositories),
+        registration=RegisterRepositoryService(
+            repositories=repositories,
+            # Deletion has to know what it would take with it: the schema
+            # cascades conversations from repositories, so the refusal lives
+            # here rather than in the database.
+            conversations=conversations,
+            search=search_store,
+            connection=connection,
+        ),
         indexing=indexing,
         lookup=lookup,
         status=RepositoryStatusService(

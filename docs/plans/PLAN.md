@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-05 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04 `complete`; P6-05 `ready`; P6-06 … P6-08 `pending` |
+| Active task | none — P6-06 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04, P6-05 `complete`; P6-06 `ready`; P6-07, P6-08 `pending` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-28T13:56:02Z (this machine's clock reads earlier than the preceding entries; recorded as observed rather than adjusted to keep the log monotonic) |
-| Git state | Branch `main` at `5d47c65` (P6-03 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-04 leaves it untouched. The `CLAUDE.md -> AGENTS.md` rename recorded in earlier entries is no longer present in the tree — `CLAUDE.md` is the file that exists. |
+| Started UTC | 2026-07-28T15:58:37Z |
+| Git state | Branch `main` at `1a51473` (P6-04 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-05 leaves it untouched. |
 | Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
 
 ### Phase 6 Task Board (active)
@@ -67,8 +67,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `complete` |
 | P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `complete` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `complete` |
-| P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `ready` |
-| P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
+| P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `complete` |
+| P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `ready` |
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
 | P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
 
@@ -184,6 +184,109 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T16:41:00Z — P6-05 completed; P6-06 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `1a51473`.
+- Transition: P6-05 `ready -> in_progress -> complete`; P6-06 `pending -> ready`.
+- Outcome: **gate condition 6 is met.** Backup, restore, and deletion are
+  explicit and refuse rather than half-finishing; a restored database passes
+  its integrity check and answers. `check_phase6.ps1 -SkipSync` exits 0 with
+  Playwright included.
+- Observed workspace state at start (rule 5): clean but for the user's own
+  uncommitted blueprint whitespace cleanup, left untouched.
+
+#### The four decisions the user made, and what each became
+
+1. **Restore is CLI-only and offline.** It refuses while the target is in use.
+   `CLAUDE.md` Section 12 specifies no endpoint for it, and swapping the file
+   under a serving process is the corruption this phase exists to prevent.
+2. **Repository deletion refuses, then cascades on request.**
+3. **The retention sweep runs once at startup**, never per request.
+4. **Deletion and retention were kept in P6-05** rather than deferred, because
+   gate condition 6 measures them.
+
+#### What was found
+
+**Repository deletion did not exist at all.** `CLAUDE.md` Section 12.1
+specifies `DELETE /v1/repositories/{id}` and blueprint 3.1 requires removing a
+repository without deleting its source files; neither the endpoint nor a CLI
+equivalent had ever been built. Gate condition 6 measures deletion, so leaving
+it would have left the gate unprovable.
+
+**And the schema would have made it silent.** `conversations` declares
+`REFERENCES repositories(...) ON DELETE CASCADE`, so a plain
+`DELETE FROM repositories` takes chat history with it and says nothing. The
+guard therefore lives in the application layer, where it can refuse — a fifth
+error code beyond ADR-0007's four, recorded in that ADR's Outcome section.
+
+#### What was built
+
+- `src/codeatlas/storage/sqlite/backup.py` — `create_backup`, `check_integrity`,
+  `read_schema_version`, `restore`. The copy goes through SQLite's online backup
+  API, staged beside the destination and moved into place with `os.replace` only
+  after passing its own integrity check, so a failure leaves no half-written
+  file and never destroys the previous backup. Restore validates existence,
+  integrity, schema version, and exclusive access **before** writing anything;
+  keeps the replaced database as `<name>.replaced`; and clears stale `-wal` /
+  `-shm` files, since one left beside a restored database can resurrect the
+  pages the restore just replaced.
+- `RegisterRepositoryService.delete(repository_id, *, cascade=False)`,
+  `RepositoryStore.delete`, `SearchStore.delete_for_repository` (FTS5 has no
+  foreign keys, so the cascade cannot reach the projections),
+  `ConversationStore.count_for_repository` — which counts **soft-deleted**
+  conversations too, because they are recoverable until purged and therefore
+  still data to lose.
+- `ConversationService.purge_deleted(older_than=RETENTION_WINDOW)`. One method,
+  two callers: the explicit purge passes a zero window, the startup sweep the
+  30-day default. The "never touch an undeleted conversation" rule is in the
+  SQL rather than in a caller, so no caller can widen it.
+- CLI `backup`, `restore`, `repo remove [--cascade]`, `purge
+  [--older-than-days]`; REST `DELETE /v1/repositories/{id}[?cascade=true]`.
+- The startup sweep in the API lifespan, whose failure is suppressed: stale
+  deleted rows are a housekeeping problem, an unavailable API is not.
+- Docs: `docs/operations/backup-and-restore.md` (new), README, and the ADR-0007
+  Outcome section extended for decisions 4 and 5.
+
+#### Tests, written first and observed failing
+
+| Suite | Count | Proves |
+| --- | --- | --- |
+| `tests/integration/test_backup_restore.py` | 19 | A backup taken from an **open** database contains commits still in the WAL; a failed backup leaves no partial file and spares the previous one; corrupted, non-database, newer-schema, missing, and in-use inputs are each refused; **a refused restore leaves the live database answering** |
+| `tests/contract/test_deletion_and_retention.py` | 18 | Deletion refuses on conversations including soft-deleted ones, changes nothing when refused, cascades only when asked, never touches source files; the sweep spares recent deletions and undeleted threads, and runs at startup |
+| `tests/contract/test_maintenance_cli.py` | 13 | The four commands, their exit codes, and that restore tells the user to start CodeAtlas again |
+
+#### Verification in this environment, each run and its exit code
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync`
+  — **exit 0**, "Phase 6 verification completed", Playwright included.
+- `uv run pytest -q` — **1307 passed** (1257 before; +50).
+- `uv run ruff check src tests scripts apps` — exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **219 source files** (215 before).
+- Web: **99 vitest passed**, eslint/tsc/build exit 0.
+- Playwright: **10 passed, 4 skipped** — the declared Chromium skips, unchanged.
+- Test-first discipline: followed. One real implementation fix after observing
+  a failure: `with sqlite3.connect(...)` manages the *transaction*, not the
+  connection, so every staged file stayed open and `os.replace` failed on
+  Windows with a sharing violation. An explicit closing context manager
+  replaced it, and the reason is documented where it was made.
+
+#### Contracts, migrations, limitations
+
+- **No migration.** `SCHEMA_VERSION` stays 9.
+- **One error code added**, `REPOSITORY_HAS_CONVERSATIONS` (409, CLI exit 2,
+  not retryable). Additive: no existing code changed meaning, so
+  `contract_version` stays `"1.1"`. `apps/web` types regenerated for the new
+  DELETE route.
+- **Backups are not scheduled.** No timer, and no retention policy for backup
+  *files* — `codeatlas backup` runs when something runs it. Wiring it to Task
+  Scheduler is a user decision the product does not make.
+- **In-use detection is best-effort.** A lock can be taken the moment after the
+  check returns. It catches the common mistake — restoring while the API runs —
+  not a determined race.
+- Next: **P6-06** — packaging, `serve --web`, and the install workflow.
+
 
 ### 2026-07-28T14:47:00Z — P6-04 completed; P6-05 `ready`
 

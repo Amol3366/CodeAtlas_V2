@@ -3307,6 +3307,52 @@
       }
     },
     "/v1/repositories/{repository_id}": {
+      "delete": {
+        "description": "Remove a repository from CodeAtlas. Source files are never touched.\n\nRefuses with `REPOSITORY_HAS_CONVERSATIONS` while conversations exist,\nunless `cascade` is set. The schema would take them silently; a user\nfreeing index space should not lose chat history without saying so.",
+        "operationId": "delete_repository_v1_repositories__repository_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Also delete the repository's conversations.",
+            "in": "query",
+            "name": "cascade",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also delete the repository's conversations.",
+              "title": "Cascade",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Repository",
+        "tags": [
+          "repositories"
+        ]
+      },
       "get": {
         "operationId": "get_repository_v1_repositories__repository_id__get",
         "parameters": [

@@ -307,7 +307,15 @@ export interface paths {
         get: operations["get_repository_v1_repositories__repository_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Repository
+         * @description Remove a repository from CodeAtlas. Source files are never touched.
+         *
+         *     Refuses with `REPOSITORY_HAS_CONVERSATIONS` while conversations exist,
+         *     unless `cascade` is set. The schema would take them silently; a user
+         *     freeing index space should not lose chat history without saying so.
+         */
+        delete: operations["delete_repository_v1_repositories__repository_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2102,6 +2110,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RepositoryResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_repository_v1_repositories__repository_id__delete: {
+        parameters: {
+            query?: {
+                /** @description Also delete the repository's conversations. */
+                cascade?: boolean;
+            };
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

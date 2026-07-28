@@ -149,6 +149,17 @@ class RepositoryStore:
             (1 if enabled else 0, repository_id),
         )
 
+    def delete(self, repository_id: str) -> None:
+        """Delete a repository; foreign keys cascade to everything it owns.
+
+        That cascade reaches `conversations`, which is why the decision to
+        delete belongs to the application layer: at this level the chat history
+        goes without anyone being asked.
+        """
+        self._connection.execute(
+            "DELETE FROM repositories WHERE repository_id = ?", (repository_id,)
+        )
+
     def list_watched(self) -> tuple[Repository, ...]:
         """Every repository the watcher should be running for."""
         rows = self._connection.execute(
@@ -746,6 +757,20 @@ class SearchStore:
         self._connection.execute(
             "DELETE FROM file_search WHERE snapshot_id = ?", (snapshot_id,)
         )
+
+    def delete_for_repository(self, repository_id: str) -> None:
+        """Clear every search projection belonging to a repository.
+
+        Called before the repository row goes. The cascade cannot do this: FTS5
+        virtual tables have no foreign keys, so deleting the repository would
+        leave its text searchable with nothing behind it.
+        """
+        for table in ("chunk_search", "file_search"):
+            self._connection.execute(
+                f"DELETE FROM {table} WHERE snapshot_id IN"  # fixed table names
+                " (SELECT snapshot_id FROM snapshots WHERE repository_id = ?)",
+                (repository_id,),
+            )
 
     def search_chunks(
         self,
@@ -1720,6 +1745,39 @@ class ConversationStore:
             " WHERE conversation_id = ? AND deleted_at IS NULL",
             (to_utc_text(archived_at), to_utc_text(archived_at), conversation_id),
         )
+
+    def count_for_repository(self, repository_id: str) -> int:
+        """Count conversations, **including soft-deleted ones**.
+
+        A soft-deleted conversation is recoverable until it is purged, so it is
+        still data a repository deletion would destroy.
+        """
+        row = self._connection.execute(
+            "SELECT COUNT(*) FROM conversations WHERE repository_id = ?",
+            (repository_id,),
+        ).fetchone()
+        return int(row[0])
+
+    def purge_deleted_before(self, cutoff: datetime) -> tuple[str, ...]:
+        """Hard-delete conversations soft-deleted at or before ``cutoff``.
+
+        Returns the ids removed. Rows with `deleted_at IS NULL` are untouched
+        by construction: an undeleted conversation is never swept, whatever the
+        window (ADR-0007 decision 5).
+        """
+        rows = self._connection.execute(
+            "SELECT conversation_id FROM conversations"
+            " WHERE deleted_at IS NOT NULL AND deleted_at <= ?",
+            (to_utc_text(cutoff),),
+        ).fetchall()
+        removed = tuple(str(row[0]) for row in rows)
+        if removed:
+            placeholders = ", ".join("?" for _ in removed)
+            self._connection.execute(
+                f"DELETE FROM conversations WHERE conversation_id IN ({placeholders})",
+                removed,
+            )
+        return removed
 
     def soft_delete(self, conversation_id: str, *, deleted_at: datetime) -> None:
         """Hide a conversation while keeping it recoverable.

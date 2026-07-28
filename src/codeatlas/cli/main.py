@@ -24,6 +24,7 @@ import sqlite3
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -46,6 +47,7 @@ from codeatlas.domain.errors import (
 from codeatlas.domain.repository import Repository
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
+from codeatlas.storage.sqlite.backup import create_backup, restore
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
@@ -80,6 +82,7 @@ _EXIT_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.RUN_NOT_RETRYABLE: EXIT_UNAVAILABLE,
     ErrorCode.CONVERSATION_ARCHIVED: EXIT_UNAVAILABLE,
     ErrorCode.QUERY_TOO_LONG: EXIT_INVALID_INPUT,
+    ErrorCode.REPOSITORY_HAS_CONVERSATIONS: EXIT_INVALID_INPUT,
     ErrorCode.WATCHER_UNAVAILABLE: EXIT_UNAVAILABLE,
     ErrorCode.RESTORE_INCOMPATIBLE: EXIT_INVALID_INPUT,
     ErrorCode.INTEGRITY_CHECK_FAILED: EXIT_UNAVAILABLE,
@@ -633,6 +636,152 @@ def diagnostics(
     _emit(
         payload,
         "\n".join(f"{key}: {value}" for key, value in payload.items()),
+        as_json=as_json,
+    )
+
+
+@repo_app.command("remove")
+def repo_remove(
+    repository_id: Annotated[str, typer.Argument()],
+    cascade: Annotated[
+        bool,
+        typer.Option(
+            "--cascade",
+            help="Also delete the repository's conversations.",
+        ),
+    ] = False,
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Remove a repository from CodeAtlas. Source files are never touched.
+
+    Refuses while conversations exist unless `--cascade` is given: the schema
+    would take them along silently, and freeing an index should not cost a user
+    their chat history without them saying so.
+    """
+    try:
+        with _services(database) as services:
+            services.registration.delete(repository_id, cascade=cascade)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    _emit(
+        {"repository_id": repository_id, "removed": True},
+        f"Removed {repository_id}. The source files were not touched.",
+        as_json=as_json,
+    )
+
+
+@app.command("backup")
+def backup(
+    destination: Annotated[
+        Path, typer.Argument(help="Where to write the backup file.")
+    ],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Copy the database to a file, verifying the copy before keeping it.
+
+    Safe to run while CodeAtlas is running: the copy goes through SQLite's
+    online backup API rather than the filesystem, because in WAL mode a file
+    copy can miss recent commits or capture a torn page.
+    """
+    source = database or default_database_path()
+    try:
+        result = create_backup(source, destination)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    _emit(
+        {
+            "path": str(result.path),
+            "schema_version": result.schema_version,
+            "size_bytes": result.size_bytes,
+        },
+        f"Backed up to {result.path} ({result.size_bytes} bytes).",
+        as_json=as_json,
+    )
+
+
+@app.command("restore")
+def restore_command(
+    backup_path: Annotated[
+        Path, typer.Argument(help="The backup file to restore from.")
+    ],
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Replace the database with a backup, after validating it.
+
+    Offline by design: stop CodeAtlas first. Swapping the file underneath a
+    serving process is a reliable way to corrupt it, so this refuses while the
+    database is in use. Schema version and integrity are checked against the
+    backup *before* anything is replaced, and the database being replaced is
+    kept beside it.
+    """
+    target = database or default_database_path()
+    try:
+        result = restore(backup_path, target)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    kept = (
+        f" The previous database was kept at {result.replaced_path}."
+        if result.replaced_path is not None
+        else ""
+    )
+    _emit(
+        {
+            "restored": True,
+            "path": str(result.path),
+            "schema_version": result.schema_version,
+            "replaced_path": (
+                None if result.replaced_path is None else str(result.replaced_path)
+            ),
+        },
+        f"Restored {result.path}.{kept} Start CodeAtlas to use it.",
+        as_json=as_json,
+    )
+
+
+@app.command("purge")
+def purge(
+    older_than_days: Annotated[
+        int,
+        typer.Option(
+            "--older-than-days",
+            help="Purge conversations deleted at least this many days ago.",
+        ),
+    ] = 30,
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Permanently remove conversations that were deleted long enough ago.
+
+    `--older-than-days 0` means "everything already deleted, gone now". An
+    undeleted conversation is never touched, whatever the window.
+    """
+    if older_than_days < 0:
+        typer.echo(
+            "INVALID_REQUEST: --older-than-days cannot be negative.", err=True
+        )
+        raise typer.Exit(EXIT_INVALID_INPUT)
+
+    try:
+        with _services(database) as services:
+            removed = services.conversations.purge_deleted(
+                older_than=timedelta(days=older_than_days)
+            )
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    _emit(
+        {"purged": removed, "older_than_days": older_than_days},
+        f"Purged {removed} deleted conversation(s).",
         as_json=as_json,
     )
 

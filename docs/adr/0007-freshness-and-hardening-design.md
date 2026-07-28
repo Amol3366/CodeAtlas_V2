@@ -166,6 +166,35 @@ None of this needed a migration: the owner lives in the job's existing
 `diagnostics` JSON, and `SCHEMA_VERSION` stays 9. The REST additions are
 optional fields, so `contract_version` stays `"1.1"`.
 
+### Decisions 4 and 5, as built (P6-05)
+
+Both decisions held. Implementation added three things worth recording.
+
+1. **A fifth error code, `REPOSITORY_HAS_CONVERSATIONS`.** Decision 7 declared
+   four; this one is beyond them, and it exists because the schema cascades
+   `conversations` from `repositories`. A plain repository deletion therefore
+   takes chat history silently — the "silent loss" this ADR's context names —
+   so deletion refuses while conversations exist unless the caller explicitly
+   cascades. 409, CLI exit 2, not retryable: retrying deletes nothing extra,
+   because the fix is a decision rather than a repeat.
+
+2. **Repository deletion did not exist at all.** `CLAUDE.md` Section 12.1
+   specifies `DELETE /v1/repositories/{id}` and blueprint 3.1 requires removing
+   a repository without deleting its source files, but neither the endpoint nor
+   a CLI equivalent had ever been built. Gate condition 6 measures deletion, so
+   it was built here rather than left to make the gate unprovable.
+
+3. **The retention sweep runs once at startup**, never on the request path. The
+   decision fixed the 30-day window but not the trigger; P6-04 had just shown
+   what per-request work costs. An unattended install is covered by its next
+   restart, which is the trade taken knowingly.
+
+Restore is **CLI-only**, matching Section 12, which specifies no endpoint for
+it: validating and swapping the database file underneath a serving process is
+the corruption this phase exists to prevent. It refuses while the target is in
+use, keeps the database it replaced, and clears stale WAL side files — one left
+beside a restored database can resurrect the pages the restore just replaced.
+
 ## Alternatives considered
 
 - **Trusting filesystem events as truth.** Rejected: silent event loss on

@@ -56,7 +56,13 @@ the remedies differ (`docs/operations/crash-recovery.md`). Recovery leaves a run
 alone while the process that owns it is still alive, so it never interrupts an
 index the watcher is in the middle of.
 
-Not built yet: backup/restore and packaging (both Phase 6); and embeddings or
+`codeatlas backup` copies the database safely while CodeAtlas is running, and
+`codeatlas restore` validates a backup's integrity and schema version *before*
+replacing anything, keeping the database it replaced. Removing a repository
+never touches source files and refuses to take conversations with it unless
+asked (`docs/operations/backup-and-restore.md`).
+
+Not built yet: packaging and the Windows installer (Phase 6); and embeddings or
 any model provider (Phase 7). `docs/plans/PLAN.md` is the live phase and task
 status.
 
@@ -85,6 +91,7 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/web-application.md` — the web app, its rules, and its limits
 - `docs/operations/continuous-freshness.md` — the watcher, its debounce, and its switch
 - `docs/operations/crash-recovery.md` — what a kill leaves behind, and `codeatlas doctor`
+- `docs/operations/backup-and-restore.md` — backup, restore, deletion, and retention
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
 - `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers

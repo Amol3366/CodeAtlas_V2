@@ -38,6 +38,7 @@ class ErrorCode(StrEnum):
     RUN_NOT_RETRYABLE = "RUN_NOT_RETRYABLE"
     CONVERSATION_ARCHIVED = "CONVERSATION_ARCHIVED"
     QUERY_TOO_LONG = "QUERY_TOO_LONG"
+    REPOSITORY_HAS_CONVERSATIONS = "REPOSITORY_HAS_CONVERSATIONS"
     WATCHER_UNAVAILABLE = "WATCHER_UNAVAILABLE"
     BACKUP_FAILED = "BACKUP_FAILED"
     RESTORE_INCOMPATIBLE = "RESTORE_INCOMPATIBLE"
@@ -241,6 +242,22 @@ class WatcherUnavailableError(CodeAtlasError):
 
     code = ErrorCode.WATCHER_UNAVAILABLE
     retryable = True
+
+
+class RepositoryHasConversationsError(CodeAtlasError):
+    """Deleting the repository would take its conversations with it.
+
+    Added in P6-05, beyond the four codes ADR-0007 declared, because the schema
+    cascades `conversations` from `repositories`: without an explicit refusal a
+    user freeing index space would silently lose chat history and find out only
+    by going to look for it.
+
+    Not retryable — retrying deletes nothing extra. The caller must decide to
+    cascade, which is a choice rather than a repeat.
+    """
+
+    code = ErrorCode.REPOSITORY_HAS_CONVERSATIONS
+    retryable = False
 
 
 class BackupFailedError(CodeAtlasError):

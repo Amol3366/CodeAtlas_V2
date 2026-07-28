@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from codeatlas.application.container import ApplicationServices
@@ -250,6 +250,25 @@ def repository_diagnostics(
             for job in diagnostics.open_jobs
         ],
     )
+
+
+@router.delete("/{repository_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_repository(
+    repository_id: str,
+    services: Services,
+    cascade: Annotated[
+        bool,
+        Query(description="Also delete the repository's conversations."),
+    ] = False,
+) -> Response:
+    """Remove a repository from CodeAtlas. Source files are never touched.
+
+    Refuses with `REPOSITORY_HAS_CONVERSATIONS` while conversations exist,
+    unless `cascade` is set. The schema would take them silently; a user
+    freeing index space should not lose chat history without saying so.
+    """
+    services.registration.delete(repository_id, cascade=cascade)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{repository_id}/snapshots/active")

@@ -1083,7 +1083,7 @@ Build:
 - [X] Crash recovery and actionable diagnostics
 - [ ] Native packaging and installation workflow
 - [ ] Upgrade and migration workflow
-- [ ] Backup, restore, deletion, and support workflows
+- [X] Backup, restore, deletion, and support workflows
 - [ ] Performance validation
 - [ ] Security validation
 - [ ] Windows release validation
@@ -1091,8 +1091,8 @@ Build:
   backup/restore, deletion, security, performance, and end-to-end release tests
   without losing the last valid active snapshot or chat history.
 
-**In progress.** Two of the eight build items are delivered; the remaining six
-are packaging, upgrade, backup, and the validation sweeps.
+**In progress.** Three of the eight build items are delivered; the remaining
+five are packaging, upgrade, and the validation sweeps.
 
 Delivered so far: P6-SETUP (ADR-0007, four hardening error codes,
 `scripts/check_phase6.ps1` with Playwright inside the gate), P6-01 (Playwright
@@ -1101,13 +1101,16 @@ corruption under concurrent requests), P6-02 (watcher, debounce, per-repository
 switch, migration `0009`), P6-STREAM (ADR-0008, accept-then-stream,
 `contract_version` **1.0 → 1.1** — the first bump in six phases), P6-03 (the
 reconciling scan and startup catch-up), P6-04 (crash-recovery reporting,
-run ownership, and `codeatlas doctor`).
+run ownership, and `codeatlas doctor`), P6-05 (backup, restore, repository
+deletion, and the retention sweep).
 
-**Gate conditions 1, 3, and 4 are met.** History survives a backend restart and
-a stream reconnects against a live run; filesystem events are never treated as
-truth, because a reconciling scan corrects what the event stream drops; and a
+**Gate conditions 1, 3, 4, and 6 are met.** History survives a backend restart
+and a stream reconnects against a live run; filesystem events are never treated
+as truth, because a reconciling scan corrects what the event stream drops; a
 genuinely killed process is recovered, leaves no orphaned rows, and says what
-it recovered. `check_phase6.ps1` passes with Playwright included.
+it recovered; and backup, restore, and deletion refuse rather than half-finish,
+with a restored database passing its integrity check. `check_phase6.ps1` passes
+with Playwright included.
 
 Two qualifications, recorded because a green gate should not hide them.
 
@@ -1119,7 +1122,7 @@ Two qualifications, recorded because a green gate should not hide them.
   `codeatlas doctor` names the run and its pid, so the failure is visible
   rather than silent, but it is not automatic.
 
-Next: **P6-05** backup and restore. Live task status lives in
+Next: **P6-06** packaging and `serve --web`. Live task status lives in
 `docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift

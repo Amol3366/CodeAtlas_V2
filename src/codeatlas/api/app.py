@@ -57,6 +57,18 @@ def create_app(database_path: Path | None = None, *, watch: bool = True) -> Fast
 
     @asynccontextmanager
     async def lifespan(instance: FastAPI) -> AsyncIterator[None]:
+        # Retention runs once, here, and never on the request path. A sweep on
+        # every request would put a delete-and-vacuum on the hot path for a
+        # policy measured in days; an unattended install is covered by its next
+        # restart, which is the trade ADR-0007 decision 5 accepted. A failure
+        # must not stop the server from serving: stale deleted rows are a
+        # housekeeping problem, an unavailable API is not.
+        with (
+            contextlib.suppress(Exception),
+            instance.state.services_factory() as services,
+        ):
+            services.conversations.purge_deleted()
+
         watchers: WatchService | None = None
         if watch:
             watchers = WatchService(services_factory=instance.state.services_factory)
