@@ -115,17 +115,41 @@ component suites in `apps/web/src/**/*.test.tsx`.
 | Local API exposure | unchanged | the API still binds to loopback with no CORS middleware; the Vite dev proxy — not a relaxed server policy — is what lets the browser reach it in development |
 | Browser storage of secrets | not applicable | the only stored value is the theme preference; no credential or repository content is written to `localStorage` |
 
-## Phase 6 Enforcement Additions (in progress)
+## Phase 6 Enforcement Additions
 
-Recorded as hardening tasks land. **This section is not yet the Phase 6 review**
-— P6-08 owns the full sweep against the packaged artifact, and until it runs,
-absence from this table means "not yet examined", not "not a risk".
+Reviewed 2026-07-28 (P6-08). The controls below are asserted by
+`tests/security/test_packaged_surface.py`, which drives the **real packaged
+executable** rather than the source tree — the rest of `tests/security/` covers
+parser limits, path canonicalization, and FTS injection in process, none of
+which change when the code is frozen. A packaging defect lives precisely in the
+gap between the two, so testing the source tree twice would not find one.
 
 | Control | Status | Where it is enforced |
 | --- | --- | --- |
+| Loopback-only binding, packaged | enforced | the running executable is probed on this machine's LAN address and must refuse the connection. A constant proves what someone intended; a socket proves what happened |
+| Binding beyond loopback | enforced | `serve --host 0.0.0.0` **refuses** and says why, in the packaged build as in source. A refusal cannot be lost by a flag the way a default can |
+| CORS headers, packaged | enforced | no `access-control-*` header is returned. One origin is what lets the API register no CORS middleware; a header here would mean that reasoning had quietly stopped holding |
+| Error envelope, packaged | enforced | a 404 from the binary carries the contract envelope, no traceback, no filesystem path, no bundle path |
+| SPA fallback swallowing the API | enforced | an unknown `/v1` path returns the **JSON error envelope**, not the shell. P6-08 found it returning a bare 404 with an empty body — not HTML, so the fallback rule held, but a client reading `error.code` met a parse failure |
+| Traversal through the static mount | enforced | four encodings of `..` are refused; the executable is never served |
+| Developer material in the release | enforced | the bundle ships no `.env`, `.git`, database, lockfile, test fixture, `.spec.ts`, or stray `.sql` outside `migrations/` |
 | Schema from a newer build | enforced | `apply_migrations` refuses a database recorded above this build's `SCHEMA_VERSION` with `SCHEMA_VERSION_UNSUPPORTED`, before anything is opened for writing. Reading a schema this build has never seen would open the tables, answer plausibly, and write into columns whose meaning had changed — corruption that announces itself only later. The guard sits in the migration path rather than in the upgrade command, so no call site bypasses it |
 | Data loss during migration | enforced | any pending migration against a non-empty database is preceded by a verified checkpoint; a checkpoint that cannot be written stops the migration. Asserted against a database written by a real prior build, not a synthetic one |
 | Install over a running process | enforced | `install_windows.ps1` refuses while `codeatlas.exe` is running from the install folder, rather than deleting it out from under a live process and leaving a half-replaced install |
+| Unbounded local storage growth | enforced | indexing applies snapshot retention, so a watched repository reindexed all day no longer keeps every snapshot forever. Before P6-08 nothing called `prune`; the local database grew without limit for as long as CodeAtlas ran |
+
+### Availability, stated rather than claimed
+
+**The API process can crash under sustained change analysis.** A Windows access
+violation inside a filesystem syscall kills the server; it is unfixed, it is not
+packaging-specific, and it is described with its captured stack and everything
+ruled out in `docs/evaluation/phase-6-baseline-environment.md`.
+
+It is recorded here because a local service that can die is an availability
+fact, and this document is where the product's security posture is supposed to
+be honest rather than flattering. It is not a confidentiality or integrity
+issue: nothing is exposed, and the last valid active snapshot survives the
+crash — restarting recovers, which is what P6-04 built.
 
 ## Provider Opt-In Gate
 

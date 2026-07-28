@@ -12,7 +12,8 @@ param(
     [switch]$SkipSync,
     [switch]$SkipWeb,
     [switch]$SkipE2E,
-    [switch]$Package
+    [switch]$Package,
+    [switch]$Perf
 )
 
 $ErrorActionPreference = "Stop"
@@ -150,6 +151,21 @@ if ($Package) {
     )
 } else {
     Write-Output "==> Packaged build (skipped; pass -Package to build and verify)"
+}
+
+# --- Performance ----------------------------------------------------------
+
+# Opt-in, and it measures the *artifact*: gate condition 7 asks for the Section
+# 19.3 targets on the packaged build. The committed record of a measurement is
+# `docs/evaluation/baseline-phase-6.{json}` plus the named hardware in
+# `phase-6-baseline-environment.md`, which is what the gate cites — this switch
+# is how that record is refreshed and re-checked.
+if ($Perf) {
+    Invoke-Checked "Packaged performance" @(
+        "run", "python", "scripts/measure_phase6_perf.py", "--runs", "10"
+    )
+} else {
+    Write-Output "==> Packaged performance (skipped; pass -Perf to measure)"
 }
 
 if ($SkipE2E) {

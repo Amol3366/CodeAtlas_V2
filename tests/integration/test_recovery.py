@@ -222,6 +222,13 @@ def test_building_services_recovers_a_crashed_snapshot(
 def test_prune_keeps_the_active_and_one_superseded_snapshot(
     harness: Harness, sample_repo: Path
 ) -> None:
+    """Since P6-08 indexing applies retention itself, so by the time an
+    explicit prune runs there is nothing left for it to delete.
+
+    The assertion that changed is the second one. It used to require a
+    non-empty deletion list, which quietly depended on the bound *not* being
+    enforced anywhere else — the very defect P6-08 found.
+    """
     repository_id = _register(harness, sample_repo)
     for _ in range(3):
         harness.services.indexing.index(repository_id)
@@ -235,7 +242,7 @@ def test_prune_keeps_the_active_and_one_superseded_snapshot(
         (repository_id,),
     ).fetchone()[0]
     assert remaining == 2
-    assert report.deleted_snapshot_ids
+    assert report.deleted_snapshot_ids == ()
 
 
 def test_prune_never_deletes_the_active_snapshot(

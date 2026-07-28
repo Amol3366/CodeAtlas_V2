@@ -42,7 +42,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
 | 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `complete` | User |
 | 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `complete` | User |
-| 6 — Continuous freshness and hardening | [phase plan](phases/phase-06-freshness-and-hardening.md) | `in_progress` (plan approved 2026-07-28) | User |
+| 6 — Continuous freshness and hardening | [phase plan](phases/phase-06-freshness-and-hardening.md) | `awaiting_user_approval` (all nine conditions met 2026-07-28) | User |
 | 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
 
 ## Active Work
@@ -50,12 +50,12 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-08 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04, P6-05, P6-06, P6-07 `complete`; P6-08 `ready` |
+| Active task | none — **Phase 6 is `awaiting_user_approval`** |
+| Task status | Phases 0–5 `complete`; every Phase 6 task `complete` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-28T17:34:00Z |
-| Git state | Branch `main` at `ee12278` (P6-06 committed) when P6-07 began. The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-07 leaves it untouched. |
-| Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
+| Started UTC | 2026-07-28T18:20:00Z |
+| Git state | Branch `main` at `cd2e8d0` (P6-07 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-08 leaves it untouched. |
+| Next gate | **Phase 6 completion gate — awaiting the user.** All nine conditions are met; one unfixed defect is reported rather than hidden (the API process can crash under sustained change analysis). Phase 7 additionally needs its own product, privacy, and architecture approval before a plan exists. |
 
 ### Phase 6 Task Board (active)
 
@@ -70,7 +70,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `complete` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `complete` |
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `complete` |
-| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `ready` |
+| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `complete` |
 
 P6-STREAM was inserted 2026-07-28 on the user's approval of ADR-0008. P6-03's
 dependency (P6-02) is satisfied; it is `pending` only to record the user's
@@ -184,6 +184,112 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T19:55:00Z — P6-08 completed; Phase 6 `awaiting_user_approval`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `cd2e8d0`.
+- Transition: P6-08 `ready -> in_progress -> complete`; Phase 6
+  `in_progress -> awaiting_user_approval`. **Only the user may approve it.**
+- Outcome: all nine gate conditions met, and **the validation did its job** —
+  it found three defects, two now fixed and one reported unfixed.
+
+#### The four decisions the user made
+
+1. **Performance driven over the packaged build's own API, server started
+   once**, with cold start reported separately rather than smeared across every
+   sample. Comparable with the Phase 4 in-process numbers by construction.
+2. **A new security suite driving the real binary**, rather than re-running the
+   in-process suites and calling it a packaged sweep.
+3. **`-Perf` as an opt-in gate switch**, with the committed baseline plus named
+   hardware as the evidence.
+4. **Playwright stays at the three suites.** Widening to the Section 14 set is
+   real work with its own value; folding it in here would have delayed the gate
+   for scope the plan itself labelled optional.
+
+#### What the validation found
+
+1. **Snapshots accumulated forever — fixed.** `SnapshotRecoveryService.prune`
+   had existed since Phase 2, documented the policy, and **was never called by
+   anything**. Every index left its predecessor behind permanently. Before
+   Phase 6 that burned slowly; the watcher changed the arithmetic, because a
+   repository edited all day is reindexed all day. Measured over 20 reindexes
+   plus 20 preflights: refresh drifted 1.6 s → 2.3 s, *through the 2 s target*,
+   and preflight stepped from 4.6 s to 10.6 s and stayed there. Retention now
+   runs where snapshots are made, so the bound holds for the CLI, the API, the
+   watcher, and the reconciling scan alike. Failure is a warning, never a failed
+   index: the snapshot is already active by then.
+2. **The SPA fallback returned a bare 404 for unknown `/v1` paths — fixed.**
+   Right status, no content type, empty body. Not HTML, so P6-06's rule held,
+   but a client that always reads `error.code` met a parse failure rather than a
+   stable code. `/v1` now returns the contract envelope for 404 and 405; outside
+   `/v1` the plain response is unchanged, because the static mount and the
+   client-side fallback depend on it.
+3. **The API process can crash under sustained change analysis — UNFIXED.**
+   A Windows access violation inside `nt._getfinalpathname`, in an anyio worker
+   thread, during `analyze_working_tree`. Established: it is a crash and not a
+   hang (handles, threads, and memory are flat to the moment it dies); it is not
+   packaging, because a source-run uvicorn reproduces it; it is not the snapshot
+   accumulation, because it survives that fix; it is not a fixed request count
+   (6th, 17th, 44th analysis in different runs); it is specific to change
+   analysis, since 20 consecutive reindexes never trigger it; and it is not
+   plain `realpath` under concurrent writes, which survives 30,000 threaded
+   resolutions. Not established: the cause. A fault inside a syscall is where
+   corrupted state finally faults, not necessarily where it was caused, and
+   guessing at a fix for a memory fault would be worse than reporting it
+   accurately. Full record with the captured stack:
+   `docs/evaluation/phase-6-baseline-environment.md`.
+
+#### Gate condition 7 — performance, on the packaged artifact
+
+| Metric | Packaged | Phase 4 source | Target | Met |
+| --- | ---: | ---: | ---: | --- |
+| Changed-file refresh p95 | **1.332 s** | 1.426 s | ≤ 2 s | yes |
+| Warm change-preflight p95 | **3.090 s** | 5.151 s | ≤ 10 s | yes |
+| Cold start to first answer | 1.627 s | n/a | — | reported |
+
+The packaged build beating the source measurement is not a packaging effect; it
+is the retention fix. Hardware, method, and the open defect are recorded
+together in `phase-6-baseline-environment.md`, per Section 19.3's naming rule.
+
+The baseline uses 10 samples per target because 20 reproduces the crash often
+enough that the measurement cannot be relied on to finish. **That constraint is
+part of the record rather than a footnote to it.**
+
+#### Gate condition 8 — security, on the packaged artifact
+
+`tests/security/test_packaged_surface.py` (9 tests) drives the real binary:
+loopback-only binding proven **on a socket** rather than against a constant,
+`--host 0.0.0.0` refused, no `access-control-*` headers, the error envelope with
+no traceback or filesystem path, four traversal encodings refused, and no `.env`,
+`.git`, database, lockfile, test fixture, `.spec.ts`, or stray `.sql` in the
+bundle. The threat model's Phase 6 section is now the review rather than a
+placeholder, and states the crash as an availability fact.
+
+#### Verification in this environment, each run and its exit code
+
+- `check_phase6.ps1 -SkipSync -Package` — **exit 0**, Playwright and packaging
+  included; packaged smoke tests 5 passed.
+- `check_phase0..5.ps1 -SkipSync` — **all exit 0** (gate condition 9).
+- `uv run pytest -q` — **1381 passed** (1365 before; +16).
+- `uv run ruff check` — exit 0; `mypy --no-incremental` — **231 source files**,
+  no issues.
+- Web: **99 vitest passed**; Playwright **10 passed, 4 skipped**.
+- `scripts/measure_phase6_perf.py --runs 10` — **exit 0**, both targets met.
+
+#### Contracts, migrations, limitations
+
+- **No migration and no contract change.** `SCHEMA_VERSION` stays 9 and
+  `contract_version` stays `"1.1"`. The `/v1` 404 now carries the envelope it
+  always should have; nothing that previously parsed stops parsing.
+- **One behavior change worth naming**: an explicit `prune` after indexing is
+  now a no-op, because indexing already pruned. `test_recovery.py` was updated
+  to assert that, and the change to that assertion is itself the evidence.
+- Four qualifications carried to the gate: the crash above, the Chromium
+  renderer skips, pid reuse not being detected in recovery, and the unsigned
+  executable. All four are in `docs/operations/release-validation.md`.
+- Next: **the user's decision on the Phase 6 gate.** Phase 7 additionally needs
+  its own product, privacy, and architecture approval before a plan exists.
+
 
 ### 2026-07-28T18:05:00Z — P6-07 completed; P6-08 `ready`
 

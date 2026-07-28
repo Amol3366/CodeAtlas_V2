@@ -11,9 +11,10 @@ Two rules shape the routing, and both are easy to get wrong:
 * **A client-side route is not a file.** `/conversations/{id}` exists only in the
   browser's router, so a deep link or a reload has to be answered with
   `index.html` and let the router take over.
-* **The fallback must not swallow `/v1`.** An unknown API path stays a JSON 404.
-  Returning HTML to a client expecting JSON converts a clear failure into a
-  parse error somewhere further away from the cause.
+* **The fallback must not swallow `/v1`.** An unknown API path comes back as the
+  contract error envelope with a 404, not as the shell. Returning HTML to a
+  client expecting JSON converts a clear failure into a parse error somewhere
+  further away from the cause.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -82,8 +83,12 @@ def mount_web_application(app: FastAPI, assets: Path) -> None:
         if f"/{full_path}".startswith(_API_PREFIX):
             # Unreachable through normal routing — an API path would have
             # matched its router first — but a request for an *unknown* `/v1`
-            # path arrives here, and it must stay JSON.
-            return Response(status_code=404)
+            # path arrives here. Raising rather than returning a bare 404 sends
+            # it through the application's error handler, so it comes back as
+            # the contract envelope; returning `Response(404)` here gave the
+            # right status with no body, which a client reading `error.code`
+            # cannot parse (found in P6-08).
+            raise HTTPException(status_code=404)
 
         candidate = _file_within(assets, full_path)
         if candidate is not None:

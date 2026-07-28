@@ -1,7 +1,10 @@
 # Phase 6 — Continuous Freshness and Hardening
 
-Status: `in_progress` (plan approved by the user 2026-07-28, who accepted the
-stated defaults for all four open questions; see "Resolved Defaults" below)
+Status: `awaiting_user_approval` (all nine gate conditions met 2026-07-28, with
+one unfixed defect reported rather than hidden — see gate condition 7 and
+`docs/evaluation/phase-6-baseline-environment.md`. Plan approved by the user
+2026-07-28, who accepted the stated defaults for all four open questions; see
+"Resolved Defaults" below)
 Gate authority: user
 Prerequisites: Phase 5 approved; `AGENTS.md` Sections 9, 15, 17, 18, 19; the
 blueprint
@@ -85,9 +88,9 @@ with verification evidence recorded in the handoff log.
 | 4 | A process killed mid-index recovers to the previous active snapshot with no orphaned rows, and says what it recovered | crash-recovery tests — **met 2026-07-28** (P6-04): a genuinely killed subprocess is recovered and reindexes, no snapshot-scoped table keeps rows for the dead snapshot, and diagnostics distinguish an interrupted run from a repository never indexed. Recovery also stopped being able to destroy a live index; see the ADR-0007 Outcome section |
 | 5 | A packaged Windows build installs, runs, and upgrades from the previous schema version without losing a snapshot or a conversation | packaging + upgrade tests — **met 2026-07-28** (P6-06 + P6-07): the packaged binary upgrades a database written by a *real* prior build, checkpointing before it migrates, and every declared row survives. An older build opening a newer database now refuses instead of quietly serving a schema it has never seen |
 | 6 | Backup, restore, and deletion are explicit, complete, and reversible where documented; a restored database passes integrity checks | backup/restore tests — **met 2026-07-28** (P6-05): a backup taken from an open database restores and answers; a corrupted or newer-schema backup is refused *before* the target is touched; repository deletion refuses to take conversations without an explicit cascade; the retention sweep never touches an undeleted conversation |
-| 7 | Performance targets from Section 19.3 still hold on the packaged build, on named hardware | `scripts/measure_phase6_perf.py` |
-| 8 | The security sweep passes against the packaged artifact, including the browser surface | `tests/security/**`, updated threat model |
-| 9 | Phases 1–5 gates still pass unchanged | `check_phase5.ps1` plus the new `check_phase6.ps1` |
+| 7 | Performance targets from Section 19.3 still hold on the packaged build, on named hardware | `scripts/measure_phase6_perf.py` — **met 2026-07-28** (P6-08): refresh p95 **1.33 s** (≤ 2 s), preflight p95 **3.09 s** (≤ 10 s), cold start 1.63 s, measured on the artifact over its own API. Both are *better* than the Phase 4 source numbers, because the measurement found and fixed unbounded snapshot accumulation. It also found an **unfixed crash**, recorded in `docs/evaluation/phase-6-baseline-environment.md` |
+| 8 | The security sweep passes against the packaged artifact, including the browser surface | `tests/security/test_packaged_surface.py`, updated threat model — **met 2026-07-28** (P6-08): loopback-only binding proven on a socket, non-loopback refused, no CORS headers, the error envelope intact, traversal refused, and no developer material in the bundle. It found the SPA fallback returning a bare 404 for unknown `/v1` paths instead of the envelope |
+| 9 | Phases 1–5 gates still pass unchanged | `check_phase5.ps1` plus the new `check_phase6.ps1` — **met 2026-07-28**: `check_phase0` through `check_phase5` all exit 0, as does `check_phase6 -Package` |
 
 A missed target is reported as missed, with the measurement and the reason.
 
@@ -179,7 +182,7 @@ anything, and refuses rather than half-restoring.
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `complete` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `complete` |
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `complete` |
-| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `ready` |
+| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `complete` |
 
 **P6-STREAM was inserted on 2026-07-28**, after the user approved the
 accept-then-stream contract change (ADR-0008) and chose to build it before

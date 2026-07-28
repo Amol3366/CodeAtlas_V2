@@ -125,6 +125,10 @@ def build_services(
         git=GitAdapter(),
         registry=default_registry(),
         connection=connection,
+        # Retention is wired here rather than left to callers so the bound
+        # holds for every adapter. Before P6-08 nothing called `prune` at all,
+        # and every index left its predecessor behind permanently.
+        retention=recovery,
     )
 
     # Hoisted because the conversation pipeline answers through these exact

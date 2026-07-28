@@ -273,6 +273,49 @@ made and approved on 2026-07-28.
 No migration and no contract change: `SCHEMA_VERSION` stays 9 and
 `contract_version` stays `"1.1"`. The new error code is additive.
 
+### What validating on the artifact found (P6-08)
+
+The consequences section predicted that "the packaged artifact becomes the thing
+under test for performance and security, which means the gate gets slower and
+more environment-dependent. That is the cost of testing what users actually
+run." The cost was as expected. What was not expected is that measuring it would
+find the phase's own decisions incomplete.
+
+1. **Decision 1 made an old omission dangerous.** `prune` had existed since
+   Phase 2, documented the retention policy, and **was never called by
+   anything** — every index left its predecessor behind permanently. That was
+   survivable while a human decided when to reindex. A watcher reindexes all
+   day, which is decision 1 working exactly as designed, and it turned an
+   unbounded database from a slow leak into the thing that pushed refresh
+   *through* its 2 s target and stepped preflight from 4.6 s to 10.6 s.
+   Retention now runs where snapshots are made, so the bound holds for every
+   caller rather than depending on each one remembering.
+
+   Worth stating as a general lesson: a policy that exists, is documented, and
+   is tested can still be dead code. Its tests passed because they called it
+   directly.
+
+2. **The packaging rule needed the artifact to prove it.** ADR-0007 decision 6
+   says packaging changes no runtime contract, and P6-06 asserted an unknown
+   `/v1` path "stays a JSON 404". It stayed a 404 and was never JSON — a bare
+   status with an empty body. The in-process test asserted only the absence of
+   HTML, so it passed. The packaged security suite asserted the envelope, and
+   failed.
+
+3. **One defect is reported unfixed.** The API process can crash under sustained
+   change analysis: a Windows access violation inside a filesystem syscall, in a
+   worker thread. It is characterized in
+   `docs/evaluation/phase-6-baseline-environment.md` with its captured stack and
+   the six hypotheses ruled out. It is not packaging-specific, and naming its
+   cause needs a native debugger.
+
+   It is recorded rather than worked around because the plausible workaround —
+   caching the resolved repository root to halve the syscalls — would weaken a
+   security control (each read re-resolves both sides so a symlink cannot escape
+   the root) to reduce the frequency of a crash whose cause is unknown. Trading
+   a containment check against a bug nobody has explained is the wrong trade to
+   make quietly.
+
 ## Alternatives considered
 
 - **Trusting filesystem events as truth.** Rejected: silent event loss on

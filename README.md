@@ -74,8 +74,15 @@ pointed at a newer database refuses rather than answering from a schema it has
 never seen. The path is tested from a database written by a real earlier build
 (`docs/operations/upgrade-and-migration.md`).
 
-Not built yet: performance and security re-verified on the packaged artifact
-(Phase 6); and embeddings or any model provider (Phase 7).
+Performance and security are verified on the packaged artifact rather than a
+source checkout: refresh p95 1.33 s and change-preflight p95 3.09 s against the
+binary, and a security suite that drives the real executable
+(`docs/operations/release-validation.md`). That validation found two defects and
+fixed them, and one it could not fix — **the API process can crash under
+sustained change analysis**, described in full in
+`docs/evaluation/phase-6-baseline-environment.md`.
+
+Not built yet: embeddings or any model provider (Phase 7).
 `docs/plans/PLAN.md` is the live phase and task status.
 
 ## Windows development
@@ -106,7 +113,9 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/backup-and-restore.md` — backup, restore, deletion, and retention
 - `docs/operations/packaging-and-install.md` — building, installing, and `serve --web`
 - `docs/operations/upgrade-and-migration.md` — upgrading, the checkpoint, and the refusal
+- `docs/operations/release-validation.md` — what to run before a release, and what each step proves
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
 - `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers
+- `docs/evaluation/phase-6-baseline-environment.md` — packaged performance, and the one open defect
 - `docs/security/threat-model.md` — controls and their enforcement status

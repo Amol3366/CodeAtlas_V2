@@ -20,7 +20,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from codeatlas.api.errors import codeatlas_error_response, error_response
 from codeatlas.api.routers import (
@@ -43,6 +44,14 @@ from codeatlas.storage.sqlite.connection import default_database_path
 
 API_TITLE = "CodeAtlas local API"
 API_VERSION = "1.0"
+
+# Transport-level failures that never reach a route, mapped to the contract's
+# codes. A route that *does* run raises a `CodeAtlasError` and is handled above;
+# these are the ones Starlette answers on its own.
+_API_FAILURES: dict[int, tuple[ErrorCode, str]] = {
+    404: (ErrorCode.INVALID_REQUEST, "No such endpoint."),
+    405: (ErrorCode.INVALID_REQUEST, "That method is not allowed here."),
+}
 
 
 def create_app(
@@ -142,6 +151,41 @@ def create_app(
             message="The request body or parameters are invalid.",
             retryable=False,
             status_code=422,
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_exception(
+        request: Request, error: StarletteHTTPException
+    ) -> Response:
+        """Give unmatched and unsupported `/v1` requests the error envelope.
+
+        Starlette answers an unknown route with a bare status and no body. A
+        client that always reads `error.code` then meets a parse failure
+        instead of a stable code — the same complaint the SPA fallback rule
+        exists to prevent, one layer further in (`CLAUDE.md` Section 12.6).
+
+        Only `/v1` is translated. Outside it the plain response is what the
+        static mount and the client-side route fallback depend on.
+        """
+        if not request.url.path.startswith("/v1"):
+            # Starlette's own default, reproduced rather than imported: the
+            # helper that used to expose it is not part of its public surface.
+            if error.status_code in {204, 304}:
+                return Response(status_code=error.status_code, headers=error.headers)
+            return PlainTextResponse(
+                error.detail, status_code=error.status_code, headers=error.headers
+            )
+
+        code, message = _API_FAILURES.get(
+            error.status_code,
+            (ErrorCode.INVALID_REQUEST, "The request could not be handled."),
+        )
+        return error_response(
+            request,
+            code=code,
+            message=message,
+            retryable=False,
+            status_code=error.status_code,
         )
 
     @app.exception_handler(Exception)

@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from sqlite3 import Connection
+from typing import Protocol
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -61,7 +62,23 @@ from codeatlas.storage.sqlite.stores import (
 
 INDEX_VERSION: str = "1.0.0"
 
+# Retention could not run. The snapshot is active and the answer is correct;
+# what is unbounded is the database's growth, which is a support problem rather
+# than a correctness one — so it is reported and does not fail the run.
+RETENTION_FAILED_WARNING: str = "SNAPSHOT_RETENTION_FAILED"
+
 _RELATIVE_PATH_ADAPTER: TypeAdapter[str] = TypeAdapter(RepositoryRelativePath)
+
+
+class SnapshotRetention(Protocol):
+    """Just enough of the recovery service for indexing to enforce the bound.
+
+    A protocol rather than the concrete service: indexing needs one method, and
+    depending on the whole of recovery would make the direction of that
+    dependency look larger than it is.
+    """
+
+    def prune(self, repository_id: str) -> object: ...
 
 
 class SnapshotValidationError(CodeAtlasError):
@@ -120,7 +137,9 @@ class IndexRepositoryService:
         connection: Connection,
         clock: Callable[[], datetime] | None = None,
         limits: ScanLimits | None = None,
+        retention: SnapshotRetention | None = None,
     ) -> None:
+        self._retention = retention
         self._repositories = repositories
         self._snapshots = snapshots
         self._files = files
@@ -138,6 +157,29 @@ class IndexRepositoryService:
         self._connection = connection
         self._clock = clock or (lambda: datetime.now(UTC))
         self._limits = limits or ScanLimits()
+
+    def _apply_retention(
+        self, repository_id: str, warnings: tuple[str, ...]
+    ) -> tuple[str, ...]:
+        """Drop snapshots beyond the retention policy, after activation.
+
+        Retention runs here rather than in any one adapter so the bound holds
+        for every caller — CLI, API, watcher, reconciling scan. Left to the
+        callers it would be one more thing each had to remember, and the
+        watcher is precisely the caller that indexes without anyone watching.
+
+        Failure is a **warning, not an error**. The new snapshot is already
+        active by this point; turning a housekeeping failure into a failed
+        index would report a good snapshot as a bad one and send the next run
+        off to rebuild it.
+        """
+        if self._retention is None:
+            return warnings
+        try:
+            self._retention.prune(repository_id)
+        except Exception:
+            return (*warnings, RETENTION_FAILED_WARNING)
+        return warnings
 
     def index(self, repository_id_value: str) -> IndexResult:
         """Scan, parse, stage, validate, and activate a snapshot."""
@@ -268,6 +310,8 @@ class IndexRepositoryService:
         activated_at = self._clock()
         with write_transaction(self._connection):
             self._snapshots.activate(snapshot_id, activated_at)
+
+        warnings = self._apply_retention(repository_id_value, warnings)
 
         self._jobs.finish(
             job_id,

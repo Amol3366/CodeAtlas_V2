@@ -1,0 +1,21 @@
+{
+  "artifact": "codeatlas.exe",
+  "artifact_built_at": "2026-07-28T20:37:20.423919Z",
+  "artifact_size_bytes": 9616446,
+  "cold_index_s": 4.744,
+  "cold_start_s": 1.627,
+  "harness_python": "3.12.12",
+  "machine": "AMD64",
+  "measured_on": "packaged build",
+  "modules": 300,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "preflight_p50_s": 2.945,
+  "preflight_p95_s": 3.09,
+  "preflight_target_met": true,
+  "preflight_target_s": 10.0,
+  "refresh_p50_s": 1.274,
+  "refresh_p95_s": 1.332,
+  "refresh_target_met": true,
+  "refresh_target_s": 2.0,
+  "runs": 10
+}

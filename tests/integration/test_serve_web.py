@@ -76,11 +76,36 @@ def test_a_client_side_route_falls_back_to_the_shell(client: TestClient) -> None
 
 
 def test_an_unknown_api_path_stays_a_json_404(client: TestClient) -> None:
-    """The rule the fallback must not break."""
+    """The rule the fallback must not break.
+
+    P6-08 found this returning a *bare* 404 — right status, no content type,
+    empty body. Not HTML, so the fallback rule held, but a client that always
+    reads `error.code` met a parse failure rather than a stable code.
+    """
     response = client.get("/v1/not-a-real-endpoint")
 
     assert response.status_code == 404
     assert "text/html" not in response.headers.get("content-type", "")
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+    assert response.json()["error"]["request_id"]
+
+
+def test_a_wrong_method_on_a_real_endpoint_is_the_envelope(
+    client: TestClient,
+) -> None:
+    response = client.delete("/v1/repositories")
+
+    assert response.status_code == 405
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+
+
+def test_the_shell_is_still_served_without_an_envelope(client: TestClient) -> None:
+    """Only `/v1` is translated. A missing asset stays a plain 404, because the
+    static mount and the client-side fallback depend on that behavior."""
+    response = client.get("/assets/not-a-real-file.js")
+
+    assert response.status_code == 404
+    assert "error" not in response.text
 
 
 def test_an_api_error_is_still_the_error_envelope(client: TestClient) -> None:
