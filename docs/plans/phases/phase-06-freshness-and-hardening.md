@@ -1,11 +1,14 @@
 # Phase 6 — Continuous Freshness and Hardening
 
 Status: `complete` — **gate approved by the user 2026-07-29**, with four
-qualifications stated before approval and carried by it, the first being an
-unfixed defect (the API process can crash under sustained change analysis; see
-gate condition 7 and `docs/evaluation/phase-6-baseline-environment.md`). The
-plan itself was approved 2026-07-28, with the stated defaults for all four open
-questions; see "Resolved Defaults" below.
+qualifications stated before approval and carried by it. The first of them — a
+server that stopped answering under sustained change analysis — was **diagnosed
+properly and fixed after the approval**, on the user's instruction; it was
+uvicorn's access log blocking the event loop on an unread stdout pipe, not the
+memory fault it had been recorded as. See
+`docs/evaluation/phase-6-baseline-environment.md`. Three qualifications remain.
+The plan itself was approved 2026-07-28, with the stated defaults for all four
+open questions; see "Resolved Defaults" below.
 Gate authority: user
 Prerequisites: Phase 5 approved; `AGENTS.md` Sections 9, 15, 17, 18, 19; the
 blueprint

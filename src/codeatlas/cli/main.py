@@ -765,7 +765,18 @@ def serve(
         with contextlib.suppress(OSError):
             webbrowser.open(url)
 
-    uvicorn.run(application, host=host, port=port)
+    # `access_log=False` for two reasons that happen to agree.
+    #
+    # It is what `CLAUDE.md` Section 17 asks for: the access log records a
+    # request path per request, and this product writes no logs by default.
+    #
+    # It is also a deadlock this server had. uvicorn writes that line
+    # synchronously **on the event-loop thread**. A server launched by a
+    # shortcut, a wrapper script, or a test harness usually gets a pipe for
+    # stdout that nobody reads; a pipe holds a few kilobytes, and the write
+    # that fills it blocks forever. Not one request — every request, with the
+    # process alive and nothing in the log to say why (found in P6-08).
+    uvicorn.run(application, host=host, port=port, access_log=False)
 
 
 @app.command("backup")

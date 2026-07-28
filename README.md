@@ -75,12 +75,12 @@ never seen. The path is tested from a database written by a real earlier build
 (`docs/operations/upgrade-and-migration.md`).
 
 Performance and security are verified on the packaged artifact rather than a
-source checkout: refresh p95 1.33 s and change-preflight p95 3.09 s against the
+source checkout: refresh p95 1.30 s and change-preflight p95 3.10 s against the
 binary, and a security suite that drives the real executable
-(`docs/operations/release-validation.md`). That validation found two defects and
-fixed them, and one it could not fix — **the API process can crash under
-sustained change analysis**, described in full in
-`docs/evaluation/phase-6-baseline-environment.md`.
+(`docs/operations/release-validation.md`). That validation found three defects,
+all now fixed — including a server that stopped answering under sustained load,
+which took a wrong diagnosis before the right one
+(`docs/evaluation/phase-6-baseline-environment.md`).
 
 Not built yet: embeddings or any model provider (Phase 7).
 `docs/plans/PLAN.md` is the live phase and task status.

@@ -138,18 +138,19 @@ gap between the two, so testing the source tree twice would not find one.
 | Install over a running process | enforced | `install_windows.ps1` refuses while `codeatlas.exe` is running from the install folder, rather than deleting it out from under a live process and leaving a half-replaced install |
 | Unbounded local storage growth | enforced | indexing applies snapshot retention, so a watched repository reindexed all day no longer keeps every snapshot forever. Before P6-08 nothing called `prune`; the local database grew without limit for as long as CodeAtlas ran |
 
-### Availability, stated rather than claimed
+### Availability
 
-**The API process can crash under sustained change analysis.** A Windows access
-violation inside a filesystem syscall kills the server; it is unfixed, it is not
-packaging-specific, and it is described with its captured stack and everything
-ruled out in `docs/evaluation/phase-6-baseline-environment.md`.
+| Control | Status | Where it is enforced |
+| --- | --- | --- |
+| Denial of service through the server's own output | enforced | `serve` runs with uvicorn's access log off. It wrote one line per request **on the event-loop thread**; a server launched with a pipe for stdout that nobody reads filled that pipe and blocked forever, taking every request with it. `tests/integration/test_serve_output_backpressure.py` drives 400 requests at a server whose output is never read |
 
-It is recorded here because a local service that can die is an availability
-fact, and this document is where the product's security posture is supposed to
-be honest rather than flattering. It is not a confidentiality or integrity
-issue: nothing is exposed, and the last valid active snapshot survives the
-crash — restarting recovers, which is what P6-04 built.
+This was recorded here on 2026-07-28 as an unfixed memory-fault crash. It was
+diagnosed properly and fixed on 2026-07-29; the wrong diagnosis, and what made
+it wrong, are kept in `docs/evaluation/phase-6-baseline-environment.md` rather
+than deleted.
+
+Turning the access log off also aligns the server with Section 17: this product
+writes no logs by default, and an access log records a request path per request.
 
 ## Provider Opt-In Gate
 

@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | none — **Phases 0–6 are `complete`.** Phase 7 is not activated |
-| Active task | none |
-| Task status | Phases 0–6 `complete`, every gate approved by the user |
+| Active task | none — the post-approval defect fix is complete |
+| Task status | Phases 0–6 `complete`, every gate approved by the user. One qualification carried by the Phase 6 approval has since been fixed |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-29T04:20:00Z (approval recorded) |
-| Git state | Branch `main` at `d78216a`. The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint, untouched throughout Phase 6. |
+| Started UTC | 2026-07-29T05:10:00Z (post-approval defect fix) |
+| Git state | Branch `main` at `ed23aea`. The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint, untouched throughout Phase 6. |
 | Next gate | **Phase 7's activation gate**, which is separate from a completion gate and has not been requested. `CLAUDE.md` Section 20 requires explicit product, privacy, and architecture approval to be recorded *before* a Phase 7 plan is written. No agent may begin Phase 7 work until that approval exists. |
 
 ### Phase 6 Task Board (active)
@@ -184,6 +184,76 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-29T05:10:00Z — Post-approval: the "crash" was a blocked write, and it is fixed
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `ed23aea`.
+- Scope: the first qualification the Phase 6 approval carried, at the user's
+  instruction. No phase status changes; Phase 6 stays `complete`.
+- **The two entries below this one describe this defect incorrectly. They are
+  not edited, because handoff evidence is append-only; this entry is the
+  correction.**
+
+#### What it actually was
+
+uvicorn's **access log**. One line per request, written synchronously **on the
+event-loop thread**. A server launched with a pipe for stdout that nobody reads
+— a shortcut, a wrapper script, a test harness — fills that pipe within a few
+dozen lines, and the write that fills it blocks forever. Every request stops,
+not just the one in flight.
+
+`py-spy dump` against the live hung process named it in one line: the main
+thread parked in `logging.StreamHandler.flush`, emitting
+`'... "POST /v1/change-analysis/working-tree HTTP/1.1" 200 OK'`. The analysis had
+already **succeeded**; the server was blocked announcing it.
+
+Falsified by removing one variable: with a thread draining stdout, 60
+consecutive analyses pass; without it, the hang lands at the same request every
+time.
+
+**Fix:** `access_log=False` in `serve`. Section 17 wanted it independently —
+this product writes no logs by default, and an access log records a request path
+per request.
+
+#### What the earlier entries got wrong, and how
+
+1. **"It is a crash, not a hang."** It was always a hang. A later run confirmed
+   `server alive=True` at the moment of failure.
+2. **"A Windows access violation in `nt._getfinalpathname`."** That stack came
+   from a run instrumented with `faulthandler.dump_traceback_later(repeat=True)`,
+   which walks frame objects from another thread while the interpreter runs.
+   **The instrumentation faulted, not the product.** It was the only observation
+   that appeared to explain the others, so it displaced them.
+3. **"Not packaging — a source-run uvicorn reproduces it."** The source server
+   in that comparison ran at `log_level="warning"`, which suppresses access
+   logs. It could not have reproduced it, and never did.
+
+The observation that mattered was present from the start and was read as noise:
+the failure moved with **how much had been logged**, not with how many requests
+had been made — the 44th analysis alone, the 17th after 20 reindexes. That is a
+fixed-size buffer's fingerprint, not a leak or a race.
+
+#### Verification in this environment
+
+- `tests/integration/test_serve_output_backpressure.py` — written first,
+  **observed failing at request 59 of 400**, passing after the fix. It drives
+  400 requests at a server whose output nobody reads.
+- The packaged build, rebuilt: **60 consecutive change analyses** with an
+  undrained stdout pipe, all passing.
+- `scripts/measure_phase6_perf.py --runs 20` — **exit 0**, the sample count that
+  previously could not finish. Refresh p95 **1.295 s**, preflight p95
+  **3.103 s**; `baseline-phase-6.json` re-recorded at 20 samples.
+- `check_phase6.ps1 -SkipSync -Package -Perf` — exit 0.
+- `uv run pytest -q` — 1382 passed; ruff and mypy clean.
+
+#### Documentation corrected rather than quietly replaced
+
+`phase-6-baseline-environment.md`, `threat-model.md`, `release-validation.md`,
+ADR-0007, `CLAUDE.md`, and `README.md` now describe the real cause, and each
+**keeps the wrong diagnosis on the record** with what made it wrong. Three
+qualifications remain on the release: the Chromium skips, pid reuse in recovery,
+and the unsigned executable.
+
 
 ### 2026-07-29T04:20:00Z — Phase 6 gate APPROVED by the user
 

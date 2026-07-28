@@ -302,19 +302,28 @@ find the phase's own decisions incomplete.
    HTML, so it passed. The packaged security suite asserted the envelope, and
    failed.
 
-3. **One defect is reported unfixed.** The API process can crash under sustained
-   change analysis: a Windows access violation inside a filesystem syscall, in a
-   worker thread. It is characterized in
-   `docs/evaluation/phase-6-baseline-environment.md` with its captured stack and
-   the six hypotheses ruled out. It is not packaging-specific, and naming its
-   cause needs a native debugger.
+3. **The server could stop answering under sustained change analysis.**
+   Originally recorded here as an unfixed memory-fault crash; diagnosed properly
+   and fixed on 2026-07-29.
 
-   It is recorded rather than worked around because the plausible workaround —
-   caching the resolved repository root to halve the syscalls — would weaken a
-   security control (each read re-resolves both sides so a symlink cannot escape
-   the root) to reduce the frequency of a crash whose cause is unknown. Trading
-   a containment check against a bug nobody has explained is the wrong trade to
-   make quietly.
+   It was **uvicorn's access log**, written one line per request on the
+   event-loop thread. A server launched with a pipe for stdout that nobody reads
+   — a shortcut, a wrapper script, a test harness — fills that pipe within a few
+   dozen lines, and the write that fills it blocks forever. Every request stops,
+   not just the one in flight. `serve` now runs with `access_log=False`, which
+   Section 17 asked for independently: this product writes no logs by default,
+   and an access log records a request path per request.
+
+   The lesson is about instrumentation rather than about logging. The original
+   diagnosis rested on a stack captured under
+   `faulthandler.dump_traceback_later(repeat=True)`, which walks frames from
+   another thread while the interpreter runs — **the instrumentation faulted,
+   and its fault looked like the bug**. It was the only observation that
+   appeared to explain the others, so it displaced them. The observation that
+   actually mattered was there the whole time: the failure moved with how much
+   had been *logged*, not with how many requests had been made, which is a
+   fixed-size buffer's fingerprint. `py-spy dump` against the live process named
+   it in one line, without perturbing it.
 
 ## Alternatives considered
 

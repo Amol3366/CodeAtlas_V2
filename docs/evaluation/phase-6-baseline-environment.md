@@ -1,9 +1,10 @@
-# Phase 6 Performance Environment, and One Open Defect
+# Phase 6 Performance Environment
 
-Status: recorded 2026-07-28
+Status: recorded 2026-07-28; **corrected and completed 2026-07-29** when the
+defect below was diagnosed properly and fixed
 Baseline artifact: `baseline-phase-6.json`
 Regenerate: `powershell -File scripts/build_package.ps1` then
-`uv run python scripts/measure_phase6_perf.py --runs 10 --json-output docs/evaluation/baseline-phase-6.json`
+`uv run python scripts/measure_phase6_perf.py --json-output docs/evaluation/baseline-phase-6.json`
 
 Gate condition 7 asks for the Section 19.3 performance targets **on the
 packaged build**. Phase 4 measured them in process from a source checkout; a
@@ -35,12 +36,14 @@ describe contention rather than refresh latency.
 
 ## Results
 
+20 samples per target, which is the sample count Phase 4 used.
+
 | Metric | Packaged (Phase 6) | Source, in-process (Phase 4) | Target | Met |
 | --- | ---: | ---: | ---: | --- |
-| Changed-file deterministic refresh p95 | **1.311 s** | 1.426 s | ≤ 2 s | yes |
-| Warm change-preflight p95 | **3.217 s** | 5.151 s | ≤ 10 s | yes |
-| Cold start to first answer | 1.104 s | n/a | — | reported |
-| Cold index, 300 modules | 6.703 s | n/a | — | reported |
+| Changed-file deterministic refresh p95 | **1.295 s** | 1.426 s | ≤ 2 s | yes |
+| Warm change-preflight p95 | **3.103 s** | 5.151 s | ≤ 10 s | yes |
+| Cold start to first answer | 1.627 s | n/a | — | reported |
+| Cold index, 300 modules | 2.287 s | n/a | — | reported |
 
 **The packaged build is faster than the Phase 4 source measurement**, which is
 not a packaging effect. It is the retention fix below: Phase 4's numbers were
@@ -67,57 +70,62 @@ API, the watcher, and the reconciling scan alike. With it, both numbers are flat
 across the run rather than degrading. Regression tests:
 `tests/integration/test_snapshot_retention.py`.
 
-### 2. The API process can crash under sustained change analysis — open
+### 2. The server stopped answering under sustained change analysis — fixed
 
-**This is an unfixed defect and it is reported as one.**
+Driving `POST /v1/change-analysis/working-tree` repeatedly, the server stopped
+answering **every** request — not the one in flight, all of them — while the
+process stayed alive with memory, threads, and handles flat and nothing in its
+log to say why.
 
-Driving `POST /v1/change-analysis/working-tree` repeatedly against the 300-module
-repository, the server process dies with a **Windows fatal exception: access
-violation**. The client sees a connection reset or a hung request; the process
-is gone.
+**The cause was uvicorn's access log.** It writes one line per request,
+synchronously, on the event-loop thread. A server launched by a shortcut, a
+wrapper script, or a test harness is usually given a pipe for stdout that nobody
+reads. A pipe holds a few kilobytes; the write that fills it blocks forever, and
+because that write happens on the event loop, the whole server stops.
 
-The captured faulthandler stack puts the fault inside a Windows syscall:
+`py-spy dump` against the live process named it in one line:
 
 ```text
-Windows fatal exception: access violation
-
-  File "<frozen ntpath>", line 739 in realpath        # nt._getfinalpathname
-  File "codeatlas/domain/paths.py", line 68 in is_inside_root
-  File "codeatlas/domain/paths.py", line 103 in resolve_inside_root
-  File "codeatlas/analysis/states.py", line 108 in _read
-  File "codeatlas/analysis/engine.py", line 290 in _classify_bodies
-  File "codeatlas/analysis/engine.py", line 136 in analyze
-  File "codeatlas/application/change_analysis.py", line 119 in analyze_working_tree
-  File "codeatlas/api/routers/change_analysis.py", line 47 in analyze_working_tree
-  File "anyio/_backends/_asyncio.py", line 1033 in run                # worker thread
+Thread (idle): "MainThread"
+    flush (logging/__init__.py:1144)
+    emit  (logging/__init__.py:1164)
+        msg: 'INFO:  127.0.0.1:54602 - "POST /v1/change-analysis/working-tree HTTP/1.1" 200 OK'
+    ...
+    send  (uvicorn/protocols/http/h11_impl.py:482)
 ```
 
-What is established:
+The analysis had already **succeeded**. The server was blocked announcing it.
 
-- **It is a crash, not a hang.** Handles, threads, and memory are flat right up
-  to the moment it dies — 260 handles, 10 threads, ~110 MB, unchanged.
-- **It is not packaging.** It reproduces identically on a source-run `uvicorn`
-  server, so it is not a frozen-build artifact.
-- **It is not the snapshot accumulation.** It survives the retention fix.
-- **It is not a fixed request count.** Observed at the 6th, 17th, and 44th
-  analysis in different runs — it is probabilistic under load.
-- **It is specific to change analysis.** Twenty consecutive reindexes through
-  the same server never triggered it, in any run.
-- **It is not plain `realpath` under concurrent writes.** A stdlib-only probe
-  doing 30,000 threaded resolutions over a tree being rewritten does not crash.
+Confirmed by removing the one variable: with a thread draining the server's
+stdout, 60 consecutive analyses pass; without it, the hang lands at the same
+request every time. The fix is `access_log=False` in `serve`, which also matches
+`CLAUDE.md` Section 17 — this product writes no logs by default, and an access
+log records a request path per request. Regression test:
+`tests/integration/test_serve_output_backpressure.py`, which drives 400 requests
+at a server whose output nobody reads.
 
-What is not established: the cause. A fault inside `nt._getfinalpathname` is
-where corrupted state finally faults, which is not necessarily where it was
-caused. Naming the cause needs a native debugger, and guessing at a fix for a
-memory fault would be worse than reporting it accurately.
+#### The wrong diagnosis, and why it was wrong
 
-**Impact.** Change preflight is the product's primary workflow, and the crash is
-in its server path. A single preflight, or a handful, is unaffected — the
-measured runs above complete cleanly, and the CLI path (a process per
-invocation) has never reproduced it. Sustained repeated preflight against one
-long-running server is what triggers it.
+This was first recorded here as an unfixed **"Windows fatal exception: access
+violation"** in `nt._getfinalpathname`, with a captured stack and six ruled-out
+hypotheses. That diagnosis was wrong, and the way it went wrong is worth keeping.
 
-The baseline above uses 10 samples per target, which completes reliably. Twenty
-samples reproduces the crash often enough that the measurement cannot be relied
-on to finish, and **that constraint is part of this record rather than a
-footnote to it**.
+The stack came from a run instrumented with
+`faulthandler.dump_traceback_later(repeat=True)`, which walks frame objects from
+a separate thread while the interpreter is running. **The instrumentation
+faulted, not the product.** Every other observation — the hangs — was real, but
+the one run that produced a stack produced a misleading one, and it was the only
+run that appeared to explain the others.
+
+Two claims made at the time were also wrong, both traceable to the same run:
+
+- *"It is a crash, not a hang."* It was always a hang. The process stayed alive;
+  a later run confirmed `server alive=True` at the moment of failure.
+- *"It is not packaging — a source-run uvicorn reproduces it."* The source
+  server in that comparison ran with `log_level="warning"`, which suppresses
+  access logs, so it could not have reproduced it. It never did.
+
+What was true, and what pointed at the answer once the crash theory was dropped:
+the failure moved with **how much had been logged** rather than how many
+requests had been made — the 44th analysis alone, the 17th after 20 reindexes —
+which is the fingerprint of a fixed-size buffer, not a leak or a race.

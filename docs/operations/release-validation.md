@@ -53,18 +53,20 @@ where they are named.
 These are stated at the gate rather than in a footnote, because a green run
 should not hide them.
 
-1. **The API process can crash under sustained change analysis.** A Windows
-   access violation inside a filesystem syscall; unfixed, not packaging-specific,
-   fully characterized in the baseline environment document. A single preflight
-   is unaffected; repeated preflight against one long-running server is what
-   triggers it.
-2. **Four conversation-route browser tests are skipped on Chromium**, whose
+1. **Four conversation-route browser tests are skipped on Chromium**, whose
    renderer crashes navigating to `/conversations/{id}`. A browser defect, not
    application code; Firefox proves all seven.
-3. **Recovery does not detect pid reuse.** If a dead run's pid is reassigned
+2. **Recovery does not detect pid reuse.** If a dead run's pid is reassigned
    before the next start, that repository stays blocked from reindexing.
    `codeatlas doctor` names the run and its pid, so it is visible rather than
    silent, but it is not automatic.
-4. **The executable is unsigned**, so SmartScreen warns on first run. Signing
+3. **The executable is unsigned**, so SmartScreen warns on first run. Signing
    needs a certificate, which is a purchasing decision rather than an
    engineering one.
+
+A fourth qualification stood here until 2026-07-29 — a server that stopped
+answering under sustained change analysis, first misdiagnosed as a memory-fault
+crash. It was uvicorn's access log blocking the event loop on an unread stdout
+pipe, and it is fixed. The mistaken diagnosis is kept in
+`docs/evaluation/phase-6-baseline-environment.md`, because how a wrong
+conclusion survived six ruled-out hypotheses is worth more than a tidy record.

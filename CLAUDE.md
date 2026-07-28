@@ -1092,7 +1092,8 @@ Build:
   without losing the last valid active snapshot or chat history.
 
 Gate approved by the user 2026-07-29, **with four qualifications stated at the
-gate and accepted**, the first of which is an unfixed defect (below). Evidence:
+gate and accepted**, the first of which was an unfixed defect at the time and
+has since been fixed (below). Evidence:
 ADR-0007 and ADR-0008, migration `0009`, `scripts/check_phase6.ps1 -Package
 -Perf`, `docs/evaluation/baseline-phase-6.json`,
 `docs/evaluation/phase-6-baseline-environment.md`,
@@ -1130,13 +1131,16 @@ anything — harmless while you reindexed by hand, serious once a watcher
 reindexes all day; and an unknown `/v1` path returned a **bare 404** rather than
 the contract envelope.
 
-Four qualifications, carried into the approval rather than resolved by it.
+Four qualifications were carried into the approval rather than resolved by it.
+**The first has since been fixed** (2026-07-29); three remain.
 
-- **The API process can crash under sustained change analysis**, with a Windows
-  access violation inside a filesystem syscall. Unfixed. Not packaging — a
-  source-run server reproduces it. A single preflight is unaffected; repeated
-  preflight against one long-running server is what triggers it. Everything
-  established and ruled out is in
+- ~~The API process can crash under sustained change analysis.~~ **Fixed.** It
+  was never a crash: uvicorn's access log writes one line per request on the
+  event-loop thread, so a server whose stdout pipe nobody drains blocked
+  forever and stopped answering everything. `serve` now runs with
+  `access_log=False`, which Section 17 wanted anyway. The original wrong
+  diagnosis — an "access violation" that turned out to be the debugging
+  instrumentation faulting, not the product — is kept in
   `docs/evaluation/phase-6-baseline-environment.md`.
 
 - Four conversation-route browser tests are **skipped on Chromium**, whose
