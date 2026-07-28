@@ -15,6 +15,7 @@ def test_schema_bundle_contains_versioned_public_contracts() -> None:
 
     assert bundle["contract_version"] == "1.0"
     assert set(bundle["schemas"]) == {
+        "change_analysis_report",
         "error_envelope",
         "finding",
         "query_response",
@@ -23,6 +24,9 @@ def test_schema_bundle_contains_versioned_public_contracts() -> None:
     query_schema = bundle["schemas"]["query_response"]
     assert query_schema["properties"]["contract_version"]["const"] == "1.0"
     assert query_schema["additionalProperties"] is False
+    report_schema = bundle["schemas"]["change_analysis_report"]
+    assert report_schema["properties"]["contract_version"]["const"] == "1.0"
+    assert report_schema["additionalProperties"] is False
 
 
 def test_schema_export_is_stable_sorted_json(tmp_path: Path) -> None:

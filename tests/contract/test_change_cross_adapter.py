@@ -1,0 +1,383 @@
+"""The same analysis through the service, REST, the CLI, and MCP.
+
+Gate condition 5 of the Phase 4 plan: four adapters, one answer. The comparison
+is field by field on the parts a consumer depends on — findings, their codes and
+order, the evidence IDs they cite, and the changed-symbol set — because an
+adapter that quietly drops a limitation or reorders findings has broken the
+contract even though every individual response still parses.
+
+The renderers are checked here too, for the properties that matter when the
+content came from a repository: Markdown cannot be escaped out of, and SARIF
+cannot carry an absolute path.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from codeatlas.api.app import create_app
+from codeatlas.application.change_analysis import ChangeAnalysisRequest
+from codeatlas.application.container import build_services
+from codeatlas.application.registration import RegisterRepositoryRequest
+from codeatlas.delivery import render_markdown, render_sarif
+from codeatlas.mcp.tools import build_registry
+from codeatlas.storage.sqlite.connection import connect
+from codeatlas.storage.sqlite.migrations import apply_migrations
+
+BASE_PY = 'def total(order):\n    return order["amount"]\n'
+TARGET_PY = (
+    "def total(order):\n"
+    "    if not order:\n"
+    '        raise ValueError("order is required")\n'
+    '    return order["amount"]\n'
+)
+
+
+def _git(root: Path, *args: str) -> None:
+    import os
+
+    subprocess.run(
+        ["git", *args],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        env={
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@example.com",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@example.com",
+            "PATH": os.environ.get("PATH", ""),
+            "GIT_CONFIG_GLOBAL": str(root / ".absent"),
+            "GIT_CONFIG_SYSTEM": str(root / ".absent"),
+        },
+    )
+
+
+@dataclass
+class Fixture:
+    database: Path
+    root: Path
+    repository_id: str
+
+
+@pytest.fixture()
+def prepared(tmp_path: Path) -> Iterator[Fixture]:
+    root = tmp_path / "repo"
+    root.mkdir()
+    _git(root, "init", "-b", "main")
+    (root / "orders.py").write_text(BASE_PY, encoding="utf-8")
+    _git(root, "add", ".")
+    _git(root, "commit", "-m", "base")
+    (root / "orders.py").write_text(TARGET_PY, encoding="utf-8")
+
+    database = tmp_path / "db.sqlite"
+    with connect(database) as connection:
+        apply_migrations(connection)
+        services = build_services(connection)
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(root))
+        )
+        yield Fixture(
+            database=database, root=root, repository_id=repository.repository_id
+        )
+
+
+def _service_report(fixture: Fixture) -> dict[str, Any]:
+    with connect(fixture.database) as connection:
+        services = build_services(connection)
+        report = services.change_analysis.analyze_working_tree(
+            ChangeAnalysisRequest(repository_id=fixture.repository_id)
+        )
+    return report.model_dump(mode="json")
+
+
+def _rest_report(fixture: Fixture) -> dict[str, Any]:
+    client = TestClient(create_app(fixture.database))
+    response = client.post(
+        "/v1/change-analysis/working-tree",
+        json={"repository_id": fixture.repository_id, "base_ref": "HEAD"},
+    )
+    assert response.status_code == 200, response.text
+    return dict(response.json())
+
+
+def _mcp_report(fixture: Fixture) -> dict[str, Any]:
+    with connect(fixture.database) as connection:
+        services = build_services(connection)
+        registry = build_registry()
+        result = registry.call(
+            services,
+            "analyze_working_tree",
+            {"repository_id": fixture.repository_id, "base_ref": "HEAD"},
+        )
+    assert isinstance(result, dict)
+    return result
+
+
+def _cli_report(fixture: Fixture) -> dict[str, Any]:
+    from typer.testing import CliRunner
+
+    from codeatlas.cli.main import app
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "impact",
+            fixture.repository_id,
+            "--db",
+            str(fixture.database),
+            "--format",
+            "json",
+        ],
+    )
+    assert result.exit_code in {0, 4}, result.output
+    return dict(json.loads(result.stdout))
+
+
+def _comparable(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Everything a consumer depends on, minus what legitimately differs.
+
+    The analysis ID, request ID, timestamps, and stage timings differ on every
+    run by design. Everything else must match exactly across adapters.
+    """
+    findings: list[Any] = list(report["findings"])
+    evidence: list[Any] = list(report["evidence"])
+    symbols: list[Any] = list(report["changed_symbols"])
+    edges: list[Any] = list(report["impact_edges"])
+    return {
+        "kind": report["kind"],
+        "status": report["status"],
+        "overall_risk": report["overall_risk"],
+        "finding_codes": [item["code"] for item in findings],
+        "finding_severities": [item["severity"] for item in findings],
+        "finding_derivations": [item["derivation"] for item in findings],
+        "evidence_count": len(evidence),
+        "evidence_sides": sorted(str(item["side"]) for item in evidence),
+        "evidence_ranges": sorted(
+            (str(item["file_path"]), int(item["start_line"]), int(item["end_line"]))
+            for item in evidence
+        ),
+        "changed_symbols": sorted(str(item["qualified_name"]) for item in symbols),
+        "impact_edges": sorted(
+            (str(item["source"]), str(item["target"])) for item in edges
+        ),
+        "warnings": sorted(str(item) for item in report["warnings"]),
+        "limitations": sorted(str(item) for item in report["limitations"]),
+        "test_gaps": sorted(str(item) for item in report["test_gaps"]),
+    }
+
+
+def test_all_four_adapters_return_the_same_analysis(prepared: Fixture) -> None:
+    service = _comparable(_service_report(prepared))
+    rest = _comparable(_rest_report(prepared))
+    cli = _comparable(_cli_report(prepared))
+    mcp = _comparable(_mcp_report(prepared))
+
+    assert rest == service
+    assert cli == service
+    assert mcp == service
+
+
+def test_the_analysis_is_not_empty(prepared: Fixture) -> None:
+    """A cross-adapter test that compares nothing to nothing proves nothing."""
+    service = _comparable(_service_report(prepared))
+
+    assert service["finding_codes"]
+    assert service["changed_symbols"]
+    assert service["evidence_count"]
+
+
+def test_a_stored_analysis_renders_in_three_formats_over_rest(
+    prepared: Fixture,
+) -> None:
+    client = TestClient(create_app(prepared.database))
+    created = client.post(
+        "/v1/change-analysis/working-tree",
+        json={"repository_id": prepared.repository_id, "base_ref": "HEAD"},
+    ).json()
+    analysis_id = created["analysis_id"]
+
+    for report_format, media in (
+        ("json", "application/json"),
+        ("markdown", "text/markdown"),
+        ("sarif", "application/json"),
+    ):
+        response = client.get(
+            f"/v1/change-analysis/{analysis_id}/report",
+            params={"report_format": report_format},
+        )
+        assert response.status_code == 200, response.text
+        assert media in response.headers["content-type"]
+
+
+def test_an_unknown_analysis_is_a_404(prepared: Fixture) -> None:
+    client = TestClient(create_app(prepared.database))
+
+    response = client.get("/v1/change-analysis/analysis_nope")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CHANGE_ANALYSIS_NOT_FOUND"
+
+
+def test_a_non_git_repository_is_a_409(tmp_path: Path) -> None:
+    root = tmp_path / "plain"
+    root.mkdir()
+    (root / "a.py").write_text(BASE_PY, encoding="utf-8")
+    database = tmp_path / "plain.sqlite"
+    with connect(database) as connection:
+        apply_migrations(connection)
+        services = build_services(connection)
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(root))
+        )
+
+    client = TestClient(create_app(database))
+    response = client.post(
+        "/v1/change-analysis/working-tree",
+        json={"repository_id": repository.repository_id},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CHANGE_ANALYSIS_REQUIRES_GIT"
+
+
+# --- Renderers ----------------------------------------------------------------
+
+
+def test_repository_text_cannot_break_out_of_the_markdown() -> None:
+    """A heading named like table syntax must not become table syntax.
+
+    Escaping is asserted on the renderer directly rather than through a Git
+    fixture, so the hostile value is exact and the assertion can be precise.
+    """
+    from codeatlas.delivery.markdown_report import _cell, _inline
+
+    assert _inline("a | b") == r"a \| b"
+    assert _inline("`code`") == r"\`code\`"
+    assert _inline("<script>") == "&lt;script&gt;"
+    assert "\n" not in _inline("two\nlines")
+    assert _inline("bell\x07") == "bell"
+    assert len(_cell("x" * 500)) <= 160
+
+
+def test_a_hostile_heading_survives_a_whole_rendered_report(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "hostile"
+    root.mkdir()
+    _git(root, "init", "-b", "main")
+    (root / "notes.md").write_text("# Start\n\nplain\n", encoding="utf-8")
+    _git(root, "add", ".")
+    _git(root, "commit", "-m", "base")
+    (root / "notes.md").write_text("# a | b\n\nchanged\n", encoding="utf-8")
+
+    database = tmp_path / "h.sqlite"
+    with connect(database) as connection:
+        apply_migrations(connection)
+        services = build_services(connection)
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(root))
+        )
+        report = services.change_analysis.analyze_working_tree(
+            ChangeAnalysisRequest(repository_id=repository.repository_id)
+        )
+
+    markdown = render_markdown(report)
+
+    # The heading reaches the report, and its pipe is escaped everywhere.
+    assert r"a \| b" in markdown
+
+    # Every table row has the column count its header declares. Splitting on
+    # *unescaped* pipes is the check that matters: `\|` is the Markdown escape
+    # a renderer reads as a literal, so a naive split would fail on correct
+    # output and pass on broken output that used a bare pipe.
+    unescaped = re.compile(r"(?<!\\)\|")
+    widths = {
+        len(unescaped.split(line))
+        for line in markdown.splitlines()
+        if line.startswith("|")
+    }
+    assert widths
+    assert all(width >= 3 for width in widths)
+
+
+def test_sarif_carries_no_absolute_path(prepared: Fixture) -> None:
+    with connect(prepared.database) as connection:
+        services = build_services(connection)
+        report = services.change_analysis.analyze_working_tree(
+            ChangeAnalysisRequest(repository_id=prepared.repository_id)
+        )
+
+    sarif = render_sarif(report)
+
+    text = json.dumps(sarif)
+    assert str(prepared.root) not in text
+    for run in sarif["runs"]:
+        for result in run["results"]:
+            for location in result["locations"]:
+                uri = location["physicalLocation"]["artifactLocation"]["uri"]
+                assert not uri.startswith("/")
+                assert ":" not in uri
+
+
+def test_sarif_has_the_shape_the_standard_requires(prepared: Fixture) -> None:
+    with connect(prepared.database) as connection:
+        services = build_services(connection)
+        report = services.change_analysis.analyze_working_tree(
+            ChangeAnalysisRequest(repository_id=prepared.repository_id)
+        )
+
+    sarif = render_sarif(report)
+
+    assert sarif["version"] == "2.1.0"
+    assert sarif["runs"]
+    run = sarif["runs"][0]
+    assert run["tool"]["driver"]["name"] == "CodeAtlas"
+    for result in run["results"]:
+        assert result["ruleId"]
+        assert result["level"] in {"error", "warning", "note", "none"}
+        assert result["message"]["text"]
+        assert result["locations"]
+
+
+def test_every_sarif_result_names_a_declared_rule(prepared: Fixture) -> None:
+    with connect(prepared.database) as connection:
+        services = build_services(connection)
+        report = services.change_analysis.analyze_working_tree(
+            ChangeAnalysisRequest(repository_id=prepared.repository_id)
+        )
+
+    sarif = render_sarif(report)
+    run = sarif["runs"][0]
+    declared = {rule["id"] for rule in run["tool"]["driver"]["rules"]}
+
+    assert declared
+    for result in run["results"]:
+        assert result["ruleId"] in declared
+
+
+def test_the_markdown_states_what_the_analysis_does_not_know(
+    prepared: Fixture,
+) -> None:
+    """Limitations and test gaps are the part that keeps the rest honest."""
+    with connect(prepared.database) as connection:
+        services = build_services(connection)
+        report = services.change_analysis.analyze_working_tree(
+            ChangeAnalysisRequest(repository_id=prepared.repository_id)
+        )
+
+    markdown = render_markdown(report)
+
+    assert "# Change analysis" in markdown
+    assert "## Findings" in markdown
+    if report.test_gaps:
+        assert "does not prove absence of coverage" in markdown

@@ -1,0 +1,5 @@
+service:
+  name: sample
+  port: 9090
+features:
+  audit: true

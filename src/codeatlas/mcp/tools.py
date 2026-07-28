@@ -21,15 +21,17 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from codeatlas.application.change_analysis import ChangeAnalysisRequest
 from codeatlas.application.container import ApplicationServices
 from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import MAX_RESULTS, SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
 from codeatlas.contracts import ErrorDetail, ErrorEnvelope
+from codeatlas.delivery import render_markdown, render_sarif
 from codeatlas.domain.errors import CodeAtlasError
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import MAX_SEARCH_RESULTS, SearchRequest
@@ -81,6 +83,31 @@ class EvidenceInput(RepositoryInput):
 
 class FileInput(RepositoryInput):
     file_id: str = Field(min_length=1, max_length=256)
+
+
+class WorkingTreeInput(RepositoryInput):
+    """Analyze the working tree against a base ref."""
+
+    base_ref: str = Field(default="HEAD", min_length=1, max_length=256)
+
+
+class CommitRangeInput(RepositoryInput):
+    """Analyze one commit range."""
+
+    base_ref: str = Field(min_length=1, max_length=256)
+    target_ref: str = Field(default="HEAD", min_length=1, max_length=256)
+
+
+class AnalysisInput(ToolInput):
+    """Address one stored analysis."""
+
+    analysis_id: str = Field(min_length=1, max_length=256)
+
+
+class AnalysisReportInput(AnalysisInput):
+    """Address one stored analysis and choose a rendering."""
+
+    report_format: Literal["json", "markdown", "sarif"] = "json"
 
 
 @dataclass(frozen=True)
@@ -251,8 +278,38 @@ def build_registry() -> ToolRegistry:
                 ("trace_flow", "trace", "Trace bounded relation paths."),
             )
         ),
+        Tool(
+            name="analyze_working_tree",
+            description=(
+                "Analyze uncommitted changes against a base ref and return a "
+                "risk-ordered, evidence-backed report."
+            ),
+            input_model=WorkingTreeInput,
+            handler=_analyze_working_tree,
+        ),
+        Tool(
+            name="analyze_commit_range",
+            description="Analyze the change between two commits.",
+            input_model=CommitRangeInput,
+            handler=_analyze_commit_range,
+        ),
+        Tool(
+            name="get_change_analysis",
+            description="Read a stored change analysis by ID.",
+            input_model=AnalysisInput,
+            handler=_get_change_analysis,
+        ),
+        Tool(
+            name="get_change_report",
+            description=(
+                "Render a stored change analysis as JSON, Markdown, or SARIF."
+            ),
+            input_model=AnalysisReportInput,
+            handler=_get_change_report,
+        ),
     ]
     return ToolRegistry({tool.name: tool for tool in tools})
+
 
 
 def _register_repository(services: ApplicationServices, payload: ToolInput) -> Any:
@@ -398,3 +455,44 @@ def _first_message(error: ValueError) -> str:
     """
     text = str(error).splitlines()
     return text[0] if text else "The tool input is invalid."
+
+
+def _analyze_working_tree(services: ApplicationServices, payload: ToolInput) -> Any:
+    assert isinstance(payload, WorkingTreeInput)
+    report = services.change_analysis.analyze_working_tree(
+        ChangeAnalysisRequest(
+            repository_id=payload.repository_id,
+            base_ref=payload.base_ref,
+            request_id=_request_id(),
+        )
+    )
+    return report.model_dump(mode="json")
+
+
+def _analyze_commit_range(services: ApplicationServices, payload: ToolInput) -> Any:
+    assert isinstance(payload, CommitRangeInput)
+    report = services.change_analysis.analyze_commit_range(
+        ChangeAnalysisRequest(
+            repository_id=payload.repository_id,
+            base_ref=payload.base_ref,
+            target_ref=payload.target_ref,
+            request_id=_request_id(),
+        )
+    )
+    return report.model_dump(mode="json")
+
+
+def _get_change_analysis(services: ApplicationServices, payload: ToolInput) -> Any:
+    assert isinstance(payload, AnalysisInput)
+    return services.change_analysis.get(payload.analysis_id).model_dump(mode="json")
+
+
+def _get_change_report(services: ApplicationServices, payload: ToolInput) -> Any:
+    """Render a stored analysis. Every format reads the same persisted rows."""
+    assert isinstance(payload, AnalysisReportInput)
+    report = services.change_analysis.get(payload.analysis_id)
+    if payload.report_format == "markdown":
+        return {"format": "markdown", "content": render_markdown(report)}
+    if payload.report_format == "sarif":
+        return {"format": "sarif", "content": render_sarif(report)}
+    return {"format": "json", "content": report.model_dump(mode="json")}

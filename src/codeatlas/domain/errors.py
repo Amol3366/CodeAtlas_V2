@@ -28,6 +28,10 @@ class ErrorCode(StrEnum):
     EVIDENCE_NOT_FOUND = "EVIDENCE_NOT_FOUND"
     FILE_NOT_FOUND = "FILE_NOT_FOUND"
     SYMBOL_NOT_FOUND = "SYMBOL_NOT_FOUND"
+    CHANGE_ANALYSIS_REQUIRES_GIT = "CHANGE_ANALYSIS_REQUIRES_GIT"
+    GIT_REF_UNRESOLVABLE = "GIT_REF_UNRESOLVABLE"
+    CHANGE_ANALYSIS_NOT_FOUND = "CHANGE_ANALYSIS_NOT_FOUND"
+    ANALYSIS_RULES_INVALID = "ANALYSIS_RULES_INVALID"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -120,3 +124,38 @@ class SymbolNotFoundError(CodeAtlasError):
     """No such symbol in the active snapshot."""
 
     code = ErrorCode.SYMBOL_NOT_FOUND
+
+
+class ChangeAnalysisRequiresGitError(CodeAtlasError):
+    """A working-tree or commit-range analysis needs a Git base to diff against.
+
+    A non-Git directory has no recorded pre-change state, so the analysis cannot
+    identify what changed. The caller is told exactly that, rather than given a
+    guess assembled from whatever happens to be on disk.
+    """
+
+    code = ErrorCode.CHANGE_ANALYSIS_REQUIRES_GIT
+    retryable = True
+
+
+class GitRefUnresolvableError(CodeAtlasError):
+    """A supplied ref did not resolve to a Git commit."""
+
+    code = ErrorCode.GIT_REF_UNRESOLVABLE
+
+
+class ChangeAnalysisNotFoundError(CodeAtlasError):
+    """No persisted analysis matches the supplied ID."""
+
+    code = ErrorCode.CHANGE_ANALYSIS_NOT_FOUND
+
+
+class AnalysisRulesInvalidError(CodeAtlasError):
+    """A repository rules file failed strict validation.
+
+    Rules are untrusted repository content: an unknown field, a bad glob, or an
+    invalid severity is refused rather than silently ignored. The analysis
+    proceeds without rules rather than with a partial or hostile interpretation.
+    """
+
+    code = ErrorCode.ANALYSIS_RULES_INVALID

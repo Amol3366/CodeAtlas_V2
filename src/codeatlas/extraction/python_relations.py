@@ -27,7 +27,25 @@ from dataclasses import dataclass, field
 
 from codeatlas.contracts import RelationKind
 from codeatlas.domain.relations import SymbolReference
+from codeatlas.extraction.routes import ROUTE_HINT, normalize_route
 from codeatlas.parsing.registry import ParseDiagnostic
+
+# Decorator names that take a path as their first argument in the frameworks
+# this phase supports. A closed list, because any decorator may be handed a
+# path-shaped string and treating each one as a route would invent edges.
+_ROUTE_DECORATORS = frozenset(
+    {
+        "get",
+        "post",
+        "put",
+        "patch",
+        "delete",
+        "head",
+        "options",
+        "route",
+        "websocket",
+    }
+)
 
 # Calls whose *purpose* is dynamic access. The call itself is real, but the
 # access it performs names no target, so recording one would imply knowledge the
@@ -201,6 +219,7 @@ def _walk_body(
             )
             _collect_annotations(node, qualified_name, collector)
             for decorator in node.decorator_list:
+                _collect_route(decorator, qualified_name, collector)
                 _visit_expression(decorator, qualified_name, class_name, collector)
             _walk_body(
                 body=node.body,
@@ -256,6 +275,44 @@ def _visit_statement(
             _visit_expression(child, scope, class_name, collector)
         elif isinstance(child, ast.stmt):
             _visit_statement(child, scope, class_name, collector)
+
+
+def _collect_route(
+    decorator: ast.expr, scope: str, collector: _Collector
+) -> None:
+    """Record the path a route decorator states, if it states one literally.
+
+    ``@app.get(PATH)`` records nothing. The decorator names a variable, and
+    reading its value would mean running the module.
+    """
+    if not isinstance(decorator, ast.Call) or not decorator.args:
+        return
+
+    callee = decorator.func
+    if isinstance(callee, ast.Attribute):
+        name = callee.attr
+    elif isinstance(callee, ast.Name):
+        name = callee.id
+    else:
+        return
+    if name.lower() not in _ROUTE_DECORATORS:
+        return
+
+    first = decorator.args[0]
+    if not isinstance(first, ast.Constant) or not isinstance(first.value, str):
+        return
+    route = normalize_route(first.value)
+    if route is None:
+        return
+
+    collector.add(
+        source=scope,
+        kind=RelationKind.ROUTES_TO,
+        target_hint=route,
+        module_hint=ROUTE_HINT,
+        start_line=first.lineno,
+        end_line=first.end_lineno or first.lineno,
+    )
 
 
 def _collect_exports(

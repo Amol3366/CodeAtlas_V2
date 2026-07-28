@@ -23,13 +23,40 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Final
 
-from codeatlas.contracts import Derivation, RelationKind
+from codeatlas.contracts import Derivation, RelationKind, SymbolKind
 from codeatlas.domain.ids import relation_id as build_relation_id
-from codeatlas.domain.relations import RelationRecord, ResolutionState, SymbolReference
+from codeatlas.domain.relations import (
+    DERIVED_HINT,
+    MENTION_HINT,
+    ROUTE_HINT,
+    RelationRecord,
+    ResolutionState,
+    SymbolReference,
+)
 from codeatlas.domain.repository import FileClassification, FileRecord
 from codeatlas.domain.symbols import SymbolRecord
+from codeatlas.extraction.routes import name_tokens, route_tokens, tokens_match
 
-RESOLVER_VERSION: str = "1.0.0"
+# Symbols that can answer a request. A route names a handler, never a module or
+# a document heading that happens to share a word with it.
+_HANDLER_KINDS: Final[frozenset[SymbolKind]] = frozenset(
+    {SymbolKind.FUNCTION, SymbolKind.METHOD}
+)
+
+# A constant states a path; it does not call one. The distinction is why
+# `healthPath` references `health` rather than routing to it.
+_VALUE_KINDS: Final[frozenset[SymbolKind]] = frozenset(
+    {SymbolKind.CONSTANT, SymbolKind.PROPERTY, SymbolKind.FIELD}
+)
+
+# Kinds a bare word in prose may not link to. A module and a document heading
+# are named by ordinary English words far too often for a word match to be
+# evidence, and a configuration key is matched by its dotted path instead.
+_UNMENTIONABLE_KINDS: Final[frozenset[SymbolKind]] = frozenset(
+    {SymbolKind.MODULE, SymbolKind.CONFIG_KEY, SymbolKind.DOCUMENT_SECTION}
+)
+
+RESOLVER_VERSION: str = "1.1.0"
 
 # Tried in order for a TypeScript/JavaScript specifier that names no extension.
 _TSJS_EXTENSIONS: Final[tuple[str, ...]] = (
@@ -124,12 +151,26 @@ class SnapshotResolver:
 
         relations.extend(import_relations)
 
+        # Route and mention references name a path or a word rather than a
+        # symbol, so the ordinary name-matching ladder cannot answer them.
+        routes = [item for item in references if item.module_hint == ROUTE_HINT]
+        mentions = [item for item in references if item.module_hint == MENTION_HINT]
+        route_index = _RouteIndex.build(routes, index)
+
         for reference in references:
             if reference.kind is RelationKind.IMPORTS:
                 continue
-            relations.append(_resolve_reference(reference, index, imports_by_file))
+            if reference.module_hint == ROUTE_HINT:
+                relations.append(_resolve_route(reference, index, route_index))
+            elif reference.module_hint == MENTION_HINT:
+                relations.append(_resolve_mention(reference, index))
+            else:
+                relations.append(
+                    _resolve_reference(reference, index, imports_by_file)
+                )
 
         relations.extend(_derive_test_edges(relations, index))
+        relations.extend(_derive_document_edges(routes, mentions, index, route_index))
         relations.sort(
             key=lambda item: (item.file_id, item.start_line, item.relation_id)
         )
@@ -348,6 +389,272 @@ def _candidate_levels(
     levels.append(_Candidates(tuple(index.by_qualified.get(hint, ()))))
     levels.append(_Candidates(tuple(index.by_name.get(hint, ()))))
     return levels
+
+
+@dataclass
+class _RouteIndex:
+    """Who states each route, and who could be answering it."""
+
+    owners: dict[str, list[SymbolRecord]] = field(default_factory=dict)
+
+    @classmethod
+    def build(
+        cls, routes: Sequence[SymbolReference], index: _Index
+    ) -> _RouteIndex:
+        """Record which code symbols write each route literal down.
+
+        A document that names a path is describing it, not serving it, so a
+        document section is never recorded as an owner.
+        """
+        built = cls()
+        for reference in routes:
+            source = index.symbols_by_id.get(reference.source_symbol_id)
+            if source is None or source.kind is SymbolKind.DOCUMENT_SECTION:
+                continue
+            bucket = built.owners.setdefault(reference.target_hint, [])
+            if all(item.symbol_id != source.symbol_id for item in bucket):
+                bucket.append(source)
+        for bucket in built.owners.values():
+            bucket.sort(key=lambda symbol: (symbol.qualified_name, symbol.symbol_id))
+        return built
+
+    def handlers(
+        self, route: str, index: _Index, *, exclude_file_id: str
+    ) -> tuple[SymbolRecord, ...]:
+        """Functions whose name shares a word with the route's path segments.
+
+        A symbol that writes the route down is excluded: it is the client that
+        addresses the path, not the code that answers it. Without that rule a
+        caller and its handler are indistinguishable, and both would be reported
+        as ambiguous rather than one being reported as the answer.
+        """
+        tokens = route_tokens(route)
+        if not tokens:
+            return ()
+        stated = {symbol.symbol_id for symbol in self.owners.get(route, ())}
+        found = [
+            symbol
+            for symbol in index.symbols_by_id.values()
+            if symbol.kind in _HANDLER_KINDS
+            and symbol.file_id != exclude_file_id
+            and symbol.symbol_id not in stated
+            and tokens_match(tokens, name_tokens(symbol.name))
+        ]
+        found.sort(key=lambda symbol: (symbol.qualified_name, symbol.symbol_id))
+        return tuple(found)
+
+
+def _resolve_route(
+    reference: SymbolReference, index: _Index, routes: _RouteIndex
+) -> RelationRecord:
+    """Match a route literal to the one function that plausibly answers it.
+
+    Everything here is a heuristic and is labeled as one. A path string is not a
+    routing table: the framework may mount it elsewhere, and no static rule can
+    see that. What can be said honestly is that exactly one function in another
+    file is named after this path, and that is what the edge records.
+    """
+    source = index.symbols_by_id.get(reference.source_symbol_id)
+    candidates = _Candidates(
+        routes.handlers(
+            reference.target_hint, index, exclude_file_id=reference.file_id
+        )
+    )
+    from_document = source is not None and source.kind is SymbolKind.DOCUMENT_SECTION
+
+    if from_document:
+        kind = RelationKind.DOCUMENTS
+        derivation = Derivation.LOW_CONFIDENCE_HEURISTIC
+    else:
+        # A constant holds a path; it does not request one.
+        kind = (
+            RelationKind.REFERENCES
+            if source is not None and source.kind in _VALUE_KINDS
+            else RelationKind.ROUTES_TO
+        )
+        derivation = Derivation.HIGH_CONFIDENCE_HEURISTIC
+
+    resolved = candidates.state is ResolutionState.RESOLVED
+    return _build(
+        reference,
+        target=candidates.symbols[0] if resolved else None,
+        resolution=candidates.state,
+        derivation=derivation,
+        candidate_count=len(candidates.symbols),
+        kind=kind,
+    )
+
+
+def _resolve_mention(reference: SymbolReference, index: _Index) -> RelationRecord:
+    """Link a word a document used to a symbol named exactly that.
+
+    Comparison is case-insensitive and whole-word, and the weakest derivation in
+    the model is used, because "the document contains this word" is genuinely
+    weak evidence. Modules, configuration keys, and headings are excluded: they
+    are named by ordinary English far too often for a word to mean anything.
+    """
+    word = reference.target_hint.lower()
+    candidates = _Candidates(
+        tuple(
+            symbol
+            for symbol in index.symbols_by_id.values()
+            if symbol.kind not in _UNMENTIONABLE_KINDS
+            and symbol.file_id != reference.file_id
+            and symbol.name.lower() == word
+        )
+    )
+    resolved = candidates.state is ResolutionState.RESOLVED
+    return _build(
+        reference,
+        target=candidates.symbols[0] if resolved else None,
+        resolution=candidates.state,
+        derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+        candidate_count=len(candidates.symbols),
+        kind=RelationKind.DOCUMENTS,
+    )
+
+
+def _derive_document_edges(
+    routes: Sequence[SymbolReference],
+    mentions: Sequence[SymbolReference],
+    index: _Index,
+    route_index: _RouteIndex,
+) -> list[RelationRecord]:
+    """Document edges that no single reference states.
+
+    Two rules, both needing more than one reference to see:
+
+    * a document naming a path also describes the code that *writes* that path,
+      which is known only by comparing this document against every other file;
+    * a document names a configuration key when every dotted segment of that
+      key appears in the section as a whole word, which needs the section's
+      whole vocabulary rather than any one word.
+
+    Both are marked derived so indexing recomputes them instead of carrying them
+    forward, exactly as it does for `TESTS`.
+    """
+    edges: list[RelationRecord] = []
+    seen: set[tuple[str, str]] = set()
+
+    for reference in routes:
+        source = index.symbols_by_id.get(reference.source_symbol_id)
+        if source is None or source.kind is not SymbolKind.DOCUMENT_SECTION:
+            continue
+        for owner in route_index.owners.get(reference.target_hint, ()):
+            if owner.file_id == reference.file_id:
+                continue
+            key = (source.symbol_id, owner.symbol_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            edges.append(
+                _derived_edge(
+                    source_symbol_id=source.symbol_id,
+                    target=owner,
+                    file_id=reference.file_id,
+                    target_hint=reference.target_hint,
+                    start_line=reference.start_line,
+                    end_line=reference.end_line,
+                )
+            )
+
+    edges.extend(_derive_config_edges(mentions, index, seen))
+    return edges
+
+
+def _derive_config_edges(
+    mentions: Sequence[SymbolReference],
+    index: _Index,
+    seen: set[tuple[str, str]],
+) -> list[RelationRecord]:
+    """Link a section to a configuration key it spells out segment by segment.
+
+    Requiring *every* segment is what keeps this quiet. A section mentioning
+    "port" alone matches nothing; one mentioning both "service" and "port"
+    matches ``service.port`` and no other key. A single-segment key is never
+    matched, because a bare top-level name is an ordinary word.
+    """
+    words_by_section: dict[str, dict[str, tuple[str, int]]] = {}
+    for reference in mentions:
+        bucket = words_by_section.setdefault(reference.source_symbol_id, {})
+        bucket.setdefault(
+            reference.target_hint.lower(), (reference.file_id, reference.start_line)
+        )
+
+    edges: list[RelationRecord] = []
+    for section_id, words in words_by_section.items():
+        section = index.symbols_by_id.get(section_id)
+        if section is None or section.kind is not SymbolKind.DOCUMENT_SECTION:
+            continue
+        for symbol in index.symbols_by_id.values():
+            if symbol.kind is not SymbolKind.CONFIG_KEY:
+                continue
+            for path in _dotted_paths(symbol):
+                segments = path.lower().split(".")
+                if len(segments) < 2 or any(part not in words for part in segments):
+                    continue
+                key = (section_id, symbol.symbol_id)
+                if key in seen:
+                    continue
+                seen.add(key)
+                file_id, line = min(words[part] for part in segments)
+                edges.append(
+                    _derived_edge(
+                        source_symbol_id=section_id,
+                        target=symbol,
+                        file_id=file_id,
+                        target_hint=path,
+                        start_line=line,
+                        end_line=line,
+                    )
+                )
+                break
+    edges.sort(key=lambda item: item.relation_id)
+    return edges
+
+
+def _dotted_paths(symbol: SymbolRecord) -> tuple[str, ...]:
+    """The nested key paths a configuration symbol summarizes."""
+    return tuple(
+        part.strip() for part in symbol.module_path.split(",") if part.strip()
+    )
+
+
+def _derived_edge(
+    *,
+    source_symbol_id: str,
+    target: SymbolRecord,
+    file_id: str,
+    target_hint: str,
+    start_line: int,
+    end_line: int,
+) -> RelationRecord:
+    """Build one derived `DOCUMENTS` edge.
+
+    The target's ID joins the relation ID because one reference may produce
+    several of these, and two edges from the same line would otherwise collide
+    on the primary key.
+    """
+    return RelationRecord(
+        relation_id=build_relation_id(
+            source_symbol_id,
+            RelationKind.DOCUMENTS.value,
+            f"{target_hint}#{target.symbol_id}",
+            start_line,
+        ),
+        source_symbol_id=source_symbol_id,
+        target_symbol_id=target.symbol_id,
+        file_id=file_id,
+        kind=RelationKind.DOCUMENTS,
+        target_hint=target_hint,
+        resolution=ResolutionState.RESOLVED,
+        derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+        confidence=_CONFIDENCE[Derivation.LOW_CONFIDENCE_HEURISTIC],
+        start_line=start_line,
+        end_line=end_line,
+        candidate_count=1,
+        module_hint=DERIVED_HINT,
+    )
 
 
 def _derive_test_edges(

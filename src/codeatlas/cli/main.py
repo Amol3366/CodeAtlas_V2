@@ -29,11 +29,13 @@ from typing import Annotated, Any
 
 import typer
 
+from codeatlas.application.change_analysis import ChangeAnalysisRequest
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
-from codeatlas.contracts import QueryResponse
+from codeatlas.contracts import ChangeAnalysisReport, QueryResponse
+from codeatlas.delivery import render_markdown, render_sarif
 from codeatlas.domain.errors import (
     CodeAtlasError,
     ErrorCode,
@@ -66,6 +68,10 @@ _EXIT_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.EVIDENCE_NOT_FOUND: EXIT_UNAVAILABLE,
     ErrorCode.FILE_NOT_FOUND: EXIT_UNAVAILABLE,
     ErrorCode.SYMBOL_NOT_FOUND: EXIT_UNAVAILABLE,
+    ErrorCode.CHANGE_ANALYSIS_NOT_FOUND: EXIT_UNAVAILABLE,
+    ErrorCode.CHANGE_ANALYSIS_REQUIRES_GIT: EXIT_UNAVAILABLE,
+    ErrorCode.GIT_REF_UNRESOLVABLE: EXIT_INVALID_INPUT,
+    ErrorCode.ANALYSIS_RULES_INVALID: EXIT_INVALID_INPUT,
     ErrorCode.PATH_NOT_ALLOWED: EXIT_POLICY_FAILURE,
     ErrorCode.PATH_OUTSIDE_ROOT: EXIT_POLICY_FAILURE,
     ErrorCode.SCAN_LIMIT_EXCEEDED: EXIT_POLICY_FAILURE,
@@ -571,6 +577,99 @@ def diagnostics(
         "\n".join(f"{key}: {value}" for key, value in payload.items()),
         as_json=as_json,
     )
+
+
+@app.command("impact")
+def impact(
+    repository_id: Annotated[str, typer.Argument(help="Repository to analyze.")],
+    base: Annotated[str, typer.Option("--base", help="Base ref.")] = "HEAD",
+    commits: Annotated[
+        str | None,
+        typer.Option(
+            "--commits",
+            help="Analyze a commit range instead of the working tree, as A..B.",
+        ),
+    ] = None,
+    report_format: Annotated[
+        str, typer.Option("--format", help="json, markdown, or sarif.")
+    ] = "markdown",
+    database: DatabaseOption = None,
+) -> None:
+    """Analyze a working tree or commit range and print the report.
+
+    Exit code 4 means the analysis ran and found nothing to report, which is a
+    different fact from a failure and scripts need to tell them apart.
+    """
+    if report_format not in {"json", "markdown", "sarif"}:
+        typer.echo(
+            "INVALID_REQUEST: --format must be json, markdown, or sarif.", err=True
+        )
+        raise typer.Exit(EXIT_INVALID_INPUT)
+
+    with _services(database) as services:
+        try:
+            if commits is None:
+                report = services.change_analysis.analyze_working_tree(
+                    ChangeAnalysisRequest(
+                        repository_id=repository_id,
+                        base_ref=base,
+                        request_id=f"cli_{uuid.uuid4().hex}",
+                    )
+                )
+            else:
+                base_ref, _, target_ref = commits.partition("..")
+                if not base_ref or not target_ref:
+                    raise InvalidRequestError(
+                        "--commits must be given as BASE..TARGET."
+                    )
+                report = services.change_analysis.analyze_commit_range(
+                    ChangeAnalysisRequest(
+                        repository_id=repository_id,
+                        base_ref=base_ref,
+                        target_ref=target_ref,
+                        request_id=f"cli_{uuid.uuid4().hex}",
+                    )
+                )
+        except CodeAtlasError as error:
+            _fail(error)
+            return
+
+        _print_report(report, report_format)
+        if not report.findings:
+            raise typer.Exit(EXIT_PARTIAL)
+
+
+@app.command("analysis")
+def analysis(
+    analysis_id: Annotated[str, typer.Argument(help="A stored analysis ID.")],
+    report_format: Annotated[
+        str, typer.Option("--format", help="json, markdown, or sarif.")
+    ] = "markdown",
+    database: DatabaseOption = None,
+) -> None:
+    """Print a stored analysis. Reads the same rows every adapter reads."""
+    if report_format not in {"json", "markdown", "sarif"}:
+        typer.echo(
+            "INVALID_REQUEST: --format must be json, markdown, or sarif.", err=True
+        )
+        raise typer.Exit(EXIT_INVALID_INPUT)
+
+    with _services(database) as services:
+        try:
+            report = services.change_analysis.get(analysis_id)
+        except CodeAtlasError as error:
+            _fail(error)
+            return
+        _print_report(report, report_format)
+
+
+def _print_report(report: ChangeAnalysisReport, report_format: str) -> None:
+    if report_format == "markdown":
+        typer.echo(render_markdown(report))
+    elif report_format == "sarif":
+        typer.echo(json.dumps(render_sarif(report), indent=2))
+    else:
+        typer.echo(json.dumps(report.model_dump(mode="json"), indent=2))
 
 
 def main() -> None:

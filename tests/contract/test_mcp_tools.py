@@ -14,6 +14,12 @@ from codeatlas.mcp.server import McpServer, open_services
 from codeatlas.mcp.tools import TOOL_SCHEMA_VERSION, build_registry
 
 EXPECTED_TOOLS = {
+    # Phase 4 change assurance.
+    "analyze_commit_range",
+    "analyze_working_tree",
+    "get_change_analysis",
+    "get_change_report",
+    # Phase 3 repository intelligence.
     "get_callees",
     "get_callers",
     "get_dependencies",

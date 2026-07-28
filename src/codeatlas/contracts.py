@@ -294,3 +294,231 @@ class StreamEventMetadata(ContractModel):
     message_id: OpaqueId
     sequence: Annotated[int, Field(ge=0)]
     timestamp: UtcDatetime
+
+
+# ---------------------------------------------------------------------------
+# Change assurance (Phase 4, ADR-0005).
+#
+# These models are additive: `contract_version` stays "1.0" and a client
+# written against Phase 3 keeps working against a backend that never produces
+# a change report. The report is the persisted machine-readable rendering of one
+# analysis; Markdown and SARIF are derived from the same rows in P4-09.
+# ---------------------------------------------------------------------------
+
+
+class ChangeAnalysisKind(StrEnum):
+    """Which form of diff an analysis compares."""
+
+    WORKING_TREE = "working_tree"
+    COMMIT_RANGE = "commit_range"
+
+
+class ChangeAnalysisStatus(StrEnum):
+    """Lifecycle of one change analysis."""
+
+    ANALYZING = "analyzing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class OverallRisk(StrEnum):
+    """The highest severity present in an analysis, or none.
+
+    Extends :class:`Severity` with one ``NONE`` value so an analysis with no
+    findings can still name its overall risk honestly rather than being absent.
+    """
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+    NONE = "none"
+
+
+class ChangeKind(StrEnum):
+    """What happened to one symbol across a change."""
+
+    ADDED = "added"
+    DELETED = "deleted"
+    MODIFIED = "modified"
+    MOVED = "moved"
+    DEPENDENCY = "dependency"
+
+
+class AnalysisSide(StrEnum):
+    """Which side of a change a piece of evidence belongs to.
+
+    Base-side evidence is hash-verified at analysis time and historical by
+    construction; it is labeled as base so a reader never mistakes it for the
+    current snapshot's content.
+    """
+
+    BASE = "base"
+    TARGET = "target"
+
+
+class FileChangeKind(StrEnum):
+    """The file-level diff classification."""
+
+    ADDED = "added"
+    DELETED = "deleted"
+    MODIFIED = "modified"
+    RENAMED = "renamed"
+
+
+class AnalysisStateRef(ContractModel):
+    """One side of a change: the ref the caller asked for and what it resolved
+    to.
+
+    The base side carries no snapshot ID — it is reconstructed in memory or read
+    from Git objects, never a stored active snapshot. The target side carries
+    the active snapshot ID it was analyzed against, so a reader can tell exactly
+    which snapshot the analysis is bound to.
+    """
+
+    ref: NonEmptyText
+    commit: OpaqueId | None
+    snapshot_id: OpaqueId | None
+    freshness: SnapshotFreshness
+
+
+class ChangedFile(ContractModel):
+    """One file in the file-level diff."""
+
+    path: RepositoryRelativePath
+    change_kind: FileChangeKind
+    base_path: RepositoryRelativePath | None = None
+    content_hash_changed: bool = False
+
+
+class ChangedSymbol(ContractModel):
+    """One symbol that differs between the base and target states.
+
+    A deleted or moved-from symbol carries base line range and a base file path;
+    an added symbol carries target range; a modified symbol carries target
+    range and, when its content also moved, a base file path. The two are kept
+    consistent: base lines without a base file is a contradiction the contract
+    refuses, because a citation with no file is not a citation.
+    """
+
+    qualified_name: NonEmptyText
+    symbol_kind: SymbolKind
+    change_kind: ChangeKind
+    file_path: RepositoryRelativePath
+    base_file_path: RepositoryRelativePath | None = None
+    base_start_line: PositiveLine | None = None
+    base_end_line: PositiveLine | None = None
+    target_start_line: PositiveLine | None = None
+    target_end_line: PositiveLine | None = None
+    signature_changed: bool
+    public: bool
+    derivation: Derivation
+    confidence: Confidence
+
+    @model_validator(mode="after")
+    def validate_ranges(self) -> ChangedSymbol:
+        has_base_lines = (
+            self.base_start_line is not None or self.base_end_line is not None
+        )
+        if has_base_lines and self.base_file_path is None:
+            raise ValueError(
+                "base_start_line or base_end_line requires a base_file_path"
+            )
+        if (
+            self.base_start_line is not None
+            and self.base_end_line is not None
+            and self.base_end_line < self.base_start_line
+        ):
+            raise ValueError("base_end_line must not precede base_start_line")
+        if (
+            self.target_start_line is not None
+            and self.target_end_line is not None
+            and self.target_end_line < self.target_start_line
+        ):
+            raise ValueError("target_end_line must not precede target_start_line")
+        return self
+
+
+class ImpactEdge(ContractModel):
+    """One edge in the impact graph, labeled but not cited.
+
+    An impact edge is a graph fact with a derivation and a confidence; it is
+    not a citable region of source. Keeping evidence off the edge is what keeps
+    the response's evidence list minimal and the exact/containing metrics
+    meaningful, per ADR-0003 and ADR-0005.
+    """
+
+    source: NonEmptyText
+    target: NonEmptyText
+    kind: RelationKind
+    derivation: Derivation
+    confidence: Confidence
+
+
+class ChangeEvidenceItem(ContractModel):
+    """One piece of analysis-scoped evidence, explicitly base- or target-side.
+
+    Unlike :class:`Evidence`, the analysis evidence model carries a ``side``
+    rather than a repository-wide ``snapshot_id``: the base side of a working
+    tree has no stored snapshot, only a commit, and pretending otherwise would
+    hide the historical nature of base-side citations.
+    """
+
+    evidence_id: OpaqueId
+    side: AnalysisSide
+    file_path: RepositoryRelativePath
+    symbol: NonEmptyText | None = None
+    start_line: PositiveLine
+    end_line: PositiveLine
+    content_hash: NonEmptyText
+    derivation: Derivation
+    confidence: Confidence
+
+    @model_validator(mode="after")
+    def validate_range(self) -> ChangeEvidenceItem:
+        if self.end_line < self.start_line:
+            raise ValueError("end_line must not precede start_line")
+        return self
+
+
+class ChangeAnalysisReport(ContractModel):
+    """The persisted, machine-readable rendering of one change analysis."""
+
+    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    analysis_id: OpaqueId
+    request_id: OpaqueId
+    repository_id: OpaqueId
+    kind: ChangeAnalysisKind
+    status: ChangeAnalysisStatus
+    overall_risk: OverallRisk
+    base: AnalysisStateRef
+    target: AnalysisStateRef
+    changed_files: list[ChangedFile] = Field(default_factory=list)
+    changed_symbols: list[ChangedSymbol] = Field(default_factory=list)
+    impact_edges: list[ImpactEdge] = Field(default_factory=list)
+    findings: list[Finding] = Field(default_factory=list)
+    evidence: list[ChangeEvidenceItem] = Field(default_factory=list)
+    test_gaps: list[NonEmptyText] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    timing_ms: dict[str, NonNegativeDuration] = Field(default_factory=dict)
+    created_at: UtcDatetime
+    completed_at: UtcDatetime | None = None
+
+    @model_validator(mode="after")
+    def validate_membership(self) -> ChangeAnalysisReport:
+        evidence_by_id = {item.evidence_id: item for item in self.evidence}
+        if len(evidence_by_id) != len(self.evidence):
+            raise ValueError("evidence IDs must be unique")
+
+        for finding in self.findings:
+            unknown = set(finding.evidence_ids) - evidence_by_id.keys()
+            if unknown:
+                raise ValueError("finding references unknown evidence")
+
+        if self.changed_symbols and not self.changed_files:
+            raise ValueError(
+                "changed_files cannot be empty when changed_symbols is not"
+            )
+        return self

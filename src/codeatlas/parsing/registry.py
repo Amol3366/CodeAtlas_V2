@@ -18,7 +18,12 @@ from codeatlas.domain.symbols import SymbolRecord
 
 # 1.1.0 (Phase 3, ADR-0004): parsers emit references alongside symbols, so every
 # symbol version derived by the 1.0.0 bundle is stale.
-PARSER_BUNDLE_VERSION: str = "1.1.0"
+# 1.2.0 (Phase 4, ADR-0005): parsers will emit route-literal references and
+# document-section mention references, so every symbol version derived by the
+# 1.1.0 bundle is stale. The behavior lands in P4-05; the constant lands in
+# P4-SETUP so the identity change is in place before the behavior that depends
+# on it, following the Phase 3 precedent.
+PARSER_BUNDLE_VERSION: str = "1.2.0"
 
 
 @dataclass(frozen=True)
