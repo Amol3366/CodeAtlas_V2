@@ -161,3 +161,32 @@ explicitly so the approval is auditable:
 - The first `contract_version` bump establishes how later ones are done.
 - Scheduled as **P6-STREAM**, ahead of P6-03, per the user's sequencing decision
   on 2026-07-28.
+
+## Outcome (recorded 2026-07-28, after implementation)
+
+Accepted and delivered. What the implementation added to the decision above:
+
+1. **The channel is opened by the submitting request, not by the worker.** This
+   is not an implementation detail but part of the contract: a client that
+   submits and immediately opens the stream would otherwise race the executor,
+   be told `no_active_run`, and fall back to polling for every run that had not
+   started yet. `test_the_stream_is_live_when_submission_returns` pins it.
+2. **The executor is a strategy, not a fork.** With none configured the run
+   happens on the calling thread, which keeps `AnswerPipeline` directly testable
+   and is what a one-shot caller wants. The alternative rejected above — two
+   endpoints — is still rejected; this is one code path with a pluggable
+   scheduler.
+3. **`Message` gained `evidence`, `snapshot_id`, and `warnings`.** Not
+   anticipated here, but forced by the decision: once the submission stops
+   returning the answer, storage is the only source for what a reopened thread
+   shows. This is what makes the freshness banner and citation restoration work.
+4. **Run warnings had never been persisted.** `warnings_json` was written only
+   at insert, while the run was still queued. Inline submission hid it by
+   carrying warnings in the response. No migration was needed — the column
+   already existed.
+5. **A stream that cannot be opened must not fail the submission.** The live
+   view is an optimisation; the persisted answer is the authority. `Thread`
+   falls back to refetching rather than rejecting inside the success callback.
+
+`SCHEMA_VERSION` stayed **9** as predicted, so rollback remains a code-only
+revert. `contract_version` moved **1.0 → 1.1**.

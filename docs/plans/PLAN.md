@@ -50,8 +50,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | P6-STREAM — accept-then-stream submission (ADR-0008) |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02 `complete`; P6-STREAM `in_progress`; P6-03 … P6-08 `pending` |
+| Active task | none — P6-03 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM `complete`; P6-03 `ready`; P6-04 … P6-08 `pending` |
 | Agent | Claude Code `claude-opus-5` |
 | Started UTC | 2026-07-28T10:00:00Z |
 | Git state | Branch `main` at `500c25a`, pushed. PR #1 merged 2026-07-28 by fast-forward; `worktree-p4-10-completion` is now an ancestor of `main`. |
@@ -64,8 +64,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P6-SETUP | ADR-0007, four hardening error codes, `check_phase6.ps1` | Phase 5 | `complete` |
 | P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
 | P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
-| P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `ready` |
-| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `pending` |
+| P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `complete` |
+| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `ready` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
@@ -184,6 +184,78 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T16:20:00Z — P6-STREAM complete; P6-03 `ready`
+
+- Agent: Claude Code `claude-opus-5`.
+- Transition: P6-STREAM `in_progress -> complete`; P6-03 `pending -> ready`.
+- **`check_phase6.ps1 -SkipSync` exits 0 with Playwright included** — the first
+  clean run of the full gate since P6-02. Phase 6 gate condition 1 is met.
+
+#### The browser policy, as chosen and as implemented
+
+The user chose **option 2: run both engines, keep the Chromium gap visible.**
+Both projects are in `playwright.config.ts`; Firefox runs all seven suites,
+Chromium runs the three transport tests, and the four conversation-route tests
+are skipped on Chromium alone.
+
+**`test.fail()` was implemented first and had to be abandoned, which is worth
+recording because it looked correct.** An expected failure is the better
+instrument — it keeps running and reports loudly the day the browser is fixed.
+It does not survive a *crashed page*: teardown of a dead context raises an error
+outside the test body that no annotation can absorb. The symptom was the worst
+possible one for a gate — **it passed when run alone and failed inside
+`check_phase6.ps1`**, twice, reproducibly. A deterministic skip replaced it, and
+the reason lives in `e2e/support/chromium-crash.ts` next to the code so the next
+reader does not re-derive it.
+
+No assertion was lost: every one still runs on Firefox. What is lost is the
+engine four of them are proven on, and that is stated rather than absorbed.
+
+#### A real defect the gate caught that I had missed
+
+`pnpm exec vitest run` reported **98 passed and 2 unhandled errors**, and my
+earlier verification grepped only the pass count — so I reported "98 passed"
+when the suite was exiting non-zero. The gate is what caught it.
+
+The cause was mine: `follow()` constructs an `EventSource`, which throws in
+jsdom, *inside the submission's success callback*. That is not merely a test
+problem — **a stream that cannot be opened must not fail the submission.** The
+live view is an optimisation; the turn is accepted and its answer is persisted
+regardless. `Thread` now falls back to refetching, proven by
+`still shows the answer when the stream cannot be opened`.
+
+#### Documentation
+
+- **ADR-0008 gained an Outcome section** recording the five things the
+  implementation added to the decision: the channel opening on the request
+  thread, the executor as a strategy rather than a fork, `Message` gaining
+  `evidence`/`snapshot_id`/`warnings`, run warnings never having been persisted,
+  and the unopenable-stream fallback.
+- `docs/operations/web-application.md` — the two closed limitations are struck
+  through and replaced rather than deleted, so a reader who remembers the old
+  behavior can see it changed and why.
+
+#### Verification in this environment, each run and its exit code
+
+- `powershell -File scripts/check_phase6.ps1 -SkipSync` — **exit 0**,
+  "Phase 6 verification completed", Playwright included.
+- `uv run pytest -q` — **1205 passed**.
+- `uv run ruff check` / `mypy --no-incremental` — exit 0, 208 files.
+- `pnpm exec vitest run` — **99 passed, 0 errors** (98 with 2 unhandled before
+  the fallback fix).
+- `pnpm exec playwright test` — **10 passed, 4 skipped**, 0 failed.
+
+#### Carried forward, not fixed
+
+- **The Chromium renderer crash is unresolved upstream.** Diagnosis and the full
+  isolation table are in the 2026-07-28T15:00:00Z entry. A Playwright version
+  bisect would name the build that introduced it; nobody has done that.
+- `scripts/e2e_backend.py` calls `create_app(database)` and so runs the harness
+  with `watch=True`. Proven not to cause the crash, but the harness should still
+  opt out of background threads it does not need.
+- Next: **P6-03** — the reconciling scan and lossy-event tests.
+
 
 ### 2026-07-28T15:00:00Z — renderer crash diagnosed: a Chromium defect, not our code
 

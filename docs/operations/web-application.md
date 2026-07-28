@@ -63,16 +63,23 @@ then web lint, types, tests, and build.
 6. **No fabricated progress.** Status lines name stages the pipeline actually
    reported.
 
-## What Phase 5 does not do
+## What the web application does not do
 
 - **No LLM.** Every assistant message is a deterministic answer or an explicit
   abstention. Generation is Phase 7, behind its own gate.
-- **Answering is synchronous**, so the stream always serves from the replay
-  buffer and cancellation has no realistic window over HTTP. The live path is
-  implemented and unit-tested; a background executor would exercise it.
-- **No Playwright suites.** The gate conditions that need a real browser —
-  restart persistence, reconnect mid-stream — are covered at the component and
-  backend layers but not end to end.
+- ~~**Answering is synchronous.**~~ **Closed by P6-STREAM (ADR-0008).**
+  `POST /v1/conversations/{id}/messages` now returns `202` with a queued run and
+  answers on a worker. The thread opens the run's stream, renders
+  `generation.delta`, and reads the persisted message when the run terminates —
+  so cancellation has a real window and the live path is exercised rather than
+  merely implemented. The channel is opened by the submitting request *before*
+  it responds, so a client may open the stream immediately without racing the
+  worker.
+- ~~**No Playwright suites.**~~ **Closed by P6-01 and P6-STREAM.** Seven browser
+  tests run on Firefox and Chromium. Four are skipped on Chromium only: its
+  renderer crashes on client-side navigation to a conversation route, which is a
+  browser defect rather than application code (Firefox passes all seven; the
+  isolation table is in the 2026-07-28 handoff in `docs/plans/PLAN.md`).
 - **No message pagination in the UI.** The backend pages; the thread fetches
   the first page only.
 - **No "purge now" control** for soft-deleted conversations; retention is

@@ -574,3 +574,41 @@ describe("a live run", () => {
     expect(rendered.textContent).toBe("once");
   });
 });
+
+it("still shows the answer when the stream cannot be opened", async () => {
+  // No EventSource stub: constructing one throws, exactly as it would in a
+  // browser that blocked the connection. Submission must survive it — the
+  // persisted message is authoritative and reachable by refetch, so losing the
+  // live view must not lose the answer.
+  const user = userEvent.setup();
+  stubFetch({
+    [messagesUrl]: {
+      body: {
+        items: [
+          message({
+            message_id: "msg_2",
+            role: "assistant",
+            content: "capture is defined in service.py.",
+          }),
+        ],
+        next_cursor: null,
+      },
+    },
+    [`POST ${messagesUrl}`]: {
+      status: 202,
+      body: { ...submission(), status: "queued", content: "", evidence: [] },
+    },
+  });
+
+  renderWithProviders(<Thread conversationId="conv_1" />);
+  await user.type(
+    await screen.findByLabelText(/Ask about this repository/i),
+    "capture",
+  );
+  await user.click(screen.getByRole("button", { name: "Send" }));
+
+  expect(
+    await screen.findByText(/capture is defined in service\.py\./),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId("pending-turn")).not.toBeInTheDocument();
+});

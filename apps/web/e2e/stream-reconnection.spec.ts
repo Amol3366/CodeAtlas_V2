@@ -24,6 +24,7 @@
  */
 
 import { expect, test } from "./support/fixtures";
+import { skipChromiumRendererCrash } from "./support/chromium-crash";
 
 interface CapturedEvent {
   readonly type: string;
@@ -242,7 +243,9 @@ test("an accepted turn is still queued when the response arrives", async ({
 test("the thread reaches its answer through the stream, with no reload", async ({
   page,
   seeded,
+  browserName,
 }) => {
+  skipChromiumRendererCrash(browserName);
   await page.goto("/");
   await page
     .getByLabel("Repository", { exact: true })
@@ -264,7 +267,8 @@ test("the thread reaches its answer through the stream, with no reload", async (
   );
 });
 
-test("citations survive a reload", async ({ page, seeded }) => {
+test("citations survive a reload", async ({ page, seeded, browserName }) => {
+  skipChromiumRendererCrash(browserName);
   await page.goto("/");
   await page
     .getByLabel("Repository", { exact: true })

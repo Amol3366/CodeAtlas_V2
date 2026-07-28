@@ -10,11 +10,14 @@
  */
 
 import { expect, test } from "./support/fixtures";
+import { skipChromiumRendererCrash } from "./support/chromium-crash";
 
 test("a repository can be added, indexed, questioned, and cited", async ({
   page,
   seeded,
+  browserName,
 }) => {
+  skipChromiumRendererCrash(browserName);
   await page.goto("/");
 
   // --- Onboard ------------------------------------------------------------

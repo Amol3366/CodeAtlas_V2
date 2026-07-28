@@ -213,7 +213,24 @@ export function Thread({
    */
   const follow = (messageId: string) => {
     stopStreaming();
-    subscription.current = subscribeToConversation(conversationId, {
+    const readPersisted = () => {
+      void client.invalidateQueries({ queryKey: keys.messages(conversationId) });
+    };
+    try {
+      subscription.current = openStream(messageId, readPersisted);
+    } catch {
+      // The live view is an optimisation, never the answer. If the stream
+      // cannot be opened at all — no EventSource, a blocked connection — the
+      // turn is still accepted and its answer is still persisted, so fall back
+      // to reading it. Letting this throw would reject inside the submission's
+      // success callback and lose an answer that already exists.
+      subscription.current = null;
+      readPersisted();
+    }
+  };
+
+  const openStream = (messageId: string, onFinished: () => void) => {
+    return subscribeToConversation(conversationId, {
       onEvent: (event) => {
         if (event.event === "generation.delta") {
           const delta = event.payload["text"];
@@ -229,9 +246,7 @@ export function Thread({
         subscription.current = null;
         // Whatever happened — completed, failed, cancelled, or a dropped
         // connection — the persisted message is the authority, so read it.
-        void client.invalidateQueries({
-          queryKey: keys.messages(conversationId),
-        });
+        onFinished();
         setStreamedByMessage((current) => {
           if (!(messageId in current)) return current;
           const rest = { ...current };

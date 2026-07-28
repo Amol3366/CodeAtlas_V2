@@ -10,11 +10,14 @@
  */
 
 import { expect, test } from "./support/fixtures";
+import { skipChromiumRendererCrash } from "./support/chromium-crash";
 
 test("conversations and messages survive a backend restart", async ({
   page,
   backend,
+  browserName,
 }) => {
+  skipChromiumRendererCrash(browserName);
   await page.goto("/");
 
   await page.getByRole("button", { name: "New chat" }).click();
