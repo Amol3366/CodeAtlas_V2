@@ -8,14 +8,13 @@
  * conversation with no live run is told to read the persisted message instead
  * of being left waiting.
  *
- * **What it does not prove.** That the conversation UI reconnects mid-run. It
- * cannot, and the reason is a gap rather than an oversight in this suite:
- * `POST /v1/conversations/{id}/messages` executes its run inline and returns
- * the finished answer, so no run is ever in flight for a second connection to
- * attach to, and `Thread` never opens a stream at all. Closing that needs an
- * accept-then-stream submission contract — a breaking API change, which
- * `AGENTS.md` Section 25 puts behind explicit approval. It is recorded as
- * Phase 5 debt rather than smuggled in here.
+ * **Since P6-STREAM (ADR-0008) it also proves the UI half.** Submission now
+ * returns 202 with a queued run, so a run *is* in flight and `Thread` does open
+ * a stream. The three tests at the end of this file are the ones that close
+ * Phase 6 gate condition 1: the thread reaches its answer through the stream
+ * with no reload, an accepted turn is genuinely still queued when the response
+ * arrives, and citations survive a reload because they come from storage rather
+ * than from a submission response nobody kept.
  *
  * The events are read through the app's own origin and proxy, so this exercises
  * the same path the UI would use. Notably it asserts frames arrive under their
@@ -195,4 +194,96 @@ test("a conversation with no live run is told to read the persisted answer", asy
 
   expect(captured.events).toHaveLength(0);
   expect(captured.closedReason).toContain("fetch_final_message");
+});
+
+
+/**
+ * Gate condition 1, in a browser.
+ *
+ * Each of these was impossible before P6-STREAM: with the run executing inside
+ * the request there was no in-flight state to observe, no stream for the thread
+ * to open, and the citations lived in component state that a reload discarded.
+ */
+test("an accepted turn is still queued when the response arrives", async ({
+  page,
+  seeded,
+}) => {
+  await page.goto("/");
+
+  const accepted = await page.evaluate(async (repositoryId) => {
+    const created = await fetch("/v1/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repository_id: repositoryId }),
+    });
+    const conversation = (await created.json()) as { conversation_id: string };
+    const posted = await fetch(
+      `/v1/conversations/${conversation.conversation_id}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "PaymentService.capture" }),
+      },
+    );
+    return {
+      status: posted.status,
+      body: (await posted.json()) as { status: string; content: string },
+    };
+  }, seeded.repository_id);
+
+  // 202 and queued: the acknowledgement, not the answer. If this ever returns
+  // 201 with content again, the run is back inside the request and every
+  // guarantee below is void.
+  expect(accepted.status).toBe(202);
+  expect(accepted.body.status).toBe("queued");
+  expect(accepted.body.content).toBe("");
+});
+
+test("the thread reaches its answer through the stream, with no reload", async ({
+  page,
+  seeded,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Repository", { exact: true })
+    .selectOption(seeded.repository_id);
+  await page.getByRole("button", { name: "New chat" }).click();
+  await expect(page).toHaveURL(/\/conversations\/conv_/);
+
+  await page
+    .getByLabel("Ask about this repository")
+    .fill("PaymentService.capture");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  // Nothing here reloads or polls by hand. The answer can only appear because
+  // the thread opened the stream, followed the run, and read the persisted
+  // message when it terminated.
+  await expect(page.getByTestId("message-assistant")).toContainText(
+    "src/payments/service.py",
+    { timeout: 30_000 },
+  );
+});
+
+test("citations survive a reload", async ({ page, seeded }) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Repository", { exact: true })
+    .selectOption(seeded.repository_id);
+  await page.getByRole("button", { name: "New chat" }).click();
+  await page
+    .getByLabel("Ask about this repository")
+    .fill("PaymentService.capture");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const citation = page.getByRole("button", {
+    name: /^\[1\] src\/payments\/service\.py:/,
+  });
+  await expect(citation).toBeVisible({ timeout: 30_000 });
+
+  await page.reload();
+
+  // The submission response is long gone. A citation visible here came from
+  // `message.evidence` on the refetched thread, which is the whole point of
+  // storing it.
+  await expect(citation).toBeVisible({ timeout: 30_000 });
 });

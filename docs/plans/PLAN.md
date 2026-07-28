@@ -185,6 +185,106 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-07-28T13:10:00Z — P6-STREAM web half built; blocked verifying criterion 6
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `4e0e749` + uncommitted.
+- Transition: **none.** P6-STREAM stays `in_progress`. Criteria 1–5, 7 and 8 are
+  done and verified. **Criterion 6 is written but not verified**, so Phase 6
+  gate condition 1 is still not met and is not being claimed.
+
+#### What landed
+
+- `pnpm install` in `main`, and `api-types.gen.ts` regenerated from the live
+  schema — `Message` had grown three fields and the generated types were stale.
+- **`Thread` now streams.** Submission returns 202; the thread opens the run's
+  stream, accumulates `generation.delta`, and on any terminal event refetches
+  the persisted message and drops the streamed text. Streamed text is
+  provisional by contract; the persisted answer replaces it, never merges.
+- **Citations, snapshot, and warnings now come from the message**, not from
+  component state. `snapshotId={null}` is gone, so the freshness banner can
+  finally appear, and a reopened thread shows what its answers cited. This is
+  criterion 7, and it is the half that only works because the backend now
+  stores and returns all three.
+- The stream is closed on unmount and on conversation switch. An `EventSource`
+  outlives the component that opened it, and a subscription surviving a thread
+  switch would append one conversation's deltas into another — the leak
+  Section 14.5 names explicitly.
+- `FakeEventSource` in the test harness, modelling **named** dispatch. jsdom has
+  no `EventSource`, so without it every submit test dies on a transport error;
+  and a fake that dispatched to `onmessage` would let a client that listens only
+  there pass here and receive nothing in a browser — precisely the defect P6-01
+  found in the real client.
+
+#### Two Phase 5 tests now assert the right thing
+
+`shows citations for the answer it just received` and the citation-click test
+both took their evidence from the submission response. That response no longer
+carries an answer, so they were rewritten to take it from the refetched
+message — which is what the product actually does now. Renamed the first to
+`…once the run has been read back` so the name states the new contract rather
+than the old one.
+
+#### Criterion 6: written, not verified, and why
+
+The three browser tests that close gate condition 1 are written. One passes:
+**`an accepted turn is still queued when the response arrives`** — 202, status
+`queued`, empty content, asserted through a real browser. That is the contract
+change proven end to end.
+
+The two that drive the **UI** — `the thread reaches its answer through the
+stream, with no reload` and `citations survive a reload` — cannot be verified
+here. **Navigating to any `/conversations/{id}` route hard-crashes the Chromium
+renderer**: no JS exception, no console output, just `CRASH`, which is the
+signature of a renderer killed rather than a page that threw.
+
+**It is not caused by this task.** A diagnostic spec was run in the
+`.claude/worktrees/p4-10-completion` worktree, which is pre-P6-STREAM on both
+sides, and it crashes at the identical point. It also crashes with this task's
+web changes stashed. Three states, one behavior. P6-01 recorded these same
+suites passing four consecutive times on 2026-07-28, so something in the
+environment has changed since — Playwright is at 1.62.0; a browser update is
+the obvious suspect but was not confirmed. Disabling GPU, dev-shm, and the
+sandbox changed nothing, and no stale preview server was holding the port.
+
+**So: `onboarding-to-citation` and `restart-persistence` are also failing, and
+they are Phase 5/P6-01 suites this task did not touch.** The Playwright step of
+`check_phase6.ps1` therefore cannot pass in this environment for any commit,
+including ones where it previously passed. That needs diagnosing on its own
+before gate condition 1 can be claimed by anyone.
+
+#### Verification in this environment, each run and its exit code
+
+- `uv run pytest -q` — **1205 passed**.
+- `uv run ruff check src tests scripts apps` — exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` — exit 0, 208 files.
+- `uv run python scripts/export_contract_schema.py --check` — exit 0.
+- `pnpm exec vitest run` — **98 passed** (91 before; +7).
+- `pnpm exec eslint . --max-warnings 0` — exit 0.
+- `pnpm exec tsc --noEmit` — exit 0.
+- `pnpm exec vite build` — exit 0.
+- `pnpm exec playwright test` — **3 passed, 4 failed**, all four failures the
+  renderer crash described above, two of them pre-existing suites.
+
+#### Test-first discipline, stated accurately
+
+The four criterion-7 tests were written first and **all four were observed
+failing**. The **three streaming tests were not** — `follow()` was already
+written when they were authored, and they passed on first run. They assert real
+behavior (a stream is opened, deltas render, a replayed delta does not
+double-append) but they never failed, so they did not prove they can catch the
+bug. Same lapse P3-07 and P4-07 recorded; recording it is cheaper than implying
+otherwise.
+
+#### What P6-STREAM still needs
+
+1. **Diagnose the renderer crash** on `/conversations/{id}`. It blocks the two
+   UI tests, both pre-existing suites, and the gate's Playwright step. It is now
+   the single thing standing between this task and gate condition 1.
+2. Re-run `check_phase6.ps1` with Playwright included once that is resolved.
+3. `docs/operations/web-application.md` and ADR-0008's consequences section.
+
+- Next: the renderer crash, which is a debugging task and not more feature work.
+
 ### 2026-07-28T11:30:00Z — P6-STREAM backend complete; still `in_progress`
 
 - Agent: Claude Code `claude-opus-5`, branch `main` at `c1f6115` + uncommitted.

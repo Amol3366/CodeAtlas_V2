@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { Markdown } from "../../components/Markdown";
@@ -8,6 +9,9 @@ import {
   useRetryMessage,
   useSubmitMessage,
 } from "../../lib/conversations";
+import { keys } from "../../lib/queries";
+import type { StreamSubscription } from "../../lib/sse";
+import { subscribeToConversation } from "../../lib/sse";
 import { ErrorNotice } from "../repositories/RepositoryPanel";
 
 /**
@@ -63,6 +67,7 @@ function AssistantTurn({
   onRetry,
   retrying,
   onCite,
+  streamed,
 }: {
   readonly message: Message;
   readonly evidence: readonly MessageEvidence[];
@@ -71,7 +76,20 @@ function AssistantTurn({
   readonly onRetry: () => void;
   readonly retrying: boolean;
   readonly onCite?: ((evidence: MessageEvidence, messageId: string) => void) | undefined;
+  /**
+   * Text accumulated from `generation.delta` while this run is live.
+   *
+   * Provisional by contract (Section 11.2): it is shown while the run is in
+   * flight and dropped the moment the persisted answer arrives, which is the
+   * authoritative one.
+   */
+  readonly streamed?: string | null | undefined;
 }) {
+  // Streamed text wins only while it exists; the persisted answer replaces it.
+  const visible =
+    streamed !== null && streamed !== undefined && streamed !== ""
+      ? streamed
+      : message.content;
   const stale =
     snapshotId !== null &&
     activeSnapshotId !== undefined &&
@@ -113,7 +131,19 @@ function AssistantTurn({
         </p>
       ) : null}
       <StatusLine status={message.status} />
-      <Markdown>{message.content}</Markdown>
+      {message.warnings.length > 0 ? (
+        <ul
+          data-testid="run-warnings"
+          className="mb-[var(--space-2)] space-y-[var(--space-1)]"
+        >
+          {message.warnings.map((warning) => (
+            <li key={warning} className="text-xs text-stale">
+              {warning}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <Markdown>{visible}</Markdown>
       {evidence.length > 0 ? (
         <ul className="mt-[var(--space-3)] flex flex-wrap gap-[var(--space-2)]">
           {evidence.map((item) => (
@@ -144,18 +174,73 @@ export function Thread({
   const retry = useRetryMessage(conversationId);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<PendingTurn | null>(null);
-  const [evidenceByMessage, setEvidenceByMessage] = useState<
-    Record<string, readonly MessageEvidence[]>
+  const [streamedByMessage, setStreamedByMessage] = useState<
+    Record<string, string>
   >({});
   const composer = useRef<HTMLTextAreaElement>(null);
+  const subscription = useRef<StreamSubscription | null>(null);
+  const client = useQueryClient();
+
+  const stopStreaming = () => {
+    subscription.current?.close();
+    subscription.current = null;
+  };
 
   // Switching threads must not carry the previous thread's pending turn or its
-  // citations across; both are per-conversation state.
+  // streamed text across, and must not leave its stream open — a live
+  // subscription would keep appending another conversation's deltas into this
+  // one (Section 14.5).
   useEffect(() => {
+    stopStreaming();
     setPending(null);
-    setEvidenceByMessage({});
+    setStreamedByMessage({});
     setDraft("");
   }, [conversationId]);
+
+  // Closing the stream on unmount is not tidiness: an EventSource outlives the
+  // component that opened it and would hold a connection open for a thread
+  // nobody is looking at.
+  useEffect(() => stopStreaming, []);
+
+  /**
+   * Follow one accepted run to its end.
+   *
+   * The stream is opened *after* the 202, which is safe because the server
+   * opens the run's channel before answering (ADR-0008) — there is no window in
+   * which the run exists and the stream does not. Streamed text is provisional;
+   * when the run terminates the persisted message is refetched and becomes what
+   * is shown.
+   */
+  const follow = (messageId: string) => {
+    stopStreaming();
+    subscription.current = subscribeToConversation(conversationId, {
+      onEvent: (event) => {
+        if (event.event === "generation.delta") {
+          const delta = event.payload["text"];
+          if (typeof delta === "string") {
+            setStreamedByMessage((current) => ({
+              ...current,
+              [messageId]: (current[messageId] ?? "") + delta,
+            }));
+          }
+        }
+      },
+      onClose: () => {
+        subscription.current = null;
+        // Whatever happened — completed, failed, cancelled, or a dropped
+        // connection — the persisted message is the authority, so read it.
+        void client.invalidateQueries({
+          queryKey: keys.messages(conversationId),
+        });
+        setStreamedByMessage((current) => {
+          if (!(messageId in current)) return current;
+          const rest = { ...current };
+          delete rest[messageId];
+          return rest;
+        });
+      },
+    });
+  };
 
   const send = () => {
     const question = draft.trim();
@@ -164,13 +249,10 @@ export function Thread({
     setDraft("");
     submit.mutate(question, {
       onSuccess: (result) => {
-        setEvidenceByMessage((current) => ({
-          ...current,
-          [result.message_id]: result.evidence,
-        }));
-        // The server's rows have arrived; the local placeholder has served its
-        // purpose and is dropped rather than merged.
+        // The turn is committed and the run is queued; the local placeholder
+        // has served its purpose and is dropped rather than merged.
         setPending(null);
+        follow(result.message_id);
       },
       onError: () => setPending(null),
     });
@@ -193,8 +275,11 @@ export function Thread({
             ) : (
               <AssistantTurn
                 message={message}
-                evidence={evidenceByMessage[message.message_id] ?? []}
-                snapshotId={null}
+                // From the message, not from component state: a reload has no
+                // submission response to remember (ADR-0008).
+                evidence={message.evidence}
+                snapshotId={message.snapshot_id}
+                streamed={streamedByMessage[message.message_id] ?? null}
                 activeSnapshotId={activeSnapshotId}
                 retrying={retry.isPending}
                 onRetry={() => retry.mutate(message.message_id)}

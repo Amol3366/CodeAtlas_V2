@@ -94,3 +94,60 @@ export function apiError(code: string, message: string, retryable = false) {
     error: { code, message, request_id: "req_test", retryable },
   };
 }
+
+/**
+ * A stand-in for `EventSource`, which jsdom does not implement.
+ *
+ * Since P6-STREAM the thread opens a stream after every submission, so without
+ * this any test that sends a message dies on `EventSource is not defined` —
+ * pointing at the transport instead of at whatever the test was asserting.
+ *
+ * It models *named* dispatch, which is the part that matters: the server names
+ * every frame, and a fake that delivered everything to `onmessage` would let a
+ * client that only listens there pass here and receive nothing in a browser.
+ * That is exactly the defect P6-01 found.
+ */
+export class FakeEventSource {
+  static readonly instances: FakeEventSource[] = [];
+  static readonly CLOSED = 2;
+
+  readonly url: string;
+  readyState = 1;
+  onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onerror: (() => void) | null = null;
+  readonly #listeners = new Map<string, Set<EventListener>>();
+
+  constructor(url: string) {
+    this.url = url;
+    FakeEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, listener: EventListener): void {
+    const existing = this.#listeners.get(type) ?? new Set<EventListener>();
+    existing.add(listener);
+    this.#listeners.set(type, existing);
+  }
+
+  removeEventListener(type: string, listener: EventListener): void {
+    this.#listeners.get(type)?.delete(listener);
+  }
+
+  close(): void {
+    this.readyState = FakeEventSource.CLOSED;
+  }
+
+  /** Deliver one named frame, as the server sends it. */
+  emit(type: string, data: unknown): void {
+    const event = new MessageEvent("message", { data: JSON.stringify(data) });
+    for (const listener of this.#listeners.get(type) ?? []) {
+      listener(event as unknown as Event);
+    }
+  }
+}
+
+/** Install the fake for the duration of a test. Returns the instance list. */
+export function stubEventSource(): readonly FakeEventSource[] {
+  FakeEventSource.instances.length = 0;
+  vi.stubGlobal("EventSource", FakeEventSource);
+  return FakeEventSource.instances;
+}

@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Message, MessageSubmission } from "../../lib/conversations";
-import { apiError, renderWithProviders, stubFetch } from "../../test/harness";
+import {
+  apiError,
+  renderWithProviders,
+  stubEventSource,
+  stubFetch,
+} from "../../test/harness";
 import { Thread } from "./Thread";
 
 function message(overrides: Partial<Message> = {}): Message {
@@ -17,6 +22,9 @@ function message(overrides: Partial<Message> = {}): Message {
     error_code: null,
     created_at: "2026-07-27T12:00:00Z",
     completed_at: "2026-07-27T12:00:00Z",
+    evidence: [],
+    snapshot_id: null,
+    warnings: [],
     ...overrides,
   };
 }
@@ -217,18 +225,30 @@ describe("Thread", () => {
     expect(await screen.findByRole("button", { name: "Send" })).toBeDisabled();
   });
 
-  it("shows citations for the answer it just received", async () => {
+  it("shows citations for the answer once the run has been read back", async () => {
+    // Since P6-STREAM the 202 carries no answer, so the citations shown are
+    // the ones on the refetched message. Stubbing the message list with them
+    // is therefore the accurate model, not a shortcut.
     const user = userEvent.setup();
+    stubEventSource();
     stubFetch({
       [messagesUrl]: {
         body: {
           items: [
-            message({ message_id: "msg_2", role: "assistant", content: "ok" }),
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              content: "ok",
+              evidence: submission().evidence,
+            }),
           ],
           next_cursor: null,
         },
       },
-      [`POST ${messagesUrl}`]: { status: 201, body: submission() },
+      [`POST ${messagesUrl}`]: {
+        status: 202,
+        body: { ...submission(), status: "queued", content: "", evidence: [] },
+      },
     });
 
     renderWithProviders(<Thread conversationId="conv_1" />);
@@ -245,16 +265,25 @@ describe("Thread", () => {
   it("hands a clicked citation to its owner with the message it belongs to", async () => {
     const user = userEvent.setup();
     const onCite = vi.fn();
+    stubEventSource();
     stubFetch({
       [messagesUrl]: {
         body: {
           items: [
-            message({ message_id: "msg_2", role: "assistant", content: "ok" }),
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              content: "ok",
+              evidence: submission().evidence,
+            }),
           ],
           next_cursor: null,
         },
       },
-      [`POST ${messagesUrl}`]: { status: 201, body: submission() },
+      [`POST ${messagesUrl}`]: {
+        status: 202,
+        body: { ...submission(), status: "queued", content: "", evidence: [] },
+      },
     });
 
     renderWithProviders(<Thread conversationId="conv_1" onCite={onCite} />);
@@ -318,5 +347,230 @@ describe("Thread", () => {
 
     expect(screen.queryByTestId("pending-turn")).not.toBeInTheDocument();
     expect(composer.value).toBe("");
+  });
+});
+
+/**
+ * P6-STREAM (ADR-0008): the answer no longer arrives in the submission
+ * response, so everything a reopened thread shows has to come from the
+ * persisted message. These pin that.
+ */
+describe("a reopened thread", () => {
+  it("restores citations from the persisted message", async () => {
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+          message({ message_id: "msg_1", role: "user" }),
+          message({
+            message_id: "msg_2",
+            role: "assistant",
+            sequence_number: 2,
+            content: "capture is defined in `src/payments/service.py:7-8`.",
+            snapshot_id: "snap_1",
+            evidence: submission().evidence,
+          }),
+        ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+
+    // Nothing was submitted in this session: if the citation renders, it came
+    // from storage, which is the whole point.
+    expect(
+      await screen.findByRole("button", {
+        name: /src\/payments\/service\.py:7-8/,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps an old answer labelled with its own snapshot", async () => {
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+          message({
+            message_id: "msg_2",
+            role: "assistant",
+            sequence_number: 2,
+            content: "An older answer.",
+            snapshot_id: "snap_old",
+          }),
+        ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(
+      <Thread conversationId="conv_1" activeSnapshotId="snap_new" />,
+    );
+
+    const banner = await screen.findByTestId("freshness-banner");
+    expect(banner).toHaveTextContent("snap_old");
+  });
+
+  it("does not claim staleness when the answer used the active snapshot", async () => {
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+          message({
+            message_id: "msg_2",
+            role: "assistant",
+            sequence_number: 2,
+            content: "A current answer.",
+            snapshot_id: "snap_new",
+          }),
+        ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(
+      <Thread conversationId="conv_1" activeSnapshotId="snap_new" />,
+    );
+
+    await screen.findByText("A current answer.");
+    expect(screen.queryByTestId("freshness-banner")).not.toBeInTheDocument();
+  });
+
+  it("shows a run's warnings with the answer", async () => {
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+          message({
+            message_id: "msg_2",
+            role: "assistant",
+            sequence_number: 2,
+            content: "A partial answer.",
+            snapshot_id: "snap_1",
+            warnings: ["GRAPH_TRUNCATED_DEPTH"],
+          }),
+        ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+
+    expect(await screen.findByText(/GRAPH_TRUNCATED_DEPTH/)).toBeInTheDocument();
+  });
+});
+
+describe("a live run", () => {
+  const accepted = {
+    status: 202,
+    body: { ...submission(), status: "queued" as const, content: "", evidence: [] },
+  };
+
+  it("opens the stream for the run it just submitted", async () => {
+    const user = userEvent.setup();
+    const sources = stubEventSource();
+    stubFetch({
+      [messagesUrl]: { body: { items: [], next_cursor: null } },
+      [`POST ${messagesUrl}`]: accepted,
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+    await user.type(
+      await screen.findByLabelText(/Ask about this repository/i),
+      "capture",
+    );
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(sources.length).toBe(1));
+    expect(sources[0]?.url).toContain("/v1/conversations/conv_1/stream");
+  });
+
+  it("renders generation deltas as they arrive", async () => {
+    const user = userEvent.setup();
+    const sources = stubEventSource();
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              status: "generating",
+              content: "",
+            }),
+          ],
+          next_cursor: null,
+        },
+      },
+      [`POST ${messagesUrl}`]: accepted,
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+    await user.type(
+      await screen.findByLabelText(/Ask about this repository/i),
+      "capture",
+    );
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(sources.length).toBe(1));
+
+    const source = sources[0];
+    source?.emit("generation.delta", {
+      sequence: 0,
+      event: "generation.delta",
+      payload: { text: "capture is " },
+    });
+    source?.emit("generation.delta", {
+      sequence: 1,
+      event: "generation.delta",
+      payload: { text: "defined in service.py." },
+    });
+
+    expect(
+      await screen.findByText(/capture is defined in service\.py\./),
+    ).toBeInTheDocument();
+  });
+
+  it("ignores a replayed delta rather than appending it twice", async () => {
+    const user = userEvent.setup();
+    const sources = stubEventSource();
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              status: "generating",
+              content: "",
+            }),
+          ],
+          next_cursor: null,
+        },
+      },
+      [`POST ${messagesUrl}`]: accepted,
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+    await user.type(
+      await screen.findByLabelText(/Ask about this repository/i),
+      "capture",
+    );
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(sources.length).toBe(1));
+
+    const frame = {
+      sequence: 0,
+      event: "generation.delta",
+      payload: { text: "once" },
+    };
+    sources[0]?.emit("generation.delta", frame);
+    sources[0]?.emit("generation.delta", frame);
+
+    const rendered = await screen.findByText(/once/);
+    expect(rendered.textContent).toBe("once");
   });
 });

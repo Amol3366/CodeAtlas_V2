@@ -18,6 +18,19 @@ export interface ConversationPage {
   readonly next_cursor: string | null;
 }
 
+export interface MessageEvidence {
+  readonly evidence_id: string;
+  readonly citation_ordinal: number;
+  readonly file_path: string;
+  readonly symbol: string | null;
+  readonly start_line: number;
+  readonly end_line: number;
+  readonly content_hash: string;
+  readonly derivation: string;
+  readonly confidence: number;
+  readonly snapshot_id: string;
+}
+
 export interface Message {
   readonly message_id: string;
   readonly conversation_id: string;
@@ -34,6 +47,17 @@ export interface Message {
   readonly error_code: string | null;
   readonly created_at: string;
   readonly completed_at: string | null;
+  /**
+   * Carried with the message since P6-STREAM (ADR-0008).
+   *
+   * The submission response no longer contains the answer, so these are the
+   * only source for what a reopened thread shows: what the answer cited, which
+   * snapshot it examined, and what it warned about. Holding them in component
+   * state instead would lose all three on reload.
+   */
+  readonly evidence: readonly MessageEvidence[];
+  readonly snapshot_id: string | null;
+  readonly warnings: readonly string[];
 }
 
 export interface MessagePage {
@@ -41,18 +65,6 @@ export interface MessagePage {
   readonly next_cursor: string | null;
 }
 
-export interface MessageEvidence {
-  readonly evidence_id: string;
-  readonly citation_ordinal: number;
-  readonly file_path: string;
-  readonly symbol: string | null;
-  readonly start_line: number;
-  readonly end_line: number;
-  readonly content_hash: string;
-  readonly derivation: string;
-  readonly confidence: number;
-  readonly snapshot_id: string;
-}
 
 export interface MessageSubmission {
   readonly conversation_id: string;

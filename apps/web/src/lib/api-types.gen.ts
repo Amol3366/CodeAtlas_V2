@@ -158,11 +158,14 @@ export interface paths {
         put?: never;
         /**
          * Submit Message
-         * @description Ask a question and return the finished turn.
+         * @description Accept a question and return its IDs; the run answers in the background.
          *
-         *     Phase 5 answers deterministically and synchronously, so the answer is ready
-         *     when this returns. P5-04 adds the streamed view of the same run; the
-         *     persisted message stays the authoritative one either way.
+         *     202, not 201: this acknowledges an accepted turn rather than presenting a
+         *     finished one (`CLAUDE.md` Section 12.2, ADR-0008). The user message and the
+         *     queued run are committed before this returns, so the IDs are durable and
+         *     the stream is already live — a client may open it immediately without
+         *     racing the worker. The persisted message stays authoritative; streamed text
+         *     is provisional.
          */
         post: operations["submit_message_v1_conversations__conversation_id__messages_post"];
         delete?: never;
@@ -598,10 +601,10 @@ export interface components {
             completed_at?: string | null;
             /**
              * Contract Version
-             * @default 1.0
+             * @default 1.1
              * @constant
              */
-            contract_version: "1.0";
+            contract_version: "1.1";
             /**
              * Created At
              * Format: date-time
@@ -1015,12 +1018,18 @@ export interface components {
             created_at: string;
             /** Error Code */
             error_code?: string | null;
+            /** Evidence */
+            evidence?: components["schemas"]["MessageEvidenceItem"][];
             /** Message Id */
             message_id: string;
             role: components["schemas"]["MessageRole"];
             /** Sequence Number */
             sequence_number: number;
+            /** Snapshot Id */
+            snapshot_id?: string | null;
             status: components["schemas"]["MessageStatus"];
+            /** Warnings */
+            warnings?: string[];
         };
         /**
          * MessageEvidenceItem
@@ -1096,10 +1105,10 @@ export interface components {
             content: string;
             /**
              * Contract Version
-             * @default 1.0
+             * @default 1.1
              * @constant
              */
-            contract_version: "1.0";
+            contract_version: "1.1";
             /** Conversation Id */
             conversation_id: string;
             /** Error Code */
@@ -1165,10 +1174,10 @@ export interface components {
             answer: components["schemas"]["Answer"];
             /**
              * Contract Version
-             * @default 1.0
+             * @default 1.1
              * @constant
              */
-            contract_version: "1.0";
+            contract_version: "1.1";
             /** Evidence */
             evidence: components["schemas"]["Evidence"][];
             /** Limitations */
@@ -1803,7 +1812,7 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            201: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -130,8 +130,8 @@
             "title": "Completed At"
           },
           "contract_version": {
-            "const": "1.0",
-            "default": "1.0",
+            "const": "1.1",
+            "default": "1.1",
             "title": "Contract Version",
             "type": "string"
           },
@@ -1250,6 +1250,13 @@
             ],
             "title": "Error Code"
           },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/MessageEvidenceItem"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
           "message_id": {
             "maxLength": 256,
             "minLength": 1,
@@ -1264,8 +1271,29 @@
             "title": "Sequence Number",
             "type": "integer"
           },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
           "status": {
             "$ref": "#/components/schemas/MessageStatus"
+          },
+          "warnings": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -1425,8 +1453,8 @@
             "type": "string"
           },
           "contract_version": {
-            "const": "1.0",
-            "default": "1.0",
+            "const": "1.1",
+            "default": "1.1",
             "title": "Contract Version",
             "type": "string"
           },
@@ -1602,8 +1630,8 @@
             "$ref": "#/components/schemas/Answer"
           },
           "contract_version": {
-            "const": "1.0",
-            "default": "1.0",
+            "const": "1.1",
+            "default": "1.1",
             "title": "Contract Version",
             "type": "string"
           },
@@ -2816,7 +2844,7 @@
         ]
       },
       "post": {
-        "description": "Ask a question and return the finished turn.\n\nPhase 5 answers deterministically and synchronously, so the answer is ready\nwhen this returns. P5-04 adds the streamed view of the same run; the\npersisted message stays the authoritative one either way.",
+        "description": "Accept a question and return its IDs; the run answers in the background.\n\n202, not 201: this acknowledges an accepted turn rather than presenting a\nfinished one (`CLAUDE.md` Section 12.2, ADR-0008). The user message and the\nqueued run are committed before this returns, so the IDs are durable and\nthe stream is already live \u2014 a client may open it immediately without\nracing the worker. The persisted message stays authoritative; streamed text\nis provisional.",
         "operationId": "submit_message_v1_conversations__conversation_id__messages_post",
         "parameters": [
           {
@@ -2840,7 +2868,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
