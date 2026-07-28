@@ -185,6 +185,58 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-07-28T09:40:00Z — executed-state documentation reconciled
+
+- Agent: Claude Code `claude-opus-5`.
+- Transition: none. No task changed status; P6-STREAM remains `ready`.
+- Outcome: the documentation now states what has actually been built. Six
+  phases were delivered and gate-approved while the delivery checklists that
+  govern them stayed entirely unticked, so a reader arriving at `CLAUDE.md`
+  Section 20 would have concluded nothing had shipped.
+
+**What was stale, and what it now says**
+
+- **`CLAUDE.md` Section 20** — the phase tracker was right (0–5 `[X]`), but
+  all 46 underlying build items across those six phases were `[ ]`. Now
+  checked, each phase followed by its gate-approval date and the artifacts that
+  prove it. Phase 6's nine items are deliberately **left unchecked**: no line
+  item is fully delivered, because the watcher is debounced but not yet
+  reconciling, and reconciliation is what makes it trustworthy on Windows.
+- **The two accepted misses are recorded where the gate is, not only in the
+  handoff log.** Phase 4 carries changed-symbol precision 0.9375 against a
+  ≥0.95 target with its structural cause; Phase 5 carries conditions 1, 2, and
+  7 as partly met, what P6-01 has since paid, and the two gaps P6-STREAM owns.
+  A gate approved with a stated exception should read that way at the gate.
+- **`docs/plans/phases/phase-03-...md` said `awaiting_user_approval`** — a real
+  error. Phase 3's gate was approved 2026-07-26 and PLAN.md has said `complete`
+  since; only the phase plan's own header disagreed.
+- **`docs/adr/README.md`** described the ADR workflow but never listed an ADR.
+  It now indexes all eight with their decision and phase. All are `accepted`,
+  none superseded — verified by reading each header, not assumed.
+- **`README.md`** claimed "Phase 4" and listed the filesystem watcher under
+  "not built" after P6-02 shipped it; it also pointed at `check_phase5.ps1`.
+  Now Phases 0–5 plus the watcher, `check_phase6.ps1`, and the honest remainder
+  — including that submission is still inline pending P6-STREAM.
+
+**Claims verified rather than assumed**
+
+Every statement added to `README.md` about the gate script was checked against
+`scripts/check_phase6.ps1` before being written: `-SkipE2E`/`-SkipWeb`/
+`-SkipSync` exist, Playwright runs inside the gate, the web lint/types/tests/
+build steps exist, and the tracked baselines are Phase 0, 3, and 4 — not
+"Phase 1–4" as the README previously said. `codeatlas repo watch` was confirmed
+in `cli/main.py`.
+
+- Contracts/migrations: none. `contract_version` `"1.0"`, `SCHEMA_VERSION` 9,
+  both unchanged.
+- Verification: none run, and none claimed — no executable file was touched.
+  The last green gate remains P6-02's and still describes `main`.
+- Not changed, deliberately: the `CLAUDE.md`/`AGENTS.md` naming split (still a
+  user decision), and the `- Status:` versus `Status:` header style split
+  between ADRs 0001–0005 and 0006–0008, which is cosmetic and would be
+  unrelated churn.
+- Next: **P6-STREAM**, unchanged.
+
 ### 2026-07-28T09:00:00Z — branch merged to `main`; ADR-0008 approved; P6-STREAM `ready`
 
 - Agent: Claude Code `claude-opus-5`.

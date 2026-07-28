@@ -1,6 +1,7 @@
 # Phase 3 — Polyglot Graph and Delivery Contracts
 
-Status: `awaiting_user_approval`
+Status: `complete` — gate approved by the user on 2026-07-26, all seven
+conditions proven; see the Phase 3 handoff entries in `docs/plans/PLAN.md`.
 Gate authority: user
 Prerequisites: Phase 2 approved; `CLAUDE.md`; the blueprint
 Activation gate: this plan must be approved by the user before P3-SETUP moves to

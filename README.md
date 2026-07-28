@@ -4,7 +4,7 @@ CodeAtlas is a local-first repository-intelligence and change-assurance layer.
 The implementation follows the authoritative requirements in `CLAUDE.md` and
 the shared execution state in `docs/plans/PLAN.md`.
 
-## What works today (Phase 4)
+## What works today (Phases 0–5 complete; Phase 6 in progress)
 
 Register a local repository, index Python/TypeScript/JavaScript into a
 validated snapshot with a cross-file relation graph, search it, traverse it,
@@ -34,9 +34,18 @@ matches. If nothing matches, it abstains rather than guessing.
 The web application in `apps/web` adds persistent conversations, an evidence
 drawer, and change preflight — see `docs/operations/web-application.md`. It
 answers deterministically: there is no LLM, and an unanswerable question
-produces an explicit abstention. Not built: the filesystem watcher and
-packaging (Phase 6), and embeddings or any model provider (Phase 7). See
-`docs/plans/PLAN.md` for the phase order.
+produces an explicit abstention.
+
+A filesystem watcher keeps the index current without an explicit `index`
+command, debounced and disableable per repository
+(`codeatlas repo watch`, `docs/operations/continuous-freshness.md`).
+
+Not built yet: the reconciling scan that makes the watcher trustworthy against
+silently dropped Windows events, crash-recovery reporting, backup/restore, and
+packaging (all Phase 6); and embeddings or any model provider (Phase 7). Message
+submission still executes its run inline rather than accept-then-stream — see
+ADR-0008, scheduled as P6-STREAM. `docs/plans/PLAN.md` is the live phase and
+task status.
 
 ## Windows development
 
@@ -46,17 +55,23 @@ the web application in `apps/web`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
-powershell -ExecutionPolicy Bypass -File scripts/check_phase5.ps1 -SkipSync
+powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync
 ```
 
-The quality command validates the tracked contract schema, tests, lint, types,
-the evaluation corpus, and the tracked Phase 1–4 baselines. Repository
-fixtures are untrusted data and are never imported, built, or executed.
+The quality command validates the tracked contract schema, the Python tests,
+lint, types, the evaluation corpus, the tracked Phase 0/3/4 baselines, and the
+web app's lint, types, component tests, and build. Unlike its predecessors it
+also runs the Playwright end-to-end suites **inside** the gate rather than
+beside it; `-SkipE2E` opts out for a fast inner loop. Repository fixtures are
+untrusted data and are never imported, built, or executed.
 
 - `docs/operations/development-windows.md` — setup and the Phase 0 gate
 - `docs/operations/development-windows-phase1.md` — CLI, API, and Windows behavior
 - `docs/operations/relations-and-graph.md` — the relation graph and traversal
 - `docs/operations/change-analysis.md` — change preflight and its limits
 - `docs/operations/web-application.md` — the web app, its rules, and its limits
+- `docs/operations/continuous-freshness.md` — the watcher, its debounce, and its switch
+- `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
+- `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers
 - `docs/security/threat-model.md` — controls and their enforcement status

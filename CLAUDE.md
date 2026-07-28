@@ -1,3 +1,4 @@
+
 # CodeAtlas — Universal Coding-Agent Context
 
 Version: 1.0
@@ -921,28 +922,34 @@ have been satisfied with current verification evidence.
 
 Build:
 
-- [ ] Versioned domain, error, and evidence contracts
-- [ ] Representative fixture repositories
-- [ ] Evaluation runner and deterministic baseline
-- [ ] ADR process and reproducible local development commands
-- [ ] **Completion gate:** Metrics are reproducible, forbidden claims are
+- [x] Versioned domain, error, and evidence contracts
+- [x] Representative fixture repositories
+- [x] Evaluation runner and deterministic baseline
+- [x] ADR process and reproducible local development commands
+- [x] **Completion gate:** Metrics are reproducible, forbidden claims are
   tested, and the baseline results are recorded.
+
+Gate approved by the user. Evidence: `docs/evaluation/baseline-phase-0.{json,md}`
+(the deliberate null baseline), ADR-0001, `scripts/check_phase0.ps1`.
 
 ### Phase 1 — Repository truth vertical slice
 
 Build:
 
-- [ ] Windows-safe repository registration and scanning
-- [ ] Ignore rules, classification, limits, and Git-state capture
-- [ ] SQLite migrations and repository, snapshot, and file models
-- [ ] Python symbol extraction through Tree-sitter plus `ast`
-- [ ] Exact symbol lookup with validated file-and-line evidence
-- [ ] Repository/index status API and minimal CLI
-- [ ] Unit, integration, contract, security, and Windows-path tests for the
+- [x] Windows-safe repository registration and scanning
+- [x] Ignore rules, classification, limits, and Git-state capture
+- [x] SQLite migrations and repository, snapshot, and file models
+- [x] Python symbol extraction through Tree-sitter plus `ast`
+- [x] Exact symbol lookup with validated file-and-line evidence
+- [x] Repository/index status API and minimal CLI
+- [x] Unit, integration, contract, security, and Windows-path tests for the
   vertical slice
-- [ ] **Completion gate:** A local repository can be registered, indexed, and
+- [x] **Completion gate:** A local repository can be registered, indexed, and
   queried for an exact Python symbol through the application service, REST API,
   and CLI with valid snapshot-bound evidence.
+
+Gate approved by the user 2026-07-25. Evidence: migration `0001`, ADR-0002,
+`docs/evaluation/baseline-phase-1.{json,md}`, `scripts/check_phase1.ps1`.
 
 Do not add embeddings, an LLM, MCP, or the full web UI.
 
@@ -950,46 +957,78 @@ Do not add embeddings, an LLM, MCP, or the full web UI.
 
 Build:
 
-- [ ] Snapshot staging, validation, activation, and rollback
-- [ ] Logical chunk identity, chunk versions, and snapshot membership
-- [ ] Syntax-aware code and document chunks
-- [ ] FTS5 plus exact and lexical search
-- [ ] Incremental one-symbol edit behavior
-- [ ] Crash, rollback, stale-entity, and incremental-reuse tests
-- [ ] **Completion gate:** Unrelated chunks remain reusable after a one-symbol
+- [x] Snapshot staging, validation, activation, and rollback
+- [x] Logical chunk identity, chunk versions, and snapshot membership
+- [x] Syntax-aware code and document chunks
+- [x] FTS5 plus exact and lexical search
+- [x] Incremental one-symbol edit behavior
+- [x] Crash, rollback, stale-entity, and incremental-reuse tests
+- [x] **Completion gate:** Unrelated chunks remain reusable after a one-symbol
   edit, interrupted indexing preserves the previous active snapshot, and stale
   entities cannot appear in active results.
+
+Gate approved by the user 2026-07-26. Evidence: migrations `0002`–`0004`,
+`tests/integration/test_incremental_indexing.py`,
+`tests/integration/test_snapshot_isolation.py`,
+`tests/end_to_end/test_crash_recovery.py`,
+`docs/operations/chunking-and-search.md`, `scripts/check_phase2.ps1`.
 
 ### Phase 3 — Polyglot graph and delivery contracts
 
 Build:
 
-- [ ] TypeScript and JavaScript parsing
-- [ ] Imports, calls, and other supported relations
-- [ ] Bounded SQLite graph traversal
-- [ ] Complete versioned REST and CLI adapters
-- [ ] Initial versioned MCP adapters
-- [ ] Evidence retrieval and cross-adapter contract suites
-- [ ] **Completion gate:** Supported Python, TypeScript, and JavaScript symbols
+- [x] TypeScript and JavaScript parsing
+- [x] Imports, calls, and other supported relations
+- [x] Bounded SQLite graph traversal
+- [x] Complete versioned REST and CLI adapters
+- [x] Initial versioned MCP adapters
+- [x] Evidence retrieval and cross-adapter contract suites
+- [x] **Completion gate:** Supported Python, TypeScript, and JavaScript symbols
   and relations resolve consistently through shared application services, and
   REST, CLI, and MCP outputs pass the same evidence-contract tests.
+
+Gate approved by the user 2026-07-26, all seven conditions proven. Evidence:
+migrations `0005`–`0006`, ADR-0003 (evidence granularity), ADR-0004 (relation
+model), `tests/contract/test_cross_adapter.py`,
+`docs/operations/relations-and-graph.md`, `scripts/check_phase3.ps1`.
+
+Per ADR-0003 the gate is measured on `containing_evidence_rate` (0.6250), which
+is reported alongside the stricter `exact_evidence_rate` (0.4167). Graph answers
+cite every supporting edge, so a call-site line rarely equals a gold range
+written to describe a definition — a granularity disagreement, not an inaccuracy.
 
 ### Phase 4 — Change assurance
 
 Build:
 
-- [ ] Working-tree diff analysis
-- [ ] Commit-range diff analysis
-- [ ] Changed-symbol and public-contract detection
-- [ ] Direct and bounded transitive impact analysis
-- [ ] Related tests and documents
-- [ ] Related configuration, schemas, and architecture rules
-- [ ] Risk ordering
-- [ ] JSON, Markdown, and SARIF reports
-- [ ] Change-analysis evaluation and security tests
-- [ ] **Completion gate:** The declared change-analysis fixtures meet the
+- [x] Working-tree diff analysis
+- [x] Commit-range diff analysis
+- [x] Changed-symbol and public-contract detection
+- [x] Direct and bounded transitive impact analysis
+- [x] Related tests and documents
+- [x] Related configuration, schemas, and architecture rules
+- [x] Risk ordering
+- [x] JSON, Markdown, and SARIF reports
+- [x] Change-analysis evaluation and security tests
+- [x] **Completion gate:** The declared change-analysis fixtures meet the
   precision, recall, evidence-validity, snapshot-isolation, and performance
   targets in Section 19.3.
+
+Gate approved by the user 2026-07-27 **with one target accepted as missed.**
+Changed-symbol recall 1.0000, direct-impact recall 1.0000, unsupported-claim
+rate 0.0000, finding precision 1.0000 on all 24 cases, warm preflight p95
+5.151 s (target 10 s), changed-file refresh p95 1.426 s (target 2 s).
+
+**Changed-symbol precision is 0.9375 against a ≥0.95 target.** The cause is
+structural, not a defect: c020–c022 split one physical `git_changes` diff into
+three single-symbol cases, so the engine — correctly reporting both affected
+symbols each run — has each case count the other's symbol against it. The other
+21 cases score 1.0. The corpus was not edited (ADR-0003). Full explanation in
+`docs/evaluation/phase-4-baseline-environment.md`.
+
+Evidence: ADR-0005, migration `0007`, `docs/evaluation/baseline-phase-4.{json,md}`,
+`scripts/measure_phase4_perf.py`, `docs/operations/change-analysis.md`,
+`scripts/check_phase4.ps1`.
 
 This phase proves the core product wedge.
 
@@ -997,19 +1036,38 @@ This phase proves the core product wedge.
 
 Build in vertical slices:
 
-1. [ ] Repository onboarding, status, and diagnostics
-2. [ ] Conversation schema and history API
-3. [ ] Sidebar plus new, open, rename, archive, and delete conversation behavior
-4. [ ] Submit message -> deterministic retrieval -> persisted answer
-5. [ ] Typed SSE streaming, cancel, retry, and reconnect
-6. [ ] Inline citations and evidence drawer
-7. [ ] Change-preflight report experience
-8. [ ] Settings, accessibility, responsive layout, and end-to-end tests
+1. [x] Repository onboarding, status, and diagnostics
+2. [x] Conversation schema and history API
+3. [x] Sidebar plus new, open, rename, archive, and delete conversation behavior
+4. [x] Submit message -> deterministic retrieval -> persisted answer
+5. [x] Typed SSE streaming, cancel, retry, and reconnect
+6. [x] Inline citations and evidence drawer
+7. [x] Change-preflight report experience
+8. [x] Settings, accessibility, responsive layout, and end-to-end tests
 
-- [ ] **Completion gate:** Persistent history survives frontend and backend
+- [x] **Completion gate:** Persistent history survives frontend and backend
   restarts; streaming is idempotent, cancellable, and reconnect-safe; citations
   retain their historical snapshot; and the critical workflows pass component,
   accessibility, responsive, and Playwright tests.
+
+Gate approved by the user 2026-07-28 **with conditions 1, 2, and 7 reported as
+only partly met**, all for one reason: no Playwright suites existed. The
+approval was given with that stated, so the gap carried into Phase 6 as declared
+work rather than being quietly dropped.
+
+Since then **P6-01 paid most of that debt**: the harness plus three browser
+suites landed, and restart persistence and the critical workflow are now proven
+end to end. Two Phase 5 gaps remain open and are owned by **P6-STREAM**:
+
+- **Mid-run stream reconnect is still unproven**, because submission executes
+  the run inline and returns it finished, so no run is ever in flight. ADR-0008
+  replaces that with accept-then-stream; the user approved it 2026-07-28.
+- `Thread` passes `snapshotId={null}` so the freshness banner cannot appear, and
+  citations are not restored after a reload.
+
+Evidence: ADR-0006, migration `0008`, `apps/web/`,
+`docs/operations/web-application.md`, `docs/operations/end-to-end-tests.md`,
+`scripts/check_phase5.ps1`.
 
 The first UI slice must use a real backend contract. Do not substitute fake chat
 data for missing domain functionality.
@@ -1029,6 +1087,20 @@ Build:
 - [ ] **Completion gate:** A packaged Windows build passes upgrade, recovery,
   backup/restore, deletion, security, performance, and end-to-end release tests
   without losing the last valid active snapshot or chat history.
+
+**In progress.** Every box above is still `[ ]` because no line item is fully
+delivered yet — the watcher is debounced but not yet reconciling, and
+reconciliation is what makes it trustworthy on Windows, where a
+`ReadDirectoryChangesW` buffer overflow drops events silently (ADR-0007).
+
+Delivered so far: P6-SETUP (ADR-0007, four hardening error codes,
+`scripts/check_phase6.ps1` with Playwright inside the gate), P6-01 (Playwright
+harness and three suites; it found and fixed a shared-SQLite-connection
+corruption under concurrent requests), P6-02 (watcher, debounce, per-repository
+switch, migration `0009`).
+
+Next: **P6-STREAM** (ADR-0008, accept-then-stream, `contract_version` 1.1), then
+P6-03 reconciliation. Live task status lives in `docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift
 
