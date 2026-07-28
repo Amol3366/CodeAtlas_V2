@@ -54,7 +54,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Task status | Phases 0–6 `complete`, every gate approved by the user. One qualification carried by the Phase 6 approval has since been fixed |
 | Agent | Claude Code `claude-opus-5` |
 | Started UTC | 2026-07-29T05:10:00Z (post-approval defect fix) |
-| Git state | Branch `main` at `ed23aea`. The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint, untouched throughout Phase 6. |
+| Git state | Branch `main` at `f9a7812` (the access-log fix). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint, untouched throughout Phase 6. |
 | Next gate | **Phase 7's activation gate**, which is separate from a completion gate and has not been requested. `CLAUDE.md` Section 20 requires explicit product, privacy, and architecture approval to be recorded *before* a Phase 7 plan is written. No agent may begin Phase 7 work until that approval exists. |
 
 ### Phase 6 Task Board (active)

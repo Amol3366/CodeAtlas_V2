@@ -19,7 +19,7 @@ is no reason to assume the numbers carry over.
 | Artifact | `dist/codeatlas-win64/codeatlas.exe`, PyInstaller onedir |
 | Workload | 300 generated Python modules with cross-package imports and calls, in a real Git repository — the *same* generator Phase 4 used, imported rather than copied |
 | Driver | the packaged build's own `/v1` API, server started **once** |
-| State | warm; 10 samples per target after a cold index |
+| State | warm; 20 samples per target after a cold index, matching Phase 4 |
 | Watching | off for the measured repository, through the product's own switch |
 
 The server is started once and driven over HTTP because that is the fair

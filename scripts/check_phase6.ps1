@@ -162,7 +162,11 @@ if ($Package) {
 # is how that record is refreshed and re-checked.
 if ($Perf) {
     Invoke-Checked "Packaged performance" @(
-        "run", "python", "scripts/measure_phase6_perf.py", "--runs", "10"
+        # The default 20 samples, which is what Phase 4 used and what the
+        # committed baseline records. It was pinned to 10 while the access-log
+        # hang capped a run; measuring at a different count than the baseline
+        # would compare two different things.
+        "run", "python", "scripts/measure_phase6_perf.py"
     )
 } else {
     Write-Output "==> Packaged performance (skipped; pass -Perf to measure)"

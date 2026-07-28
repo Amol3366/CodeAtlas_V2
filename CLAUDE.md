@@ -1121,7 +1121,7 @@ by a real earlier build** — checkpointing first, losing no snapshot and no
 conversation, and refusing outright when the database came from a *newer* build;
 backup, restore, and deletion refuse rather than half-finish, with a restored
 database passing its integrity check; the Section 19.3 performance targets hold
-**on the artifact** (refresh p95 1.33 s, preflight p95 3.09 s); the security
+**on the artifact** (refresh p95 1.295 s, preflight p95 3.103 s); the security
 sweep runs against the **real binary**; and every earlier phase gate still exits
 0. `check_phase6.ps1 -Package` passes with Playwright and packaging included.
 
