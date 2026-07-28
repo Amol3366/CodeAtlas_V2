@@ -99,10 +99,14 @@ def build_services(
         repositories=repositories,
         snapshots=snapshots,
         search=search_store,
+        jobs=jobs,
         connection=connection,
     )
     # Heal anything a crashed predecessor left mid-build before this process
-    # serves a single query.
+    # serves a single query. The return value is deliberately dropped: what was
+    # recovered is written onto the job it describes, because services are
+    # built per request and the request that discovers a crash is almost never
+    # the one asked about it later.
     recovery.recover_interrupted()
 
     # Hoisted because change analysis re-indexes before it compares: its

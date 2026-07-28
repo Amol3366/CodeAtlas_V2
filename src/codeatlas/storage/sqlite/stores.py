@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -55,9 +56,34 @@ from codeatlas.domain.repository import FileClassification, FileRecord, Reposito
 from codeatlas.domain.search import ChunkSearchHit, FileSearchHit
 from codeatlas.domain.snapshot import Snapshot, SnapshotState
 from codeatlas.domain.symbols import SymbolRecord, Visibility
+from codeatlas.indexing.ownership import current_owner
 from codeatlas.storage.sqlite.connection import from_utc_text, to_utc_text
 
 _ACTIVE_JOB_STATUSES = ("queued", "running")
+
+
+@dataclass(frozen=True)
+class OpenJob:
+    """An index run that was never closed, and what it was doing.
+
+    Either a run in flight right now or one a killed process abandoned. Which
+    it is depends on whether ``owner`` is still alive, and that is decided by
+    the recovery service.
+    """
+
+    job_id: str
+    repository_id: str
+    snapshot_id: str
+    stage: str
+    started_at: str
+    owner: Mapping[str, Any] | None = None
+
+    @property
+    def owner_pid(self) -> int | None:
+        if self.owner is None:
+            return None
+        pid = self.owner.get("pid")
+        return pid if isinstance(pid, int) else None
 
 # Columns a caller may restrict a chunk search to. A column filter is FTS
 # syntax, so the name can only ever come from this fixed set.
@@ -303,6 +329,46 @@ class SnapshotStore:
         self._connection.execute(
             "DELETE FROM snapshots WHERE snapshot_id = ?", (snapshot_id,)
         )
+
+    def delete_derived_rows(self, snapshot_id: str) -> None:
+        """Delete a snapshot's rows while keeping the snapshot itself.
+
+        Recovery needs the absence that `delete` produces without losing the
+        record of what failed. The tables are discovered from the schema rather
+        than listed: every one that declares a foreign key to `snapshots` is
+        exactly what a cascade would have removed, so a later migration adding
+        a snapshot-scoped table is covered without anyone remembering this
+        function exists.
+
+        Tables that merely *store* a snapshot id — change analyses, messages —
+        declare no such key and are correctly untouched. A message must keep
+        naming the snapshot that answered it.
+        """
+        for table in self._cascading_tables():
+            # The name came from `sqlite_master`, never from a caller, so this
+            # is not a parameterizable position rather than an unchecked one.
+            self._connection.execute(
+                f"DELETE FROM {table} WHERE snapshot_id = ?",
+                (snapshot_id,),
+            )
+
+    def _cascading_tables(self) -> tuple[str, ...]:
+        names = [
+            str(row[0])
+            for row in self._connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+                " AND name NOT LIKE 'sqlite_%'"
+            )
+        ]
+        cascading = []
+        for name in names:
+            # The table name comes from sqlite_master, never from a caller.
+            keys = self._connection.execute(
+                f'PRAGMA foreign_key_list("{name}")'
+            ).fetchall()
+            if any(str(key["table"]) == "snapshots" for key in keys):
+                cascading.append(name)
+        return tuple(cascading)
 
 
 class FileStore:
@@ -818,13 +884,28 @@ class IndexJobStore:
         self._clock = clock or (lambda: datetime.now(UTC))
 
     def start(self, job_id: str, repository_id: str, snapshot_id: str) -> None:
+        """Open a job, stamped with the process that owns it.
+
+        The owner is what lets recovery tell a run abandoned by a dead process
+        from one a live process is still working on. It goes in the existing
+        `diagnostics` JSON rather than a new column: the value is transient —
+        `finish` overwrites it, and a finished job is never a recovery
+        candidate — so it needs no schema of its own.
+        """
         now = to_utc_text(self._clock())
         self._connection.execute(
             "INSERT INTO index_jobs ("
             " job_id, repository_id, snapshot_id, stage, status, attempts,"
             " started_at, updated_at, diagnostics"
-            ") VALUES (?, ?, ?, 'scanning', 'running', 1, ?, ?, '[]')",
-            (job_id, repository_id, snapshot_id, now, now),
+            ") VALUES (?, ?, ?, 'scanning', 'running', 1, ?, ?, ?)",
+            (
+                job_id,
+                repository_id,
+                snapshot_id,
+                now,
+                now,
+                json.dumps({"owner": current_owner()}, sort_keys=True),
+            ),
         )
 
     def update_stage(self, job_id: str, stage: str, status: str) -> None:
@@ -883,6 +964,48 @@ class IndexJobStore:
             (repository_id, *_ACTIVE_JOB_STATUSES),
         ).fetchone()
         return str(row[0]) if row is not None else None
+
+    def list_open(self, repository_id: str | None = None) -> tuple[OpenJob, ...]:
+        """Return jobs that were never closed, with the owner each recorded.
+
+        Whether an owner is still alive is a policy question, so it is answered
+        by the recovery service rather than here. This returns rows.
+        """
+        placeholders = ", ".join("?" for _ in _ACTIVE_JOB_STATUSES)
+        clause = "" if repository_id is None else " AND repository_id = ?"
+        parameters: tuple[Any, ...] = _ACTIVE_JOB_STATUSES
+        if repository_id is not None:
+            parameters = (*parameters, repository_id)
+
+        rows = self._connection.execute(
+            "SELECT job_id, repository_id, snapshot_id, stage, started_at,"
+            " diagnostics FROM index_jobs"
+            f" WHERE status IN ({placeholders}){clause}"
+            " ORDER BY started_at, rowid",
+            parameters,
+        ).fetchall()
+        return tuple(
+            OpenJob(
+                job_id=str(row["job_id"]),
+                repository_id=str(row["repository_id"]),
+                snapshot_id=str(row["snapshot_id"]),
+                stage=str(row["stage"]),
+                started_at=str(row["started_at"]),
+                owner=_owner_of(row["diagnostics"]),
+            )
+            for row in rows
+        )
+
+
+def _owner_of(diagnostics: Any) -> Mapping[str, Any] | None:
+    try:
+        parsed = json.loads(diagnostics)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    owner = parsed.get("owner")
+    return owner if isinstance(owner, dict) else None
 
 
 def _repository_from_row(row: sqlite3.Row) -> Repository:

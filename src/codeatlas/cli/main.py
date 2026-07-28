@@ -43,6 +43,7 @@ from codeatlas.domain.errors import (
     RepositoryNotFoundError,
     SnapshotNotReadyError,
 )
+from codeatlas.domain.repository import Repository
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.storage.sqlite.connection import connect, default_database_path
@@ -634,6 +635,140 @@ def diagnostics(
         "\n".join(f"{key}: {value}" for key, value in payload.items()),
         as_json=as_json,
     )
+
+
+@app.command("doctor")
+def doctor(
+    repository_id: Annotated[
+        str | None,
+        typer.Argument(help="Repository to check. Omit to check every one."),
+    ] = None,
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Report the health of the installation and its repositories.
+
+    The product's fifth question — "what does CodeAtlas not know?" — asked
+    about the installation rather than about a query. Its most useful answer is
+    the one recovery leaves behind: an index run that was interrupted, or one
+    that no live process owns and that is quietly blocking every reindex.
+
+    Exit code 4 means problems were found. That is a different fact from the
+    command failing, and a script needs to tell them apart.
+    """
+    try:
+        with _services(database) as services:
+            repositories = (
+                [services.registration.get(repository_id)]
+                if repository_id is not None
+                else services.repositories.list_all()
+            )
+            entries = [_doctor_entry(services, item) for item in repositories]
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    healthy = all(not entry["problems"] for entry in entries)
+    payload: dict[str, Any] = {"healthy": healthy, "repositories": entries}
+    _emit(payload, _doctor_text(entries, healthy=healthy), as_json=as_json)
+    if not healthy:
+        raise typer.Exit(EXIT_PARTIAL)
+
+
+def _doctor_entry(
+    services: ApplicationServices, repository: Repository
+) -> dict[str, Any]:
+    repository_id = repository.repository_id
+    status_result = services.status.status(repository_id)
+    report = services.status.diagnostics(repository_id)
+
+    problems: list[str] = []
+    if not Path(repository.canonical_root).is_dir():
+        # Diagnosis must not require the thing being diagnosed to be healthy.
+        problems.append("ROOT_MISSING")
+    if status_result.snapshot is None:
+        problems.append("NEVER_INDEXED")
+    if report.interrupted_run is not None:
+        problems.append("INDEX_RUN_INTERRUPTED")
+    if report.open_jobs:
+        # Either a run genuinely in flight or one whose owner cannot be
+        # verified. Both block a reindex, and from outside they look the same
+        # — which is exactly why the owner is printed.
+        problems.append("INDEX_RUN_IN_PROGRESS")
+    if report.parse_error_count:
+        problems.append("PARSE_ERRORS")
+
+    interrupted = report.interrupted_run
+    return {
+        "repository_id": repository_id,
+        "display_name": repository.display_name,
+        "watch_enabled": repository.watch_enabled,
+        "active_snapshot_id": (
+            None
+            if status_result.snapshot is None
+            else status_result.snapshot.snapshot_id
+        ),
+        "file_count": status_result.file_count,
+        "symbol_count": status_result.symbol_count,
+        "parse_error_count": report.parse_error_count,
+        "interrupted_run": (
+            None
+            if interrupted is None
+            else {
+                "snapshot_id": interrupted.snapshot_id,
+                "stage": interrupted.stage,
+                "started_at": interrupted.started_at,
+                "recovered_at": interrupted.recovered_at,
+            }
+        ),
+        "open_jobs": [
+            {
+                "job_id": job.job_id,
+                "stage": job.stage,
+                "started_at": job.started_at,
+                "owner_pid": job.owner_pid,
+            }
+            for job in report.open_jobs
+        ],
+        "warnings": list(report.warnings),
+        "problems": problems,
+    }
+
+
+def _doctor_text(entries: list[dict[str, Any]], *, healthy: bool) -> str:
+    lines = ["CodeAtlas doctor"]
+    if not entries:
+        lines.append("  No repositories are registered.")
+        return "\n".join(lines)
+
+    for entry in entries:
+        lines.append(f"\n{entry['display_name']}  [{entry['repository_id']}]")
+        snapshot = entry["active_snapshot_id"]
+        lines.append(
+            f"  snapshot: {snapshot or 'none'}"
+            f"  files: {entry['file_count']}  symbols: {entry['symbol_count']}"
+        )
+        lines.append(f"  watching: {'on' if entry['watch_enabled'] else 'off'}")
+
+        interrupted = entry["interrupted_run"]
+        if interrupted is not None:
+            lines.append(
+                f"  last index was interrupted during {interrupted['stage']}"
+                f" (recovered {interrupted['recovered_at']}); reindex to refresh"
+            )
+        for job in entry["open_jobs"]:
+            owner = job["owner_pid"]
+            lines.append(
+                f"  an index run is open: {job['job_id']} at {job['stage']},"
+                f" owned by pid {owner if owner is not None else 'unknown'}"
+            )
+        if not entry["problems"]:
+            lines.append("  ok")
+        else:
+            lines.append(f"  problems: {', '.join(entry['problems'])}")
+
+    lines.append("\nHealthy." if healthy else "\nProblems were found.")
+    return "\n".join(lines)
 
 
 @app.command("impact")

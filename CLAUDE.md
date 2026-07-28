@@ -1079,8 +1079,8 @@ data for missing domain functionality.
 
 Build:
 
-- [ ] Reconciled and debounced filesystem watcher
-- [ ] Crash recovery and actionable diagnostics
+- [X] Reconciled and debounced filesystem watcher
+- [X] Crash recovery and actionable diagnostics
 - [ ] Native packaging and installation workflow
 - [ ] Upgrade and migration workflow
 - [ ] Backup, restore, deletion, and support workflows
@@ -1091,30 +1091,36 @@ Build:
   backup/restore, deletion, security, performance, and end-to-end release tests
   without losing the last valid active snapshot or chat history.
 
-**In progress.** Every box above is still `[ ]` because no line item is fully
-delivered yet — the watcher is debounced but not yet reconciling, and
-reconciliation is what makes it trustworthy on Windows, where a
-`ReadDirectoryChangesW` buffer overflow drops events silently (ADR-0007).
+**In progress.** Two of the eight build items are delivered; the remaining six
+are packaging, upgrade, backup, and the validation sweeps.
 
 Delivered so far: P6-SETUP (ADR-0007, four hardening error codes,
 `scripts/check_phase6.ps1` with Playwright inside the gate), P6-01 (Playwright
 harness and three suites; it found and fixed a shared-SQLite-connection
 corruption under concurrent requests), P6-02 (watcher, debounce, per-repository
 switch, migration `0009`), P6-STREAM (ADR-0008, accept-then-stream,
-`contract_version` **1.0 → 1.1** — the first bump in six phases).
+`contract_version` **1.0 → 1.1** — the first bump in six phases), P6-03 (the
+reconciling scan and startup catch-up), P6-04 (crash-recovery reporting,
+run ownership, and `codeatlas doctor`).
 
-**Gate condition 1 is met**: history survives a backend restart, a stream
-reconnects against a live run, and the critical workflows run in a browser.
-`check_phase6.ps1` passes with Playwright included.
+**Gate conditions 1, 3, and 4 are met.** History survives a backend restart and
+a stream reconnects against a live run; filesystem events are never treated as
+truth, because a reconciling scan corrects what the event stream drops; and a
+genuinely killed process is recovered, leaves no orphaned rows, and says what
+it recovered. `check_phase6.ps1` passes with Playwright included.
 
-One qualification, recorded because a green gate should not hide it: four
-conversation-route browser tests are **skipped on Chromium**, whose renderer
-crashes navigating to `/conversations/{id}` — a browser defect, not application
-code, unresolved upstream. Firefox proves all seven. The isolation evidence is
-in the 2026-07-28 handoffs.
+Two qualifications, recorded because a green gate should not hide them.
 
-Next: **P6-03** reconciliation. Live task status lives in `docs/plans/PLAN.md`,
-never here.
+- Four conversation-route browser tests are **skipped on Chromium**, whose
+  renderer crashes navigating to `/conversations/{id}` — a browser defect, not
+  application code, unresolved upstream. Firefox proves all seven.
+- Recovery **does not detect pid reuse**: if a dead run's pid is reassigned
+  before the next start, that repository stays blocked from reindexing.
+  `codeatlas doctor` names the run and its pid, so the failure is visible
+  rather than silent, but it is not automatic.
+
+Next: **P6-05** backup and restore. Live task status lives in
+`docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift
 

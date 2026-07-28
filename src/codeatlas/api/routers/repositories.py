@@ -71,6 +71,24 @@ class StatusResponse(StrictModel):
     warnings: list[str]
 
 
+class InterruptedRunResponse(StrictModel):
+    """An index run abandoned by a killed process, as recovery found it."""
+
+    snapshot_id: str
+    stage: str
+    started_at: str
+    recovered_at: str
+
+
+class OpenJobResponse(StrictModel):
+    """An index run that is still open. `owner_pid` is null when unrecorded."""
+
+    job_id: str
+    stage: str
+    started_at: str
+    owner_pid: int | None
+
+
 class DiagnosticsResponse(StrictModel):
     repository_id: str
     snapshot_id: str | None
@@ -78,6 +96,11 @@ class DiagnosticsResponse(StrictModel):
     parse_error_count: int
     limits: LimitsResponse
     warnings: list[str]
+    # Added in P6-04. Both default so the addition is additive: an existing
+    # client that ignores them sees the response it already knew, which is why
+    # `contract_version` does not move.
+    interrupted_run: InterruptedRunResponse | None = None
+    open_jobs: list[OpenJobResponse] = []
 
 
 def get_services(request: Request) -> Iterator[ApplicationServices]:
@@ -199,6 +222,7 @@ def repository_diagnostics(
     repository_id: str, services: Services
 ) -> DiagnosticsResponse:
     diagnostics = services.status.diagnostics(repository_id)
+    interrupted = diagnostics.interrupted_run
     return DiagnosticsResponse(
         repository_id=diagnostics.repository_id,
         snapshot_id=diagnostics.snapshot_id,
@@ -206,6 +230,25 @@ def repository_diagnostics(
         parse_error_count=diagnostics.parse_error_count,
         limits=_limits_response(diagnostics.limits),
         warnings=list(diagnostics.warnings),
+        interrupted_run=(
+            None
+            if interrupted is None
+            else InterruptedRunResponse(
+                snapshot_id=interrupted.snapshot_id,
+                stage=interrupted.stage,
+                started_at=interrupted.started_at,
+                recovered_at=interrupted.recovered_at,
+            )
+        ),
+        open_jobs=[
+            OpenJobResponse(
+                job_id=job.job_id,
+                stage=job.stage,
+                started_at=job.started_at,
+                owner_pid=job.owner_pid,
+            )
+            for job in diagnostics.open_jobs
+        ],
     )
 
 

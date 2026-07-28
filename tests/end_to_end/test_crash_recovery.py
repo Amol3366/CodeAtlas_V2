@@ -7,6 +7,8 @@ previous active snapshot still answers correctly.
 
 from __future__ import annotations
 
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -146,6 +148,113 @@ def test_chat_and_search_survive_a_backend_restart(
     assert [item.evidence_id for item in first.evidence] == [
         item.evidence_id for item in second.evidence
     ]
+
+
+_CHILD_PROGRAM = """
+import sys
+from pathlib import Path
+from codeatlas.application.container import build_services
+from codeatlas.storage.sqlite.connection import connect
+
+database, repository_id = Path(sys.argv[1]), sys.argv[2]
+with connect(database) as connection:
+    services = build_services(connection)
+    services.indexing.index(repository_id)
+"""
+
+
+def test_a_genuinely_killed_process_is_recovered_and_can_reindex(
+    tmp_path: Path, sample_repo: Path
+) -> None:
+    """The state every fast crash test assumes, produced by a real kill.
+
+    The other tests in this area write the post-kill state directly, which is
+    fast and deterministic but asserts a state we *believe* a kill produces.
+    This one kills a real process — no `except`, no `finally`, no atexit — and
+    proves the belief. It is the slow test that keeps the quick ones honest.
+    """
+    database = tmp_path / "db.sqlite"
+
+    # Enough files that indexing outlives the poll below. A repository that
+    # indexes in 50 ms would be finished before any kill could land mid-run,
+    # and the test would silently prove nothing.
+    package = sample_repo / "src" / "bulk"
+    package.mkdir(parents=True, exist_ok=True)
+    for index in range(400):
+        (package / f"module_{index}.py").write_text(
+            f"class Bulk{index}:\n"
+            f"    def method(self) -> int:\n"
+            f"        return {index}\n",
+            encoding="utf-8",
+        )
+
+    repository_id = _register_and_index(database, sample_repo)
+    (package / "module_0.py").write_text(
+        "class Bulk0:\n    def method(self) -> int:\n        return 999\n",
+        encoding="utf-8",
+    )
+
+    # Fixed argv, no shell: nothing here is interpolated from user input.
+    child = subprocess.Popen(
+        [sys.executable, "-c", _CHILD_PROGRAM, str(database), repository_id],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        # Kill as soon as the job row exists. `index()` writes it before it
+        # scans, so its presence means the run is genuinely under way.
+        deadline = time.monotonic() + 60.0
+        job_id: str | None = None
+        # One connection for the whole poll. Reopening every 10 ms while the
+        # child writes hits "disk I/O error" on Windows, which is contention
+        # for the WAL side files rather than anything wrong with the code
+        # under test.
+        with connect(database) as watcher:
+            while time.monotonic() < deadline and job_id is None:
+                if child.poll() is not None:
+                    # Report why it exited. A silent "it finished too fast"
+                    # hides a child that in fact crashed on startup, and the
+                    # test would then be measuring nothing.
+                    _, stderr = child.communicate()
+                    pytest.fail(
+                        "the child exited before it could be killed"
+                        f" (code {child.returncode}):"
+                        f" {stderr.decode(errors='replace')}"
+                    )
+                row = watcher.execute(
+                    "SELECT job_id FROM index_jobs WHERE status = 'running'"
+                    " ORDER BY started_at DESC LIMIT 1"
+                ).fetchone()
+                job_id = None if row is None else str(row[0])
+                if job_id is None:
+                    time.sleep(0.01)
+        assert job_id is not None, "no indexing run started"
+        child.kill()
+    finally:
+        child.wait(timeout=30)
+
+    # A killed process runs no cleanup, so the job it opened is still running.
+    with connect(database) as connection:
+        status = connection.execute(
+            "SELECT status FROM index_jobs WHERE job_id = ?", (job_id,)
+        ).fetchone()[0]
+    assert status == "running", "a killed process should leave its job open"
+
+    # A new process starts. Recovery must heal the job, say what it found, and
+    # leave the repository indexable again.
+    with connect(database) as connection:
+        services = build_services(connection)
+        diagnostics = services.status.diagnostics(repository_id)
+        assert diagnostics.interrupted_run is not None
+        assert "INDEX_RUN_INTERRUPTED" in diagnostics.warnings
+
+        result = services.indexing.index(repository_id)
+        assert result.snapshot.state is SnapshotState.ACTIVE
+
+        found = services.lookup.lookup(
+            SymbolLookupRequest(repository_id, "Bulk0.method", "req-kill")
+        )
+        assert found.evidence
 
 
 def test_a_large_file_chunks_within_bounds_and_without_quadratic_time(

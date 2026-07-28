@@ -673,8 +673,26 @@
       "DiagnosticsResponse": {
         "additionalProperties": false,
         "properties": {
+          "interrupted_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterruptedRunResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "limits": {
             "$ref": "#/components/schemas/LimitsResponse"
+          },
+          "open_jobs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OpenJobResponse"
+            },
+            "title": "Open Jobs",
+            "type": "array"
           },
           "parse_error_count": {
             "title": "Parse Error Count",
@@ -1177,6 +1195,36 @@
         "title": "IndexResponse",
         "type": "object"
       },
+      "InterruptedRunResponse": {
+        "additionalProperties": false,
+        "description": "An index run abandoned by a killed process, as recovery found it.",
+        "properties": {
+          "recovered_at": {
+            "title": "Recovered At",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "stage",
+          "started_at",
+          "recovered_at"
+        ],
+        "title": "InterruptedRunResponse",
+        "type": "object"
+      },
       "LimitsResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1566,6 +1614,43 @@
           "intent"
         ],
         "title": "MessageSubmission",
+        "type": "object"
+      },
+      "OpenJobResponse": {
+        "additionalProperties": false,
+        "description": "An index run that is still open. `owner_pid` is null when unrecorded.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "owner_pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Pid"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "stage",
+          "started_at",
+          "owner_pid"
+        ],
+        "title": "OpenJobResponse",
         "type": "object"
       },
       "OverallRisk": {

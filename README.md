@@ -49,9 +49,16 @@ Server-Sent Events — so a long answer never holds a request open, cancelling
 reaches a run that is genuinely executing, and a reload recovers the persisted
 answer with its citations and the snapshot it used (ADR-0008).
 
-Not built yet: crash-recovery reporting, backup/restore, and packaging (all
-Phase 6); and embeddings or any model provider (Phase 7).
-`docs/plans/PLAN.md` is the live phase and task status.
+A process killed mid-index is healed on the next start, and the repository says
+so: `codeatlas doctor` reports what was interrupted, what is blocking a reindex,
+and which repositories were never indexed at all — telling those apart, because
+the remedies differ (`docs/operations/crash-recovery.md`). Recovery leaves a run
+alone while the process that owns it is still alive, so it never interrupts an
+index the watcher is in the middle of.
+
+Not built yet: backup/restore and packaging (both Phase 6); and embeddings or
+any model provider (Phase 7). `docs/plans/PLAN.md` is the live phase and task
+status.
 
 ## Windows development
 
@@ -77,6 +84,7 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/change-analysis.md` — change preflight and its limits
 - `docs/operations/web-application.md` — the web app, its rules, and its limits
 - `docs/operations/continuous-freshness.md` — the watcher, its debounce, and its switch
+- `docs/operations/crash-recovery.md` — what a kill leaves behind, and `codeatlas doctor`
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
 - `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers

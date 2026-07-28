@@ -806,7 +806,13 @@ export interface components {
         Derivation: "deterministic" | "static_resolved" | "high_confidence_heuristic" | "low_confidence_heuristic" | "semantic_candidate" | "model_generated" | "unsupported";
         /** DiagnosticsResponse */
         DiagnosticsResponse: {
+            interrupted_run?: components["schemas"]["InterruptedRunResponse"] | null;
             limits: components["schemas"]["LimitsResponse"];
+            /**
+             * Open Jobs
+             * @default []
+             */
+            open_jobs: components["schemas"]["OpenJobResponse"][];
             /** Parse Error Count */
             parse_error_count: number;
             /** Repository Id */
@@ -983,6 +989,20 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /**
+         * InterruptedRunResponse
+         * @description An index run abandoned by a killed process, as recovery found it.
+         */
+        InterruptedRunResponse: {
+            /** Recovered At */
+            recovered_at: string;
+            /** Snapshot Id */
+            snapshot_id: string;
+            /** Stage */
+            stage: string;
+            /** Started At */
+            started_at: string;
+        };
         /** LimitsResponse */
         LimitsResponse: {
             /** Max Depth */
@@ -1134,6 +1154,20 @@ export interface components {
             user_message_id: string;
             /** Warnings */
             warnings?: string[];
+        };
+        /**
+         * OpenJobResponse
+         * @description An index run that is still open. `owner_pid` is null when unrecorded.
+         */
+        OpenJobResponse: {
+            /** Job Id */
+            job_id: string;
+            /** Owner Pid */
+            owner_pid: number | null;
+            /** Stage */
+            stage: string;
+            /** Started At */
+            started_at: string;
         };
         /**
          * OverallRisk

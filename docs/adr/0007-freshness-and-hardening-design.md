@@ -123,6 +123,49 @@ incurred; P6-08 may propose it once the harness exists.
 - Retention becomes a policy with a default, which is a user-visible behavior
   change: deletions that were permanent-but-recoverable now expire.
 
+## Outcome
+
+Recorded as implementation proceeds. The decisions above are unchanged; this
+section says what building them added.
+
+### Decision 3, as built (P6-04)
+
+The decision said recovery should speak. Implementation found that it first had
+to become **safe**, and that two of the three things a kill leaves behind were
+not being healed at all.
+
+1. **A killed process left its `index_jobs` row at `running`, and nothing ever
+   cleared it.** Only `finish` does, and it runs in `index()`'s `except` block —
+   which a raised exception reaches and a kill never does. While that row
+   survived, `active_job_for` reported an index in progress forever, so every
+   reindex was refused: manual, watcher-triggered, and reconciling-scan alike.
+   A repository killed once could never be indexed again, and went silently
+   stale for good — the exact failure this ADR's context names. The existing
+   crash tests missed it because all of them simulate the crash by raising
+   inside `index()`, which closes the job.
+
+2. **Recovery could kill a live index.** It failed *every* non-terminal
+   snapshot, and it runs inside `build_services`, which is per request and also
+   runs on the watcher's background thread. A request arriving mid-index marked
+   the live snapshot `FAILED` underneath the thread still building it. Decision
+   1's periodic reconciling scan (P6-03) turned that from rare into routine.
+   Fixed by recording an owner on every run and healing only runs whose owner
+   is gone; `codeatlas.indexing.ownership` holds the reasoning, and the pid-reuse
+   limitation is stated there rather than hidden.
+
+3. **Derived rows and FTS projections** of a dead snapshot are now cleared,
+   while the snapshot row is kept as the record of what failed. The tables are
+   discovered from the schema's foreign keys rather than listed, so a later
+   migration adding a snapshot-scoped table is covered without anyone
+   remembering.
+
+4. **`codeatlas doctor`** — required by blueprint section 6.2 and never built —
+   landed here, because what it most needs to report is what recovery found.
+
+None of this needed a migration: the owner lives in the job's existing
+`diagnostics` JSON, and `SCHEMA_VERSION` stays 9. The REST additions are
+optional fields, so `contract_version` stays `"1.1"`.
+
 ## Alternatives considered
 
 - **Trusting filesystem events as truth.** Rejected: silent event loss on

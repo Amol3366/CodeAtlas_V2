@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-04 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03 `complete`; P6-04 `ready`; P6-05 … P6-08 `pending` |
-| Agent | opencode `kimi-k3` |
-| Started UTC | 2026-07-28T16:23:00Z |
-| Git state | Branch `main` at `e51f30e` + P6-03 uncommitted. The working tree also carries the user's own uncommitted rename `CLAUDE.md -> AGENTS.md` plus blueprint whitespace cleanup; P6-03 leaves both untouched. |
+| Active task | none — P6-05 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04 `complete`; P6-05 `ready`; P6-06 … P6-08 `pending` |
+| Agent | Claude Code `claude-opus-5` |
+| Started UTC | 2026-07-28T13:56:02Z (this machine's clock reads earlier than the preceding entries; recorded as observed rather than adjusted to keep the log monotonic) |
+| Git state | Branch `main` at `5d47c65` (P6-03 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-04 leaves it untouched. The `CLAUDE.md -> AGENTS.md` rename recorded in earlier entries is no longer present in the tree — `CLAUDE.md` is the file that exists. |
 | Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
 
 ### Phase 6 Task Board (active)
@@ -66,8 +66,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
 | P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `complete` |
 | P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `complete` |
-| P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `ready` |
-| P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
+| P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `complete` |
+| P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `ready` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
 | P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
@@ -184,6 +184,133 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T14:47:00Z — P6-04 completed; P6-05 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `5d47c65`.
+- Transition: P6-04 `ready -> in_progress -> complete`; P6-05 `pending -> ready`.
+- Outcome: **gate condition 4 is met.** A process killed mid-index recovers to
+  the previous active snapshot, leaves no rows behind for the dead one, and
+  says what it recovered. `check_phase6.ps1 -SkipSync` exits 0 with Playwright
+  included.
+- Clock note: this machine's UTC reads earlier than the three preceding
+  entries. Recorded as observed rather than adjusted upward to keep the log
+  monotonic — the ordering of the entries is the truth, not the arithmetic.
+- Observed workspace state at start (rule 5): P6-03 committed as `5d47c65`
+  after the user asked for it. The tree carries the user's own uncommitted
+  trailing-whitespace cleanup in the blueprint, left untouched. The
+  `CLAUDE.md -> AGENTS.md` rename that earlier entries recorded is **no longer
+  in the tree**; `CLAUDE.md` is the file that exists, while the Phase 6 plan
+  still cites `AGENTS.md` sections. Flagged for the user, not resolved by me.
+
+#### Two defects found, both older than this task
+
+**1. A killed process blocked its repository from ever being indexed again.**
+`IndexJobStore.start` writes a job row at `status='running'`, and only `finish`
+clears it — inside `index()`'s `except` block, which a raised exception reaches
+and a kill never does. Nothing else in the codebase moved a job off `running`.
+While that row survived, `active_job_for` reported an index in progress
+forever, so every reindex was refused: manual, watcher-triggered, and
+reconciling-scan alike. The repository went silently stale permanently — the
+failure ADR-0007 exists to prevent, reachable by one `taskkill /F`.
+
+The suite missed it because **both existing crash tests simulate the crash by
+raising inside `index()`**, which runs the `except` and closes the job. They
+prove recovery from a graceful exception; the gate condition says *killed*.
+
+**2. Recovery could destroy a live index.** It failed *every* non-terminal
+snapshot, and it runs inside `build_services` — per request since P6-01, and
+also on the watcher's background thread. A request arriving mid-index marked
+the live snapshot `FAILED` underneath the thread still building it. P6-03's
+periodic reconciling scan had just turned that from rare into routine.
+
+#### What was built
+
+- `src/codeatlas/indexing/ownership.py` — every run records an owner; recovery
+  heals only runs whose owner is gone. This process's own token is recognised
+  without a system call (the common case: watcher indexing, request arrives).
+  Another live process is left alone, conservatively. **No owner recorded means
+  unowned and therefore recoverable**, which is what lets a database written
+  before this existed be repaired on upgrade rather than staying blocked.
+  Windows liveness goes through `ctypes.OpenProcess`, because Python implements
+  `os.kill` on Windows with `TerminateProcess` — the POSIX idiom for *asking
+  whether a process exists* would kill it.
+- `src/codeatlas/application/recovery.py` — heals the job row as well as the
+  snapshot, purges the dead snapshot's derived rows and FTS projections, and
+  writes what it found onto the job it describes. Persisted rather than
+  returned, because services are built per request and the request that
+  discovers a crash is almost never the one asked about it later.
+- `SnapshotStore.delete_derived_rows` — deletes what a cascade would have,
+  keeping the snapshot row as the record. The tables are **discovered from the
+  schema's foreign keys**, not listed, so a later migration adding a
+  snapshot-scoped table is covered without anyone remembering this function
+  exists. Tables that merely store a snapshot id as historical data — change
+  analyses, messages — declare no such key and are correctly untouched.
+- `RepositoryStatusService.diagnostics` gains `interrupted_run` and
+  `open_jobs`, read from the *latest* job on purpose: once a repository has
+  been indexed successfully its last run was not interrupted, and continuing to
+  report one would describe a condition that no longer exists.
+- **`codeatlas doctor`** — required by blueprint section 6.2, never built until
+  now. Reports every repository or one, distinguishes `NEVER_INDEXED` from
+  `INDEX_RUN_INTERRUPTED` from `INDEX_RUN_IN_PROGRESS`, names the pid holding a
+  blocking run, and exits 4 when problems are found. Its JSON omits the
+  absolute root: the CLI is local, but its JSON is what gets pasted into a bug
+  report.
+- Docs: `docs/operations/crash-recovery.md` (new), README, and an **Outcome
+  section on ADR-0007** recording what implementation added — following the
+  ADR-0008 precedent rather than editing an accepted decision.
+
+#### Tests, written first and observed failing
+
+| Suite | Count | Proves |
+| --- | --- | --- |
+| `tests/integration/test_crash_reporting.py` | 16 | The blocked-forever regression, ownership in all four states, the report surviving the process that wrote it, no orphaned rows, and a live index undisturbed by concurrent service construction with real threads |
+| `tests/contract/test_doctor_command.py` | 11 | `doctor` across every repository and one, each problem class, exit 4, no absolute path in JSON, and that it writes nothing |
+| `tests/end_to_end/test_crash_recovery.py` | +1 | **A genuinely killed subprocess** — no `except`, no `finally` — leaves a `running` job, is recovered, and reindexes |
+
+The orphan test derives snapshot-scoped tables from `PRAGMA foreign_key_list`
+rather than listing them, so it fails if a future migration adds a table the
+purge does not cover.
+
+The subprocess test is the slow one that keeps the fast ones honest: the others
+write the post-kill state directly, which asserts a state we *believe* a kill
+produces. It ran 3× consecutively without flaking.
+
+#### Verification in this environment, each run and its exit code
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync`
+  — **exit 0**, "Phase 6 verification completed", Playwright included.
+- `uv run pytest -q` — **1257 passed** (1229 before; +28).
+- `uv run ruff check src tests scripts apps` — exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **215 source files** (212 before).
+- Web: **99 vitest passed**, eslint/tsc/build exit 0.
+- Playwright: **10 passed, 4 skipped** — the declared Chromium skips, unchanged.
+- Test-first discipline: followed. Three test-side corrections after
+  observation, all mine and all fixture bugs rather than behavior changes: two
+  wrong column lists, a killed job stamped *earlier* than the successful index
+  (so `latest_for` correctly preferred the success), and a `--database` flag
+  that is spelled `--db`. One real fix: the subprocess test reopened a
+  connection every 10 ms while the child wrote, which hits "disk I/O error" on
+  Windows — WAL side-file contention, not the code under test.
+
+#### Contracts, migrations, limitations
+
+- **No migration.** The owner lives in the job's existing `diagnostics` JSON —
+  transient, since `finish` overwrites it and a finished job is never a
+  recovery candidate. `SCHEMA_VERSION` stays 9.
+- **No contract version change.** `interrupted_run` and `open_jobs` are
+  optional additions to the diagnostics response; a client that ignores them
+  sees the response it already knew. `contract_version` stays `"1.1"`.
+  `apps/web/src/lib/api-types.gen.ts` was regenerated; the diff is additive.
+- **Pid reuse is not detected.** If the OS reassigns a dead owner's pid before
+  CodeAtlas next starts, its run looks alive and that repository stays blocked.
+  Visible rather than silent — `doctor` names the run and its pid — but not
+  automatic. Closing it needs the owner's process start time, which has no
+  portable source without a new dependency. Stated in `ownership.py`, the
+  operations doc, and here.
+- Next: **P6-05** — backup, restore, deletion, and integrity validation.
+
 
 ### 2026-07-28T17:05:00Z — P6-03 completed; P6-04 `ready`
 
