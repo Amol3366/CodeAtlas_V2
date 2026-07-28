@@ -236,7 +236,7 @@ def test_search_text_returns_a_contract_response(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["contract_version"] == "1.0"
+    assert body["contract_version"] == "1.1"
     assert body["evidence"]
     assert all(
         item["snapshot_id"] == body["snapshot"]["snapshot_id"]

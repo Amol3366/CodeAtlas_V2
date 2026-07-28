@@ -1,0 +1,20 @@
+# Line endings are part of repository truth here, not a formatting preference.
+#
+# The change engine hashes bytes and diffs lines. The evaluation corpus declares
+# gold symbol ranges, evidence line numbers, and content hashes against files as
+# they were authored — with LF. Without this file Git's `core.autocrlf` rewrites
+# them to CRLF on any Windows checkout, every fixture hash changes, and the
+# Phase 4 corpus fails on a fresh clone while passing for whoever wrote it.
+#
+# So: normalized in the repository, LF in the working tree, on every platform.
+* text=auto eol=lf
+
+# Binary formats must never be touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.sqlite binary
+*.db binary

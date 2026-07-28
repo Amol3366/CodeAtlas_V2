@@ -85,7 +85,7 @@ def test_symbol_relations_returns_a_contract_response(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["contract_version"] == "1.0"
+    assert payload["contract_version"] == "1.1"
     assert "relation_paths" in payload
     assert payload["snapshot"]["snapshot_id"]
 

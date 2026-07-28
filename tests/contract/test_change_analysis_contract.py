@@ -30,7 +30,7 @@ from codeatlas.contracts import (
 
 def valid_report_data() -> dict[str, object]:
     return {
-        "contract_version": "1.0",
+        "contract_version": "1.1",
         "analysis_id": "ca_abc",
         "request_id": "req-1",
         "repository_id": "repo_1",
@@ -123,7 +123,7 @@ def valid_report_data() -> dict[str, object]:
 def test_valid_report_round_trips_as_contract_v1() -> None:
     report = ChangeAnalysisReport.model_validate(valid_report_data())
 
-    assert report.contract_version == "1.0"
+    assert report.contract_version == "1.1"
     assert report.kind is ChangeAnalysisKind.WORKING_TREE
     assert report.status is ChangeAnalysisStatus.COMPLETED
     assert report.overall_risk is OverallRisk.MEDIUM
@@ -287,7 +287,7 @@ def test_constructed_report_round_trips() -> None:
     # Constructing the report from typed models (not dicts) must also produce a
     # byte-identical dump, proving the models compose without surprise defaults.
     report = ChangeAnalysisReport(
-        contract_version="1.0",
+        contract_version="1.1",
         analysis_id="ca_abc",
         request_id="req-1",
         repository_id="repo_1",

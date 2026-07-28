@@ -1,14 +1,17 @@
-"""The stream over HTTP: what a client actually receives (P5-04).
+"""The stream over HTTP: what a client actually receives (P5-04, P6-STREAM).
 
-Phase 5 answers synchronously, so by the time `POST …/messages` returns, the
-run has finished and its events are in the replay buffer. That is not a
-weakness of the test — it is the reconnect path exercised on every run, which
-is the one hardest to get right and easiest to leave untested.
+Since P6-STREAM the submission returns a 202 acknowledgement and the run
+answers on a worker, so `_ask` waits for the run to finish before these tests
+read the stream. Every test here is about replaying a *completed* run — the
+reconnect path exercised on every run, the one hardest to get right and
+easiest to leave untested — and that is unchanged. What changed is only that
+finishing is now waited for rather than guaranteed by the response.
 """
 
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -73,13 +76,34 @@ def _ids(body: str) -> list[int]:
 def _ask(
     client: TestClient, conversation_id: str, question: str
 ) -> dict[str, object]:
+    """Submit a question and wait for its run to finish.
+
+    Since P6-STREAM the response is a 202 acknowledgement, so "finished" is
+    something to wait for rather than something the response guarantees. Every
+    test below is about replaying a *completed* run, so the wait belongs here
+    — it keeps each test asserting what it always asserted.
+    """
     response = client.post(
         f"/v1/conversations/{conversation_id}/messages",
         json={"content": question},
     )
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
     body: dict[str, object] = response.json()
+    _await_terminal(client, conversation_id, str(body["message_id"]))
     return body
+
+
+def _await_terminal(client: TestClient, conversation_id: str, message_id: str) -> None:
+    deadline = time.monotonic() + 20.0
+    terminal = {"complete", "failed", "cancelled"}
+    while time.monotonic() < deadline:
+        page = client.get(f"/v1/conversations/{conversation_id}/messages")
+        assert page.status_code == 200, page.text
+        for item in page.json()["items"]:
+            if item["message_id"] == message_id and item["status"] in terminal:
+                return
+        time.sleep(0.05)
+    raise AssertionError(f"{message_id} never reached a terminal status")
 
 
 def test_a_finished_run_replays_its_whole_event_sequence(
@@ -232,7 +256,7 @@ def test_every_streamed_event_validates_against_the_contract(
     events = _events(response.text)
     assert events
     for event in events:
-        assert event.contract_version == "1.0"
+        assert event.contract_version == "1.1"
         assert event.conversation_id == conversation
         assert event.message_id
 

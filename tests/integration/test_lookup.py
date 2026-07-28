@@ -65,7 +65,7 @@ def test_exact_lookup_returns_validated_snapshot_bound_evidence(
         )
     )
 
-    assert response.contract_version == "1.0"
+    assert response.contract_version == "1.1"
     assert response.repository_id == indexed.repository_id
     assert response.snapshot.snapshot_id == indexed.snapshot_id
     assert response.snapshot.freshness is SnapshotFreshness.FRESH

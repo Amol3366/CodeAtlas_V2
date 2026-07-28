@@ -23,7 +23,7 @@ from codeatlas.contracts import (
 
 def valid_response_data() -> dict[str, object]:
     return {
-        "contract_version": "1.0",
+        "contract_version": "1.1",
         "request_id": "req-1",
         "repository_id": "repo-1",
         "snapshot": {
@@ -74,7 +74,7 @@ def valid_response_data() -> dict[str, object]:
 def test_valid_query_response_round_trips_as_contract_v1() -> None:
     response = QueryResponse.model_validate(valid_response_data())
 
-    assert response.contract_version == "1.0"
+    assert response.contract_version == "1.1"
     assert response.snapshot.freshness is SnapshotFreshness.FRESH
     assert response.answer.claims[0].derivation is Derivation.STATIC_RESOLVED
     assert response.evidence[0].validation is EvidenceValidation.VALID

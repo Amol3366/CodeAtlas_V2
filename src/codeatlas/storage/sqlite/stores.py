@@ -1734,6 +1734,29 @@ class ConversationStore:
             (snapshot_id, run_id),
         )
 
+    def set_run_warnings(self, run_id: str, warnings: Sequence[str]) -> None:
+        """Record what the run warned about.
+
+        A run is inserted while queued, before retrieval has warned about
+        anything, so the column is written again on completion. Until
+        P6-STREAM the submission response carried these straight from memory
+        and nothing noticed they were never stored — an accepted turn returns
+        before they exist, so a warning that is not persisted is a warning the
+        user never sees.
+        """
+        encoded = json.dumps(list(warnings))
+        if len(encoded.encode("utf-8")) > MAX_WARNINGS_BYTES:
+            raise ValueError("run warnings exceed the stored bound")
+        self._connection.execute(
+            "UPDATE message_runs SET warnings_json = ? WHERE run_id = ?",
+            (encoded, run_id),
+        )
+
+    def latest_run(self, message_id: str) -> RunRecord | None:
+        """The most recent attempt, which is the one a reader is shown."""
+        runs = self.list_runs(message_id)
+        return runs[-1] if runs else None
+
     def create_retry_run(self, message_id: str, run: RunRecord) -> None:
         """Queue another attempt, preserving every prior one."""
         self._connection.execute(

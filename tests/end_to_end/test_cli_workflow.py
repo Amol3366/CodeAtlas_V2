@@ -207,7 +207,7 @@ def test_search_returns_evidence_in_json(sample_repo: Path, tmp_path: Path) -> N
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
-    assert payload["contract_version"] == "1.0"
+    assert payload["contract_version"] == "1.1"
     assert payload["evidence"]
     assert all(
         item["derivation"] == "high_confidence_heuristic"

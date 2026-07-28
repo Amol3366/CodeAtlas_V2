@@ -11,6 +11,7 @@ compares two empty answers proves nothing.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -53,9 +54,33 @@ def _ask(client: TestClient, repository_id: str, question: str) -> dict[str, obj
         f"/v1/conversations/{conversation_id}/messages",
         json={"content": question},
     )
-    assert posted.status_code == 201, posted.text
-    body: dict[str, object] = posted.json()
-    return body
+    assert posted.status_code == 202, posted.text
+    message_id = posted.json()["message_id"]
+
+    # Since P6-STREAM the submission is an acknowledgement, so the answer is
+    # read back from the thread rather than taken from the response. That is
+    # the stronger comparison anyway: it proves the *persisted* answer matches
+    # the direct query, and the persisted one is the authoritative one.
+    return _await_answer(client, conversation_id, message_id)
+
+
+def _await_answer(
+    client: TestClient, conversation_id: str, message_id: str
+) -> dict[str, object]:
+    deadline = time.monotonic() + 20.0
+    while time.monotonic() < deadline:
+        page = client.get(f"/v1/conversations/{conversation_id}/messages")
+        assert page.status_code == 200, page.text
+        for item in page.json()["items"]:
+            if item["message_id"] == message_id and item["status"] in {
+                "complete",
+                "failed",
+                "cancelled",
+            }:
+                answer: dict[str, object] = item
+                return answer
+        time.sleep(0.05)
+    raise AssertionError(f"{message_id} never reached a terminal status")
 
 
 def _query(

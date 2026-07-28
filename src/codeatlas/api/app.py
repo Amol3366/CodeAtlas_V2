@@ -36,6 +36,7 @@ from codeatlas.api.routers import (
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.application.watching import WatchService
 from codeatlas.conversations.events import EventHub
+from codeatlas.conversations.executor import RunExecutor, ThreadedRunExecutor
 from codeatlas.domain.errors import CodeAtlasError, ErrorCode
 from codeatlas.storage.sqlite.connection import default_database_path
 
@@ -70,9 +71,16 @@ def create_app(database_path: Path | None = None, *, watch: bool = True) -> Fast
             yield
         finally:
             # Connections are per request and closed with them, so shutdown has
-            # no database handle of its own to release — only the watchers.
+            # no database handle of its own to release — only the watchers and
+            # the run workers.
             if watchers is not None:
                 watchers.stop_all()
+            runner: RunExecutor | None = getattr(instance.state, "run_executor", None)
+            if runner is not None:
+                # Waited on deliberately. An accepted turn has already told the
+                # client it is queued, so dropping it mid-flight would leave a
+                # message that never resolves and never says why.
+                runner.shutdown(wait=True)
 
     app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
     app.state.database_path = resolved_path
@@ -165,11 +173,30 @@ def _services_factory(
                 app.state.event_hub = existing
             return existing
 
+    executor_lock = threading.Lock()
+
+    def executor() -> RunExecutor:
+        # One pool for the application's lifetime, built lazily and by the same
+        # double-checked pattern the hub uses: two concurrent first requests
+        # would otherwise each build a pool and keep only one, leaking the
+        # other's threads. It is handed `factory` — the very function being
+        # defined — so each worker opens its own connection rather than
+        # borrowing the submitting request's.
+        existing: RunExecutor | None = getattr(app.state, "run_executor", None)
+        if existing is not None:
+            return existing
+        with executor_lock:
+            existing = getattr(app.state, "run_executor", None)
+            if existing is None:
+                existing = ThreadedRunExecutor(factory)
+                app.state.run_executor = existing
+            return existing
+
     @contextmanager
     def factory() -> Iterator[ApplicationServices]:
         connection = _open(database_path)
         try:
-            yield build_services(connection, hub=hub())
+            yield build_services(connection, hub=hub(), executor=executor())
         finally:
             connection.close()
 

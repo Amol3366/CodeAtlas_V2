@@ -31,7 +31,8 @@ from codeatlas.contracts import (
     RunStatus,
     StreamEventType,
 )
-from codeatlas.conversations.events import EventHub
+from codeatlas.conversations.events import EventHub, RunChannel
+from codeatlas.conversations.executor import QueuedRun, RunExecutor
 from codeatlas.conversations.pipeline import (
     AnswerPipeline,
     AnswerRequest,
@@ -130,12 +131,18 @@ class ConversationService:
         connection: Connection,
         pipeline: AnswerPipeline | None = None,
         hub: EventHub | None = None,
+        executor: RunExecutor | None = None,
     ) -> None:
         self._repositories = repositories
         self._conversations = conversations
         self._connection = connection
         self._pipeline = pipeline
         self._hub = hub
+        # No executor means "run it here". That is not a second code path but
+        # the absence of one: the service always commits the turn, opens the
+        # channel, and then hands the run somewhere. A one-shot caller — a test
+        # of the pipeline, a script — wants that somewhere to be this thread.
+        self._executor = executor
 
     @property
     def hub(self) -> EventHub | None:
@@ -306,15 +313,18 @@ class ConversationService:
                 ),
             )
 
-        return self._execute_run(
+        return self._dispatch(
+            QueuedRun(
+                run_id=run_id,
+                conversation_id=conversation_id,
+                message_id=assistant_message_id,
+                user_message_id=user_message_id,
+                question=question,
+                sequence=sequence + 1,
+                request_id=resolved_request_id,
+                intent=classification.intent.value,
+            ),
             conversation=conversation,
-            user_message_id=user_message_id,
-            message_id=assistant_message_id,
-            run_id=run_id,
-            question=question,
-            sequence=sequence + 1,
-            request_id=resolved_request_id,
-            intent=classification.intent.value,
             cancel=cancel,
         )
 
@@ -353,17 +363,33 @@ class ConversationService:
                 ),
             )
 
-        return self._execute_run(
+        return self._dispatch(
+            QueuedRun(
+                run_id=run_id,
+                conversation_id=conversation.conversation_id,
+                message_id=message_id,
+                user_message_id="",
+                question=question,
+                sequence=message.sequence_number,
+                request_id=request_id or f"conv_{uuid.uuid4().hex}",
+                intent=classification.intent.value,
+            ),
             conversation=conversation,
-            user_message_id="",
-            message_id=message_id,
-            run_id=run_id,
-            question=question,
-            sequence=message.sequence_number,
-            request_id=request_id or f"conv_{uuid.uuid4().hex}",
-            intent=classification.intent.value,
             cancel=None,
         )
+
+    def get_evidence(self, message_id: str) -> tuple[MessageEvidenceRow, ...]:
+        """What one answer cited, as stored.
+
+        Read back rather than remembered: since P6-STREAM the submission
+        returns before the answer exists, so the citations a reopened thread
+        shows can only come from the database.
+        """
+        return self._conversations.get_evidence(message_id)
+
+    def latest_run(self, message_id: str) -> RunRecord | None:
+        """The attempt a reader is shown: its snapshot and its warnings."""
+        return self._conversations.latest_run(message_id)
 
     def save_feedback(
         self, message_id: str, *, rating: str, reason_code: str | None = None
@@ -396,35 +422,94 @@ class ConversationService:
             )
         channel.cancel.cancel()
 
-    def _execute_run(
+    def _dispatch(
         self,
+        queued: QueuedRun,
         *,
         conversation: ConversationRecord,
-        user_message_id: str,
-        message_id: str,
-        run_id: str,
-        question: str,
-        sequence: int,
-        request_id: str,
-        intent: str,
+        cancel: CancelToken | None,
+    ) -> SubmissionResult:
+        """Open the run's channel, then hand the run to its executor.
+
+        The channel is opened **here**, on the thread that is about to answer
+        the client, and never inside the worker. A client that submits and
+        immediately opens the stream would otherwise race the executor: it
+        would find no active run, be told to read the persisted message, and
+        quietly fall back to polling for every run that had not started yet.
+        Opening it before responding is what makes the accepted response a
+        promise the stream can keep.
+        """
+        self._open_channel(queued)
+
+        if self._executor is None:
+            return self._execute_run(
+                queued, conversation=conversation, cancel=cancel
+            )
+
+        self._executor.schedule(queued)
+        # Reported as queued because that is what it is. The answer does not
+        # exist yet, and saying otherwise would make the client render an empty
+        # message as a finished one.
+        return SubmissionResult(
+            conversation_id=queued.conversation_id,
+            user_message_id=queued.user_message_id,
+            message_id=queued.message_id,
+            run_id=queued.run_id,
+            status=MessageStatus.QUEUED,
+            sequence_number=queued.sequence,
+            content="",
+            intent=queued.intent,
+        )
+
+    def execute_queued_run(self, queued: QueuedRun) -> SubmissionResult:
+        """Answer an accepted turn. The entry point a background worker calls.
+
+        Everything is rebuilt from this service's own connection: the worker
+        may not reuse the submitting request's, and `QueuedRun` carries only
+        values for exactly that reason.
+        """
+        conversation = self.get(queued.conversation_id)
+        return self._execute_run(queued, conversation=conversation, cancel=None)
+
+    def _open_channel(self, queued: QueuedRun) -> RunChannel | None:
+        """Register the run as live and announce it."""
+        if self._hub is None:
+            return None
+        channel = self._hub.open(
+            run_id=queued.run_id,
+            request_id=queued.request_id,
+            conversation_id=queued.conversation_id,
+            message_id=queued.message_id,
+        )
+        channel.publish(
+            StreamEventType.RUN_ACCEPTED,
+            {"run_id": queued.run_id, "intent": queued.intent},
+        )
+        return channel
+
+    def _execute_run(
+        self,
+        queued: QueuedRun,
+        *,
+        conversation: ConversationRecord,
         cancel: CancelToken | None,
     ) -> SubmissionResult:
         """Run the pipeline and commit whatever outcome it reaches."""
         if self._pipeline is None:  # pragma: no cover - wiring guard
             raise InvalidRequestError("Answering is not available.")
 
-        channel = None
-        if self._hub is not None:
-            channel = self._hub.open(
-                run_id=run_id,
-                request_id=request_id,
-                conversation_id=conversation.conversation_id,
-                message_id=message_id,
-            )
-            channel.publish(
-                StreamEventType.RUN_ACCEPTED,
-                {"run_id": run_id, "intent": intent},
-            )
+        user_message_id = queued.user_message_id
+        message_id = queued.message_id
+        run_id = queued.run_id
+        question = queued.question
+        sequence = queued.sequence
+        request_id = queued.request_id
+        intent = queued.intent
+
+        # Opened by `_dispatch` before the client was answered; a worker on
+        # another thread finds the same channel through the process-wide hub.
+        channel = self._hub.get(run_id) if self._hub is not None else None
+        if channel is not None:
             # A caller-supplied token wins; otherwise the channel's token is
             # the one `cancel_run` can reach.
             cancel = cancel or channel.cancel
@@ -503,6 +588,9 @@ class ConversationService:
                 completed_at=completed_at,
             )
             self._conversations.set_run_snapshot(run_id, snapshot_id)
+            self._conversations.set_run_warnings(
+                run_id, result.response.warnings
+            )
 
         if channel is not None:
             channel.publish(

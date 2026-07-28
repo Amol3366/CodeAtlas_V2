@@ -20,6 +20,7 @@ from codeatlas.application.recovery import SnapshotRecoveryService
 from codeatlas.application.registration import RegisterRepositoryService
 from codeatlas.application.status import RepositoryStatusService
 from codeatlas.conversations.events import EventHub
+from codeatlas.conversations.executor import RunExecutor
 from codeatlas.conversations.pipeline import AnswerPipeline
 from codeatlas.parsing.registry import default_registry
 from codeatlas.repositories.git_diff import GitDiffAdapter
@@ -63,7 +64,10 @@ class ApplicationServices:
 
 
 def build_services(
-    connection: Connection, *, hub: EventHub | None = None
+    connection: Connection,
+    *,
+    hub: EventHub | None = None,
+    executor: RunExecutor | None = None,
 ) -> ApplicationServices:
     """Construct the application services for one database connection.
 
@@ -73,6 +77,11 @@ def build_services(
     request that streams it — the stream would find nothing. The API owns one
     hub for the application's lifetime and passes it in; a one-shot caller
     (the CLI, a test) can let this default and never notice.
+
+    ``executor`` decides where an accepted turn is answered. Supplying one
+    makes submission return as soon as the turn is committed (ADR-0008);
+    leaving it out answers on the calling thread, which is what a one-shot
+    caller wants and what keeps the pipeline directly testable.
     """
     repositories = RepositoryStore(connection)
     snapshots = SnapshotStore(connection)
@@ -171,6 +180,7 @@ def build_services(
             # by coincidence.
             pipeline=AnswerPipeline(lookup=lookup, graph=graph, search=search),
             hub=hub if hub is not None else EventHub(),
+            executor=executor,
         ),
         change_analysis=ChangeAnalysisService(
             repositories=repositories,

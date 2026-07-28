@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "contract_version": "1.0",
+  "contract_version": "1.1",
   "schemas": {
     "change_analysis_report": {
       "$defs": {
@@ -572,8 +572,8 @@
           "title": "Completed At"
         },
         "contract_version": {
-          "const": "1.0",
-          "default": "1.0",
+          "const": "1.1",
+          "default": "1.1",
           "title": "Contract Version",
           "type": "string"
         },
@@ -992,6 +992,105 @@
     },
     "message": {
       "$defs": {
+        "Derivation": {
+          "enum": [
+            "deterministic",
+            "static_resolved",
+            "high_confidence_heuristic",
+            "low_confidence_heuristic",
+            "semantic_candidate",
+            "model_generated",
+            "unsupported"
+          ],
+          "title": "Derivation",
+          "type": "string"
+        },
+        "MessageEvidenceItem": {
+          "additionalProperties": false,
+          "description": "One citation attached to an assistant message.\n\nThe evidence fields are snapshotted rather than joined live: a historical\nmessage must keep telling the truth it told after its snapshot is\nsuperseded, which is the same audit rule change analyses follow.",
+          "properties": {
+            "citation_ordinal": {
+              "minimum": 1,
+              "title": "Citation Ordinal",
+              "type": "integer"
+            },
+            "claim_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "title": "Claim Ids",
+              "type": "array"
+            },
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "content_hash": {
+              "minLength": 1,
+              "title": "Content Hash",
+              "type": "string"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "end_line": {
+              "minimum": 1,
+              "title": "End Line",
+              "type": "integer"
+            },
+            "evidence_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Evidence Id",
+              "type": "string"
+            },
+            "file_path": {
+              "maxLength": 4096,
+              "title": "File Path",
+              "type": "string"
+            },
+            "snapshot_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Snapshot Id",
+              "type": "string"
+            },
+            "start_line": {
+              "minimum": 1,
+              "title": "Start Line",
+              "type": "integer"
+            },
+            "symbol": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Symbol"
+            }
+          },
+          "required": [
+            "evidence_id",
+            "citation_ordinal",
+            "file_path",
+            "start_line",
+            "end_line",
+            "content_hash",
+            "derivation",
+            "confidence",
+            "snapshot_id"
+          ],
+          "title": "MessageEvidenceItem",
+          "type": "object"
+        },
         "MessageRole": {
           "description": "Who produced a message.",
           "enum": [
@@ -1061,6 +1160,13 @@
           "default": null,
           "title": "Error Code"
         },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/MessageEvidenceItem"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
         "message_id": {
           "maxLength": 256,
           "minLength": 1,
@@ -1075,8 +1181,30 @@
           "title": "Sequence Number",
           "type": "integer"
         },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Id"
+        },
         "status": {
           "$ref": "#/$defs/MessageStatus"
+        },
+        "warnings": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
         }
       },
       "required": [
@@ -1193,6 +1321,19 @@
     },
     "message_page": {
       "$defs": {
+        "Derivation": {
+          "enum": [
+            "deterministic",
+            "static_resolved",
+            "high_confidence_heuristic",
+            "low_confidence_heuristic",
+            "semantic_candidate",
+            "model_generated",
+            "unsupported"
+          ],
+          "title": "Derivation",
+          "type": "string"
+        },
         "Message": {
           "additionalProperties": false,
           "description": "One turn in a conversation.\n\n``sequence_number`` starts at 1 and orders the thread; it is also the\nstream's resume key, so 0 is reserved to mean \"nothing yet\".",
@@ -1239,6 +1380,13 @@
               "default": null,
               "title": "Error Code"
             },
+            "evidence": {
+              "items": {
+                "$ref": "#/$defs/MessageEvidenceItem"
+              },
+              "title": "Evidence",
+              "type": "array"
+            },
             "message_id": {
               "maxLength": 256,
               "minLength": 1,
@@ -1253,8 +1401,30 @@
               "title": "Sequence Number",
               "type": "integer"
             },
+            "snapshot_id": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Snapshot Id"
+            },
             "status": {
               "$ref": "#/$defs/MessageStatus"
+            },
+            "warnings": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "title": "Warnings",
+              "type": "array"
             }
           },
           "required": [
@@ -1266,6 +1436,92 @@
             "created_at"
           ],
           "title": "Message",
+          "type": "object"
+        },
+        "MessageEvidenceItem": {
+          "additionalProperties": false,
+          "description": "One citation attached to an assistant message.\n\nThe evidence fields are snapshotted rather than joined live: a historical\nmessage must keep telling the truth it told after its snapshot is\nsuperseded, which is the same audit rule change analyses follow.",
+          "properties": {
+            "citation_ordinal": {
+              "minimum": 1,
+              "title": "Citation Ordinal",
+              "type": "integer"
+            },
+            "claim_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "title": "Claim Ids",
+              "type": "array"
+            },
+            "confidence": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "content_hash": {
+              "minLength": 1,
+              "title": "Content Hash",
+              "type": "string"
+            },
+            "derivation": {
+              "$ref": "#/$defs/Derivation"
+            },
+            "end_line": {
+              "minimum": 1,
+              "title": "End Line",
+              "type": "integer"
+            },
+            "evidence_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Evidence Id",
+              "type": "string"
+            },
+            "file_path": {
+              "maxLength": 4096,
+              "title": "File Path",
+              "type": "string"
+            },
+            "snapshot_id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Snapshot Id",
+              "type": "string"
+            },
+            "start_line": {
+              "minimum": 1,
+              "title": "Start Line",
+              "type": "integer"
+            },
+            "symbol": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Symbol"
+            }
+          },
+          "required": [
+            "evidence_id",
+            "citation_ordinal",
+            "file_path",
+            "start_line",
+            "end_line",
+            "content_hash",
+            "derivation",
+            "confidence",
+            "snapshot_id"
+          ],
+          "title": "MessageEvidenceItem",
           "type": "object"
         },
         "MessageRole": {
@@ -1558,8 +1814,8 @@
           "type": "string"
         },
         "contract_version": {
-          "const": "1.0",
-          "default": "1.0",
+          "const": "1.1",
+          "default": "1.1",
           "title": "Contract Version",
           "type": "string"
         },
@@ -2004,8 +2260,8 @@
           "$ref": "#/$defs/Answer"
         },
         "contract_version": {
-          "const": "1.0",
-          "default": "1.0",
+          "const": "1.1",
+          "default": "1.1",
           "title": "Contract Version",
           "type": "string"
         },
@@ -2095,8 +2351,8 @@
       "description": "One typed event on a conversation stream.\n\nThe envelope is :class:`StreamEventMetadata`'s fields plus a typed\ndiscriminator and payload. Streaming text is provisional; the persisted\nmessage is authoritative (Section 11.2).",
       "properties": {
         "contract_version": {
-          "const": "1.0",
-          "default": "1.0",
+          "const": "1.1",
+          "default": "1.1",
           "title": "Contract Version",
           "type": "string"
         },
@@ -2152,8 +2408,8 @@
       "additionalProperties": false,
       "properties": {
         "contract_version": {
-          "const": "1.0",
-          "default": "1.0",
+          "const": "1.1",
+          "default": "1.1",
           "title": "Contract Version",
           "type": "string"
         },

@@ -10,7 +10,6 @@ from typing import Literal, Protocol
 from pydantic import Field, model_validator
 
 from codeatlas.contracts import (
-    CONTRACT_VERSION,
     Confidence,
     ContractModel,
     NonEmptyText,
@@ -19,7 +18,12 @@ from codeatlas.contracts import (
     PositiveLine,
     RepositoryRelativePath,
 )
-from codeatlas.evaluation.dataset import ChangeCase, Dataset, QueryCase
+from codeatlas.evaluation.dataset import (
+    DATASET_CONTRACT_VERSION,
+    ChangeCase,
+    Dataset,
+    QueryCase,
+)
 
 
 class EvaluationError(ValueError):
@@ -83,7 +87,7 @@ class ChangePrediction(ContractModel):
 
 
 class PredictionFile(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
     implementation_status: Literal["implemented", "not_implemented"] = (
         "implemented"
     )
@@ -166,7 +170,7 @@ class AggregateMetrics(ContractModel):
 
 
 class EvaluationReport(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
     implementation_status: Literal["implemented", "not_implemented"]
     case_counts: dict[str, int]
     metrics: AggregateMetrics

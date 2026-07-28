@@ -17,7 +17,7 @@ from pydantic import (
     model_validator,
 )
 
-CONTRACT_VERSION: Literal["1.0"] = "1.0"
+CONTRACT_VERSION: Literal["1.1"] = "1.1"
 
 OpaqueId = Annotated[
     str,
@@ -232,7 +232,7 @@ class RelationPath(ContractModel):
 
 
 class QueryResponse(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.1"] = CONTRACT_VERSION
     request_id: OpaqueId
     repository_id: OpaqueId
     snapshot: SnapshotReference
@@ -288,7 +288,7 @@ class ErrorEnvelope(ContractModel):
 
 
 class StreamEventMetadata(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.1"] = CONTRACT_VERSION
     request_id: OpaqueId
     conversation_id: OpaqueId
     message_id: OpaqueId
@@ -485,7 +485,7 @@ class ChangeEvidenceItem(ContractModel):
 class ChangeAnalysisReport(ContractModel):
     """The persisted, machine-readable rendering of one change analysis."""
 
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.1"] = CONTRACT_VERSION
     analysis_id: OpaqueId
     request_id: OpaqueId
     repository_id: OpaqueId
@@ -622,6 +622,18 @@ class Message(ContractModel):
     error_code: NonEmptyText | None = None
     created_at: UtcDatetime
     completed_at: UtcDatetime | None = None
+    # Carried with the message rather than fetched per citation. Reading a
+    # thread means reading every message's citations, and one request per
+    # citation would make reopening a long thread cost dozens of round trips.
+    # Since P6-STREAM the submission no longer returns the answer, so this is
+    # also the only way a reloaded thread recovers what its answers cited.
+    evidence: list[MessageEvidenceItem] = Field(default_factory=list)
+    # From the message's most recent run. The snapshot is what lets a reopened
+    # thread label an old answer with the tree it actually examined rather than
+    # implying it is current (Section 14.5); it is null while a run is queued,
+    # because a queued run has not resolved one.
+    snapshot_id: OpaqueId | None = None
+    warnings: list[NonEmptyText] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_lifecycle(self) -> Message:
@@ -692,7 +704,7 @@ class StreamEvent(ContractModel):
     message is authoritative (Section 11.2).
     """
 
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.1"] = CONTRACT_VERSION
     request_id: OpaqueId
     conversation_id: OpaqueId
     message_id: OpaqueId
@@ -725,7 +737,7 @@ class MessageSubmission(ContractModel):
     to display and retry.
     """
 
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.1"] = CONTRACT_VERSION
     conversation_id: OpaqueId
     user_message_id: OpaqueId
     message_id: OpaqueId

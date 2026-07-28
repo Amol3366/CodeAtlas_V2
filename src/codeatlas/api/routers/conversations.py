@@ -10,6 +10,8 @@ P5-04. Keeping them out means this surface cannot fail for retrieval reasons.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from fastapi import APIRouter, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,7 +30,12 @@ from codeatlas.contracts import (
     MessagePage,
     MessageSubmission,
 )
-from codeatlas.domain.conversations import ConversationRecord, MessageRecord
+from codeatlas.domain.conversations import (
+    ConversationRecord,
+    MessageEvidenceRow,
+    MessageRecord,
+    RunRecord,
+)
 
 router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
 
@@ -121,7 +128,7 @@ class FeedbackRequest(StrictModel):
 
 
 @router.post(
-    "/{conversation_id}/messages", status_code=status.HTTP_201_CREATED
+    "/{conversation_id}/messages", status_code=status.HTTP_202_ACCEPTED
 )
 def submit_message(
     request: Request,
@@ -129,11 +136,14 @@ def submit_message(
     conversation_id: str,
     body: SubmitMessageRequest,
 ) -> MessageSubmission:
-    """Ask a question and return the finished turn.
+    """Accept a question and return its IDs; the run answers in the background.
 
-    Phase 5 answers deterministically and synchronously, so the answer is ready
-    when this returns. P5-04 adds the streamed view of the same run; the
-    persisted message stays the authoritative one either way.
+    202, not 201: this acknowledges an accepted turn rather than presenting a
+    finished one (`CLAUDE.md` Section 12.2, ADR-0008). The user message and the
+    queued run are committed before this returns, so the IDs are durable and
+    the stream is already live — a client may open it immediately without
+    racing the worker. The persisted message stays authoritative; streamed text
+    is provisional.
     """
     result = services.conversations.submit(
         conversation_id, body.content, request_id=request_id_for(request)
@@ -173,7 +183,14 @@ def list_messages(
         conversation_id, cursor=cursor, limit=limit
     )
     return MessagePage(
-        items=[_message(item) for item in page.items],
+        items=[
+            _message(
+                item,
+                services.conversations.get_evidence(item.message_id),
+                services.conversations.latest_run(item.message_id),
+            )
+            for item in page.items
+        ],
         next_cursor=page.next_cursor,
     )
 
@@ -189,21 +206,7 @@ def _submission(result: SubmissionResult) -> MessageSubmission:
         content=result.content,
         snapshot_id=result.snapshot_id,
         intent=result.intent,
-        evidence=[
-            MessageEvidenceItem(
-                evidence_id=item.evidence_id,
-                citation_ordinal=item.citation_ordinal,
-                file_path=item.file_path,
-                symbol=item.symbol,
-                start_line=item.start_line,
-                end_line=item.end_line,
-                content_hash=item.content_hash,
-                derivation=item.derivation,
-                confidence=item.confidence,
-                snapshot_id=item.snapshot_id,
-            )
-            for item in result.evidence
-        ],
+        evidence=[_evidence_item(item) for item in result.evidence],
         warnings=list(result.warnings),
         limitations=list(result.limitations),
         error_code=result.error_code,
@@ -223,7 +226,11 @@ def _conversation(record: ConversationRecord) -> Conversation:
     )
 
 
-def _message(record: MessageRecord) -> Message:
+def _message(
+    record: MessageRecord,
+    evidence: Sequence[MessageEvidenceRow] = (),
+    run: RunRecord | None = None,
+) -> Message:
     return Message(
         message_id=record.message_id,
         conversation_id=record.conversation_id,
@@ -234,4 +241,28 @@ def _message(record: MessageRecord) -> Message:
         error_code=record.error_code,
         created_at=record.created_at,
         completed_at=record.completed_at,
+        evidence=[_evidence_item(item) for item in evidence],
+        # 'pending' is the placeholder a queued run carries until it
+        # resolves one; reporting it as a snapshot ID would be a lie.
+        snapshot_id=(
+            run.snapshot_id
+            if run is not None and run.snapshot_id != "pending"
+            else None
+        ),
+        warnings=list(run.warnings) if run is not None else [],
+    )
+
+
+def _evidence_item(item: MessageEvidenceRow) -> MessageEvidenceItem:
+    return MessageEvidenceItem(
+        evidence_id=item.evidence_id,
+        citation_ordinal=item.citation_ordinal,
+        file_path=item.file_path,
+        symbol=item.symbol,
+        start_line=item.start_line,
+        end_line=item.end_line,
+        content_hash=item.content_hash,
+        derivation=item.derivation,
+        confidence=item.confidence,
+        snapshot_id=item.snapshot_id,
     )

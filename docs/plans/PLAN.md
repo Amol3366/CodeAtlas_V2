@@ -50,10 +50,10 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-STREAM is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02 `complete`; P6-STREAM `ready`; P6-03 … P6-08 `pending` |
+| Active task | P6-STREAM — accept-then-stream submission (ADR-0008) |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02 `complete`; P6-STREAM `in_progress`; P6-03 … P6-08 `pending` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-28T09:00:00Z |
+| Started UTC | 2026-07-28T10:00:00Z |
 | Git state | Branch `main` at `500c25a`, pushed. PR #1 merged 2026-07-28 by fast-forward; `worktree-p4-10-completion` is now an ancestor of `main`. |
 | Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
 
@@ -184,6 +184,119 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T11:30:00Z — P6-STREAM backend complete; still `in_progress`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `c1f6115` + uncommitted.
+- Transition: **none.** P6-STREAM stays `in_progress`. Acceptance criteria 1, 2,
+  3, 5 and the backend half of 7 are done and verified; criteria 4, 6 and the
+  frontend half of 7 are not started, so the task is not being claimed complete
+  and **Phase 6's gate condition 1 is not yet met.**
+
+#### What works now
+
+`POST /v1/conversations/{id}/messages` returns **202** with `message_id`,
+`run_id`, and `status: "queued"` as soon as the user message and queued run are
+committed. The run answers on a bounded worker pool, each worker opening its own
+connection through the injected factory — the P6-01 rule applied rather than
+restated. `contract_version` is **1.1**.
+
+**The load-bearing design decision: the event channel is opened by the
+submitting request, before it responds — never by the worker.** A client that
+submits and immediately opens the stream would otherwise race the executor, be
+told `no_active_run`, and silently fall back to polling for every run that had
+not started yet. `test_the_stream_is_live_when_submission_returns` is the test
+that pins it, and it is the one that would have failed silently in production.
+
+`ThreadedRunExecutor` is a strategy, not a second code path: with no executor
+the run happens on the calling thread, which is what keeps `AnswerPipeline`
+directly testable and what `test_answer_pipeline.py` still exercises unchanged.
+
+**Cancellation is no longer vestigial.** Before this, `cancel_run` could only
+arrive after the run it named had finished — the endpoint could never do what
+its name said. `tests/integration/test_run_cancellation.py` holds a run open on
+a worker and cancels it mid-flight.
+
+#### Two defects found on the way, both pre-existing, both real
+
+1. **The repository had no `.gitattributes`, and it corrupts the evaluation
+   corpus on any Windows clone.** Git's `core.autocrlf` rewrote every fixture to
+   CRLF when the merge checked them out into `main`. The change engine hashes
+   bytes and diffs lines, so a CRLF fixture is a different file from the LF one
+   the gold corpus declares ranges against: `test_change_adapter.py` failed in
+   `main` and passed in the worktree with byte-identical *tracked* content. This
+   was not caused by the merge — the merge is simply the first checkout that
+   ever happened on Windows. Fixed with `.gitattributes` (`* text=auto eol=lf`)
+   plus a renormalization of 245 tracked files. **Anyone cloning this repository
+   on Windows would have hit it, and `check_phase4.ps1` would have failed for
+   them while passing for whoever wrote the corpus.**
+2. **Run warnings were never persisted.** `warnings_json` exists in
+   `message_runs` and was only ever written at insert — while the run was still
+   queued and had nothing to warn about. Inline submission hid this by carrying
+   warnings from memory in the response. An accepted turn returns before they
+   exist, so an unpersisted warning is one the user never sees. Now written on
+   completion beside the snapshot. **No migration: the column was already
+   there**, so `SCHEMA_VERSION` stays 9 as ADR-0008 said.
+
+#### Contract changes
+
+- `contract_version` **1.0 → 1.1** across the bundle; schema regenerated and
+  `--check` passes.
+- **The evaluation corpus was deliberately *not* renumbered.** `dataset.py` and
+  `runner.py` had `Literal["1.0"] = CONTRACT_VERSION`, so the bump would have
+  silently invalidated every tracked case file and baseline. They now carry
+  their own `DATASET_CONTRACT_VERSION`, because the corpus format and the API
+  contract version different things.
+- `Message` gained `evidence`, `snapshot_id`, and `warnings`, all read back from
+  storage. This is the backend half of criterion 7 and it is what makes a
+  reopened thread able to show its citations and its freshness label at all —
+  since the submission no longer returns the answer, the database is the only
+  source for them.
+- `POST …/messages` is **202**, not 201.
+
+#### Test-first discipline, stated accurately
+
+`tests/integration/test_accept_then_stream.py` was written first. **Three of its
+seven tests failed for the right reasons** (201 vs 202, no live channel, version
+1.0); the other four passed immediately because inline execution satisfied them
+trivially. Those four are regression guards, not proofs of new behavior, and
+saying otherwise would overstate what watching them run proved.
+`test_run_cancellation.py` was written before the behavior it needed existed.
+
+**One of my own test assumptions was wrong and the test was fixed, not the
+code:** it asserted `run.accepted` appears in `?after=0`, but sequences start at
+0, so `after=0` correctly means "I already have it". Recorded because the
+opposite reflex — loosening the production code to satisfy a test — is the one
+that quietly breaks a contract.
+
+#### Verification in this environment, each run and its exit code
+
+- `uv run pytest -q` — **1205 passed** (1196 before; +7 accept-then-stream, +2
+  cancellation).
+- `uv run ruff check src tests scripts apps` — exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **208 source files**.
+- `uv run python scripts/export_contract_schema.py --check` — exit 0.
+- **Web tests, lint, types, build and Playwright: not run.** `apps/web/node_modules`
+  exists only in the `.claude/worktrees/p4-10-completion` worktree, never in
+  `main` — a direct consequence of merging without installing. `main` needs
+  `pnpm install` before any web step, and no web claim is made here.
+
+#### What P6-STREAM still needs
+
+1. **`pnpm install` in `main`**, then regenerate `api-types.gen.ts` — `Message`
+   grew three fields and the generated types are stale.
+2. **Criterion 4** — `Thread` must submit, open the stream, render
+   `generation.delta`, and resume at the last sequence after a reload. Today it
+   submits and refetches, so an accepted turn shows as queued and never updates.
+3. **Criterion 7, frontend** — stop passing `snapshotId={null}` and restore
+   citations from the message payload. The data is now there; nothing reads it.
+4. **Criterion 6** — extend the Playwright stream suite to reconnect *mid-run*.
+   This is the one that closes Phase 6 gate condition 1, and it is the reason
+   the whole task exists.
+5. `docs/operations/web-application.md` and the ADR-0008 consequences section.
+
+- Next: the web half, starting with `pnpm install` and the generated types.
 
 ### 2026-07-28T09:40:00Z — executed-state documentation reconciled
 

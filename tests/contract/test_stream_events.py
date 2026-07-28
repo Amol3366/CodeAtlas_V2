@@ -39,7 +39,7 @@ def test_every_event_carries_the_full_envelope() -> None:
     )
 
     assert isinstance(event, StreamEvent)
-    assert event.contract_version == "1.0"
+    assert event.contract_version == "1.1"
     assert event.request_id == "req_1"
     assert event.conversation_id == "conv_1"
     assert event.message_id == "msg_2"

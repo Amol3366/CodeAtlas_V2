@@ -258,7 +258,7 @@ def test_every_response_is_snapshot_bound_and_contract_valid(
         harness.services.graph.trace,
     ):
         response = method(_request(harness, "PaymentService.capture"))
-        assert response.contract_version == "1.0"
+        assert response.contract_version == "1.1"
         assert response.snapshot.snapshot_id == active.snapshot_id
         for item in response.evidence:
             assert item.snapshot_id == active.snapshot_id

@@ -13,7 +13,7 @@ from codeatlas.schema_export import (
 def test_schema_bundle_contains_versioned_public_contracts() -> None:
     bundle = build_schema_bundle()
 
-    assert bundle["contract_version"] == "1.0"
+    assert bundle["contract_version"] == "1.1"
     assert set(bundle["schemas"]) == {
         "change_analysis_report",
         "conversation",
@@ -30,10 +30,10 @@ def test_schema_bundle_contains_versioned_public_contracts() -> None:
         "stream_event_metadata",
     }
     query_schema = bundle["schemas"]["query_response"]
-    assert query_schema["properties"]["contract_version"]["const"] == "1.0"
+    assert query_schema["properties"]["contract_version"]["const"] == "1.1"
     assert query_schema["additionalProperties"] is False
     report_schema = bundle["schemas"]["change_analysis_report"]
-    assert report_schema["properties"]["contract_version"]["const"] == "1.0"
+    assert report_schema["properties"]["contract_version"]["const"] == "1.1"
     assert report_schema["additionalProperties"] is False
     # The web client generates its types from this bundle (ADR-0006 decision
     # 5), so every conversation schema must be strict for the generated types
@@ -41,7 +41,7 @@ def test_schema_bundle_contains_versioned_public_contracts() -> None:
     for name in ("conversation", "message", "message_run", "stream_event"):
         assert bundle["schemas"][name]["additionalProperties"] is False
     event_schema = bundle["schemas"]["stream_event"]
-    assert event_schema["properties"]["contract_version"]["const"] == "1.0"
+    assert event_schema["properties"]["contract_version"]["const"] == "1.1"
 
 
 def test_schema_export_is_stable_sorted_json(tmp_path: Path) -> None:

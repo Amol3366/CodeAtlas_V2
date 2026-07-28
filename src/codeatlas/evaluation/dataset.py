@@ -9,13 +9,22 @@ from typing import Annotated, Literal
 from pydantic import Field, ValidationError, model_validator
 
 from codeatlas.contracts import (
-    CONTRACT_VERSION,
     ContractModel,
     NonEmptyText,
     OpaqueId,
     PositiveLine,
     RepositoryRelativePath,
 )
+
+DATASET_CONTRACT_VERSION: Literal["1.0"] = "1.0"
+"""The evaluation corpus format version, deliberately independent of the API's
+``CONTRACT_VERSION``.
+
+They version different things. The API contract describes what a client
+receives; this describes the shape of the gold corpus on disk. P6-STREAM moved
+the API to 1.1, and letting that renumber the corpus would have invalidated
+every tracked case file and every baseline for a change that touched neither.
+"""
 
 
 class DatasetError(ValueError):
@@ -105,7 +114,7 @@ class ChangeCase(ContractModel):
 
 
 class DatasetManifest(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
     fixtures_root: RepositoryRelativePath
     variants_root: RepositoryRelativePath = "variants"
     fixtures: list[FixtureDescriptor] = Field(min_length=1)
@@ -116,17 +125,17 @@ class DatasetManifest(ContractModel):
 
 
 class QueryCaseFile(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
     cases: list[QueryCase]
 
 
 class ChangeCaseFile(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
     cases: list[ChangeCase]
 
 
 class Dataset(ContractModel):
-    contract_version: Literal["1.0"] = CONTRACT_VERSION
+    contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
     fixtures_root: Path
     fixtures: list[FixtureDescriptor]
     query_cases: list[QueryCase]

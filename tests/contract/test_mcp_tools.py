@@ -100,7 +100,7 @@ def test_resolve_symbol_returns_the_same_contract_as_rest(
     )
 
     response = QueryResponse.model_validate_json(payload)
-    assert response.contract_version == "1.0"
+    assert response.contract_version == "1.1"
     assert response.evidence[0].file_path == "src/payments/service.py"
 
 

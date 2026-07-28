@@ -11,3 +11,7 @@ __pycache__/
 *.py[cod]
 build/
 dist/
+
+# Agent worktrees and local session state. Holds a full checkout with
+# node_modules, so an unguarded `git add -A` would otherwise sweep it in.
+.claude/

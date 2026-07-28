@@ -95,7 +95,7 @@ def test_hostile_repository_text_is_returned_as_data_not_obeyed(
     result = json.loads(payload)
     # The text may appear inside an excerpt — that is data. What matters is that
     # it arrives as a serialized evidence field and changes nothing.
-    assert result["contract_version"] == "1.0"
+    assert result["contract_version"] == "1.1"
     assert result["evidence"][0]["file_path"] == "src/evil.py"
 
 
