@@ -50,12 +50,33 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-03 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02 `complete`; P6-03 `ready`; P6-04 … P6-08 `pending` |
-| Agent | Claude Code `claude-fable-5` |
-| Started UTC | 2026-07-27T18:20:00Z |
-| Git state | Branch `worktree-p4-10-completion` (from `main` at `d71f408`, pushed; PR #1). |
+| Active task | none — P6-STREAM is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02 `complete`; P6-STREAM `ready`; P6-03 … P6-08 `pending` |
+| Agent | Claude Code `claude-opus-5` |
+| Started UTC | 2026-07-28T09:00:00Z |
+| Git state | Branch `main` at `500c25a`, pushed. PR #1 merged 2026-07-28 by fast-forward; `worktree-p4-10-completion` is now an ancestor of `main`. |
 | Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
+
+### Phase 6 Task Board (active)
+
+| Task | Deliverable | Dependencies | Status |
+| --- | --- | --- | --- |
+| P6-SETUP | ADR-0007, four hardening error codes, `check_phase6.ps1` | Phase 5 | `complete` |
+| P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
+| P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
+| P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `ready` |
+| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `pending` |
+| P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
+| P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
+| P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
+| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
+| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
+
+P6-STREAM was inserted 2026-07-28 on the user's approval of ADR-0008. P6-03's
+dependency (P6-02) is satisfied; it is `pending` only to record the user's
+sequencing decision, and returns to `ready` when P6-STREAM completes. Detail and
+acceptance criteria live in the
+[Phase 6 plan](phases/phase-06-freshness-and-hardening.md).
 
 ### Phase 5 Task Board
 
@@ -163,6 +184,103 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T09:00:00Z — branch merged to `main`; ADR-0008 approved; P6-STREAM `ready`
+
+- Agent: Claude Code `claude-opus-5`.
+- Transition: no task changed status. **P6-STREAM was created** and is `ready`;
+  P6-03 moved `ready -> pending` to record sequencing only, not a blocker.
+- This entry records two user decisions and one repository reconciliation. No
+  product behavior changed and no test was run, because nothing executable was
+  modified — only Git refs and planning documents.
+
+#### 1. `main` reconciled; PR #1 merged
+
+All Phase 4, 5, and 6 work lived on `worktree-p4-10-completion` while `main`
+sat three phases behind at `d71f408` — and `main`'s working tree additionally
+carried an **uncommitted, superseded** copy of partial Phase 4 work. Two
+divergent representations of the same phase, one of them untracked, is a merge
+hazard that grows with every commit.
+
+Before touching anything, the uncommitted state was diffed against the branch.
+It is a strict subset: all 147 "added" lines are *older* forms of lines the
+branch later superseded — `SCHEMA_VERSION = 7` against the branch's 9, PLAN.md's
+Phase 4 `in_progress` against `complete`, the chunker from before P4-10's
+empty-file fix. Nothing unique existed on `main`.
+
+It was still preserved rather than discarded. Sequence:
+
+1. `rescue/main-wip-superseded` (`a517bc9`) commits `main`'s working tree
+   verbatim, pushed. It is a safety net, explicitly not for merge.
+2. `main` fast-forwarded `d71f408 -> 500c25a`. `git diff` against the branch is
+   **empty**, which is the check that a fast-forward changed refs and not
+   content — the branch's own green gate therefore still describes `main`.
+3. `git push origin main`; GitHub marked **PR #1 MERGED**.
+
+`main`, `worktree-p4-10-completion`, and `origin/main` now all point at
+`500c25a`. The `.claude/worktrees/p4-10-completion` worktree is left in place
+and still locked: it holds the only installed `node_modules` and built `dist`,
+so removing it would cost a `pnpm install` for no benefit. It is now a checkout
+of an ancestor of `main`, not a divergent line of work.
+
+#### 2. Accept-then-stream approved (ADR-0008)
+
+**The user approved the change on 2026-07-28** and chose to build it **before
+P6-03**. Recorded per rule 10.
+
+P6-01 declared this as Phase 5 debt needing a user decision, because changing
+the response shape of `POST /v1/conversations/{id}/messages` is a Section 25
+breaking change. Reading for the approval turned up something that reframes it:
+**the inline endpoint is a deviation from `CLAUDE.md` Section 12.2**, which
+already specifies "Return IDs immediately, then stream or poll status." The
+endpoint returns IDs only after finishing the work it was meant to start. So
+P6-STREAM closes a gap against the existing specification rather than expanding
+scope — which is why the approval is better grounded than a convenience change
+would be, and it is recorded here because the Phase 6 plan framed it the other
+way.
+
+Three defects follow from inline execution and are unavoidable in that shape,
+not incidental: a long run holds an HTTP request open for its full duration at
+the mercy of any client timeout; `POST /v1/message-runs/{run_id}/cancel` can
+only ever arrive after the run it names has finished; and a reload mid-answer
+has no stream to resume.
+
+The parallel-async-endpoint alternative was rejected in the ADR: it avoids the
+version bump but forks the core request path permanently, and the unpicked path
+becomes untested weight that still has to work.
+
+**`contract_version` moves `"1.0"` -> `"1.1"`** — the first bump in six phases.
+Reusing `"1.0"` for two incompatible response shapes would make the version
+field a lie. `SCHEMA_VERSION` stays **9**: no persisted data changes shape,
+which is also what makes rollback a code-only revert with no data consequence.
+
+- Files created: `docs/adr/0008-accept-then-stream-message-submission.md`,
+  carrying the Section 25 checklist (need, evidence, security/operational
+  impact, migration and rollback, approval) as an explicit table so the
+  approval is auditable.
+- Files modified: `docs/plans/phases/phase-06-freshness-and-hardening.md`
+  (P6-STREAM on the board with eight acceptance criteria; the debt section
+  records the decision), `docs/plans/PLAN.md` (Phase 6 board added — the active
+  phase was the only one without one; Active Work; this entry).
+- Contracts/migrations: **none applied yet.** The `1.1` bump and the schema
+  entry land in P6-STREAM itself.
+- Verification: none run, and none claimed. Nothing executable changed. The
+  last green gate remains P6-02's — `check_phase6.ps1 -SkipSync` exit 0, 1196
+  backend tests, 91 vitest, 4 Playwright — and it still describes `main`
+  because the merge was a content-identical fast-forward.
+
+#### A documentation inconsistency, noted not fixed
+
+The repository refers to its policy file as both `CLAUDE.md` (the tracked
+filename, and what PLAN.md names as policy authority) and `AGENTS.md` (used
+throughout the Phase 6 plan and several handoffs). `main`'s discarded working
+tree contained a staged `CLAUDE.md -> AGENTS.md` rename that was never
+completed. ADR-0008 uses `CLAUDE.md` because that is the file that exists.
+Left alone deliberately: renaming the policy authority mid-phase is a change
+the user should make knowingly, not a side effect of a merge.
+
+- Next: **P6-STREAM** — accept-then-stream submission, test-first, per the eight
+  acceptance criteria in the Phase 6 plan.
 
 ### 2026-07-28T07:15:00Z — P6-02 completed; P6-03 `ready`
 

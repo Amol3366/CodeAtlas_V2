@@ -50,6 +50,17 @@ suite proves the transport contract instead and says plainly what it does not
 cover. **This is carried as Phase 5 debt awaiting a decision, not silently
 absorbed.**
 
+**Decided 2026-07-28.** The user approved replacing inline execution with
+accept-then-stream and chose to build it before P6-03. The decision and its
+Section 25 checklist are recorded in
+[ADR-0008](../../adr/0008-accept-then-stream-message-submission.md); the work is
+**P6-STREAM** on the board below.
+
+Worth stating plainly, because it changes what this task is: the inline endpoint
+is a **deviation from `CLAUDE.md` Section 12.2**, which already specifies
+"Return IDs immediately, then stream or poll status." P6-STREAM closes a gap
+against the existing specification rather than expanding scope.
+
 ## Completion Gate (from `AGENTS.md` Section 20)
 
 Phase 6 may enter `awaiting_user_approval` only when all of the following hold
@@ -151,12 +162,47 @@ anything, and refuses rather than half-restoring.
 | P6-SETUP | ADR-0007, error codes, `check_phase6.ps1` skeleton | Phase 5 | `complete` |
 | P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
 | P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
-| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `ready` |
+| P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `ready` |
+| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `pending` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
 | P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
+
+**P6-STREAM was inserted on 2026-07-28**, after the user approved the
+accept-then-stream contract change (ADR-0008) and chose to build it before
+P6-03. It is placed here rather than appended because it pays the Phase 5 debt
+that P6-01 could only declare, and because every later suite is stronger once
+the stream contract behind it is real.
+
+**P6-03's own dependency (P6-02) is satisfied** — it is `pending` rather than
+`ready` only to record the user's sequencing decision, not because anything
+blocks it. It returns to `ready` when P6-STREAM completes. Stating this keeps
+the "Dependencies" column meaning what it says instead of absorbing an ordering
+preference.
+
+### P6-STREAM acceptance criteria
+
+1. `POST /v1/conversations/{id}/messages` returns `202` with `message_id`,
+   `run_id`, and `status: "queued"` once the message and queued run are
+   committed; the run executes in the background.
+2. The background executor obtains its own connection through the injected
+   factory (the P6-01 rule), and honours the existing timeout, bound, and
+   cooperative-cancellation contracts (Section 10.3).
+3. `contract_version` becomes `"1.1"`; the exported schema is regenerated and
+   `export_contract_schema.py --check` passes; contract and cross-adapter
+   suites are extended so REST, CLI, and MCP agree on the new shape.
+4. `Thread` submits, opens the stream, renders `generation.delta`, and resumes
+   at the last sequence after a reload; duplicate events are ignored.
+5. `POST /v1/message-runs/{run_id}/cancel` reaches a run that is actually
+   executing, and the cancelled run stays visible and retryable.
+6. The Playwright stream suite is extended to reconnect **mid-run** against a
+   live run, which is what makes gate condition 1 provable.
+7. `Thread` stops passing `snapshotId={null}` so the freshness banner can
+   appear, and citations are restored after a reload — the two Phase 5 UI gaps
+   that live in the same component.
+8. Test-first: each behavior above starts from a test observed failing.
 
 ## Resolved Defaults
 
