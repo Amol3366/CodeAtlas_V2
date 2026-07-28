@@ -452,11 +452,14 @@ Confidence and derivation are separate fields.
 
 ### 11.1 Standard response envelope
 
-All query adapters should serialize the same conceptual contract:
+All query adapters should serialize the same conceptual contract. The bundle is
+at `"1.1"` since ADR-0008 moved message submission to accept-then-stream; it was
+`"1.0"` for Phases 0–5, and every addition in those phases was deliberately
+additive so the version could stay put.
 
 ```json
 {
-  "contract_version": "1.0",
+  "contract_version": "1.1",
   "request_id": "opaque-id",
   "repository_id": "opaque-id",
   "snapshot": {
@@ -1097,10 +1100,21 @@ Delivered so far: P6-SETUP (ADR-0007, four hardening error codes,
 `scripts/check_phase6.ps1` with Playwright inside the gate), P6-01 (Playwright
 harness and three suites; it found and fixed a shared-SQLite-connection
 corruption under concurrent requests), P6-02 (watcher, debounce, per-repository
-switch, migration `0009`).
+switch, migration `0009`), P6-STREAM (ADR-0008, accept-then-stream,
+`contract_version` **1.0 → 1.1** — the first bump in six phases).
 
-Next: **P6-STREAM** (ADR-0008, accept-then-stream, `contract_version` 1.1), then
-P6-03 reconciliation. Live task status lives in `docs/plans/PLAN.md`, never here.
+**Gate condition 1 is met**: history survives a backend restart, a stream
+reconnects against a live run, and the critical workflows run in a browser.
+`check_phase6.ps1` passes with Playwright included.
+
+One qualification, recorded because a green gate should not hide it: four
+conversation-route browser tests are **skipped on Chromium**, whose renderer
+crashes navigating to `/conversations/{id}` — a browser defect, not application
+code, unresolved upstream. Firefox proves all seven. The isolation evidence is
+in the 2026-07-28 handoffs.
+
+Next: **P6-03** reconciliation. Live task status lives in `docs/plans/PLAN.md`,
+never here.
 
 ### Phase 7 — Measured semantic uplift
 

@@ -40,12 +40,16 @@ A filesystem watcher keeps the index current without an explicit `index`
 command, debounced and disableable per repository
 (`codeatlas repo watch`, `docs/operations/continuous-freshness.md`).
 
+Asking a question is accept-then-stream: the request returns `202` with a queued
+run, the answer is computed on a worker, and the thread follows it over
+Server-Sent Events — so a long answer never holds a request open, cancelling
+reaches a run that is genuinely executing, and a reload recovers the persisted
+answer with its citations and the snapshot it used (ADR-0008).
+
 Not built yet: the reconciling scan that makes the watcher trustworthy against
 silently dropped Windows events, crash-recovery reporting, backup/restore, and
-packaging (all Phase 6); and embeddings or any model provider (Phase 7). Message
-submission still executes its run inline rather than accept-then-stream — see
-ADR-0008, scheduled as P6-STREAM. `docs/plans/PLAN.md` is the live phase and
-task status.
+packaging (all Phase 6); and embeddings or any model provider (Phase 7).
+`docs/plans/PLAN.md` is the live phase and task status.
 
 ## Windows development
 

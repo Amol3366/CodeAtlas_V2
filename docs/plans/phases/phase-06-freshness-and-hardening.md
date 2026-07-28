@@ -50,11 +50,22 @@ suite proves the transport contract instead and says plainly what it does not
 cover. **This is carried as Phase 5 debt awaiting a decision, not silently
 absorbed.**
 
-**Decided 2026-07-28.** The user approved replacing inline execution with
-accept-then-stream and chose to build it before P6-03. The decision and its
-Section 25 checklist are recorded in
-[ADR-0008](../../adr/0008-accept-then-stream-message-submission.md); the work is
-**P6-STREAM** on the board below.
+**Decided 2026-07-28, and delivered.** The user approved replacing inline
+execution with accept-then-stream and chose to build it before P6-03. The
+decision and its Section 25 checklist are in
+[ADR-0008](../../adr/0008-accept-then-stream-message-submission.md), whose
+Outcome section records what implementation added to it. **P6-STREAM is
+`complete` and gate condition 1 is met**: `check_phase6.ps1` passes with
+Playwright included.
+
+**The qualification, stated at the gate rather than in a footnote.** Four
+conversation-route browser tests are **skipped on Chromium**, whose renderer
+crashes on client-side navigation to `/conversations/{id}`. It is a browser
+defect and not application code — Firefox passes all seven suites, no JS error
+is raised in a production or a development React build, and the heap is flat at
+the moment of death. It is unresolved upstream; a Playwright version bisect
+would name the build that introduced it. Every assertion still runs, on Firefox;
+what is lost is the engine four of them are proven on.
 
 Worth stating plainly, because it changes what this task is: the inline endpoint
 is a **deviation from `CLAUDE.md` Section 12.2**, which already specifies
@@ -68,7 +79,7 @@ with verification evidence recorded in the handoff log.
 
 | # | Gate condition | Measured against |
 | --- | --- | --- |
-| 1 | The Phase 5 conditions that were deferred now pass end to end: history survives a backend restart, a stream reconnects mid-run, and the critical workflows run in a browser | Playwright suites |
+| 1 | The Phase 5 conditions that were deferred now pass end to end: history survives a backend restart, a stream reconnects mid-run, and the critical workflows run in a browser | Playwright suites — **met 2026-07-28** (P6-01 + P6-STREAM); see the Chromium qualification below |
 | 2 | A file changed on disk is reflected in query results without an explicit index command, within a declared debounce window | watcher integration tests |
 | 3 | Filesystem events alone are never treated as truth: a reconciling scan corrects missed, duplicated, and out-of-order events | watcher reconciliation tests |
 | 4 | A process killed mid-index recovers to the previous active snapshot with no orphaned rows, and says what it recovered | crash-recovery tests (extending the Phase 2 suite) |
@@ -162,8 +173,8 @@ anything, and refuses rather than half-restoring.
 | P6-SETUP | ADR-0007, error codes, `check_phase6.ps1` skeleton | Phase 5 | `complete` |
 | P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
 | P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
-| P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `ready` |
-| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `pending` |
+| P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `complete` |
+| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `ready` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
@@ -176,11 +187,10 @@ P6-03. It is placed here rather than appended because it pays the Phase 5 debt
 that P6-01 could only declare, and because every later suite is stronger once
 the stream contract behind it is real.
 
-**P6-03's own dependency (P6-02) is satisfied** — it is `pending` rather than
-`ready` only to record the user's sequencing decision, not because anything
-blocks it. It returns to `ready` when P6-STREAM completes. Stating this keeps
-the "Dependencies" column meaning what it says instead of absorbing an ordering
-preference.
+**P6-03 returned to `ready` when P6-STREAM completed**, as planned. It was
+`pending` only to record the user's sequencing decision, never because anything
+blocked it — which kept the "Dependencies" column meaning what it says instead
+of absorbing an ordering preference.
 
 ### P6-STREAM acceptance criteria
 

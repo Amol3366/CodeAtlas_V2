@@ -185,6 +185,46 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-07-28T16:50:00Z — executed-state documentation reconciled (P6-STREAM)
+
+- Agent: Claude Code `claude-opus-5`.
+- Transition: none. P6-03 stays `ready`. Documentation only; no executable file
+  was touched and no verification is claimed.
+
+**What was stale, and what it now says**
+
+- **`CLAUDE.md` Section 20, Phase 6** listed P6-SETUP/01/02 as delivered and
+  named P6-STREAM as next. It now records P6-STREAM as delivered with the
+  `contract_version` bump, states plainly that **gate condition 1 is met**, and
+  carries the Chromium qualification *at the gate* rather than in a footnote —
+  a green gate that hides a skipped engine is the kind of number this project
+  exists not to produce. The nine build boxes stay `[ ]`: the watcher is still
+  not reconciling, so no line item is fully delivered.
+- **`CLAUDE.md` Section 11.1** still showed `"contract_version": "1.0"` in the
+  normative response envelope. That is the example implementers copy, so it was
+  the one genuinely misleading version reference in the repository. Now `"1.1"`,
+  with a line saying when it moved and why it had not before.
+- **`README.md`** said submission "still executes its run inline … scheduled as
+  P6-STREAM". Replaced with what the product does now, and the "not built yet"
+  list narrowed to what is actually outstanding.
+- **The Phase 6 plan** carried P6-STREAM as `ready` and P6-03 as `pending`,
+  and its gate table showed condition 1 open. Board corrected, condition 1
+  marked met with its date and its qualification.
+
+**Deliberately not changed**
+
+- **ADR-0004, ADR-0005, and ADR-0006 still say `contract_version` stays
+  `"1.0"`.** They are records of decisions taken when that was true, and the ADR
+  workflow forbids editing an accepted decision to change its meaning. ADR-0008
+  is where the bump is recorded; rewriting the older three would erase the fact
+  that five phases held the line.
+- `docs/evaluation/phase-1-baseline-environment.md` records the versions in
+  force at Phase 1. Historical, and correct as written.
+- The `CLAUDE.md` / `AGENTS.md` naming split, still a user decision.
+
+- Next: **P6-03** — the reconciling scan and lossy-event tests.
+
+
 ### 2026-07-28T16:20:00Z — P6-STREAM complete; P6-03 `ready`
 
 - Agent: Claude Code `claude-opus-5`.
