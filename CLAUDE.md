@@ -918,7 +918,7 @@ have been satisfied with current verification evidence.
 - [X] [Phase 3 — Polyglot graph and delivery contracts](#phase-3--polyglot-graph-and-delivery-contracts)
 - [X] [Phase 4 — Change assurance](#phase-4--change-assurance)
 - [X] [Phase 5 — Persistent ChatGPT-style web application](#phase-5--persistent-chatgpt-style-web-application)
-- [ ] [Phase 6 — Continuous freshness and hardening](#phase-6--continuous-freshness-and-hardening)
+- [X] [Phase 6 — Continuous freshness and hardening](#phase-6--continuous-freshness-and-hardening)
 - [ ] [Phase 7 — Measured semantic uplift](#phase-7--measured-semantic-uplift)
 
 ### Phase 0 — Product contract and evaluation
@@ -1087,12 +1087,16 @@ Build:
 - [X] Performance validation
 - [X] Security validation
 - [X] Windows release validation
-- [ ] **Completion gate:** A packaged Windows build passes upgrade, recovery,
+- [X] **Completion gate:** A packaged Windows build passes upgrade, recovery,
   backup/restore, deletion, security, performance, and end-to-end release tests
   without losing the last valid active snapshot or chat history.
 
-**Awaiting user approval.** All eight build items are delivered and all nine
-gate conditions are met. Only the user may approve the gate.
+Gate approved by the user 2026-07-29, **with four qualifications stated at the
+gate and accepted**, the first of which is an unfixed defect (below). Evidence:
+ADR-0007 and ADR-0008, migration `0009`, `scripts/check_phase6.ps1 -Package
+-Perf`, `docs/evaluation/baseline-phase-6.json`,
+`docs/evaluation/phase-6-baseline-environment.md`,
+`docs/operations/release-validation.md`.
 
 Delivered so far: P6-SETUP (ADR-0007, four hardening error codes,
 `scripts/check_phase6.ps1` with Playwright inside the gate), P6-01 (Playwright
@@ -1126,7 +1130,7 @@ anything — harmless while you reindexed by hand, serious once a watcher
 reindexes all day; and an unknown `/v1` path returned a **bare 404** rather than
 the contract envelope.
 
-Four qualifications, recorded because a green gate should not hide them.
+Four qualifications, carried into the approval rather than resolved by it.
 
 - **The API process can crash under sustained change analysis**, with a Windows
   access violation inside a filesystem syscall. Unfixed. Not packaging — a
@@ -1145,7 +1149,9 @@ Four qualifications, recorded because a green gate should not hide them.
 - **The packaged executable is unsigned**, so Windows SmartScreen warns on
   first run. Signing needs a certificate, which is a purchasing decision.
 
-Next: **the user's decision on the Phase 6 gate.** Live task status lives in
+**Phase 7 is not active.** It needs its own product, privacy, and architecture
+approval before a plan is written at all — the gate below is separate from
+this one and has not been asked for. Live task status lives in
 `docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift

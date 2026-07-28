@@ -42,20 +42,20 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 3 — Polyglot graph and delivery contracts | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md) | `complete` | User |
 | 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `complete` | User |
 | 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `complete` | User |
-| 6 — Continuous freshness and hardening | [phase plan](phases/phase-06-freshness-and-hardening.md) | `awaiting_user_approval` (all nine conditions met 2026-07-28) | User |
-| 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` | User |
+| 6 — Continuous freshness and hardening | [phase plan](phases/phase-06-freshness-and-hardening.md) | `complete` (gate approved by the user 2026-07-29) | User |
+| 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` — **not activated**; needs explicit product, privacy, and architecture approval first | User |
 
 ## Active Work
 
 | Field | Value |
 | --- | --- |
-| Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — **Phase 6 is `awaiting_user_approval`** |
-| Task status | Phases 0–5 `complete`; every Phase 6 task `complete` |
+| Active phase | none — **Phases 0–6 are `complete`.** Phase 7 is not activated |
+| Active task | none |
+| Task status | Phases 0–6 `complete`, every gate approved by the user |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-28T18:20:00Z |
-| Git state | Branch `main` at `cd2e8d0` (P6-07 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-08 leaves it untouched. |
-| Next gate | **Phase 6 completion gate — awaiting the user.** All nine conditions are met; one unfixed defect is reported rather than hidden (the API process can crash under sustained change analysis). Phase 7 additionally needs its own product, privacy, and architecture approval before a plan exists. |
+| Started UTC | 2026-07-29T04:20:00Z (approval recorded) |
+| Git state | Branch `main` at `d78216a`. The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint, untouched throughout Phase 6. |
+| Next gate | **Phase 7's activation gate**, which is separate from a completion gate and has not been requested. `CLAUDE.md` Section 20 requires explicit product, privacy, and architecture approval to be recorded *before* a Phase 7 plan is written. No agent may begin Phase 7 work until that approval exists. |
 
 ### Phase 6 Task Board (active)
 
@@ -184,6 +184,68 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-29T04:20:00Z — Phase 6 gate APPROVED by the user
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `d78216a`.
+- Transition: Phase 6 `awaiting_user_approval -> complete`. Recorded, not
+  granted: only the user may approve a gate, and the user did so on
+  2026-07-29 after the qualifications below were stated.
+- Phase 7 is **not** activated. Its gate is an *activation* gate, not a
+  completion gate, and it has not been requested.
+
+#### What was approved
+
+All nine gate conditions met, each with evidence in the phase plan's table:
+the Phase 5 debt paid end to end in a browser; a disk edit reaching query
+results with no `index` command; a reconciling scan correcting what the event
+stream drops; a genuinely killed process recovered without orphaned rows and
+saying what it recovered; a packaged build that installs, runs, and upgrades a
+database written by a real earlier build; backup, restore, and deletion that
+complete or refuse; the Section 19.3 performance targets **on the artifact**;
+a security sweep driving the **real binary**; and every earlier phase gate
+still exiting 0.
+
+#### The four qualifications the approval carries
+
+These were stated before approval and are not resolved by it.
+
+1. **The API process can crash under sustained change analysis.** A Windows
+   access violation inside `nt._getfinalpathname`, in a worker thread during
+   `analyze_working_tree`. Unfixed, cause unidentified. Six hypotheses ruled
+   out and the captured stack are in
+   `docs/evaluation/phase-6-baseline-environment.md`. A single preflight and
+   the CLI path are unaffected; sustained repeated preflight against one
+   long-running server is the trigger. **This is the one that most deserves
+   revisiting**, because it sits in the product's primary workflow.
+2. **Four conversation-route browser tests skipped on Chromium**, whose
+   renderer crashes navigating to `/conversations/{id}`. Firefox proves all
+   seven; the defect is upstream.
+3. **Recovery does not detect pid reuse.** `codeatlas doctor` names the run
+   and its pid, so the failure is visible rather than silent, but a reassigned
+   pid keeps that repository blocked from reindexing.
+4. **The packaged executable is unsigned.** SmartScreen warns on first run;
+   signing needs a certificate, which is a purchasing decision.
+
+#### One correction made while closing
+
+Gate condition 2 carried no evidence in the phase plan's table — conditions 1
+and 3–9 each named their proving test, condition 2 said only "watcher
+integration tests". The proof existed from P6-02
+(`test_an_edit_on_disk_reaches_query_results_unasked`), so the condition was
+genuinely met, but a gate table with one unevidenced row is what makes an
+approval hard to trust. Recorded in `d78216a` before the approval, not after.
+
+#### State at approval
+
+- `check_phase6.ps1 -SkipSync -Package -Perf` — exit 0.
+- `check_phase0..5.ps1 -SkipSync` — all exit 0.
+- `pytest -q` — 1381 passed; ruff and mypy clean over 231 source files;
+  99 vitest; Playwright 10 passed, 4 skipped.
+- `SCHEMA_VERSION` 9, `contract_version` `"1.1"`, migrations `0001`–`0009`.
+- Next: **nothing is scheduled.** Phase 7 requires its own recorded approval
+  before a plan exists; until then there is no active phase and no active task.
+
 
 ### 2026-07-28T19:55:00Z — P6-08 completed; Phase 6 `awaiting_user_approval`
 

@@ -1,10 +1,11 @@
 # Phase 6 — Continuous Freshness and Hardening
 
-Status: `awaiting_user_approval` (all nine gate conditions met 2026-07-28, with
-one unfixed defect reported rather than hidden — see gate condition 7 and
-`docs/evaluation/phase-6-baseline-environment.md`. Plan approved by the user
-2026-07-28, who accepted the stated defaults for all four open questions; see
-"Resolved Defaults" below)
+Status: `complete` — **gate approved by the user 2026-07-29**, with four
+qualifications stated before approval and carried by it, the first being an
+unfixed defect (the API process can crash under sustained change analysis; see
+gate condition 7 and `docs/evaluation/phase-6-baseline-environment.md`). The
+plan itself was approved 2026-07-28, with the stated defaults for all four open
+questions; see "Resolved Defaults" below.
 Gate authority: user
 Prerequisites: Phase 5 approved; `AGENTS.md` Sections 9, 15, 17, 18, 19; the
 blueprint
