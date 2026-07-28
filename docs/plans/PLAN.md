@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-07 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04, P6-05, P6-06 `complete`; P6-07 `ready`; P6-08 `pending` |
+| Active task | none — P6-08 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04, P6-05, P6-06, P6-07 `complete`; P6-08 `ready` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-28T16:53:00Z |
-| Git state | Branch `main` at `ca210a7` (P6-05 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-06 leaves it untouched. |
+| Started UTC | 2026-07-28T17:34:00Z |
+| Git state | Branch `main` at `ee12278` (P6-06 committed) when P6-07 began. The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-07 leaves it untouched. |
 | Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
 
 ### Phase 6 Task Board (active)
@@ -69,8 +69,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `complete` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `complete` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `complete` |
-| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `ready` |
-| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
+| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `complete` |
+| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `ready` |
 
 P6-STREAM was inserted 2026-07-28 on the user's approval of ADR-0008. P6-03's
 dependency (P6-02) is satisfied; it is `pending` only to record the user's
@@ -184,6 +184,104 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T18:05:00Z — P6-07 completed; P6-08 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `ee12278`.
+- Transition: P6-07 `ready -> in_progress -> complete`; P6-08 `pending -> ready`.
+- Outcome: **an upgrade you can watch, undo, and prove.** A database written by
+  a *real* earlier build is upgraded — checkpointed first, every declared row
+  intact — and the packaged binary does it too. **Gate condition 5 is now fully
+  met**; only conditions 7 and 8 remain, both P6-08.
+
+#### The four decisions the user made
+
+1. **The prior-version database is generated once and committed**, produced by
+   a git worktree at the pre-`0009` commit. Real, fast, no git at test time.
+2. **The checkpoint is unconditional** before any pending migration, rather
+   than only for migrations someone labelled destructive.
+3. **A newer database is refused** with a new error code, rather than warned
+   about and used.
+4. **Implicit on open plus an explicit `codeatlas upgrade`**, sharing one
+   implementation.
+
+#### What was built
+
+- `src/codeatlas/storage/sqlite/upgrade.py` — `plan_upgrade` (non-mutating, and
+  it does not create the file it describes) and `upgrade_database`. Three rules:
+  a pending migration is preceded by a **verified** checkpoint; a checkpoint
+  that cannot be written **stops** the migration; version 0 is a creation, not
+  an upgrade, so it is not checkpointed. The checkpoint is named for the version
+  it *preserves* (`codeatlas.db.pre-upgrade-v8`) because a user hunting for a
+  way back is looking for "the database as it was".
+- **`SCHEMA_VERSION_UNSUPPORTED`** — a sixth error code beyond ADR-0007
+  decision 7's four and P6-05's fifth. The guard lives in `apply_migrations`,
+  not only in the upgrade path, so no call site can bypass it. 409, CLI exit 3,
+  not retryable.
+- `codeatlas upgrade [--json]`; `doctor` gained a `schema` section reporting the
+  version it **found**, planned before opening, since opening is what upgrades.
+- `_services`, `serve`, and MCP's `open_services` all route through
+  `upgrade_database`, so no adapter is the one that migrates uncheckpointed.
+- `scripts/make_upgrade_fixture.py` — drives an older checkout and **refuses to
+  run against the current tree**: a fixture written by today's code would pass
+  every test and prove nothing.
+- `tests/fixtures/upgrade/schema_0008.db` (303 KB) plus its manifest and README.
+- `install_windows.ps1` refuses to replace a **running** installation, and names
+  the database it is leaving alone.
+
+#### What this found
+
+- **An older build opening a newer database silently succeeded.**
+  `apply_migrations` saw a higher recorded version, had nothing to apply, and
+  returned — after which the tables opened and writes would land in columns
+  whose meaning had changed. Reachable by the ordinary act of running
+  yesterday's build. `restore` already refused a newer *backup*; the database
+  the product opens on every start had no such guard.
+- **`check_phase6.ps1 -SkipE2E` returned before the packaging block**, so
+  `-SkipE2E -Package` reported success having never built the artifact — the
+  exact failure that block's comment says it exists to prevent. `-SkipE2E` now
+  skips Playwright and nothing else.
+- **The first packaged run of the new test failed**, correctly: the binary in
+  `dist/` was P6-06's and had no `upgrade` command. Rebuilt.
+
+#### Tests, written first and observed failing
+
+| Suite | Count | Proves |
+| --- | --- | --- |
+| `tests/integration/test_upgrade_from_prior_version.py` | 11 | The real 8→9 upgrade: every manifest row count intact, the active snapshot still active, an old answer's citations still attached, the services still reading it, the checkpoint **restored** rather than merely present, and a tripwire that fails if the fixture is ever regenerated with current code |
+| `tests/integration/test_upgrade_guardrails.py` | 9 | Planning creates nothing; a first run is not an upgrade; a failed checkpoint stops the migration; a newer database is refused byte-for-byte untouched, through both entry points |
+| `tests/contract/test_upgrade_command.py` | 9 | `upgrade` reporting versions/checkpoint/counts, an up-to-date no-op, refusal at exit 3, the implicit upgrade an ordinary command performs, and doctor's schema section |
+| `tests/end_to_end/test_packaged_build.py` | +1 | **The binary** upgrades the same prior-version database, which is also what proves the *bundled* migrations are the ones applied |
+
+#### Verification in this environment, each run and its exit code
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync
+  -Package` — **exit 0**, packaging and Playwright included.
+- `uv run pytest -q` — **1365 passed** (1335 before; +30).
+- `uv run ruff check` — exit 0; `mypy --no-incremental` — **228 source files**,
+  no issues.
+- Web: **99 vitest passed**; Playwright **10 passed, 4 skipped** — the unchanged
+  Chromium gap.
+- `scripts/build_package.ps1` — exit 0; packaged smoke tests **5 passed**
+  against the rebuilt binary.
+
+#### Contracts, migrations, limitations
+
+- **No migration and no contract change.** `SCHEMA_VERSION` stays 9,
+  `contract_version` stays `"1.1"`; the new error code is additive and
+  `export_contract_schema.py --check` passes unchanged.
+- **The fixture is one prior version, not every prior version.** It proves 8→9.
+  A future migration should add a fixture at the version before it; the README
+  says how, and the existing file stays valid.
+- **A migration that loses rows is reported, not prevented.** By the time the
+  counts are compared the migration has committed; the checkpoint is the way
+  back, and saying so is more use than a failure that cannot undo anything.
+- **Row-count preservation is checked for the durable tables**, not every table.
+  The set is filtered to what both schema versions have, since the older side
+  may predate a table the newer one introduced.
+- Next: **P6-08** — performance and security measured on the packaged artifact
+  (gate conditions 7 and 8), Windows release validation, and the phase gate.
+
 
 ### 2026-07-28T17:20:00Z — P6-06 completed; P6-07 `ready`
 

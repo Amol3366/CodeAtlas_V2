@@ -54,7 +54,11 @@ from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.storage.sqlite.backup import create_backup, restore
 from codeatlas.storage.sqlite.connection import connect, default_database_path
-from codeatlas.storage.sqlite.migrations import apply_migrations
+from codeatlas.storage.sqlite.upgrade import (
+    UpgradePlan,
+    plan_upgrade,
+    upgrade_database,
+)
 
 EXIT_SUCCESS = 0
 EXIT_INVALID_INPUT = 2
@@ -96,6 +100,9 @@ _EXIT_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.WATCHER_UNAVAILABLE: EXIT_UNAVAILABLE,
     ErrorCode.RESTORE_INCOMPATIBLE: EXIT_INVALID_INPUT,
     ErrorCode.INTEGRITY_CHECK_FAILED: EXIT_UNAVAILABLE,
+    # Unavailable rather than invalid input: nothing about the command was
+    # wrong. This build simply cannot serve the database it was pointed at.
+    ErrorCode.SCHEMA_VERSION_UNSUPPORTED: EXIT_UNAVAILABLE,
     # A backup that did not complete is an internal failure of an operation the
     # user asked for, not a bad request and not an unavailable resource.
     ErrorCode.BACKUP_FAILED: EXIT_INTERNAL_FAILURE,
@@ -124,10 +131,16 @@ JsonOption = Annotated[
 
 @contextmanager
 def _services(database: Path | None) -> Iterator[ApplicationServices]:
-    """Open the database, apply migrations, and build the services."""
+    """Open the database, upgrade it if needed, and build the services.
+
+    The upgrade is implicit here on purpose: a user who installs a new build
+    should be able to run any command and have it work. It is not silent —
+    it checkpoints first, and `codeatlas upgrade` reports the same thing
+    deliberately for anyone who wants to look before it happens.
+    """
     path = database or default_database_path()
+    upgrade_database(path)
     with connect(path) as connection:
-        apply_migrations(connection)
         yield build_services(connection)
 
 
@@ -731,10 +744,14 @@ def serve(
             raise typer.Exit(EXIT_INVALID_INPUT)
 
     resolved = database or default_database_path()
-    # Migrate before listening: a first run must not answer requests against an
-    # unmigrated database.
-    with connect(resolved) as connection:
-        apply_migrations(connection)
+    # Upgrade before listening: a first run must not answer requests against an
+    # unmigrated database, and a database from a newer build must stop the
+    # server here rather than fail one request at a time.
+    try:
+        upgrade_database(resolved)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
 
     application = create_app(resolved, web_assets=assets)
     url = f"http://{host}:{port}"
@@ -825,6 +842,66 @@ def restore_command(
     )
 
 
+@app.command("upgrade")
+def upgrade(
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Bring the database up to the schema this build understands.
+
+    Every command upgrades on open, so this is rarely required. It exists
+    because an upgrade of a long history is worth being able to inspect and to
+    have a record of: which version was found, which migrations ran, and where
+    the checkpoint taken beforehand was written.
+
+    A database from a *newer* build is refused. Migrations are forward-only, so
+    there is no honest way to read a schema this build has never seen.
+    """
+    target = database or default_database_path()
+    try:
+        result = upgrade_database(target)
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    checkpoint = (
+        None if result.checkpoint_path is None else str(result.checkpoint_path)
+    )
+    if result.upgraded:
+        summary = (
+            f"Upgraded {result.path} from schema {result.from_version} to"
+            f" {result.to_version}."
+        )
+        if checkpoint is not None:
+            summary += f" The database as it was is kept at {checkpoint}."
+        preserved = ", ".join(
+            f"{count} {table}" for table, count in sorted(result.counts.items())
+        )
+        summary += f"\nPreserved: {preserved}."
+    else:
+        summary = (
+            f"{result.path} is already at schema {result.to_version}."
+            " Nothing to upgrade."
+        )
+    for warning in result.warnings:
+        summary += f"\nWarning: {warning}. Restore the checkpoint to compare."
+
+    _emit(
+        {
+            "upgraded": result.upgraded,
+            "path": str(result.path),
+            "from_version": result.from_version,
+            "to_version": result.to_version,
+            "applied": list(result.applied),
+            "checkpoint_path": checkpoint,
+            "counts": dict(result.counts),
+            "warnings": list(result.warnings),
+        },
+        summary,
+        as_json=as_json,
+    )
+
+
 @app.command("purge")
 def purge(
     older_than_days: Annotated[
@@ -883,6 +960,10 @@ def doctor(
     Exit code 4 means problems were found. That is a different fact from the
     command failing, and a script needs to tell them apart.
     """
+    # Planned before opening, because opening is what performs the upgrade.
+    # Reporting the version doctor *caused* would answer a question nobody
+    # asked.
+    plan = plan_upgrade(database or default_database_path())
     try:
         with _services(database) as services:
             repositories = (
@@ -896,8 +977,16 @@ def doctor(
         return
 
     healthy = all(not entry["problems"] for entry in entries)
-    payload: dict[str, Any] = {"healthy": healthy, "repositories": entries}
-    _emit(payload, _doctor_text(entries, healthy=healthy), as_json=as_json)
+    payload: dict[str, Any] = {
+        "healthy": healthy,
+        "schema": {
+            "found_version": plan.current_version,
+            "expected_version": plan.target_version,
+            "pending": list(plan.pending),
+        },
+        "repositories": entries,
+    }
+    _emit(payload, _doctor_text(entries, plan, healthy=healthy), as_json=as_json)
     if not healthy:
         raise typer.Exit(EXIT_PARTIAL)
 
@@ -962,8 +1051,18 @@ def _doctor_entry(
     }
 
 
-def _doctor_text(entries: list[dict[str, Any]], *, healthy: bool) -> str:
+def _doctor_text(
+    entries: list[dict[str, Any]], plan: UpgradePlan, *, healthy: bool
+) -> str:
     lines = ["CodeAtlas doctor"]
+    if plan.is_required:
+        lines.append(
+            f"  schema {plan.current_version} found, {plan.target_version} expected"
+            f" — upgraded on open (migrations {list(plan.pending)})"
+        )
+    else:
+        lines.append(f"  schema {plan.target_version}, up to date")
+
     if not entries:
         lines.append("  No repositories are registered.")
         return "\n".join(lines)

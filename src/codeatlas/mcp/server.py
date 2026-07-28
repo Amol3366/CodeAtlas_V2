@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.mcp.tools import TOOL_SCHEMA_VERSION, ToolRegistry, build_registry
 from codeatlas.storage.sqlite.connection import connect, default_database_path
-from codeatlas.storage.sqlite.migrations import apply_migrations
+from codeatlas.storage.sqlite.upgrade import upgrade_database
 
 SERVER_NAME = "codeatlas"
 SERVER_VERSION = "1.0"
@@ -35,10 +35,14 @@ MAX_RESULT_CHARACTERS = 200_000
 
 @contextmanager
 def open_services(database: Path | None = None) -> Iterator[ApplicationServices]:
-    """Open the database, apply migrations, and build the services."""
+    """Open the database, upgrading it if needed, and build the services.
+
+    Goes through the same upgrade path as the CLI, so an MCP client is not the
+    one caller that migrates without a checkpoint first.
+    """
     path = database or default_database_path()
+    upgrade_database(path)
     with connect(path) as connection:
-        apply_migrations(connection)
         yield build_services(connection)
 
 

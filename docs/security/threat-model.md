@@ -115,6 +115,18 @@ component suites in `apps/web/src/**/*.test.tsx`.
 | Local API exposure | unchanged | the API still binds to loopback with no CORS middleware; the Vite dev proxy — not a relaxed server policy — is what lets the browser reach it in development |
 | Browser storage of secrets | not applicable | the only stored value is the theme preference; no credential or repository content is written to `localStorage` |
 
+## Phase 6 Enforcement Additions (in progress)
+
+Recorded as hardening tasks land. **This section is not yet the Phase 6 review**
+— P6-08 owns the full sweep against the packaged artifact, and until it runs,
+absence from this table means "not yet examined", not "not a risk".
+
+| Control | Status | Where it is enforced |
+| --- | --- | --- |
+| Schema from a newer build | enforced | `apply_migrations` refuses a database recorded above this build's `SCHEMA_VERSION` with `SCHEMA_VERSION_UNSUPPORTED`, before anything is opened for writing. Reading a schema this build has never seen would open the tables, answer plausibly, and write into columns whose meaning had changed — corruption that announces itself only later. The guard sits in the migration path rather than in the upgrade command, so no call site bypasses it |
+| Data loss during migration | enforced | any pending migration against a non-empty database is preceded by a verified checkpoint; a checkpoint that cannot be written stops the migration. Asserted against a database written by a real prior build, not a synthetic one |
+| Install over a running process | enforced | `install_windows.ps1` refuses while `codeatlas.exe` is running from the install folder, rather than deleting it out from under a live process and leaving a half-replaced install |
+
 ## Provider Opt-In Gate
 
 Provider use is prohibited until all of the following are recorded for the

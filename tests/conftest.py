@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import json
+import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+PRIOR_VERSION_DATABASE = (
+    Path(__file__).resolve().parent / "fixtures" / "upgrade" / "schema_0008.db"
+)
 
 SERVICE_SOURCE = (
     "from .idempotency import IdempotencyStore\n"
@@ -22,6 +29,28 @@ IDEMPOTENCY_SOURCE = (
     "    def claim(self, key: str) -> str:\n"
     "        return key\n"
 )
+
+
+@pytest.fixture()
+def prior_version_database(tmp_path: Path) -> Path:
+    """A writable copy of a database written by a real earlier build.
+
+    Produced by `scripts/make_upgrade_fixture.py` against a checkout of the
+    commit before migration `0009`. The committed file is never modified —
+    every test works on its own copy — and the manifest beside it declares what
+    it contains, so "nothing was lost" can be measured rather than assumed.
+    """
+    target = tmp_path / "codeatlas.db"
+    shutil.copy2(PRIOR_VERSION_DATABASE, target)
+    return target
+
+
+@pytest.fixture()
+def prior_version_manifest() -> dict[str, Any]:
+    loaded: dict[str, Any] = json.loads(
+        PRIOR_VERSION_DATABASE.with_suffix(".json").read_text(encoding="utf-8")
+    )
+    return loaded
 
 
 @pytest.fixture()

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
 
+from codeatlas.domain.errors import SchemaVersionUnsupportedError
 from codeatlas.storage.sqlite.connection import to_utc_text
 
 SCHEMA_VERSION: int = 9
@@ -48,9 +49,34 @@ def current_version(connection: sqlite3.Connection) -> int:
     return int(highest) if highest is not None else 0
 
 
+def pending_versions(applied: int) -> tuple[int, ...]:
+    """Return the migration versions that would run against ``applied``."""
+    return tuple(
+        migration.version
+        for migration in _load_migrations()
+        if migration.version > applied
+    )
+
+
 def apply_migrations(connection: sqlite3.Connection) -> int:
-    """Apply every pending migration and return the resulting version."""
+    """Apply every pending migration and return the resulting version.
+
+    Refuses a database recorded at a *higher* version than this build knows.
+    The guard lives here rather than only in the upgrade path so that no call
+    site can bypass it by opening a connection and migrating directly: a build
+    that quietly serves a schema it has never seen would answer plausibly and
+    write into columns whose meaning had changed.
+    """
     applied = current_version(connection)
+    if applied > SCHEMA_VERSION:
+        raise SchemaVersionUnsupportedError(
+            "This database was written by a newer version of CodeAtlas.",
+            details={
+                "found_version": str(applied),
+                "supported_version": str(SCHEMA_VERSION),
+            },
+        )
+
     for migration in _load_migrations():
         if migration.version <= applied:
             continue

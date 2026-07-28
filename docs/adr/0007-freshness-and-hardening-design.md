@@ -223,6 +223,56 @@ Packaging enters the gate through an opt-in `-Package` switch, and the packaged
 smoke tests **skip with their reason stated** when no artifact exists. A gate
 that never built the artifact must not read as one that verified it.
 
+### The upgrade path, as built (P6-07)
+
+No decision above covers upgrading, which is the one operation in this phase
+that touches a database the user already has something in. Four choices were
+made and approved on 2026-07-28.
+
+1. **The checkpoint is unconditional.** The Phase 6 constraint says a migration
+   that *can* lose data must be preceded by a checkpoint. Deciding which
+   migration qualifies makes safety depend on someone correctly labelling a
+   future one, and an unmarked mistake is unrecoverable — so any pending
+   migration against a database that already holds something is preceded by a
+   verified copy. If the checkpoint cannot be written, **the migration does not
+   run**: proceeding would satisfy the letter of an upgrade and none of its
+   purpose. A database at version 0 is exempted, because a checkpoint of an
+   empty file is not a way back, it only looks like one.
+
+2. **A sixth error code, `SCHEMA_VERSION_UNSUPPORTED`.** Decision 7 declared
+   four and P6-05 added a fifth; this one exists because an older build opening
+   a *newer* database silently succeeded. `apply_migrations` saw a higher
+   recorded version, had nothing to apply, and returned — after which the
+   tables opened, the queries mostly worked, and writes would land in columns
+   whose meaning had changed. That is the silent corruption this ADR's context
+   names, reachable by the ordinary act of running yesterday's build. The guard
+   lives in `apply_migrations` rather than only in the upgrade path, so no call
+   site can bypass it by opening a connection directly. 409, CLI exit 3, not
+   retryable — the remedy is to run the newer build or restore its checkpoint,
+   and neither happens by trying again.
+
+   `restore` already refused a newer *backup*. What was missing was the same
+   refusal for the database the product opens every time it starts.
+
+3. **Implicit on open, plus an explicit command.** Opening still upgrades, so a
+   packaged upgrade simply works; `codeatlas upgrade` reports the version found,
+   the migrations applied, the checkpoint path, and the rows preserved, for an
+   upgrade worth looking at before it happens. Both go through one function —
+   a second path that migrated would be a second set of rules about when to
+   checkpoint. `doctor` plans *before* opening, so it reports the version it
+   found rather than the one it caused.
+
+4. **The prior-version database is real, and committed.** It was produced by
+   checking out the commit before migration `0009` and running that code;
+   `scripts/make_upgrade_fixture.py` does it and refuses to run against the
+   current tree, because a fixture written by today's code would pass every test
+   and prove nothing. Committing the artifact keeps the suite fast and free of a
+   git dependency at test time. The manifest beside it declares its row counts,
+   so "no snapshot and no conversation was lost" is measured.
+
+No migration and no contract change: `SCHEMA_VERSION` stays 9 and
+`contract_version` stays `"1.1"`. The new error code is additive.
+
 ## Alternatives considered
 
 - **Trusting filesystem events as truth.** Rejected: silent event loss on
@@ -231,5 +281,10 @@ that never built the artifact must not read as one that verified it.
   continuously to detect nothing, and the reconcile scan already provides the
   same guarantee at a far lower duty cycle.
 - **File-copy backup.** Rejected: unsafe against an open WAL database.
+- **A synthetic prior-version database.** Rejected: it would test the migration
+  against a reading of the old schema rather than against what the old code
+  wrote, which is the one thing an upgrade test exists to check.
+- **Warning instead of refusing when the database is newer.** Rejected: a
+  warning does not stop the write that corrupts.
 - **An MSI installer.** Deferred: it adds an installer framework and elevated
   privilege for a tool that needs neither.

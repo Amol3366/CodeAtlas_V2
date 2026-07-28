@@ -12,6 +12,14 @@ __pycache__/
 build/
 dist/
 
+# SQLite side files. Reading the committed upgrade fixture creates empty ones
+# beside it; a *stale* -wal committed next to a database can resurrect pages
+# the file was supposed to have left behind.
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+
 # Agent worktrees and local session state. Holds a full checkout with
 # node_modules, so an unguarded `git add -A` would otherwise sweep it in.
 .claude/

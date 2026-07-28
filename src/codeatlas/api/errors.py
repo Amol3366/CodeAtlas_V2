@@ -46,6 +46,10 @@ _STATUS_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.BACKUP_FAILED: status.HTTP_409_CONFLICT,
     ErrorCode.RESTORE_INCOMPATIBLE: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.INTEGRITY_CHECK_FAILED: status.HTTP_409_CONFLICT,
+    # Conflict rather than a server error: the request is well formed and the
+    # service is running; it is the database on disk that this build cannot
+    # serve, and no retry or rewording changes that.
+    ErrorCode.SCHEMA_VERSION_UNSUPPORTED: status.HTTP_409_CONFLICT,
     ErrorCode.INTERNAL_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

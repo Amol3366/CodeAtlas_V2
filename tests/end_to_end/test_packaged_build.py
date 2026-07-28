@@ -13,6 +13,7 @@ Chromium gap is.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import time
 import urllib.error
@@ -23,6 +24,10 @@ import pytest
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _ARTIFACT = _REPOSITORY_ROOT / "dist" / "codeatlas-win64" / "codeatlas.exe"
+_PRIOR_VERSION_DATABASE = (
+    _REPOSITORY_ROOT / "tests" / "fixtures" / "upgrade" / "schema_0008.db"
+)
+_FIXTURE_MANIFEST = _PRIOR_VERSION_DATABASE.with_suffix(".json")
 
 packaged = pytest.mark.skipif(
     not _ARTIFACT.is_file(),
@@ -98,6 +103,35 @@ def test_the_packaged_build_indexes_and_answers(tmp_path: Path) -> None:
     payload = json.loads(found.stdout)
     assert payload["evidence"], "the packaged build resolved no evidence"
     assert payload["evidence"][0]["file_path"].endswith("service.py")
+
+
+@packaged
+def test_the_packaged_build_upgrades_a_prior_version_database(tmp_path: Path) -> None:
+    """Gate condition 5's second half, measured on the artifact.
+
+    The database here was written by a real earlier build (see
+    `tests/fixtures/upgrade/`). A packaged build must upgrade it, keep a
+    checkpoint, and still answer from what the old build indexed — which is
+    also what proves the *bundled* migrations are the ones being applied.
+    """
+    manifest = json.loads(
+        _FIXTURE_MANIFEST.read_text(encoding="utf-8")
+    )
+    database = tmp_path / "codeatlas.db"
+    shutil.copy2(_PRIOR_VERSION_DATABASE, database)
+
+    upgraded = _run("upgrade", "--db", str(database), "--json")
+    assert upgraded.returncode == 0, upgraded.stderr
+    payload = json.loads(upgraded.stdout)
+    assert payload["upgraded"] is True
+    assert payload["from_version"] == manifest["schema_version"]
+    assert Path(payload["checkpoint_path"]).is_file()
+
+    listed = _run("repo", "list", "--db", str(database), "--json")
+    assert listed.returncode == 0, listed.stderr
+    assert [item["repository_id"] for item in json.loads(listed.stdout)] == [
+        manifest["repository_id"]
+    ]
 
 
 @packaged

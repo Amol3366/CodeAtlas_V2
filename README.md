@@ -67,10 +67,16 @@ starts the API and serves the web application from the same origin, so the
 browser needs no CORS relaxation and the API stays loopback-bound
 (`docs/operations/packaging-and-install.md`).
 
-Not built yet: the upgrade workflow from a previous version, and performance and
-security re-verified on the packaged artifact (both Phase 6); and embeddings or
-any model provider (Phase 7). `docs/plans/PLAN.md` is the live phase and task
-status.
+Installing a newer build upgrades the database on first open, and writes a
+verified checkpoint beside it before any migration runs — `codeatlas upgrade`
+does the same thing deliberately and says what it preserved. An *older* build
+pointed at a newer database refuses rather than answering from a schema it has
+never seen. The path is tested from a database written by a real earlier build
+(`docs/operations/upgrade-and-migration.md`).
+
+Not built yet: performance and security re-verified on the packaged artifact
+(Phase 6); and embeddings or any model provider (Phase 7).
+`docs/plans/PLAN.md` is the live phase and task status.
 
 ## Windows development
 
@@ -99,6 +105,7 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/crash-recovery.md` — what a kill leaves behind, and `codeatlas doctor`
 - `docs/operations/backup-and-restore.md` — backup, restore, deletion, and retention
 - `docs/operations/packaging-and-install.md` — building, installing, and `serve --web`
+- `docs/operations/upgrade-and-migration.md` — upgrading, the checkpoint, and the refusal
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
 - `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers

@@ -61,6 +61,11 @@ Uninstalling deliberately **does not remove your data**. The database lives in
 `%LOCALAPPDATA%\CodeAtlas\data` and survives; the uninstaller says so and names
 the folder rather than deciding for you.
 
+Re-running the installer over an existing installation is the upgrade path: the
+application folder is replaced, the data folder is untouched, and the database is
+upgraded on first run after a checkpoint. It refuses while CodeAtlas is running
+from that folder. Details in `docs/operations/upgrade-and-migration.md`.
+
 ## Running
 
 ```powershell
@@ -104,9 +109,13 @@ indexes a repository (which is what proves the native tree-sitter extensions
 load), resolves a symbol with evidence, and serves both the shell and `/v1` over
 one origin.
 
+It also **upgrades a database written by a real earlier build** and still
+answers from what that build indexed — the same fixture the source-level upgrade
+tests use, run through the binary, which is what proves the *bundled* migrations
+are the ones being applied. See `docs/operations/upgrade-and-migration.md`.
+
 Not yet covered, and owned by later tasks:
 
-- **Upgrading** an existing installation from a previous schema version — P6-07.
 - **Performance and the security sweep measured on the packaged artifact**
   rather than a source checkout — P6-08, which is what gate conditions 7 and 8
   ask for.

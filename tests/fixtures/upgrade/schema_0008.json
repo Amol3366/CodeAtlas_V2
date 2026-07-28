@@ -1,0 +1,43 @@
+{
+  "produced_by": "74cc906040159e67bf81a985dbd408ff4dc9564a",
+  "schema_version": 8,
+  "declared_schema_version": 8,
+  "repository_id": "repo_e20211dbfb44183798ddc38f21e43a78",
+  "repository_display_name": "payments",
+  "active_snapshot_id": "snap_4676081c0169f356ddd2ec5086efa5bd",
+  "conversations": {
+    "answered": "conv_895087e616814597b83ce08227aadddd",
+    "archived": "conv_0f22206b01214a3099fe6a27d744bb0f",
+    "deleted": "conv_bad14afae5ce4cbba7efa68d395ec9c1"
+  },
+  "messages": [
+    {
+      "message_id": "msg_4450a29636b8402093fc61e485da4e58",
+      "run_id": "run_559d8c73ea8c415a825c6478dda8de3e",
+      "status": "complete",
+      "content": "CodeAtlas found no locations matching 'Where is PaymentService.capture defined?' in the active snapshot.\n\nCodeAtlas found nothing through lexical search over the active snapshot, so it is not answering rather than guessing.\n\n**Warnings**\n- `NO_LEXICAL_MATCH`\n\n**Limitations**\n- Lexical search matches text in the active snapshot; it does not resolve relations, and a match is evidence of wording rather than of behavior.\n",
+      "evidence_count": 0
+    },
+    {
+      "message_id": "msg_f26fd0a5c23b4f89bde86965ba7d8a39",
+      "run_id": "run_3b4b45a4952744f4b8e9d793b521ee96",
+      "status": "complete",
+      "content": "PaymentService.settle has 1 callers in the active snapshot.\n\n- PaymentService.capture calls PaymentService.settle at src/payments/service.py:6. [1]\n\n**Evidence**\n1. `src/payments/service.py:6-6` \u2014 `PaymentService.capture` (static_resolved, confidence 0.95)\n\n**Limitations**\n- Phase 3 resolves relations statically. Calls through a variable, dynamic attribute access, and computed imports are not represented.\n",
+      "evidence_count": 1
+    }
+  ],
+  "row_counts": {
+    "repositories": 1,
+    "snapshots": 1,
+    "files": 3,
+    "symbols": 5,
+    "relations": 12,
+    "chunks": 7,
+    "conversations": 3,
+    "messages": 4,
+    "message_runs": 2,
+    "message_evidence": 1
+  },
+  "file": "schema_0008.db",
+  "size_bytes": 303104
+}

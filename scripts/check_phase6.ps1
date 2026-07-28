@@ -121,13 +121,15 @@ Invoke-Checked "Web build" @("exec", "vite", "build") `
 
 # --- End to end ----------------------------------------------------------
 
+# `-SkipE2E` skips Playwright and nothing else. It used to return here, which
+# meant `-SkipE2E -Package` reported success having never built the artifact —
+# the precise failure the packaging block below exists to avoid.
 if ($SkipE2E) {
-    Write-Output "Phase 6 verification completed (end-to-end skipped)."
-    exit 0
+    Write-Output "==> End-to-end suites (skipped by -SkipE2E)"
+} else {
+    Invoke-Checked "End-to-end suites" @("exec", "playwright", "test") `
+        -Command "pnpm" -WorkingDirectory $web
 }
-
-Invoke-Checked "End-to-end suites" @("exec", "playwright", "test") `
-    -Command "pnpm" -WorkingDirectory $web
 
 # --- Packaged build ------------------------------------------------------
 
@@ -150,4 +152,8 @@ if ($Package) {
     Write-Output "==> Packaged build (skipped; pass -Package to build and verify)"
 }
 
-Write-Output "Phase 6 verification completed."
+if ($SkipE2E) {
+    Write-Output "Phase 6 verification completed (end-to-end skipped)."
+} else {
+    Write-Output "Phase 6 verification completed."
+}

@@ -43,6 +43,7 @@ class ErrorCode(StrEnum):
     BACKUP_FAILED = "BACKUP_FAILED"
     RESTORE_INCOMPATIBLE = "RESTORE_INCOMPATIBLE"
     INTEGRITY_CHECK_FAILED = "INTEGRITY_CHECK_FAILED"
+    SCHEMA_VERSION_UNSUPPORTED = "SCHEMA_VERSION_UNSUPPORTED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -281,6 +282,21 @@ class RestoreIncompatibleError(CodeAtlasError):
     """
 
     code = ErrorCode.RESTORE_INCOMPATIBLE
+
+
+class SchemaVersionUnsupportedError(CodeAtlasError):
+    """The database was written by a newer build than the one running.
+
+    Migrations are forward-only, so there is no honest way to read a schema this
+    build has never seen. Continuing anyway is the dangerous option: the tables
+    would open, the queries would mostly work, and writes would land in columns
+    whose meaning had changed — silent corruption, discovered later.
+
+    Not retryable. The remedy is to run the newer build, or to restore a backup
+    taken before the upgrade, and neither happens by trying again.
+    """
+
+    code = ErrorCode.SCHEMA_VERSION_UNSUPPORTED
 
 
 class IntegrityCheckFailedError(CodeAtlasError):

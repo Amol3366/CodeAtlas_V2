@@ -83,7 +83,7 @@ with verification evidence recorded in the handoff log.
 | 2 | A file changed on disk is reflected in query results without an explicit index command, within a declared debounce window | watcher integration tests |
 | 3 | Filesystem events alone are never treated as truth: a reconciling scan corrects missed, duplicated, and out-of-order events | watcher reconciliation tests — **met 2026-07-28** (P6-03): `tests/integration/test_watch_reconciliation.py` proves each failure shape end to end, and the periodic plus startup scans run in real operation |
 | 4 | A process killed mid-index recovers to the previous active snapshot with no orphaned rows, and says what it recovered | crash-recovery tests — **met 2026-07-28** (P6-04): a genuinely killed subprocess is recovered and reindexes, no snapshot-scoped table keeps rows for the dead snapshot, and diagnostics distinguish an interrupted run from a repository never indexed. Recovery also stopped being able to destroy a live index; see the ADR-0007 Outcome section |
-| 5 | A packaged Windows build installs, runs, and upgrades from the previous schema version without losing a snapshot or a conversation | packaging + upgrade tests |
+| 5 | A packaged Windows build installs, runs, and upgrades from the previous schema version without losing a snapshot or a conversation | packaging + upgrade tests — **met 2026-07-28** (P6-06 + P6-07): the packaged binary upgrades a database written by a *real* prior build, checkpointing before it migrates, and every declared row survives. An older build opening a newer database now refuses instead of quietly serving a schema it has never seen |
 | 6 | Backup, restore, and deletion are explicit, complete, and reversible where documented; a restored database passes integrity checks | backup/restore tests — **met 2026-07-28** (P6-05): a backup taken from an open database restores and answers; a corrupted or newer-schema backup is refused *before* the target is touched; repository deletion refuses to take conversations without an explicit cascade; the retention sweep never touches an undeleted conversation |
 | 7 | Performance targets from Section 19.3 still hold on the packaged build, on named hardware | `scripts/measure_phase6_perf.py` |
 | 8 | The security sweep passes against the packaged artifact, including the browser surface | `tests/security/**`, updated threat model |
@@ -178,8 +178,8 @@ anything, and refuses rather than half-restoring.
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `complete` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `complete` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `complete` |
-| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `ready` |
-| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
+| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `complete` |
+| P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `ready` |
 
 **P6-STREAM was inserted on 2026-07-28**, after the user approved the
 accept-then-stream contract change (ADR-0008) and chose to build it before

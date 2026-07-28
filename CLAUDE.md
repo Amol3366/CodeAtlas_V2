@@ -1082,7 +1082,7 @@ Build:
 - [X] Reconciled and debounced filesystem watcher
 - [X] Crash recovery and actionable diagnostics
 - [X] Native packaging and installation workflow
-- [ ] Upgrade and migration workflow
+- [X] Upgrade and migration workflow
 - [X] Backup, restore, deletion, and support workflows
 - [ ] Performance validation
 - [ ] Security validation
@@ -1091,8 +1091,8 @@ Build:
   backup/restore, deletion, security, performance, and end-to-end release tests
   without losing the last valid active snapshot or chat history.
 
-**In progress.** Four of the eight build items are delivered; the remaining
-four are the upgrade workflow and the validation sweeps.
+**In progress.** Five of the eight build items are delivered; the remaining
+three are the validation sweeps.
 
 Delivered so far: P6-SETUP (ADR-0007, four hardening error codes,
 `scripts/check_phase6.ps1` with Playwright inside the gate), P6-01 (Playwright
@@ -1103,17 +1103,21 @@ switch, migration `0009`), P6-STREAM (ADR-0008, accept-then-stream,
 reconciling scan and startup catch-up), P6-04 (crash-recovery reporting,
 run ownership, and `codeatlas doctor`), P6-05 (backup, restore, repository
 deletion, and the retention sweep), P6-06 (PyInstaller packaging,
-`codeatlas serve --web`, and the no-elevation install script).
+`codeatlas serve --web`, and the no-elevation install script), P6-07 (the
+upgrade workflow, its mandatory pre-migration checkpoint, and a sixth error
+code, `SCHEMA_VERSION_UNSUPPORTED`).
 
-**Gate conditions 1, 3, 4, and 6 are met.** History survives a backend restart
-and a stream reconnects against a live run; filesystem events are never treated
-as truth, because a reconciling scan corrects what the event stream drops; a
-genuinely killed process is recovered, leaves no orphaned rows, and says what
-it recovered; and backup, restore, and deletion refuse rather than half-finish,
-with a restored database passing its integrity check. `check_phase6.ps1` passes
-with Playwright included, and `-Package` adds a real packaged build plus smoke
-tests run against the binary. **Gate condition 5 is half met**: the packaged
-build installs and runs; upgrading from a previous version is P6-07.
+**Gate conditions 1, 3, 4, 5, and 6 are met.** History survives a backend
+restart and a stream reconnects against a live run; filesystem events are never
+treated as truth, because a reconciling scan corrects what the event stream
+drops; a genuinely killed process is recovered, leaves no orphaned rows, and
+says what it recovered; the packaged build installs, runs, and **upgrades a
+database written by a real earlier build** — checkpointing first, losing no
+snapshot and no conversation, and refusing outright when the database came from
+a *newer* build; and backup, restore, and deletion refuse rather than
+half-finish, with a restored database passing its integrity check.
+`check_phase6.ps1` passes with Playwright included, and `-Package` adds a real
+packaged build plus smoke tests run against the binary.
 
 Three qualifications, recorded because a green gate should not hide them.
 
@@ -1127,7 +1131,8 @@ Three qualifications, recorded because a green gate should not hide them.
 - **The packaged executable is unsigned**, so Windows SmartScreen warns on
   first run. Signing needs a certificate, which is a purchasing decision.
 
-Next: **P6-07** the upgrade workflow. Live task status lives in
+Next: **P6-08** performance, security, and Windows release validation, all
+measured on the packaged artifact. Live task status lives in
 `docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift

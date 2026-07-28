@@ -42,7 +42,9 @@ Everything is checked before anything is written:
 
 A **newer** schema is refused outright. Migrations are forward-only, so there is
 no honest way to accept a database written by a later build. An **older** schema
-restores fine and migrates forward on the next start.
+restores fine and is upgraded on the next start — after a checkpoint, which is
+the one backup nobody has to remember to take. See
+`docs/operations/upgrade-and-migration.md`.
 
 The database being replaced is kept beside it as `<name>.replaced`, because
 restore is the most destructive operation the product has and a user who

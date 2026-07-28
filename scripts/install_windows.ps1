@@ -57,7 +57,18 @@ if (-not (Test-Path (Join-Path $Source "codeatlas.exe"))) {
     throw "No codeatlas.exe under '$Source'. Pass -Source <unzipped folder>."
 }
 
+$upgrading = Test-Path (Join-Path $target "codeatlas.exe")
+
 if (Test-Path $target) {
+    # Refuse rather than delete out from under a running process. Removing the
+    # folder while codeatlas.exe is running fails partway through and leaves a
+    # half-replaced install, which is worse than the old one it was fixing.
+    $running = Get-Process -Name "codeatlas" -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -and $_.Path.StartsWith($target, [StringComparison]::OrdinalIgnoreCase) }
+    if ($running) {
+        throw "CodeAtlas is running from '$target' (pid $($running.Id -join ', ')). Stop it and run this again."
+    }
+
     # Replacing rather than merging: a leftover file from an older build is the
     # kind of thing that produces an impossible bug report.
     Remove-Item -Recurse -Force $target
@@ -65,7 +76,23 @@ if (Test-Path $target) {
 
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 Copy-Item -Path (Join-Path $Source "*") -Destination $target -Recurse -Force
-Write-Output "Installed to $target."
+if ($upgrading) {
+    Write-Output "Upgraded the build in $target."
+} else {
+    Write-Output "Installed to $target."
+}
+
+# The app folder is replaceable; the data folder is not, and the two are
+# deliberately separate. Say what happens to the database rather than leaving a
+# user to wonder whether an upgrade just ate their history.
+$database = Join-Path $env:LOCALAPPDATA "CodeAtlas\data\codeatlas.db"
+if (Test-Path $database) {
+    Write-Output ""
+    Write-Output "Your existing database was left untouched:"
+    Write-Output "  $database"
+    Write-Output "It is upgraded on first run, after a checkpoint is written beside it."
+    Write-Output "Run 'codeatlas upgrade' first if you would rather watch it happen."
+}
 
 $entries = Get-UserPath
 if ($entries -notcontains $target) {
