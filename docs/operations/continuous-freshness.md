@@ -37,6 +37,30 @@ because unchanged content hashes reuse their existing chunks.
 The maximum delay is the one people forget. Without it a running build, or a
 long checkout, starves the refresh at exactly the worst moment.
 
+## The reconciling scan
+
+The watcher only reacts to events it receives. Events that were never delivered
+— the silent buffer overflow above, or anything that changed while the process
+was not running — are covered by the **reconciling scan**: on a fixed interval
+the repository is rescanned whether or not any event arrived.
+
+A reconcile is only ever a trigger, like an event. It names no paths and
+concludes nothing; the scan and the content hashes decide what changed, so the
+outcome is identical however the scan came about. That is also why any full
+scan restarts the interval — an event-driven reindex has already reconciled,
+and scanning again moments later would learn nothing.
+
+| Window | Default | Why it exists |
+| --- | --- | --- |
+| Reconcile interval | 60 s | Bounds how long a silently missed event can hide. |
+| Startup catch-up | immediate | Changes made while the process was down produced no events at all, so the first scan cannot wait for the interval. |
+
+The interval is not configurable to zero. It is the only defense against
+silently dropped events; switching it off would reintroduce the invisible
+failure the watcher exists to prevent (ADR-0007). It is a constructor
+parameter rather than a user setting, because no setting surface exists yet
+to expose it.
+
 ## Turning it off for one repository
 
 On by default, because a watcher that stays off until asked answers the
@@ -82,13 +106,9 @@ say "on" about a watcher that is not running.
 watcher deliberately survives those failures: dying on the first error would
 leave the index silently stale, which is worse than retrying and reporting.
 
-## What it does not cover yet
-
-The watcher only reacts to events it receives. Events that were never delivered
-— the silent buffer overflow above, or anything that changed while the process
-was not running — need the periodic reconciling scan, which is **P6-03**. Until
-that lands, a change missed by the event stream stays missed until something
-else touches the repository.
+## What it does not cover
 
 Turning the watcher off does not make the index stale on its own; it makes it
-stale *silently*, which is why the status endpoint reports the switch.
+stale *silently*, which is why the status endpoint reports the switch. A
+disabled repository is also not reconciled — the switch turns the whole
+freshness mechanism off, not just the event half.

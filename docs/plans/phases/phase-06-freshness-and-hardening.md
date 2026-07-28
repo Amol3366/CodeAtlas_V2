@@ -81,7 +81,7 @@ with verification evidence recorded in the handoff log.
 | --- | --- | --- |
 | 1 | The Phase 5 conditions that were deferred now pass end to end: history survives a backend restart, a stream reconnects mid-run, and the critical workflows run in a browser | Playwright suites — **met 2026-07-28** (P6-01 + P6-STREAM); see the Chromium qualification below |
 | 2 | A file changed on disk is reflected in query results without an explicit index command, within a declared debounce window | watcher integration tests |
-| 3 | Filesystem events alone are never treated as truth: a reconciling scan corrects missed, duplicated, and out-of-order events | watcher reconciliation tests |
+| 3 | Filesystem events alone are never treated as truth: a reconciling scan corrects missed, duplicated, and out-of-order events | watcher reconciliation tests — **met 2026-07-28** (P6-03): `tests/integration/test_watch_reconciliation.py` proves each failure shape end to end, and the periodic plus startup scans run in real operation |
 | 4 | A process killed mid-index recovers to the previous active snapshot with no orphaned rows, and says what it recovered | crash-recovery tests (extending the Phase 2 suite) |
 | 5 | A packaged Windows build installs, runs, and upgrades from the previous schema version without losing a snapshot or a conversation | packaging + upgrade tests |
 | 6 | Backup, restore, and deletion are explicit, complete, and reversible where documented; a restored database passes integrity checks | backup/restore tests |
@@ -174,8 +174,8 @@ anything, and refuses rather than half-restoring.
 | P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
 | P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
 | P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `complete` |
-| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `ready` |
-| P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
+| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `complete` |
+| P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `ready` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |

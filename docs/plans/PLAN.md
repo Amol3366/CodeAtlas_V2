@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-03 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM `complete`; P6-03 `ready`; P6-04 … P6-08 `pending` |
-| Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-28T10:00:00Z |
-| Git state | Branch `main` at `500c25a`, pushed. PR #1 merged 2026-07-28 by fast-forward; `worktree-p4-10-completion` is now an ancestor of `main`. |
+| Active task | none — P6-04 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03 `complete`; P6-04 `ready`; P6-05 … P6-08 `pending` |
+| Agent | opencode `kimi-k3` |
+| Started UTC | 2026-07-28T16:23:00Z |
+| Git state | Branch `main` at `e51f30e` + P6-03 uncommitted. The working tree also carries the user's own uncommitted rename `CLAUDE.md -> AGENTS.md` plus blueprint whitespace cleanup; P6-03 leaves both untouched. |
 | Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
 
 ### Phase 6 Task Board (active)
@@ -65,8 +65,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P6-01 | Playwright harness and the three deferred Phase 5 suites | P6-SETUP | `complete` |
 | P6-02 | Filesystem watcher: debounce, subtree scan, incremental index | P6-SETUP | `complete` |
 | P6-STREAM | Accept-then-stream submission (ADR-0008), `contract_version` 1.1, live-run reconnect suite | P6-01 | `complete` |
-| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `ready` |
-| P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `pending` |
+| P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `complete` |
+| P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `ready` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `pending` |
 | P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `pending` |
 | P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
@@ -184,6 +184,117 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T17:05:00Z — P6-03 completed; P6-04 `ready`
+
+- Agent: opencode `kimi-k3`, branch `main` at `e51f30e`.
+- Transition: P6-03 `ready -> in_progress -> complete`; P6-04
+  `pending -> ready`.
+- Outcome: **gate condition 3 is met.** Filesystem events alone are never
+  treated as truth: a reconciling scan corrects missed, duplicated, and
+  out-of-order events, proven end to end. `check_phase6.ps1 -SkipSync` exits 0
+  with Playwright included.
+- Observed workspace state at start (rule 5): the tree carries the user's own
+  uncommitted rename `CLAUDE.md -> AGENTS.md` and trailing-whitespace cleanup
+  in the blueprint. Both are the user's in-flight change and are left
+  untouched, exactly as the 2026-07-28T16:50:00Z entry recorded the naming
+  split as a user decision.
+
+#### What was built
+
+- `src/codeatlas/indexing/reconcile.py` — `Reconciler`, the schedule policy,
+  mirroring `Debouncer`'s time-passed-in shape so behavior is asserted rather
+  than slept on. A zero or negative interval is refused, making ADR-0007's
+  "not configurable to zero" structural. `request()` makes the next check due
+  immediately — the startup catch-up, for changes made while no process was
+  listening. Any full scan counts as reconciliation whatever triggered it, so
+  `record` restarts the interval. Default interval 60 s: the backstop, not the
+  freshness mechanism, and cheap because unchanged files reuse their chunks.
+- `src/codeatlas/indexing/watcher.py` — the reconcile rides on the existing
+  `tick`, so no new thread exists. When due, `on_reconcile` fires **naming no
+  paths**: a batch names candidates, a reconcile names nothing, because
+  nothing about the event stream is trusted to say what changed. A successful
+  batch dispatch records a scan (an event-driven reindex has already
+  reconciled); a failed one does not. A failing reconcile records the
+  *attempt*, so it retries at the next interval rather than hammering on every
+  0.1 s tick, and is counted in the same `failure_count`/`last_error`
+  diagnostics. `request_reconcile()` is the public startup hook. A watcher
+  built without `on_reconcile` behaves exactly as before — the product-level
+  "always reconciles" rule lives in `WatchService`, which never builds one
+  without.
+- `src/codeatlas/application/watching.py` — `reconcile_interval_seconds`
+  (validated positive at construction, failing loudly rather than at watcher
+  start), the per-repository `_reconcile` trigger, and the startup catch-up:
+  `start_all` requests a reconcile per watched repository, fired on the drain
+  thread so startup is not blocked by indexing. `_reconcile` swallows only
+  `IndexInProgressError` — an index already running *is* a reconciling scan,
+  and unlike a dropped batch there is nothing to requeue because a reconcile
+  names no paths. Every other failure propagates so the watcher surfaces it.
+- Tests, all written first and observed failing (`ModuleNotFoundError` for
+  `codeatlas.indexing.reconcile`; constructor `TypeError` for the new watcher
+  and service parameters): `tests/unit/test_reconciler.py` (7),
+  `tests/unit/test_watcher_reconcile.py` (10),
+  `tests/integration/test_watch_reconciliation.py` (7, the gate-condition
+  suite). 24 tests total, 1229 in the suite.
+- Docs: `docs/operations/continuous-freshness.md` gains the reconciling-scan
+  section (the two windows table, why the interval cannot be zero, and the
+  honest note that a disabled repository is not reconciled either); `README.md`
+  moves the reconciling scan out of "not built yet".
+
+#### The lossy-event proofs, one per failure shape
+
+| Shape | Test |
+| --- | --- |
+| Missed event (buffer overflow) | `test_a_change_with_no_event_is_caught_by_the_reconciling_scan` — no `note` ever called; the reconcile alone converges the index to the disk |
+| Process down at change time | `test_changes_made_while_the_process_was_down_are_caught_on_startup` — `start_all` requests the catch-up; real threads, bounded poll |
+| Periodic scan in real operation | `test_the_periodic_scan_corrects_a_missed_event_in_real_operation` — 0.3 s interval, real drain thread, no explicit reconcile |
+| Duplicated events | `test_duplicated_events_do_not_duplicate_the_outcome` — the snapshot moves once, to the truth, and a reconcile moves nothing |
+| Out-of-order events | `test_out_of_order_events_are_corrected_by_the_scan` — scrambled order, both changes answerable |
+| Reconcile during an index | `test_a_reconcile_during_an_index_is_not_an_error` — swallowed, not counted, not piled on |
+| Failing reconcile | `test_a_failing_reconcile_is_visible_and_does_not_hammer` — visible in status, one attempt per interval |
+
+#### A race the full suite caught in my own test
+
+`test_duplicated_events_do_not_duplicate_the_outcome` passed in isolation and
+failed under full-suite load. The live OS observer delivers events for the
+test's own file write asynchronously, so `watcher.pending` at assertion time
+was at the mercy of OS timing — an internal-state assertion, not the property
+the test owns (debounce collapse is already proven deterministically in the
+unit suite). The test now settles on content-hash-verified resolution
+(`resolve` withholds evidence on drift, so it cannot pass on an intermediate
+scan of a partially written file) and asserts the outcome: the snapshot moved
+once and the reconcile moved nothing. Recorded because a browser-load-style
+race is exactly what P6-01 taught, and this one was mine.
+
+#### Verification in this environment, each run and its exit code
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync`
+  — **exit 0**, "Phase 6 verification completed", Playwright included.
+- `uv run pytest -q` — **1229 passed** (1205 before; +24).
+- `uv run ruff check src tests scripts apps` — exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` — exit 0, no issues in
+  **212 source files** (208 before).
+- Web: **99 vitest passed**, eslint/tsc/build exit 0 (all inside the gate).
+- Playwright: **10 passed, 4 skipped** — the declared Chromium skips, unchanged.
+- Test-first discipline: followed. One test-side correction after observation
+  (a binary floating-point boundary in my own arithmetic, `1060.1 - 1000.1`;
+  fixed in the test, not the code), and the race fix above.
+
+#### Contracts, migrations, limitations
+
+- **No contract change, no migration.** `contract_version` stays `"1.1"`,
+  `SCHEMA_VERSION` stays 9, and the REST watch response shape is unchanged.
+- The reconcile interval is a constructor parameter, not a user setting — no
+  settings surface exists to expose it, same as the debounce windows.
+- A repository with watching disabled is not reconciled either; the switch
+  turns the whole freshness mechanism off, and the status endpoint keeps
+  reporting that choice. Documented in `continuous-freshness.md`.
+- The startup catch-up means every app start rescans each watched repository
+  once — idempotent and cheap on unchanged trees, and it is the ADR-mandated
+  price of "no silent staleness across restarts". The e2e harness
+  (`scripts/e2e_backend.py` runs with `watch=True`) inherits it harmlessly.
+- Next: **P6-04** — crash recovery reporting and diagnostics.
+
 
 ### 2026-07-28T16:50:00Z — executed-state documentation reconciled (P6-STREAM)
 

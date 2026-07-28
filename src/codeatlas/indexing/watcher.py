@@ -10,7 +10,9 @@ duplicated, and reordered on every platform, and on Windows a
 `ReadDirectoryChangesW` buffer overflow drops events *silently* — the API
 reports success while telling you nothing happened. Anything that treated these
 events as truth would produce exactly the silent staleness Phase 6 exists to
-prevent. The periodic reconciling scan (P6-03) is what covers the gap.
+prevent. The reconciling scan (P6-03) rides on the same `tick`: when the
+interval says a full scan is owed, `on_reconcile` fires — naming no paths,
+because the scan and the content hashes decide what changed here too.
 
 The policy lives in `note` and `tick`, which are ordinary methods with no
 threads or clocks of their own. `start`/`stop` are a thin shell that feeds them
@@ -26,6 +28,10 @@ from pathlib import Path
 from typing import Any, Final
 
 from codeatlas.indexing.debounce import Debouncer
+from codeatlas.indexing.reconcile import (
+    DEFAULT_RECONCILE_INTERVAL_SECONDS,
+    Reconciler,
+)
 from codeatlas.repositories.ignore_rules import IgnoreRules
 
 # How often the drain thread looks for a due batch. Well below the quiet period,
@@ -33,6 +39,7 @@ from codeatlas.repositories.ignore_rules import IgnoreRules
 DEFAULT_POLL_INTERVAL_SECONDS: Final[float] = 0.1
 
 BatchCallback = Callable[[tuple[str, ...]], None]
+ReconcileCallback = Callable[[], None]
 
 
 class RepositoryWatcher:
@@ -45,6 +52,8 @@ class RepositoryWatcher:
         root: Path,
         rules: IgnoreRules,
         on_batch: BatchCallback,
+        on_reconcile: ReconcileCallback | None = None,
+        reconcile_interval_seconds: float = DEFAULT_RECONCILE_INTERVAL_SECONDS,
         debouncer: Debouncer | None = None,
         clock: Callable[[], float] | None = None,
         poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
@@ -55,8 +64,18 @@ class RepositoryWatcher:
         self._root = root.resolve()
         self._rules = rules
         self._on_batch = on_batch
+        self._on_reconcile = on_reconcile
         self._debouncer = debouncer or Debouncer()
         self._clock = clock or time.monotonic
+        # Without a callback there is nothing to schedule: the reconciler
+        # exists only when a scan can actually be triggered. The product-level
+        # rule that watching always reconciles lives in `WatchService`, which
+        # never constructs one without.
+        self._reconciler = (
+            Reconciler(interval_seconds=reconcile_interval_seconds, now=self._clock())
+            if on_reconcile is not None
+            else None
+        )
         self._poll_interval = poll_interval_seconds
         self._lock = threading.Lock()
         self._observer: Any | None = None
@@ -86,6 +105,18 @@ class RepositoryWatcher:
             for path in paths:
                 self._debouncer.record(path, now=now)
 
+    def request_reconcile(self) -> None:
+        """Ask for a full scan outside the schedule — the startup catch-up.
+
+        Changes made while the process was not running produced no events at
+        all, so waiting for the interval would leave them stale. The scan is
+        requested, never concluded: what changed is still decided by the scan
+        and the content hashes.
+        """
+        with self._lock:
+            if self._reconciler is not None:
+                self._reconciler.request()
+
     def flush(self) -> None:
         """Dispatch whatever is pending, without waiting for the window."""
         with self._lock:
@@ -93,10 +124,27 @@ class RepositoryWatcher:
         self._dispatch(batch)
 
     def tick(self) -> None:
-        """One drain pass: dispatch the batch if it is due."""
+        """One drain pass: dispatch the batch if due, then the reconcile."""
+        now = self._clock()
         with self._lock:
-            batch = self._debouncer.due(now=self._clock())
+            batch = self._debouncer.due(now=now)
         self._dispatch(batch)
+
+        if self._reconciler is None or self._on_reconcile is None:
+            return
+        with self._lock:
+            due = self._reconciler.due(now=now)
+            if due:
+                # Record the attempt, not the outcome: a failing reconcile
+                # retries at the next interval rather than on every 0.1 s
+                # tick, which would hammer a repository whose index keeps
+                # failing. The failure is still counted and surfaced.
+                self._reconciler.record(now=now)
+        if due:
+            try:
+                self._on_reconcile()
+            except Exception as error:
+                self._record_failure(error)
 
     def _dispatch(self, batch: tuple[str, ...] | None) -> None:
         if batch is None:
@@ -104,15 +152,26 @@ class RepositoryWatcher:
         try:
             self._on_batch(batch)
         except Exception as error:
-            # Deliberately broad. A reindex can fail for a hundred reasons — a
-            # file vanishing mid-scan, a full disk, a parser timeout — and none
-            # of them should stop the watcher permanently. Dying here would
-            # leave the index silently stale, which is the failure this phase
-            # exists to prevent. The count and the last error are exposed so a
-            # persistent problem is visible in diagnostics rather than only in
-            # a log nobody reads.
-            self.failure_count += 1
-            self.last_error = f"{type(error).__name__}: {error}"
+            self._record_failure(error)
+        else:
+            # The batch's reindex is a full scan, so it counts as
+            # reconciliation: any full scan establishes the same truth,
+            # whatever triggered it, and rescanning moments later on the
+            # schedule would learn nothing.
+            if self._reconciler is not None:
+                with self._lock:
+                    self._reconciler.record(now=self._clock())
+
+    def _record_failure(self, error: Exception) -> None:
+        # Deliberately broad. A reindex can fail for a hundred reasons — a
+        # file vanishing mid-scan, a full disk, a parser timeout — and none
+        # of them should stop the watcher permanently. Dying here would
+        # leave the index silently stale, which is the failure this phase
+        # exists to prevent. The count and the last error are exposed so a
+        # persistent problem is visible in diagnostics rather than only in
+        # a log nobody reads.
+        self.failure_count += 1
+        self.last_error = f"{type(error).__name__}: {error}"
 
     def _relative(self, path: Path, *, is_directory: bool) -> str | None:
         """The repository-relative path, or ``None`` if it is not a candidate."""
@@ -214,4 +273,9 @@ class RepositoryWatcher:
             self.tick()
 
 
-__all__ = ["DEFAULT_POLL_INTERVAL_SECONDS", "BatchCallback", "RepositoryWatcher"]
+__all__ = [
+    "DEFAULT_POLL_INTERVAL_SECONDS",
+    "BatchCallback",
+    "ReconcileCallback",
+    "RepositoryWatcher",
+]

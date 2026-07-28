@@ -38,7 +38,10 @@ produces an explicit abstention.
 
 A filesystem watcher keeps the index current without an explicit `index`
 command, debounced and disableable per repository
-(`codeatlas repo watch`, `docs/operations/continuous-freshness.md`).
+(`codeatlas repo watch`, `docs/operations/continuous-freshness.md`). A periodic
+reconciling scan, plus an immediate catch-up at startup, covers what the event
+stream can silently lose — events name candidates, never truth, so the scan
+and the content hashes always decide.
 
 Asking a question is accept-then-stream: the request returns `202` with a queued
 run, the answer is computed on a worker, and the thread follows it over
@@ -46,9 +49,8 @@ Server-Sent Events — so a long answer never holds a request open, cancelling
 reaches a run that is genuinely executing, and a reload recovers the persisted
 answer with its citations and the snapshot it used (ADR-0008).
 
-Not built yet: the reconciling scan that makes the watcher trustworthy against
-silently dropped Windows events, crash-recovery reporting, backup/restore, and
-packaging (all Phase 6); and embeddings or any model provider (Phase 7).
+Not built yet: crash-recovery reporting, backup/restore, and packaging (all
+Phase 6); and embeddings or any model provider (Phase 7).
 `docs/plans/PLAN.md` is the live phase and task status.
 
 ## Windows development
