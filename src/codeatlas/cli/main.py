@@ -19,9 +19,11 @@ Exit codes distinguish the failure classes a script needs to branch on:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import uuid
+import webbrowser
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import timedelta
@@ -29,7 +31,10 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+import uvicorn
 
+from codeatlas.api.app import create_app
+from codeatlas.api.web import web_assets_path
 from codeatlas.application.change_analysis import ChangeAnalysisRequest
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.application.graph_queries import GraphQueryRequest
@@ -59,6 +64,11 @@ EXIT_POLICY_FAILURE = 5
 EXIT_INTERNAL_FAILURE = 6
 
 _SEARCH_KINDS = ("text", "files", "symbols")
+
+# Binding beyond loopback needs authentication, a CSRF/CORS review, a revised
+# threat model, and explicit approval (`AGENTS.md` Section 25). Until that
+# exists, `--host` refuses rather than exposing an unauthenticated service.
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 _EXIT_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.INVALID_REQUEST: EXIT_INVALID_INPUT,
@@ -671,6 +681,74 @@ def repo_remove(
         f"Removed {repository_id}. The source files were not touched.",
         as_json=as_json,
     )
+
+
+@app.command("serve")
+def serve(
+    web: Annotated[
+        bool,
+        typer.Option("--web", help="Also serve the built web application."),
+    ] = False,
+    host: Annotated[
+        str, typer.Option("--host", help="Interface to bind. Loopback only.")
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="Port to listen on.")] = 8000,
+    open_browser: Annotated[
+        bool, typer.Option("--open", help="Open a browser once the server starts.")
+    ] = False,
+    database: DatabaseOption = None,
+) -> None:
+    """Run the local API, optionally serving the web application with it.
+
+    `--web` is what a packaged build runs: there is no Vite to proxy, so the API
+    serves the built assets itself and the browser sees one origin — which is
+    what lets the API keep its no-CORS, loopback-only posture.
+
+    The URL is printed rather than opened. Starting a server should not steal
+    focus, and it must not try to in a script or on a headless machine; `--open`
+    is there for the user who wants it.
+    """
+    if host not in _LOOPBACK_HOSTS:
+        typer.echo(
+            "INVALID_REQUEST: --host must be a loopback address. Binding beyond"
+            " loopback needs authentication, a CORS review, and explicit"
+            " approval.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_INVALID_INPUT)
+
+    assets: Path | None = None
+    if web:
+        assets = web_assets_path()
+        if assets is None:
+            # Serving an API-only server after `--web` was asked for would be a
+            # quiet lie: the user would meet an empty page and no explanation.
+            typer.echo(
+                "INVALID_REQUEST: the web application has not been built."
+                " Run `pnpm --dir apps/web build`, or use a packaged release.",
+                err=True,
+            )
+            raise typer.Exit(EXIT_INVALID_INPUT)
+
+    resolved = database or default_database_path()
+    # Migrate before listening: a first run must not answer requests against an
+    # unmigrated database.
+    with connect(resolved) as connection:
+        apply_migrations(connection)
+
+    application = create_app(resolved, web_assets=assets)
+    url = f"http://{host}:{port}"
+    typer.echo(
+        f"CodeAtlas is listening on {url}"
+        + (" — open it in a browser." if web else " (API only).")
+    )
+
+    if open_browser:
+        # A browser that will not open is not a reason to refuse to serve.
+        with contextlib.suppress(OSError):
+            webbrowser.open(url)
+
+    uvicorn.run(application, host=host, port=port)
 
 
 @app.command("backup")

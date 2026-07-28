@@ -1081,7 +1081,7 @@ Build:
 
 - [X] Reconciled and debounced filesystem watcher
 - [X] Crash recovery and actionable diagnostics
-- [ ] Native packaging and installation workflow
+- [X] Native packaging and installation workflow
 - [ ] Upgrade and migration workflow
 - [X] Backup, restore, deletion, and support workflows
 - [ ] Performance validation
@@ -1091,8 +1091,8 @@ Build:
   backup/restore, deletion, security, performance, and end-to-end release tests
   without losing the last valid active snapshot or chat history.
 
-**In progress.** Three of the eight build items are delivered; the remaining
-five are packaging, upgrade, and the validation sweeps.
+**In progress.** Four of the eight build items are delivered; the remaining
+four are the upgrade workflow and the validation sweeps.
 
 Delivered so far: P6-SETUP (ADR-0007, four hardening error codes,
 `scripts/check_phase6.ps1` with Playwright inside the gate), P6-01 (Playwright
@@ -1102,7 +1102,8 @@ switch, migration `0009`), P6-STREAM (ADR-0008, accept-then-stream,
 `contract_version` **1.0 → 1.1** — the first bump in six phases), P6-03 (the
 reconciling scan and startup catch-up), P6-04 (crash-recovery reporting,
 run ownership, and `codeatlas doctor`), P6-05 (backup, restore, repository
-deletion, and the retention sweep).
+deletion, and the retention sweep), P6-06 (PyInstaller packaging,
+`codeatlas serve --web`, and the no-elevation install script).
 
 **Gate conditions 1, 3, 4, and 6 are met.** History survives a backend restart
 and a stream reconnects against a live run; filesystem events are never treated
@@ -1110,9 +1111,11 @@ as truth, because a reconciling scan corrects what the event stream drops; a
 genuinely killed process is recovered, leaves no orphaned rows, and says what
 it recovered; and backup, restore, and deletion refuse rather than half-finish,
 with a restored database passing its integrity check. `check_phase6.ps1` passes
-with Playwright included.
+with Playwright included, and `-Package` adds a real packaged build plus smoke
+tests run against the binary. **Gate condition 5 is half met**: the packaged
+build installs and runs; upgrading from a previous version is P6-07.
 
-Two qualifications, recorded because a green gate should not hide them.
+Three qualifications, recorded because a green gate should not hide them.
 
 - Four conversation-route browser tests are **skipped on Chromium**, whose
   renderer crashes navigating to `/conversations/{id}` — a browser defect, not
@@ -1121,8 +1124,10 @@ Two qualifications, recorded because a green gate should not hide them.
   before the next start, that repository stays blocked from reindexing.
   `codeatlas doctor` names the run and its pid, so the failure is visible
   rather than silent, but it is not automatic.
+- **The packaged executable is unsigned**, so Windows SmartScreen warns on
+  first run. Signing needs a certificate, which is a purchasing decision.
 
-Next: **P6-06** packaging and `serve --web`. Live task status lives in
+Next: **P6-07** the upgrade workflow. Live task status lives in
 `docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift

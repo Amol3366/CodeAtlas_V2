@@ -24,6 +24,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28,<1",
+    # Packaging only (P6-06). A dev dependency rather than a runtime one: the
+    # packaged build does not contain its own packer.
+    "pyinstaller>=6.11,<7",
     "mypy>=1.19,<2",
     "pytest>=9,<10",
     "ruff>=0.14,<1",

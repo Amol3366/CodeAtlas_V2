@@ -62,7 +62,13 @@ replacing anything, keeping the database it replaced. Removing a repository
 never touches source files and refuses to take conversations with it unless
 asked (`docs/operations/backup-and-restore.md`).
 
-Not built yet: packaging and the Windows installer (Phase 6); and embeddings or
+CodeAtlas packages as a Windows build you unzip and run: `codeatlas serve --web`
+starts the API and serves the web application from the same origin, so the
+browser needs no CORS relaxation and the API stays loopback-bound
+(`docs/operations/packaging-and-install.md`).
+
+Not built yet: the upgrade workflow from a previous version, and performance and
+security re-verified on the packaged artifact (both Phase 6); and embeddings or
 any model provider (Phase 7). `docs/plans/PLAN.md` is the live phase and task
 status.
 
@@ -92,6 +98,7 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/continuous-freshness.md` — the watcher, its debounce, and its switch
 - `docs/operations/crash-recovery.md` — what a kill leaves behind, and `codeatlas doctor`
 - `docs/operations/backup-and-restore.md` — backup, restore, deletion, and retention
+- `docs/operations/packaging-and-install.md` — building, installing, and `serve --web`
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
 - `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers

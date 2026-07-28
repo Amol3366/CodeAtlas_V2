@@ -177,8 +177,8 @@ anything, and refuses rather than half-restoring.
 | P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `complete` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `complete` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `complete` |
-| P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `ready` |
-| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
+| P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `complete` |
+| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `ready` |
 | P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
 
 **P6-STREAM was inserted on 2026-07-28**, after the user approved the

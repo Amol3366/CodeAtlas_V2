@@ -195,6 +195,34 @@ the corruption this phase exists to prevent. It refuses while the target is in
 use, keeps the database it replaced, and clears stale WAL side files — one left
 beside a restored database can resurrect the pages the restore just replaced.
 
+### Decision 6, as built (P6-06) — with one approved deviation
+
+**The build is onedir, not `--onefile`.** The decision says "a single
+executable", and `--onefile` matches that wording most literally. It was
+rejected on measurement rather than taste: `--onefile` re-extracts the whole
+~44 MB bundle to `%TEMP%` on *every* launch, which costs seconds of startup for
+a command-line tool and is a well-known trigger for Windows antivirus
+heuristics. onedir starts immediately and loads the native tree-sitter
+extensions from disk. It remains one command the user runs, which is what the
+decision was asking for. **Approved by the user on 2026-07-28**, recorded here
+rather than as a new ADR because the intent of decision 6 is unchanged.
+
+Two things had to be bundled explicitly, and both would have failed late rather
+than at build time:
+
+- the built web application, or `serve --web` has nothing to serve;
+- the SQL migrations, which are read through `importlib.resources`. A frozen
+  build without them fails on a user's **first run against a fresh database** —
+  the worst possible moment to discover a packaging omission.
+
+`--host` on `serve` refuses anything but a loopback address. The decision said
+"loopback only"; making that a refusal rather than a default means the property
+cannot be lost by a flag.
+
+Packaging enters the gate through an opt-in `-Package` switch, and the packaged
+smoke tests **skip with their reason stated** when no artifact exists. A gate
+that never built the artifact must not read as one that verified it.
+
 ## Alternatives considered
 
 - **Trusting filesystem events as truth.** Rejected: silent event loss on

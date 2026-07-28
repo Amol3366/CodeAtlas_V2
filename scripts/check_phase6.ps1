@@ -11,7 +11,8 @@
 param(
     [switch]$SkipSync,
     [switch]$SkipWeb,
-    [switch]$SkipE2E
+    [switch]$SkipE2E,
+    [switch]$Package
 )
 
 $ErrorActionPreference = "Stop"
@@ -127,5 +128,26 @@ if ($SkipE2E) {
 
 Invoke-Checked "End-to-end suites" @("exec", "playwright", "test") `
     -Command "pnpm" -WorkingDirectory $web
+
+# --- Packaged build ------------------------------------------------------
+
+# Opt-in: PyInstaller takes minutes, and most runs of this gate change one
+# Python file. Without -Package the packaged smoke tests skip *with their
+# reason stated*, so a gate that never built the artifact does not read as one
+# that verified it. P6-07 and P6-08 both require the packaged form, which is
+# what keeps packaging from rotting unnoticed.
+if ($Package) {
+    Write-Output "==> Packaged build"
+    & (Join-Path $PSScriptRoot "build_package.ps1") -SkipWebBuild
+    if ($LASTEXITCODE -ne 0) {
+        throw "Packaging failed with exit code $LASTEXITCODE."
+    }
+
+    Invoke-Checked "Packaged smoke tests" @(
+        "run", "pytest", "-q", "tests/end_to_end/test_packaged_build.py"
+    )
+} else {
+    Write-Output "==> Packaged build (skipped; pass -Package to build and verify)"
+}
 
 Write-Output "Phase 6 verification completed."

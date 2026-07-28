@@ -33,6 +33,7 @@ from codeatlas.api.routers import (
     search,
     stream,
 )
+from codeatlas.api.web import mount_web_application
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.application.watching import WatchService
 from codeatlas.conversations.events import EventHub
@@ -44,8 +45,17 @@ API_TITLE = "CodeAtlas local API"
 API_VERSION = "1.0"
 
 
-def create_app(database_path: Path | None = None, *, watch: bool = True) -> FastAPI:
+def create_app(
+    database_path: Path | None = None,
+    *,
+    watch: bool = True,
+    web_assets: Path | None = None,
+) -> FastAPI:
     """Build the application bound to one database file.
+
+    ``web_assets`` serves the built web application from this process, which is
+    what a packaged build does: there is no Vite to proxy, so the API answers
+    both `/v1` and the shell and the browser still sees one origin.
 
     ``watch`` starts the filesystem watchers for every repository that has not
     opted out. It defaults to on because the product's third question is "how
@@ -96,6 +106,8 @@ def create_app(database_path: Path | None = None, *, watch: bool = True) -> Fast
 
     app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
     app.state.database_path = resolved_path
+    # Recorded so a caller can see what was mounted without inspecting routes.
+    app.state.web_assets = web_assets
     app.state.services_factory = _services_factory(app, resolved_path)
 
     app.include_router(repositories.router)
@@ -106,6 +118,11 @@ def create_app(database_path: Path | None = None, *, watch: bool = True) -> Fast
     app.include_router(change_analysis.router)
     app.include_router(conversations.router)
     app.include_router(stream.router)
+
+    # Mounted after every router, so no API route can be shadowed by a file
+    # that happens to share its path.
+    if web_assets is not None:
+        mount_web_application(app, web_assets)
 
     @app.exception_handler(CodeAtlasError)
     async def handle_codeatlas_error(

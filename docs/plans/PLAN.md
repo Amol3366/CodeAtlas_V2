@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | Phase 6 — Continuous freshness and hardening (plan and defaults approved by the user 2026-07-28) |
-| Active task | none — P6-06 is `ready` |
-| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04, P6-05 `complete`; P6-06 `ready`; P6-07, P6-08 `pending` |
+| Active task | none — P6-07 is `ready` |
+| Task status | Phases 0–5 `complete`; P6-SETUP, P6-01, P6-02, P6-STREAM, P6-03, P6-04, P6-05, P6-06 `complete`; P6-07 `ready`; P6-08 `pending` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-28T15:58:37Z |
-| Git state | Branch `main` at `1a51473` (P6-04 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-05 leaves it untouched. |
+| Started UTC | 2026-07-28T16:53:00Z |
+| Git state | Branch `main` at `ca210a7` (P6-05 committed). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint; P6-06 leaves it untouched. |
 | Next gate | Phase 6 completion gate after P6-08; only the user may approve it. |
 
 ### Phase 6 Task Board (active)
@@ -68,8 +68,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P6-03 | Reconciliation scan and lossy-event tests | P6-02 | `complete` |
 | P6-04 | Crash recovery reporting and diagnostics | P6-SETUP | `complete` |
 | P6-05 | Backup, restore, deletion, and integrity validation | P6-04 | `complete` |
-| P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `ready` |
-| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `pending` |
+| P6-06 | Packaging, `serve --web`, and the install workflow | P6-01, P6-05 | `complete` |
+| P6-07 | Upgrade and migration workflow from a real prior version | P6-06 | `ready` |
 | P6-08 | Performance, security, Windows release validation, docs, phase gate | P6-03, P6-07 | `pending` |
 
 P6-STREAM was inserted 2026-07-28 on the user's approval of ADR-0008. P6-03's
@@ -184,6 +184,104 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-28T17:20:00Z — P6-06 completed; P6-07 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `ca210a7`.
+- Transition: P6-06 `ready -> in_progress -> complete`; P6-07 `pending -> ready`.
+- Outcome: **CodeAtlas is a thing you can unzip and run.** A real packaged
+  binary was built in this environment and the smoke tests ran **against it**.
+  `check_phase6.ps1 -SkipSync -Package` exits 0, packaging included.
+- Gate condition 5 is **partly** met: the packaged build installs and runs, and
+  that half is proven. The *upgrade* half is P6-07 and stays open.
+
+#### The four decisions the user made
+
+1. **onedir shipped as a zip**, not `--onefile` — a deviation from ADR-0007's
+   literal "single executable" wording, approved 2026-07-28 and recorded in that
+   ADR's Outcome section. `--onefile` re-extracts ~44 MB to `%TEMP%` on every
+   launch: seconds of startup for a CLI, and a known antivirus trigger.
+2. **Opt-in `-Package` in the gate**, with the packaged smoke tests skipping
+   *with their reason stated* otherwise.
+3. **Unzip-and-run, plus a no-elevation install script** that changes exactly
+   two things and reverses exactly those two.
+4. **`serve` prints the URL; `--open` opts in.**
+
+#### What was built
+
+- `src/codeatlas/api/web.py` — locating the built assets (`sys._MEIPASS` when
+  frozen, `apps/web/dist` from source) and mounting them. Two routing rules
+  carry the weight: a client-side route falls back to `index.html` so a deep
+  link or reload works, and that fallback **never swallows `/v1`**, which stays
+  a JSON 404. The arbitrary-path route resolves and containment-checks before
+  serving, because it is the one route that takes a path from the URL.
+- `codeatlas serve [--web] [--host] [--port] [--open]`. `--host` **refuses**
+  anything but loopback rather than defaulting to it, so the property cannot be
+  lost by a flag. `--web` with no built assets refuses and says why instead of
+  starting an API-only server behind an empty page. A browser that will not
+  open is not a reason to refuse to serve.
+- `packaging/entry.py`, deliberately empty of logic: behavior that lived only
+  there would be behavior only packaged users get.
+- `scripts/build_package.ps1` — PyInstaller onedir, bundling the built SPA and
+  the SQL migrations, verifying the artifact answers `--help` before zipping.
+- `scripts/install_windows.ps1` with `-Uninstall`. No elevation, no
+  machine-wide state. Uninstall deliberately **does not remove user data**; it
+  names the folder instead of deciding.
+- `check_phase6.ps1 -Package`; `pyinstaller` as a dev dependency.
+
+#### What the build taught, and what it caught
+
+- **Zipping failed the first time.** The handle on a freshly written `.exe`
+  outlives the process that ran it — Windows Defender scans new executables, and
+  the build's own `--help` verification is what triggers the scan. A bounded
+  retry replaced it; failing there would report a good build as a broken one.
+- **Two data sets would have failed late rather than at build time**: the web
+  assets, and the SQL migrations. Migrations are read through
+  `importlib.resources`, so a frozen build without them fails on a user's
+  *first run against a fresh database*.
+- **No hidden imports were needed for tree-sitter**: every language pack is a
+  static import, so PyInstaller's analysis finds them. `uvicorn` did need
+  `--collect-submodules`, because it loads protocol implementations by name.
+- The application uses only `ThreadPoolExecutor`, so PyInstaller's
+  `multiprocessing.freeze_support` hazard does not apply. Checked rather than
+  assumed.
+
+#### Tests, written first and observed failing
+
+| Suite | Count | Proves |
+| --- | --- | --- |
+| `tests/integration/test_serve_web.py` | 12 | The shell, assets, client-side fallback, `/v1` staying JSON, the error envelope intact, traversal refused, and the API still serving when assets are absent or missing |
+| `tests/contract/test_serve_command.py` | 12 | Loopback default and non-loopback refusal, port, printed URL, no browser unless asked, migration before listening, and `--web` refusing when unbuilt |
+| `tests/end_to_end/test_packaged_build.py` | 4 | **The real binary**: it starts, migrates from bundled migrations, indexes and resolves a symbol with evidence (which is what proves the native extensions load), and serves shell and `/v1` on one origin |
+
+#### Verification in this environment, each run and its exit code
+
+- `powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync
+  -Package` — **exit 0**, "Phase 6 verification completed", packaging included.
+- `uv run pytest -q` — **1335 passed** (1307 before; +28). Note that 4 of those
+  are the packaged smoke tests, which passed because the artifact existed; on a
+  machine without one the same run reports 1331 passed and 4 skipped, with the
+  reason printed.
+- `scripts/build_package.ps1` — exit 0, producing `dist/codeatlas-win64` (44 MB)
+  and `dist/codeatlas-win64.zip`.
+- `uv run pytest tests/end_to_end/test_packaged_build.py` — **4 passed** against
+  the real executable.
+- `uv run ruff check` / `mypy --no-incremental` — exit 0, **223 source files**.
+- Web: **99 vitest passed**; Playwright **10 passed, 4 skipped** — unchanged.
+
+#### Contracts, migrations, limitations
+
+- **No migration, no contract change.** `SCHEMA_VERSION` stays 9,
+  `contract_version` stays `"1.1"`. The API gained no route: the SPA mount is
+  outside `/v1` and `include_in_schema=False`.
+- **The executable is unsigned.** Windows SmartScreen will warn on first run.
+  Code signing needs a certificate, which is a purchasing decision.
+- **Upgrade is not covered here** — gate condition 5's second half is P6-07.
+- **Performance and security are still measured on a source checkout.** Gate
+  conditions 7 and 8 ask for the packaged artifact; that is P6-08.
+- `dist/` is already git-ignored, so the 44 MB artifact is not committed.
+- Next: **P6-07** — upgrade and migration from a real prior version.
+
 
 ### 2026-07-28T16:41:00Z — P6-05 completed; P6-06 `ready`
 
