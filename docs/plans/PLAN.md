@@ -185,6 +185,82 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-07-28T15:00:00Z — renderer crash diagnosed: a Chromium defect, not our code
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `8f545af`.
+- Transition: none. P6-STREAM stays `in_progress`, but **criterion 6 is now
+  verified** — on Firefox — so only the browser policy decision is outstanding.
+
+#### The finding
+
+**The Chromium build shipped with Playwright 1.62.0 crashes its renderer** when
+this application navigates client-side to `/conversations/{id}` after creating a
+conversation. **All seven suites pass on Firefox in 28 seconds**, including the
+two criterion-6 tests that could not run before:
+
+| Suite | Chromium | Firefox |
+| --- | --- | --- |
+| `onboarding-to-citation` | crash | **pass** |
+| `restart-persistence` | crash | **pass** |
+| `stream-reconnection` (3 transport tests) | pass | **pass** |
+| `the thread reaches its answer through the stream` | crash | **pass** |
+| `citations survive a reload` | crash | **pass** |
+
+#### How it was isolated
+
+The crash needs **create *and* navigate**. Neither alone does it:
+
+| Experiment | Result |
+| --- | --- |
+| `page.goto` straight to `/conversations/{id}` | no crash, heap flat 10 MB for 10 s |
+| Click an **existing** conversation (client-side nav) | no crash |
+| Click "New chat" with `navigate()` removed | no crash |
+| Click "New chat" with `navigate()` deferred to a macrotask | **crash** |
+| Route rendering a bare `<div>` instead of `Thread` | **crash** |
+| Dev React build (unminified, dev warnings on) | **crash, and still no JS error** |
+| Chromium headed instead of headless | **crash** |
+| Backend started with `watch=False` | **crash** |
+| Firefox | **no crash** |
+
+At the moment of the crash: heap **10 MB**, **19** requests, **3** frame
+navigations. No OOM, no request storm, no reconnect loop, and no `pageerror` in
+either build. A renderer that dies without raising anything, on a flow another
+engine completes, is a browser defect.
+
+#### What it is not
+
+- **Not P6-STREAM.** It reproduces on the `p4-10-completion` worktree, which is
+  pre-P6-STREAM on both sides, and in this tree with the web changes stashed.
+- **Not `Thread`, and not the stream.** Removing `Thread` from the route
+  entirely changes nothing, and no stream is open at that point.
+- **Not P6-02's watcher**, the obvious suspect as the change since P6-01 ran
+  these suites four times successfully. Disabling it changes nothing. (Worth
+  noting separately: `scripts/e2e_backend.py` calls `create_app(database)` and so
+  inherits `watch=True`. Harmless, but the harness should probably opt out.)
+
+#### What this costs and what it needs
+
+Gate condition 1 is **met on a real browser**. What is lost is Chromium
+coverage, and Chromium is what most users run — so "switch the gate to Firefox"
+is not a free win, and it is a decision about what the gate asserts rather than
+a fix. Three options, none of them applied yet:
+
+1. **Run the gate on Firefox**, and record Chromium as a known-failing
+   environment with this reproduction. Fastest to green; loses Chromium.
+2. **Run both**, with the Chromium conversation-route tests marked as expected
+   failures. Keeps the signal visible and keeps the gate honest about it.
+3. **Pin or roll back the Playwright Chromium build** until the regression is
+   identified upstream. Most correct, most work, and not yet attempted — a
+   version bisect across Playwright releases would say exactly which build
+   introduced it.
+
+`playwright.config.ts` is **unchanged**; every bisect edit was reverted and the
+working tree was verified clean.
+
+- Next: **the user picks the browser policy.** After that, P6-STREAM needs only
+  `docs/operations/web-application.md` and ADR-0008's consequences section.
+
+
 ### 2026-07-28T13:10:00Z — P6-STREAM web half built; blocked verifying criterion 6
 
 - Agent: Claude Code `claude-opus-5`, branch `main` at `4e0e749` + uncommitted.
