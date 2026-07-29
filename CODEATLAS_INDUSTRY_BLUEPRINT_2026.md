@@ -4,14 +4,14 @@
 
 **Trusted repository intelligence and change assurance for developers and AI coding agents**
 
-**Document status:** Refined product and engineering blueprint  
-**Revision:** 1.0  
-**Date:** 24 July 2026  
-**Primary audience:** Executive sponsors, product leaders, engineering leaders, architects, and implementation teams  
-**Initial deployment:** Local-first, single-user, Windows 11 workstation  
-**Initial repository scope:** Local Git repositories  
-**Primary interfaces:** CLI, MCP, local REST API, JSON, Markdown, and SARIF  
-**Authority model:** Deterministic evidence is authoritative; semantic and generative output is advisory  
+**Document status:** Refined product and engineering blueprint
+**Revision:** 1.0
+**Date:** 24 July 2026
+**Primary audience:** Executive sponsors, product leaders, engineering leaders, architects, and implementation teams
+**Initial deployment:** Local-first, single-user, Windows 11 workstation
+**Initial repository scope:** Local Git repositories
+**Primary interfaces:** CLI, MCP, local REST API, JSON, Markdown, and SARIF
+**Authority model:** Deterministic evidence is authoritative; semantic and generative output is advisory
 
 ---
 
@@ -29,11 +29,11 @@ An LLM may explain verified findings. It does not define repository truth.
 
 This document is intentionally layered so different readers can stop at the level appropriate to their decision.
 
-| Layer | Primary reader | Purpose |
-|---|---|---|
-| Executive layer | Sponsor, founder, product leader, engineering executive | Decide whether CodeAtlas is worth building, what outcome it owns, and how success will be measured |
-| Product layer | Product manager, staff engineer, security lead, developer-experience lead | Define users, workflows, MVP boundaries, operating model, and release gates |
-| Technical layer | Architect, engineering team, coding agents | Implement the system through explicit architecture, data contracts, phases, risks, and acceptance criteria |
+| Layer           | Primary reader                                                            | Purpose                                                                                                    |
+| --------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Executive layer | Sponsor, founder, product leader, engineering executive                   | Decide whether CodeAtlas is worth building, what outcome it owns, and how success will be measured         |
+| Product layer   | Product manager, staff engineer, security lead, developer-experience lead | Define users, workflows, MVP boundaries, operating model, and release gates                                |
+| Technical layer | Architect, engineering team, coding agents                                | Implement the system through explicit architecture, data contracts, phases, risks, and acceptance criteria |
 
 The executive and product layers are normative for product intent and scope. The technical layer is normative for the initial implementation, but individual technology selections may change through recorded architecture decisions when benchmarks justify the change.
 
@@ -90,13 +90,13 @@ CodeAtlas addresses that assurance gap. It acts as an independent evidence and i
 
 CodeAtlas should own the space between static repository analysis and probabilistic coding assistance.
 
-| Existing category | Strength | Typical gap CodeAtlas addresses |
-|---|---|---|
-| IDE navigation and language servers | Fast local symbol navigation | Limited cross-artifact change assurance and portable agent-facing evidence contracts |
-| Static analysis and code scanning | Deterministic rule findings | Often narrow to predefined defects; limited repository question answering and change-specific explanation |
-| Code search and repository chat | Broad discovery and natural-language access | Evidence freshness, line validity, deterministic relationship resolution, and change-impact precision vary |
-| Coding agents | Planning and code generation | The same agent may generate and judge its own work; context and impact claims can be difficult to audit |
-| Software-composition tools | Dependency and supply-chain inventory | Do not usually map source-level callers, tests, documents, architecture rules, and local working-tree changes together |
+| Existing category                   | Strength                                    | Typical gap CodeAtlas addresses                                                                                        |
+| ----------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| IDE navigation and language servers | Fast local symbol navigation                | Limited cross-artifact change assurance and portable agent-facing evidence contracts                                   |
+| Static analysis and code scanning   | Deterministic rule findings                 | Often narrow to predefined defects; limited repository question answering and change-specific explanation              |
+| Code search and repository chat     | Broad discovery and natural-language access | Evidence freshness, line validity, deterministic relationship resolution, and change-impact precision vary             |
+| Coding agents                       | Planning and code generation                | The same agent may generate and judge its own work; context and impact claims can be difficult to audit                |
+| Software-composition tools          | Dependency and supply-chain inventory       | Do not usually map source-level callers, tests, documents, architecture rules, and local working-tree changes together |
 
 CodeAtlas should integrate with these categories rather than attempt to replace them.
 
@@ -132,14 +132,14 @@ The product does not promise perfect program understanding. Dynamic dispatch, re
 
 Use a stage-gated investment model.
 
-| Gate | Investment question | Required proof |
-|---|---|---|
-| Gate 0: Feasibility | Can CodeAtlas build stable, current repository evidence on Windows? | Scanner, snapshots, parser diagnostics, exact symbol lookup, valid line evidence |
-| Gate 1: Product wedge | Does change analysis find useful impact with acceptable noise? | Working-tree and commit-range benchmark on representative repositories |
-| Gate 2: Agent integration | Can independent agents reliably consume the same contracts? | Versioned CLI/MCP/REST contracts and end-to-end agent workflows |
-| Gate 3: Incremental operation | Does the system stay fresh at practical repository scale? | Incremental correctness, latency, storage, and stale-entity tests |
-| Gate 4: Semantic uplift | Do embeddings or reranking add measurable recall? | Offline evaluation demonstrating improvement over deterministic baseline |
-| Gate 5: Enterprise expansion | Is there repeatable demand beyond the local product? | Pull-request/CI pilots, security review, identity and policy requirements |
+| Gate                          | Investment question                                                 | Required proof                                                                   |
+| ----------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Gate 0: Feasibility           | Can CodeAtlas build stable, current repository evidence on Windows? | Scanner, snapshots, parser diagnostics, exact symbol lookup, valid line evidence |
+| Gate 1: Product wedge         | Does change analysis find useful impact with acceptable noise?      | Working-tree and commit-range benchmark on representative repositories           |
+| Gate 2: Agent integration     | Can independent agents reliably consume the same contracts?         | Versioned CLI/MCP/REST contracts and end-to-end agent workflows                  |
+| Gate 3: Incremental operation | Does the system stay fresh at practical repository scale?           | Incremental correctness, latency, storage, and stale-entity tests                |
+| Gate 4: Semantic uplift       | Do embeddings or reranking add measurable recall?                   | Offline evaluation demonstrating improvement over deterministic baseline         |
+| Gate 5: Enterprise expansion  | Is there repeatable demand beyond the local product?                | Pull-request/CI pilots, security review, identity and policy requirements        |
 
 If Gate 1 fails, do not mask the problem with a richer UI or a larger model. Improve parsing, relationship extraction, evidence quality, and the evaluation set.
 
@@ -194,15 +194,15 @@ Embeddings, reranking, LLM explanations, new parser languages, and richer graphs
 
 ## Target Users and Jobs to Be Done
 
-| User | Primary job | Product outcome |
-|---|---|---|
-| Developer | Understand a repository and assess a local change before opening a pull request | Faster self-review with fewer missed dependencies |
-| Reviewer or tech lead | Verify the blast radius and rationale of a change | Less reconstruction work; evidence-linked review |
-| AI coding agent | Retrieve current symbols, relationships, constraints, tests, and post-change impact | Better planning and safer completion loops |
-| Architect | Detect prohibited dependencies and architecture drift | Enforceable, explainable architecture rules |
-| QA engineer | Identify related tests and likely gaps | Risk-based test selection with transparent confidence |
-| Documentation owner | Detect source changes that may invalidate documents or ADRs | Earlier documentation updates |
-| Security or platform engineer, later phase | Consume normalized findings in CI and governance systems | Portable assurance and auditable policy outcomes |
+| User                                       | Primary job                                                                         | Product outcome                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Developer                                  | Understand a repository and assess a local change before opening a pull request     | Faster self-review with fewer missed dependencies     |
+| Reviewer or tech lead                      | Verify the blast radius and rationale of a change                                   | Less reconstruction work; evidence-linked review      |
+| AI coding agent                            | Retrieve current symbols, relationships, constraints, tests, and post-change impact | Better planning and safer completion loops            |
+| Architect                                  | Detect prohibited dependencies and architecture drift                               | Enforceable, explainable architecture rules           |
+| QA engineer                                | Identify related tests and likely gaps                                              | Risk-based test selection with transparent confidence |
+| Documentation owner                        | Detect source changes that may invalidate documents or ADRs                         | Earlier documentation updates                         |
+| Security or platform engineer, later phase | Consume normalized findings in CI and governance systems                            | Portable assurance and auditable policy outcomes      |
 
 ## Priority Workflows
 
@@ -261,11 +261,11 @@ A vector index, a chat UI, or an MCP wrapper alone is replicable. A trusted, mea
 
 The local MVP should optimize for product learning, not premature monetization. A plausible progression is:
 
-| Stage | Offering | Adoption motion |
-|---|---|---|
-| Local technical preview | Single-user Windows application and CLI | Design partners, internal use, selected open-source repositories |
-| Team pilot | Shared policy packs, CI/PR reports, centralized evaluation | Platform engineering and developer productivity teams |
-| Enterprise | Hybrid control plane, identity, audit, policy administration, multi-repository intelligence | Security, engineering governance, regulated enterprises |
+| Stage                   | Offering                                                                                    | Adoption motion                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Local technical preview | Single-user Windows application and CLI                                                     | Design partners, internal use, selected open-source repositories |
+| Team pilot              | Shared policy packs, CI/PR reports, centralized evaluation                                  | Platform engineering and developer productivity teams            |
+| Enterprise              | Hybrid control plane, identity, audit, policy administration, multi-repository intelligence | Security, engineering governance, regulated enterprises          |
 
 Potential future packaging can include an open local engine with paid team governance, or a commercial local application plus enterprise services. This blueprint does not select a licensing model; that decision should follow customer discovery and the cost of supporting language packs and enterprise controls.
 
@@ -279,33 +279,33 @@ This metric must be sampled through repository fixtures and pilot feedback; it c
 
 ### Product metrics
 
-| Dimension | Metric | Initial target |
-|---|---|---:|
-| Trust | Valid file-and-line evidence | 100% |
-| Trust | Active-snapshot leakage | 0 |
-| Impact quality | Changed-symbol precision and recall | ≥95% on supported fixture cases |
-| Impact quality | Direct dependency impact recall | ≥90% on curated supported cases |
-| Noise | High-severity finding precision | ≥80% before default enablement |
-| Usefulness | Pilot reports rated useful by developers/reviewers | ≥70% |
-| Speed | Warm local change-preflight p95 on target fixture | ≤10 seconds |
-| Freshness | Deterministic index available after an ordinary changed-file update | ≤2 seconds p95, excluding unusually large files |
-| Efficiency | Unchanged content re-parsed or re-embedded after one-symbol edit | 0 |
-| Reliability | Successful analyses with visible diagnostics rather than silent omissions | 100% |
-| Agent readiness | Contract-valid MCP tool responses | 100% |
+| Dimension       | Metric                                                                    |                                   Initial target |
+| --------------- | ------------------------------------------------------------------------- | -----------------------------------------------: |
+| Trust           | Valid file-and-line evidence                                              |                                             100% |
+| Trust           | Active-snapshot leakage                                                   |                                                0 |
+| Impact quality  | Changed-symbol precision and recall                                       |                 ≥95% on supported fixture cases |
+| Impact quality  | Direct dependency impact recall                                           |                 ≥90% on curated supported cases |
+| Noise           | High-severity finding precision                                           |                  ≥80% before default enablement |
+| Usefulness      | Pilot reports rated useful by developers/reviewers                        |                                            ≥70% |
+| Speed           | Warm local change-preflight p95 on target fixture                         |                                     ≤10 seconds |
+| Freshness       | Deterministic index available after an ordinary changed-file update       | ≤2 seconds p95, excluding unusually large files |
+| Efficiency      | Unchanged content re-parsed or re-embedded after one-symbol edit          |                                                0 |
+| Reliability     | Successful analyses with visible diagnostics rather than silent omissions |                                             100% |
+| Agent readiness | Contract-valid MCP tool responses                                         |                                             100% |
 
 Targets are release hypotheses. Phase 0 must define repository sizes, hardware, fixture composition, exclusions, and measurement procedures so the numbers are reproducible.
 
 ## Key Strategic Risks
 
-| Risk | Consequence | Executive response |
-|---|---|---|
-| Product becomes a broad code chat tool | Weak differentiation and crowded positioning | Protect the change-assurance wedge and evidence contract |
-| Static relationships are overclaimed | Loss of developer trust | Encode derivation and confidence; abstain when unsupported |
-| Too many noisy findings | Users disable the product | Gate rules by measured precision and severity |
-| Language breadth outruns quality | Superficial support and unstable roadmap | Add languages through benchmarked language packs |
-| LLM features consume roadmap | Core correctness remains weak | Keep semantic and generative layers behind release gates |
-| Local architecture cannot evolve | Enterprise path becomes a rewrite | Keep provider and interface boundaries, but avoid distributed infrastructure now |
-| Metrics optimize technical activity | Product appears successful without preventing review work | Measure omissions, usefulness, reviewer time, and escaped issues |
+| Risk                                   | Consequence                                               | Executive response                                                               |
+| -------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Product becomes a broad code chat tool | Weak differentiation and crowded positioning              | Protect the change-assurance wedge and evidence contract                         |
+| Static relationships are overclaimed   | Loss of developer trust                                   | Encode derivation and confidence; abstain when unsupported                       |
+| Too many noisy findings                | Users disable the product                                 | Gate rules by measured precision and severity                                    |
+| Language breadth outruns quality       | Superficial support and unstable roadmap                  | Add languages through benchmarked language packs                                 |
+| LLM features consume roadmap           | Core correctness remains weak                             | Keep semantic and generative layers behind release gates                         |
+| Local architecture cannot evolve       | Enterprise path becomes a rewrite                         | Keep provider and interface boundaries, but avoid distributed infrastructure now |
+| Metrics optimize technical activity    | Product appears successful without preventing review work | Measure omissions, usefulness, reviewer time, and escaped issues                 |
 
 ---
 
@@ -313,18 +313,18 @@ Targets are release hypotheses. Phase 0 must define repository sizes, hardware, 
 
 ## Capability Map
 
-| Capability domain | MVP | Later expansion |
-|---|---|---|
-| Repository ingestion | Windows-safe local directories and Git repositories | Remote Git providers, repository fleets |
-| Language intelligence | Python, TypeScript, JavaScript; structured documents and configuration | Language-pack framework and additional ecosystems |
-| Repository map | Files, symbols, imports, calls, dependencies, tests, docs, config, schemas | Cross-repository and runtime-enriched relations |
-| Retrieval | Exact, lexical, graph, Git; optional semantic | Learned ranking and organization-level search |
-| Change assurance | Working tree and commit range | Pull requests, CI, release comparisons |
-| Policy | Local architecture rules | Centrally managed policy packs and exceptions |
-| Evidence | Snapshot-bound file, symbol, line, relation, derivation, confidence | Signed attestations and enterprise audit trails |
-| Delivery | CLI, MCP, REST, JSON, Markdown, SARIF | IDE extensions, pull-request checks, dashboards |
-| Models | Optional local or external embeddings/explanations | Governed routing, enterprise model gateways |
-| Deployment | Single-user modular monolith | Team service, hybrid control plane, enterprise tenancy |
+| Capability domain     | MVP                                                                        | Later expansion                                        |
+| --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Repository ingestion  | Windows-safe local directories and Git repositories                        | Remote Git providers, repository fleets                |
+| Language intelligence | Python, TypeScript, JavaScript; structured documents and configuration     | Language-pack framework and additional ecosystems      |
+| Repository map        | Files, symbols, imports, calls, dependencies, tests, docs, config, schemas | Cross-repository and runtime-enriched relations        |
+| Retrieval             | Exact, lexical, graph, Git; optional semantic                              | Learned ranking and organization-level search          |
+| Change assurance      | Working tree and commit range                                              | Pull requests, CI, release comparisons                 |
+| Policy                | Local architecture rules                                                   | Centrally managed policy packs and exceptions          |
+| Evidence              | Snapshot-bound file, symbol, line, relation, derivation, confidence        | Signed attestations and enterprise audit trails        |
+| Delivery              | CLI, MCP, REST, JSON, Markdown, SARIF                                      | IDE extensions, pull-request checks, dashboards        |
+| Models                | Optional local or external embeddings/explanations                         | Governed routing, enterprise model gateways            |
+| Deployment            | Single-user modular monolith                                               | Team service, hybrid control plane, enterprise tenancy |
 
 ## Functional Requirements
 
@@ -358,32 +358,32 @@ CodeAtlas shall produce JSON and Markdown in the MVP. SARIF 2.1.0 output shall b
 
 ## Non-Functional Requirements
 
-| Quality | Requirement |
-|---|---|
-| Privacy | No source or derived content leaves the workstation unless a provider is explicitly enabled |
-| Security | Repository content is untrusted data; indexing never executes repository code |
-| Correctness | Active results cannot contain entities outside the selected snapshot |
-| Availability | Deterministic search and change analysis remain usable when semantic or model providers are unavailable |
-| Performance | Ordinary updates process changed files and changed semantic units only |
-| Recoverability | Interrupted indexing leaves the previous active snapshot usable |
-| Observability | Each analysis records timing, channel usage, freshness, warnings, model usage, and contract errors |
-| Portability | Paths are normalized internally while preserving display-safe Windows paths |
-| Extensibility | Parsers, vector stores, model providers, rules, and delivery adapters use explicit interfaces |
-| Maintainability | The MVP remains a modular monolith with independently tested components |
+| Quality         | Requirement                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------- |
+| Privacy         | No source or derived content leaves the workstation unless a provider is explicitly enabled             |
+| Security        | Repository content is untrusted data; indexing never executes repository code                           |
+| Correctness     | Active results cannot contain entities outside the selected snapshot                                    |
+| Availability    | Deterministic search and change analysis remain usable when semantic or model providers are unavailable |
+| Performance     | Ordinary updates process changed files and changed semantic units only                                  |
+| Recoverability  | Interrupted indexing leaves the previous active snapshot usable                                         |
+| Observability   | Each analysis records timing, channel usage, freshness, warnings, model usage, and contract errors      |
+| Portability     | Paths are normalized internally while preserving display-safe Windows paths                             |
+| Extensibility   | Parsers, vector stores, model providers, rules, and delivery adapters use explicit interfaces           |
+| Maintainability | The MVP remains a modular monolith with independently tested components                                 |
 
 ## Trust and Confidence Model
 
 Every relationship and finding shall use a controlled derivation class:
 
-| Class | Meaning | May support an authoritative finding? |
-|---|---|---|
-| `deterministic` | Directly observed in Git, syntax, configuration, or an exact stored rule | Yes |
-| `static_resolved` | Resolved through a supported language-aware static rule | Yes, with language limitations stated |
-| `high_confidence_heuristic` | Strong naming, path, test, or document evidence | Yes, only when labeled heuristic |
-| `low_confidence_heuristic` | Weak association useful for discovery | No; advisory candidate only |
-| `semantic_candidate` | Similarity-based retrieval candidate | No without independent evidence |
-| `model_generated` | LLM-created narrative or classification | No without supporting evidence |
-| `unsupported` | CodeAtlas cannot establish the claim | No; system must abstain |
+| Class                         | Meaning                                                                  | May support an authoritative finding? |
+| ----------------------------- | ------------------------------------------------------------------------ | ------------------------------------- |
+| `deterministic`             | Directly observed in Git, syntax, configuration, or an exact stored rule | Yes                                   |
+| `static_resolved`           | Resolved through a supported language-aware static rule                  | Yes, with language limitations stated |
+| `high_confidence_heuristic` | Strong naming, path, test, or document evidence                          | Yes, only when labeled heuristic      |
+| `low_confidence_heuristic`  | Weak association useful for discovery                                    | No; advisory candidate only           |
+| `semantic_candidate`        | Similarity-based retrieval candidate                                     | No without independent evidence       |
+| `model_generated`           | LLM-created narrative or classification                                  | No without supporting evidence        |
+| `unsupported`               | CodeAtlas cannot establish the claim                                     | No; system must abstain               |
 
 Confidence is not a substitute for derivation. A high numeric score from a model does not convert a probabilistic result into deterministic evidence.
 
@@ -488,13 +488,13 @@ Optional embeddings and explanations are not part of the minimum proof. They may
 
 The implementation detail in the technical layer contains fifteen engineering phases. Executively, they group into five horizons:
 
-| Horizon | Technical phases | Outcome |
-|---|---|---|
-| H1: Truth foundation | 0–5 | Evaluation contract, scanner, snapshots, language parsing, stable chunks |
-| H2: Retrieval and interfaces | 6–7 | Exact/lexical/graph retrieval and versioned CLI/MCP/REST evidence |
-| H3: Change assurance | 8–10 | Git impact, tests/docs/config/policy findings, complete reports |
-| H4: Continuous freshness | 11 | Incremental watcher, diagnostics, recovery, performance |
-| H5: Measured intelligence | 12–15 | Optional semantic uplift, model migration, explanations, minimal UI, packaging |
+| Horizon                      | Technical phases | Outcome                                                                        |
+| ---------------------------- | ---------------- | ------------------------------------------------------------------------------ |
+| H1: Truth foundation         | 0–5             | Evaluation contract, scanner, snapshots, language parsing, stable chunks       |
+| H2: Retrieval and interfaces | 6–7             | Exact/lexical/graph retrieval and versioned CLI/MCP/REST evidence              |
+| H3: Change assurance         | 8–10            | Git impact, tests/docs/config/policy findings, complete reports                |
+| H4: Continuous freshness     | 11               | Incremental watcher, diagnostics, recovery, performance                        |
+| H5: Measured intelligence    | 12–15           | Optional semantic uplift, model migration, explanations, minimal UI, packaging |
 
 No calendar estimate is asserted until Phase 0 measures repository fixtures, staffing, parser reuse, packaging constraints, and the required Windows support matrix. Planning should use capacity ranges and demonstrated phase exit criteria rather than a single speculative completion date.
 
@@ -502,15 +502,15 @@ No calendar estimate is asserted until Phase 0 measures repository fixtures, sta
 
 A lean initial team can work effectively if responsibilities are explicit:
 
-| Responsibility | Accountable role |
-|---|---|
-| Product wedge, discovery, success metrics | Product lead |
-| Architecture, evidence contracts, technical quality | Staff/principal engineer |
-| Scanner, snapshots, storage, incremental indexing | Backend/platform engineer |
-| Language parsing and relationship extraction | Compiler/static-analysis engineer or strong language tooling engineer |
-| CLI, MCP, API, packaging, Windows reliability | Developer-experience engineer |
+| Responsibility                                          | Accountable role                                                           |
+| ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Product wedge, discovery, success metrics               | Product lead                                                               |
+| Architecture, evidence contracts, technical quality     | Staff/principal engineer                                                   |
+| Scanner, snapshots, storage, incremental indexing       | Backend/platform engineer                                                  |
+| Language parsing and relationship extraction            | Compiler/static-analysis engineer or strong language tooling engineer      |
+| CLI, MCP, API, packaging, Windows reliability           | Developer-experience engineer                                              |
 | Evaluation corpus, impact benchmarks, test intelligence | Applied ML/evaluation engineer with strong software-engineering background |
-| Threat model and provider controls | Security reviewer, initially part-time |
+| Threat model and provider controls                      | Security reviewer, initially part-time                                     |
 
 One person may own multiple responsibilities in an early build. Accountability must still be visible.
 
@@ -824,7 +824,6 @@ flowchart TD
 
 The deterministic index is the freshness boundary. Embeddings improve recall but must not block repository availability.
 
-
 ## 2.2 Repository Onboarding Workflow
 
 ```mermaid
@@ -917,7 +916,6 @@ flowchart TD
 ```
 
 A file save must not trigger repository-wide re-chunking or re-embedding.
-
 
 ---
 
@@ -1270,7 +1268,6 @@ MCP tool adapter
 ```
 
 Do not add Celery, RabbitMQ, Redis, Docker, a distributed vector service, or microservices during the initial implementation.
-
 
 ---
 
@@ -2054,7 +2051,6 @@ answer cache:
 repository + active snapshot + normalized query + retrieval policy + answer model + prompt version
 ```
 
-
 ## 4.8 Retrieval System
 
 CodeAtlas requires hybrid retrieval.
@@ -2167,15 +2163,15 @@ Do not invoke a model-based reranker for every query.
 
 Intent routing:
 
-| Query type | Default handling |
-|---|---|
-| Exact symbol or path | Exact and lexical retrieval only |
-| Find callers/dependencies | Relation graph traversal |
-| Find related tests | TESTS relation, imports, calls, and naming heuristics |
-| Change-impact analysis | Git, graph, rules, and deterministic scoring |
-| Configuration lookup | Exact key and lexical retrieval |
-| Broad conceptual explanation | Optional reranking |
-| Ambiguous natural-language question | Optional reranking |
+| Query type                          | Default handling                                      |
+| ----------------------------------- | ----------------------------------------------------- |
+| Exact symbol or path                | Exact and lexical retrieval only                      |
+| Find callers/dependencies           | Relation graph traversal                              |
+| Find related tests                  | TESTS relation, imports, calls, and naming heuristics |
+| Change-impact analysis              | Git, graph, rules, and deterministic scoring          |
+| Configuration lookup                | Exact key and lexical retrieval                       |
+| Broad conceptual explanation        | Optional reranking                                    |
+| Ambiguous natural-language question | Optional reranking                                    |
 
 Run rule-based fusion first. When needed, rerank only a small candidate set in one request rather than one request per candidate.
 
@@ -2365,36 +2361,36 @@ Use `watchdog` with event debouncing and duplicate-event coalescing.
 
 ## 5.1 Core Build Stack
 
-| Layer | Technology | Purpose | MVP status |
-|---|---|---|---|
-| Operating system | Windows 11 | Primary local environment | Required |
-| Shell | PowerShell 7 | Setup and automation | Required |
-| Backend language | Python 3.12+ | Core implementation | Required |
-| Dependency management | `uv` | Environments and locking | Required |
-| API framework | FastAPI | Local REST and internal API | Required |
-| Validation | Pydantic | Typed contracts | Required |
-| ORM and migrations | SQLAlchemy + Alembic | Persistent schema | Required |
-| Metadata and graph | SQLite | Embedded source of truth | Required |
-| Lexical search | SQLite FTS5 | Exact and BM25-style retrieval | Required |
-| Fuzzy matching | RapidFuzz | Identifier and path similarity | Required |
-| Parsing | Tree-sitter | Multi-language syntax parsing | Required |
-| Python enrichment | Python `ast` | Stronger Python semantics | Required |
-| TypeScript enrichment | TypeScript compiler API | Module and symbol resolution | Early follow-up |
-| Git | Git CLI, optionally GitPython | Diff, history, rename detection | Required |
-| File monitoring | watchdog | Incremental updates | Required |
-| CLI | Typer or argparse | Primary developer interface | Required |
-| MCP | MCP Python SDK or thin adapter | Coding-agent integration | Required |
-| Logging | structlog | Structured diagnostics | Required |
-| Testing | pytest + Hypothesis | Unit, integration, and property tests | Required |
-| Machine-readable reports | JSON + SARIF | Agent and CI consumption | Required |
-| Vector storage | LanceDB or replaceable adapter | Optional semantic retrieval | Deferred until exact/graph baseline |
-| Local embeddings | Sentence Transformers | Offline semantic retrieval | Optional |
-| Cloud embeddings | OpenAI embedding provider | Explicit opt-in semantic retrieval | Optional |
-| Local answering | Ollama adapter | Offline explanation | Optional |
-| Cloud answering | OpenAI Responses API adapter | Evidence-grounded explanation | Optional |
-| Browser UI | React + TypeScript | Minimal report viewer | Later |
-| Code viewer | Monaco | Rich evidence inspection | Later |
-| Graph viewer | React Flow | Visual traversal | Later |
+| Layer                    | Technology                     | Purpose                               | MVP status                          |
+| ------------------------ | ------------------------------ | ------------------------------------- | ----------------------------------- |
+| Operating system         | Windows 11                     | Primary local environment             | Required                            |
+| Shell                    | PowerShell 7                   | Setup and automation                  | Required                            |
+| Backend language         | Python 3.12+                   | Core implementation                   | Required                            |
+| Dependency management    | `uv`                         | Environments and locking              | Required                            |
+| API framework            | FastAPI                        | Local REST and internal API           | Required                            |
+| Validation               | Pydantic                       | Typed contracts                       | Required                            |
+| ORM and migrations       | SQLAlchemy + Alembic           | Persistent schema                     | Required                            |
+| Metadata and graph       | SQLite                         | Embedded source of truth              | Required                            |
+| Lexical search           | SQLite FTS5                    | Exact and BM25-style retrieval        | Required                            |
+| Fuzzy matching           | RapidFuzz                      | Identifier and path similarity        | Required                            |
+| Parsing                  | Tree-sitter                    | Multi-language syntax parsing         | Required                            |
+| Python enrichment        | Python`ast`                  | Stronger Python semantics             | Required                            |
+| TypeScript enrichment    | TypeScript compiler API        | Module and symbol resolution          | Early follow-up                     |
+| Git                      | Git CLI, optionally GitPython  | Diff, history, rename detection       | Required                            |
+| File monitoring          | watchdog                       | Incremental updates                   | Required                            |
+| CLI                      | Typer or argparse              | Primary developer interface           | Required                            |
+| MCP                      | MCP Python SDK or thin adapter | Coding-agent integration              | Required                            |
+| Logging                  | structlog                      | Structured diagnostics                | Required                            |
+| Testing                  | pytest + Hypothesis            | Unit, integration, and property tests | Required                            |
+| Machine-readable reports | JSON + SARIF                   | Agent and CI consumption              | Required                            |
+| Vector storage           | LanceDB or replaceable adapter | Optional semantic retrieval           | Deferred until exact/graph baseline |
+| Local embeddings         | Sentence Transformers          | Offline semantic retrieval            | Optional                            |
+| Cloud embeddings         | OpenAI embedding provider      | Explicit opt-in semantic retrieval    | Optional                            |
+| Local answering          | Ollama adapter                 | Offline explanation                   | Optional                            |
+| Cloud answering          | OpenAI Responses API adapter   | Evidence-grounded explanation         | Optional                            |
+| Browser UI               | React + TypeScript             | Minimal report viewer                 | Later                               |
+| Code viewer              | Monaco                         | Rich evidence inspection              | Later                               |
+| Graph viewer             | React Flow                     | Visual traversal                      | Later                               |
 
 ## 5.2 Suggested MVP Python Dependencies
 
@@ -2749,7 +2745,6 @@ flowchart TD
     V --> W[CLI, MCP, REST, JSON, Markdown, or SARIF]
 ```
 
-
 ## 7.2 Query Intent Types
 
 ```text
@@ -2770,20 +2765,20 @@ GENERAL_PROJECT
 
 ## 7.3 Intent-to-Retrieval Priority
 
-| Intent | Priority |
-|---|---|
-| LOCATE | Exact symbol → path → lexical |
-| EXPLAIN | Exact symbol → parent/children → semantic |
-| TRACE_FLOW | Route/symbol → graph → semantic |
-| FIND_CALLERS | Inbound CALLS/MAY_CALL graph |
-| FIND_DEPENDENCIES | Outbound graph |
-| FIND_TESTS | TESTS relations → lexical → naming heuristics |
-| FIND_DOCUMENTS | Exact reference → semantic |
-| IMPACT_ANALYSIS | Changed symbol → inbound/outbound graph → tests/docs |
-| ARCHITECTURE | Relations → architecture rules |
-| CONFIGURATION | Config keys → exact/lexical |
-| DATABASE | SQL/schema relations |
-| HISTORY | Git log, blame, diff |
+| Intent            | Priority                                               |
+| ----------------- | ------------------------------------------------------ |
+| LOCATE            | Exact symbol → path → lexical                        |
+| EXPLAIN           | Exact symbol → parent/children → semantic            |
+| TRACE_FLOW        | Route/symbol → graph → semantic                      |
+| FIND_CALLERS      | Inbound CALLS/MAY_CALL graph                           |
+| FIND_DEPENDENCIES | Outbound graph                                         |
+| FIND_TESTS        | TESTS relations → lexical → naming heuristics        |
+| FIND_DOCUMENTS    | Exact reference → semantic                            |
+| IMPACT_ANALYSIS   | Changed symbol → inbound/outbound graph → tests/docs |
+| ARCHITECTURE      | Relations → architecture rules                        |
+| CONFIGURATION     | Config keys → exact/lexical                           |
+| DATABASE          | SQL/schema relations                                   |
+| HISTORY           | Git log, blame, diff                                   |
 
 ## 7.4 Query Pipeline Pseudocode
 
@@ -4035,7 +4030,6 @@ POST   /v1/models/embedding-migrations/{migration_id}/activate
 
 The MCP server should expose the tools listed in Section 6.3 and return the same evidence contracts as REST. MCP is an adapter over application services, not a second implementation of repository logic.
 
-
 ---
 
 # 13. Evaluation and Acceptance Criteria
@@ -4091,21 +4085,21 @@ Evaluate separately:
 
 ## 13.5 Initial Engineering Targets
 
-| Metric | Target |
-|---|---:|
-| Valid file and line citations | 100% |
-| Exact symbol lookup on fixtures | ≥ 98% |
-| Primary evidence Recall@10 | ≥ 90% |
-| Unsupported factual claim rate | < 2% |
-| Incremental indexing correctness | 100% on fixture tests |
-| Storage consistency | 100% |
-| Parse failure visibility | 100% |
-| Working-tree change detection | 100% on fixture cases |
-| Active-snapshot leakage | 0 stale entities |
-| Re-embedding after one-symbol edit | Only changed unique content hashes |
-| Deterministic availability while semantic index is pending | 100% |
-| Embedding-model migration downtime | 0 |
-| Invalid MCP/REST evidence contracts | 0 |
+| Metric                                                     |                             Target |
+| ---------------------------------------------------------- | ---------------------------------: |
+| Valid file and line citations                              |                               100% |
+| Exact symbol lookup on fixtures                            |                             ≥ 98% |
+| Primary evidence Recall@10                                 |                             ≥ 90% |
+| Unsupported factual claim rate                             |                               < 2% |
+| Incremental indexing correctness                           |              100% on fixture tests |
+| Storage consistency                                        |                               100% |
+| Parse failure visibility                                   |                               100% |
+| Working-tree change detection                              |              100% on fixture cases |
+| Active-snapshot leakage                                    |                   0 stale entities |
+| Re-embedding after one-symbol edit                         | Only changed unique content hashes |
+| Deterministic availability while semantic index is pending |                               100% |
+| Embedding-model migration downtime                         |                                  0 |
+| Invalid MCP/REST evidence contracts                        |                                  0 |
 
 ## 13.6 Evaluation Dataset Example
 

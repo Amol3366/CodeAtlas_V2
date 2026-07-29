@@ -36,6 +36,20 @@ dev = [
 codeatlas = "codeatlas.cli.main:main"
 codeatlas-mcp = "codeatlas.mcp.server:main"
 
+# Optional semantic layer (Phase 7, ADR-0009). These extras are never required
+# for deterministic operation: an install without them behaves exactly like
+# Phases 0-6, and provider packages are imported lazily so their absence is not
+# an import error.
+[project.optional-dependencies]
+semantic-local = [
+    "lancedb>=0.34,<0.36",
+    "sentence-transformers>=5.6,<6",
+]
+semantic-openai = [
+    "lancedb>=0.34,<0.36",
+    "openai>=2.50,<3",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/codeatlas"]
 

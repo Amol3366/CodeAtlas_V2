@@ -30,6 +30,10 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 | [0006](0006-web-application-design.md) | Web application: persistence, streaming, sanitization, and evidence presentation | 5 |
 | [0007](0007-freshness-and-hardening-design.md) | The watcher is a trigger, never an authority; recovery, backup, and packaging decisions | 6 |
 | [0008](0008-accept-then-stream-message-submission.md) | Accept-then-stream message submission; `contract_version` 1.0 → 1.1 | 6 |
+| [0009](0009-measured-semantic-uplift.md) | Optional semantic layer admitted: provider-neutral embeddings, LanceDB base/delta with SQLite membership authoritative, per-repository privacy governance, shadow migration, measurement-admitted rerank/explanation | 7 |
 
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
+ADR-0009 admits the optional vector store the blueprint gates behind its
+activation approval, and records why no Section 25 item is triggered by
+default.

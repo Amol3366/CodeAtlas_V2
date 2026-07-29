@@ -33,6 +33,17 @@ _FIXTURE = (
 )
 
 
+def _expected_pending() -> list[int]:
+    """Every schema version the fixture still has to cross to reach this build.
+
+    Derived, not written out: the fixture is a real older artifact and stays
+    put, so the list grows with each migration. Since 0010 it has more than one
+    entry, which is the multi-step upgrade a literal would have stopped
+    covering.
+    """
+    return list(range(read_schema_version(_FIXTURE) + 1, SCHEMA_VERSION + 1))
+
+
 def _run(*arguments: str) -> tuple[int, str]:
     """Return the exit code and everything the command printed.
 
@@ -74,7 +85,7 @@ def test_upgrade_reports_the_versions_and_the_checkpoint(tmp_path: Path) -> None
     assert payload["upgraded"] is True
     assert payload["from_version"] == 8
     assert payload["to_version"] == SCHEMA_VERSION
-    assert payload["applied"] == [9]
+    assert payload["applied"] == _expected_pending()
     assert Path(payload["checkpoint_path"]).is_file()
     assert payload["counts"]["conversations"] == 3
 
@@ -162,7 +173,7 @@ def test_doctor_reports_the_schema_it_found(tmp_path: Path) -> None:
     payload = json.loads(output)
     assert payload["schema"]["found_version"] == 8
     assert payload["schema"]["expected_version"] == SCHEMA_VERSION
-    assert payload["schema"]["pending"] == [9]
+    assert payload["schema"]["pending"] == _expected_pending()
     assert code in (EXIT_SUCCESS, 4)  # the fixture's repository root is long gone
 
 

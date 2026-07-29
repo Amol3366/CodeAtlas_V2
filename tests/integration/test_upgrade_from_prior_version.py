@@ -35,6 +35,17 @@ _FIXTURE = (
 )
 
 
+def _expected_pending() -> tuple[int, ...]:
+    """Every schema version between the fixture's and this build's.
+
+    Derived rather than written out. The fixture is a real artifact of an older
+    build and stays where it is, so each new migration widens the gap it has to
+    cross — since migration 0010 this is a *multi-step* upgrade, which is
+    exactly the case a hand-edited literal would have stopped exercising.
+    """
+    return tuple(range(read_schema_version(_FIXTURE) + 1, SCHEMA_VERSION + 1))
+
+
 @pytest.fixture
 def manifest(prior_version_manifest: dict[str, Any]) -> dict[str, Any]:
     return prior_version_manifest
@@ -63,7 +74,7 @@ def test_planning_an_upgrade_changes_nothing(prior_database: Path) -> None:
 
     assert plan.current_version == read_schema_version(_FIXTURE)
     assert plan.target_version == SCHEMA_VERSION
-    assert plan.pending == (SCHEMA_VERSION,)
+    assert plan.pending == _expected_pending()
     assert plan.is_required
     assert prior_database.stat().st_mtime_ns == before
 
@@ -73,7 +84,7 @@ def test_upgrading_moves_the_schema_forward(prior_database: Path) -> None:
 
     assert result.from_version == 8
     assert result.to_version == SCHEMA_VERSION
-    assert result.applied == (9,)
+    assert result.applied == _expected_pending()
     assert read_schema_version(prior_database) == SCHEMA_VERSION
     check_integrity(prior_database)
 

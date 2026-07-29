@@ -1153,16 +1153,19 @@ Four qualifications were carried into the approval rather than resolved by it.
 - **The packaged executable is unsigned**, so Windows SmartScreen warns on
   first run. Signing needs a certificate, which is a purchasing decision.
 
-**Phase 7 is not active.** It needs its own product, privacy, and architecture
-approval before a plan is written at all — the gate below is separate from
-this one and has not been asked for. Live task status lives in
+**Phase 7's activation gate has been granted** — product, privacy, and
+architecture approval recorded 2026-07-29 in `docs/plans/PLAN.md` — and its
+phase plan is drafted at
+`docs/plans/phases/phase-07-measured-semantic-uplift.md`. No task may start
+until the user approves that plan. Live task status lives in
 `docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift
 
 Only after an approval gate:
 
-- [ ] Explicit product, privacy, and architecture approval recorded
+- [x] Explicit product, privacy, and architecture approval recorded
+  (2026-07-29, `docs/plans/PLAN.md` handoff)
 - [ ] Provider-neutral embedding interface
 - [ ] Content-hash embedding cache
 - [ ] LanceDB base/delta namespaces with authoritative SQLite membership

@@ -60,10 +60,138 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_nine() -> None:
-    """Phase 6's migration 0009 adds the per-repository watch switch. The pin is
-    deliberate: a version bump is a contract change someone must review."""
-    assert SCHEMA_VERSION == 9
+def test_schema_version_is_ten() -> None:
+    """Phase 7's migration 0010 adds the optional semantic layer's bookkeeping.
+    The pin is deliberate: a version bump is a contract change someone must
+    review."""
+    assert SCHEMA_VERSION == 10
+
+
+def test_semantic_tables_exist(tmp_path: Path) -> None:
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        rows = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
+    names = {row[0] for row in rows}
+    assert {
+        "embedding_namespaces",
+        "embeddings",
+        "repository_provider_policy",
+        "provider_usage",
+    } <= names
+
+
+def test_upgrading_an_existing_version_9_database_preserves_data(
+    tmp_path: Path,
+) -> None:
+    """Migration 0010 is additive; a version-9 database keeps its rows."""
+    database = tmp_path / "v9.sqlite"
+    with connect(database) as connection:
+        _apply_through_version(connection, 9)
+        assert current_version(connection) == 9
+        _insert_repository(connection, "repo_1")
+        _insert_snapshot(connection, "snap_1", "repo_1", "active")
+
+    with connect(database) as connection:
+        assert apply_migrations(connection) == SCHEMA_VERSION
+        repositories = connection.execute(
+            "SELECT COUNT(*) FROM repositories"
+        ).fetchone()[0]
+        embeddings = connection.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+
+    assert repositories == 1
+    assert embeddings == 0
+
+
+def test_an_upgraded_repository_has_no_provider_enabled(tmp_path: Path) -> None:
+    """The mirror image of the watch-switch default, and for the opposite
+    reason. `watch_enabled` defaults on because silence about staleness is the
+    harm; a provider defaults *off* because transmission is the harm. An
+    upgrade must never opt an existing repository into sending its source
+    anywhere (AGENTS.md Section 4.4).
+    """
+    with connect(tmp_path / "db.sqlite") as connection:
+        _apply_through_version(connection, 9)
+        _insert_repository(connection, "repo_1")
+
+        apply_migrations(connection)
+
+        rows = connection.execute(
+            "SELECT COUNT(*) FROM repository_provider_policy"
+        ).fetchone()[0]
+
+    assert rows == 0, "an upgrade must not write an opt-in row for anyone"
+
+
+def test_embeddings_are_not_bound_to_a_snapshot(tmp_path: Path) -> None:
+    """Deliberate: the cache is content-addressed, so an unchanged chunk keeps
+    its vector across snapshots and branches. A snapshot-scoped embedding row
+    would re-embed the whole corpus on every index (blueprint 8.21)."""
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(embeddings)")
+        }
+
+    assert "snapshot_id" not in columns
+    assert "repository_id" not in columns
+
+
+def test_deleting_a_repository_leaves_the_shared_embedding_cache_alone(
+    tmp_path: Path,
+) -> None:
+    """Two repositories can vendor the same file. Removing one must not delete
+    the other's vectors — the cache is keyed by content, not by owner.
+
+    The cost of that choice is orphaned rows once nothing references a hash;
+    that is a retention sweep's job (P7-04), not a cascade's.
+    """
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        _insert_repository(connection, "repo_1")
+        connection.execute(
+            "INSERT INTO embedding_namespaces ("
+            " namespace_id, model_id, dimensions, normalization_version, status,"
+            " created_at, activated_at"
+            ") VALUES ('m_1d_v', 'm', 1, 'v', 'active', '2026-07-29T00:00:00Z', NULL)"
+        )
+        connection.execute(
+            "INSERT INTO embeddings ("
+            " embedding_key, namespace_id, content_hash, status, created_at,"
+            " embedded_at, failure_code"
+            ") VALUES ('emb_1', 'm_1d_v', 'hash', 'embedded',"
+            " '2026-07-29T00:00:00Z', '2026-07-29T00:00:00Z', NULL)"
+        )
+
+        connection.execute("DELETE FROM repositories WHERE repository_id = 'repo_1'")
+
+        remaining = connection.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+
+    assert remaining == 1
+
+
+def test_deleting_a_repository_removes_its_usage_records(tmp_path: Path) -> None:
+    """Usage is about one repository and is deleted with it, unlike the shared
+    cache above. Section 18's deletion and retention behaviour."""
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        _insert_repository(connection, "repo_1")
+        connection.execute(
+            "INSERT INTO provider_usage ("
+            " usage_id, repository_id, operation, provider, model_id,"
+            " request_count, token_count, latency_ms, outcome, occurred_at"
+            ") VALUES ('u1', 'repo_1', 'embed_documents', 'openai', 'm',"
+            " 1, 10, 5, 'ok', '2026-07-29T00:00:00Z')"
+        )
+
+        connection.execute("DELETE FROM repositories WHERE repository_id = 'repo_1'")
+
+        remaining = connection.execute(
+            "SELECT COUNT(*) FROM provider_usage"
+        ).fetchone()[0]
+
+    assert remaining == 0
 
 
 def test_watch_enabled_defaults_to_on_for_an_existing_repository(

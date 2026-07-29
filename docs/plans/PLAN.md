@@ -2,12 +2,12 @@
 
 Status: active  
 Plan contract version: 1.0  
-Policy authority: `CLAUDE.md`  
+Policy authority: `AGENTS.md`  
 Blueprint: `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`
 
 ## Rules for Every Coding Agent
 
-1. Read `CLAUDE.md`, this file, and the active phase plan before acting.
+1. Read `AGENTS.md`, this file, and the active phase plan before acting.
 2. Inspect the workspace, available Git state, and the latest handoff.
 3. Work only on the single task marked `ready`, `in_progress`, or `verifying`.
 4. Do not start a task until every declared dependency is `complete`.
@@ -43,19 +43,40 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 4 — Change assurance | [phase plan](phases/phase-04-change-assurance.md) | `complete` | User |
 | 5 — Persistent web application | [phase plan](phases/phase-05-persistent-web-application.md) | `complete` | User |
 | 6 — Continuous freshness and hardening | [phase plan](phases/phase-06-freshness-and-hardening.md) | `complete` (gate approved by the user 2026-07-29) | User |
-| 7 — Measured semantic uplift | Created only after its additional approval gate | `pending` — **not activated**; needs explicit product, privacy, and architecture approval first | User |
+| 7 — Measured semantic uplift | [phase plan](phases/phase-07-measured-semantic-uplift.md) | `in_progress` — plan approved by the user 2026-07-29 | User |
 
 ## Active Work
 
 | Field | Value |
 | --- | --- |
-| Active phase | none — **Phases 0–6 are `complete`.** Phase 7 is not activated |
-| Active task | none — the post-approval defect fix is complete |
-| Task status | Phases 0–6 `complete`, every gate approved by the user. One qualification carried by the Phase 6 approval has since been fixed |
+| Active phase | 7 — **plan approved by the user 2026-07-29** |
+| Active task | P7-02 |
+| Task status | `ready` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-29T05:10:00Z (post-approval defect fix) |
-| Git state | Branch `main` at `f9a7812` (the access-log fix). The working tree carries the user's own uncommitted trailing-whitespace cleanup in the blueprint, untouched throughout Phase 6. |
-| Next gate | **Phase 7's activation gate**, which is separate from a completion gate and has not been requested. `CLAUDE.md` Section 20 requires explicit product, privacy, and architecture approval to be recorded *before* a Phase 7 plan is written. No agent may begin Phase 7 work until that approval exists. |
+| Started UTC | 2026-07-29T13:40:00Z (P7-SETUP recovery and P7-01) |
+| Git state | Branch `main` at `600b903` plus the P7-SETUP/P7-01 commit below. `CLAUDE.md` is now `AGENTS.md` on the user's instruction; the in-text citations in 37 files still say `CLAUDE.md` and were deliberately left, because rewriting historical ADR and baseline records is not a rename. |
+| Next gate | The Phase 7 completion gate, per the phase plan's 12 conditions |
+
+### Phase 7 Task Board
+
+| Task | Deliverable | Dependencies | Status |
+| --- | --- | --- | --- |
+| P7-SETUP | ADR-0009, optional deps, `check_phase7.ps1` skeleton, comparison baseline | Phase 6 | `complete` |
+| P7-01 | Semantic domain, migration `0010`, stores | P7-SETUP | `complete` |
+| P7-02 | `EmbeddingProvider` interface, NoOp + local provider, content-hash cache | P7-01 | `ready` |
+| P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces | P7-01 | `pending` |
+| P7-04 | Index-time embedding pipeline, coverage tracking, crash-safe jobs | P7-02, P7-03 | `pending` |
+| P7-05 | Semantic retrieval channel, candidate-only fusion, fallback matrix | P7-04 | `pending` |
+| P7-06 | Uplift evaluation vs deterministic baseline, `baseline-phase-7`, admission decision | P7-05 | `pending` |
+| P7-07 | Privacy governance + OpenAI provider: opt-in, redaction, budgets, telemetry | P7-02, P7-05 | `pending` |
+| P7-08 | Settings surface (Section 12.5): REST, CLI, web settings page | P7-07 | `pending` |
+| P7-09 | Shadow embedding migration, cutover/rollback, migration endpoints | P7-03, P7-04 | `pending` |
+| P7-10 | Optional bounded reranking, uplift A/B, admission decision | P7-06 | `pending` |
+| P7-11 | Optional evidence-grounded explanation, steps 14–15, admission decision | P7-06, P7-07 | `pending` |
+| P7-12 | Perf/packaging/security validation, docs, phase gate | P7-06, P7-08, P7-09, P7-10, P7-11 | `pending` |
+
+Detail, gate conditions, and the four user decisions behind the scope live in
+the [Phase 7 plan](phases/phase-07-measured-semantic-uplift.md).
 
 ### Phase 6 Task Board (active)
 
@@ -184,6 +205,215 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-29T13:40:00Z — P7-SETUP recovered and completed; P7-01 completed; P7-02 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `600b903`.
+- Transitions: P7-SETUP `in_progress -> complete` (recovered in place, rule 9);
+  P7-01 `pending -> in_progress -> complete`; P7-02 `pending -> ready`.
+
+#### What was recovered, and what the state actually was
+
+P7-SETUP was left `in_progress` by the previous agent with no handoff entry —
+rule 5 requires one before implementation, so the task's real state had to be
+read from the working tree rather than the log. Present and uncommitted:
+ADR-0009 (with the pre-torch packaging baseline measured), the
+`semantic-local` / `semantic-openai` extras in `pyproject.toml`, and the
+resolved `uv.lock`. Missing: `scripts/check_phase7.ps1` and the comparison
+baseline. Existing work was preserved and continued, not restarted.
+
+Three documents disagreed with each other and were reconciled: PLAN.md said
+the plan was approved while its own board header said "awaiting user
+approval", and `phase-07-...md` still said `plan_drafted`. The user's
+instruction this session confirms the approval, so the two stale statements
+were corrected to match.
+
+**`CLAUDE.md` is now `AGENTS.md`**, on the user's explicit instruction
+("CLAUDE.md is formally AGENTS.md"), via `git mv` so history follows the file.
+PLAN.md and ADR-0009 already referenced `AGENTS.md`; they are now correct. The
+37 files whose *prose* cites "CLAUDE.md Section N" were deliberately left
+alone — those are ADRs and baseline records describing what was decided at the
+time, and a rename is not a reason to rewrite them.
+
+#### P7-SETUP: what was added
+
+`scripts/check_phase7.ps1`. It inherits Phase 6's gate and adds two things
+that matter for this phase:
+
+- The deterministic half runs with **no extras installed**. `uv sync` is
+  deliberately not `--all-extras`, so every check above the semantic block
+  proves what a non-opted-in installation actually does — which is gate
+  condition 2, and would be silently lost if the gate needed torch to start.
+- The semantic half is opt-in (`-Semantic`), following the `-Package`
+  precedent: skipped work announces itself and its reason. It installs the
+  extras and runs `tests/semantic` once P7-02 creates it.
+
+The Phase 4 baseline check is relabelled as **the Phase 7 comparison point**,
+because gate conditions 5 and 7 both read against it: a provider-disabled run
+must score identically to it, and uplift is measured over it. Both readings
+are worthless if the deterministic numbers drift while the semantic layer is
+built, so `--check` is what pins them.
+
+#### P7-01: the semantic domain and migration `0010`
+
+Additive and forward-only. Four tables — `embedding_namespaces`, `embeddings`,
+`repository_provider_policy`, `provider_usage` — and `SCHEMA_VERSION` 9 → 10.
+
+Three decisions are worth naming because each has a failure mode:
+
+1. **No opt-in row is written by the migration, and absence means `none`.**
+   `ProviderPolicyStore.get` returns a policy rather than `None`, defaulting
+   to `EmbeddingProviderKind.NONE`. A default that depended on a row being
+   written correctly would turn a failed insert, a partial restore, or an
+   upgrade into a disclosure. This is the mirror image of `watch_enabled`
+   defaulting *on* in migration 0009, and for the opposite reason: silence
+   about staleness is that column's harm, transmission is this one's.
+2. **The embedding cache is not scoped to a snapshot or a repository.** The
+   key is content-addressed, so an unchanged chunk keeps its vector across
+   snapshots and branches — the cost contract of blueprint 8.21. The price is
+   rows outliving the last chunk that referenced their hash, which is a
+   retention sweep's job (P7-04) and explicitly not a cascade's: a cascade
+   would delete vectors another repository is still using. `provider_usage`
+   *does* cascade, because it is about one repository.
+3. **A namespace ID is a readable slug, and therefore validated.** It becomes
+   a directory name under the vectors root and one of its inputs is a model ID
+   typed into settings — untrusted input by Section 4.4. `embedding_namespace_id`
+   rejects rather than sanitises (a silently rewritten model ID would leave a
+   namespace whose name no longer identifies the model that filled it), and
+   `NamespaceStore.add` re-validates, because a namespace ID can also arrive
+   from a request body or a restored row.
+
+A partial unique index enforces one `active` namespace, mirroring the
+one-active-snapshot rule; a shadow namespace can fill without answering
+queries, which is what P7-09's zero-downtime cutover needs.
+
+#### Four tests changed, and why that is not a papering-over
+
+Bumping `SCHEMA_VERSION` broke four assertions that hardcoded a single-step
+upgrade (`applied == (9,)`, `pending == [9]`). They now derive the expected
+list from the fixture's own version:
+`range(read_schema_version(fixture) + 1, SCHEMA_VERSION + 1)`.
+
+The committed fixture stays a **real** schema-8 artifact produced by an older
+build, so it now has to cross two migrations instead of one. That is strictly
+more coverage than before — a multi-step upgrade is a case a hardcoded literal
+would have stopped exercising — and it is why a schema-9 fixture was not
+generated to make the numbers match again.
+
+#### Files created or changed
+
+- `AGENTS.md` (renamed from `CLAUDE.md`)
+- `scripts/check_phase7.ps1`
+- `src/codeatlas/domain/semantic.py`,
+  `src/codeatlas/domain/ids.py` (`embedding_key`, `embedding_namespace_id`,
+  `validate_namespace_id`)
+- `src/codeatlas/storage/sqlite/migrations/0010_phase7_semantic.sql`,
+  `src/codeatlas/storage/sqlite/migrations.py` (`SCHEMA_VERSION` 10),
+  `src/codeatlas/storage/sqlite/semantic_stores.py`
+- `tests/unit/test_semantic_identity.py`,
+  `tests/integration/test_semantic_store.py`,
+  `tests/integration/test_migrations.py`,
+  `tests/integration/test_upgrade_from_prior_version.py`,
+  `tests/contract/test_upgrade_command.py`
+- `docs/plans/PLAN.md`, `docs/plans/phases/phase-07-measured-semantic-uplift.md`
+
+#### Contracts and compatibility
+
+`contract_version` stays `"1.1"` — nothing here reaches a response envelope
+yet. `SCHEMA_VERSION` 9 → 10, additive; migrations `0001`–`0009` untouched. No
+new dependency is required: `semantic_stores.py` imports nothing optional, and
+the extras remain uninstalled in the default environment.
+
+#### Verification in this environment
+
+- Tests written first and **observed failing** (`ImportError: cannot import
+  name 'embedding_key'`), then implemented.
+- `uv run pytest -q` — **1430 passed**, 1 warning, 252.97s. Baseline before
+  this work was 1382 passed, so 48 tests were added and none were lost.
+- `uv run ruff check src tests scripts apps` — All checks passed.
+- `uv run mypy --no-incremental src tests scripts apps` — no issues, 236 source
+  files.
+- `scripts/check_phase7.ps1 -SkipSync -SkipWeb` — exit 0, including the
+  contract-schema freshness check and all four evaluation baselines under
+  `--check`.
+
+#### Limitations
+
+- No embedding, vector-store, or provider code exists yet; the tables are
+  empty in every installation. `tests/semantic/` does not exist, so
+  `check_phase7.ps1 -Semantic` reports that and skips.
+- The packaging measurement gate condition 12 asks for is still unmeasured:
+  ADR-0009 carries only the pre-torch figures (42.7 MB folder / 20.0 MB zip).
+  The `uv.lock` resolution shows torch 2.13.0's CUDA dependencies are all
+  `sys_platform == 'linux'` gated and the Windows wheel is 122 MB, so the
+  plan's "~1–2 GB" estimate is likely high for this platform — but that is an
+  inference from the lockfile, not a measurement, and P7-12 must measure it.
+
+- Next: **P7-02** — `EmbeddingProvider` interface, `NoEmbeddingProvider`, the
+  pinned local sentence-transformers provider, and the content-hash cache.
+
+
+### 2026-07-29T07:15:00Z — Phase 7 activation approval recorded; phase plan drafted and awaiting the user's approval
+
+- Agent: OpenCode `kimi-k3`, branch `main` at `600b903` (plus the two docs
+  edits below, uncommitted).
+- Scope: **Phase 7 activation gate and plan drafting only.** No task started;
+  no code changed. Per rule 11, every Phase 7 task stays `pending` until the
+  user approves the plan.
+
+#### The activation gate, granted
+
+The user instructed "start with plan of Phase 7" and then explicitly granted
+**product, privacy, and architecture approval** for Phase 7 when asked, which
+`AGENTS.md` Section 20 requires to be recorded *before* a plan is written.
+This entry is that record. The first Phase 7 checklist box in `AGENTS.md` is
+now checked.
+
+#### The four decisions the user made, and what each became in the plan
+
+1. **Record full activation approval, then draft the plan.** This entry; the
+   plan itself is a separate approval the user has not yet been asked for.
+2. **Provider scope: local + OpenAI opt-in**, behind one provider-neutral
+   interface, `NoEmbeddingProvider` default. (Plan decisions 1 and 5.)
+3. **Local runtime: sentence-transformers + torch**, accepting the ~1–2 GB
+   installer consequence, with the requirement that ADR-0009 records the
+   measured size and the package stays functional. (Plan decision 4.)
+4. **One phase, measurement admits:** embeddings, migration, and privacy land
+   first; reranking and explanation land last and are admitted **only** on
+   measured uplift, else declined with the measurement recorded. (Plan
+   decision 8; gate conditions 9 and 10.)
+
+#### What was produced
+
+- `docs/plans/phases/phase-07-measured-semantic-uplift.md` — outcome, the four
+  decisions, a 12-row completion-gate table mapping `AGENTS.md` Section 20's
+  checklist to measurements, global constraints, non-goals, eight architecture
+  decisions (ADR-0009's content), a 13-task board (P7-SETUP + P7-01…P7-12) with
+  dependencies, and the verification approach.
+- This file: Phase 7 index row, Active Work, the Phase 7 task board, and the
+  two `CLAUDE.md` → `AGENTS.md` policy-authority references, updated to match
+  the rename the user's working tree already carries.
+- `AGENTS.md`: the Phase 7 approval checklist box checked, and the stale
+  "Phase 7 is not active" paragraph replaced with the current state.
+
+#### Grounding facts the plan is built on
+
+`semantic_coverage` exists in the envelope but is hardcoded `0.0`; the
+`semantic_candidate`/`model_generated` derivations and `PARTIAL` freshness
+already exist; `AnswerPipeline` names steps 14–15 as Phase 7's seam; the
+Section 12.1 `semantic-status` and Section 12.5 settings/models endpoints are
+unimplemented spec gaps the plan closes (the P6-STREAM pattern, not scope
+expansion); no settings domain exists beyond a theme toggle.
+
+#### Verification
+
+Documentation and planning artifacts only — no executable behavior changed, so
+no test suite was run; claiming one passed would violate Section 22. The plan
+itself carries the verification approach each task must follow.
+
+- Next: **the user's decision on the Phase 7 plan.** On approval, P7-SETUP
+  becomes `ready`; any requested change is made to the plan first.
+
 
 ### 2026-07-29T05:10:00Z — Post-approval: the "crash" was a blocked write, and it is fixed
 

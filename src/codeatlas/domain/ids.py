@@ -13,9 +13,18 @@ inputs is idempotent.
 from __future__ import annotations
 
 import hashlib
+import re
+
+from codeatlas.domain.errors import PathSafetyError
 
 _FIELD_SEPARATOR = "\x1f"
 _DIGEST_LENGTH = 32
+
+# A namespace ID becomes a directory name under the vectors root, and one of
+# its inputs is a model ID a user types into settings. Allowing only this set
+# means no separator, no traversal, no drive letter, no control character, and
+# no bidirectional-override character can reach a path join.
+_NAMESPACE_TOKEN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
 def stable_hash(*parts: str) -> str:
@@ -166,3 +175,77 @@ def evidence_id(
         str(end_line),
     )
     return f"ev_{digest}"
+
+
+def embedding_key(
+    content_hash: str,
+    model_id: str,
+    dimensions: int,
+    normalization_version: str,
+) -> str:
+    """Identify one embedding of one piece of content under one model.
+
+    Content-addressed on purpose: an unchanged chunk keeps its key across
+    snapshots and branches, so a normal edit embeds only what changed rather
+    than the corpus (blueprint 8.21). The model, dimensions, and normalization
+    participate because vectors from different models must never share a
+    similarity space (blueprint 4.7.6) — an identity that ignored them would
+    let one model's vector answer for another's.
+    """
+    if dimensions <= 0:
+        raise ValueError("dimensions must be positive")
+    digest = stable_hash(
+        content_hash, model_id, str(dimensions), normalization_version
+    )
+    return f"emb_{digest}"
+
+
+def embedding_namespace_id(
+    model_id: str,
+    dimensions: int,
+    normalization_version: str,
+) -> str:
+    """Name one similarity space.
+
+    Unlike every other identity here this is a readable slug rather than a
+    digest, because it names a directory an operator will read while deciding
+    whether a migration is safe to cut over.
+
+    That readability is exactly why it is validated: the model ID arrives from
+    settings, and settings are untrusted input. A rejected value is better than
+    a sanitised one — silently rewriting ``text-embedding-3-small`` into
+    something else would leave a namespace whose name no longer identifies the
+    model that filled it.
+    """
+    if dimensions <= 0:
+        raise ValueError("dimensions must be positive")
+    model = _namespace_token(model_id, field="model_id")
+    normalization = _namespace_token(
+        normalization_version, field="normalization_version"
+    )
+    return f"{model}_{dimensions}d_{normalization}"
+
+
+def _namespace_token(value: str, *, field: str) -> str:
+    token = value.strip().casefold()
+    if not _NAMESPACE_TOKEN.match(token):
+        raise PathSafetyError(
+            "A vector namespace name must be a simple identifier.",
+            details={"field": field},
+        )
+    return token
+
+
+def validate_namespace_id(namespace_id: str) -> str:
+    """Reject a namespace ID that could not safely become a directory name.
+
+    Defence in depth. Identity construction already validates its inputs, but
+    a namespace ID can also arrive from a stored row or a request body, and
+    every path that reaches a filesystem join must be checked at that join
+    rather than trusting where the string came from.
+    """
+    if not namespace_id or len(namespace_id) > 128:
+        raise PathSafetyError("A vector namespace name is missing or too long.")
+    if not _NAMESPACE_TOKEN.match(namespace_id):
+        raise PathSafetyError("A vector namespace name must be a simple identifier.")
+    return namespace_id
