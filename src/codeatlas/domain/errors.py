@@ -44,6 +44,8 @@ class ErrorCode(StrEnum):
     RESTORE_INCOMPATIBLE = "RESTORE_INCOMPATIBLE"
     INTEGRITY_CHECK_FAILED = "INTEGRITY_CHECK_FAILED"
     SCHEMA_VERSION_UNSUPPORTED = "SCHEMA_VERSION_UNSUPPORTED"
+    PROVIDER_DISABLED = "PROVIDER_DISABLED"
+    PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -308,3 +310,34 @@ class IntegrityCheckFailedError(CodeAtlasError):
     """
 
     code = ErrorCode.INTEGRITY_CHECK_FAILED
+
+
+class ProviderDisabledError(CodeAtlasError):
+    """A model provider was asked to work while switched off.
+
+    Reaching this is not a user-facing failure in normal operation: the
+    deterministic path never calls a provider, so the caller falls back and
+    answers without one. It exists so that a wiring mistake fails loudly
+    instead of a disabled provider returning zero vectors, which would rank
+    every candidate equally and look like a working search.
+
+    Not retryable. Nothing to retry — someone chose this setting.
+    """
+
+    code = ErrorCode.PROVIDER_DISABLED
+
+
+class ProviderUnavailableError(CodeAtlasError):
+    """A provider is selected but cannot run here.
+
+    The common cause is the one a user actually hits: the setting was switched
+    on before the optional extra was installed. The message names the extra,
+    because an ``ImportError`` surfacing from three frames down does not tell
+    anyone what to do next.
+
+    Retryable: installing the package, restoring the network, or restoring the
+    credential fixes it without changing any setting.
+    """
+
+    code = ErrorCode.PROVIDER_UNAVAILABLE
+    retryable = True

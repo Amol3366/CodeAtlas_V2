@@ -50,10 +50,10 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | 7 — **plan approved by the user 2026-07-29** |
-| Active task | P7-02 |
+| Active task | P7-03 |
 | Task status | `ready` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-29T13:40:00Z (P7-SETUP recovery and P7-01) |
+| Started UTC | 2026-07-29T15:10:00Z (P7-02) |
 | Git state | Branch `main` at `600b903` plus the P7-SETUP/P7-01 commit below. `CLAUDE.md` is now `AGENTS.md` on the user's instruction; the in-text citations in 37 files still say `CLAUDE.md` and were deliberately left, because rewriting historical ADR and baseline records is not a rename. |
 | Next gate | The Phase 7 completion gate, per the phase plan's 12 conditions |
 
@@ -63,8 +63,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | --- | --- | --- | --- |
 | P7-SETUP | ADR-0009, optional deps, `check_phase7.ps1` skeleton, comparison baseline | Phase 6 | `complete` |
 | P7-01 | Semantic domain, migration `0010`, stores | P7-SETUP | `complete` |
-| P7-02 | `EmbeddingProvider` interface, NoOp + local provider, content-hash cache | P7-01 | `ready` |
-| P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces | P7-01 | `pending` |
+| P7-02 | `EmbeddingProvider` interface, NoOp + local provider, content-hash cache | P7-01 | `complete` |
+| P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces | P7-01 | `ready` |
 | P7-04 | Index-time embedding pipeline, coverage tracking, crash-safe jobs | P7-02, P7-03 | `pending` |
 | P7-05 | Semantic retrieval channel, candidate-only fusion, fallback matrix | P7-04 | `pending` |
 | P7-06 | Uplift evaluation vs deterministic baseline, `baseline-phase-7`, admission decision | P7-05 | `pending` |
@@ -205,6 +205,130 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-29T15:10:00Z — P7-02 completed; P7-03 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `56d1f38`.
+- Transition: P7-02 `ready -> in_progress -> verifying -> complete`;
+  P7-03 `pending -> ready`.
+
+#### What was built
+
+`src/codeatlas/semantic/` — the provider seam and the content-hash cache.
+
+`providers.py` holds the ADR-0009 Protocol verbatim, `NoEmbeddingProvider`,
+`LocalSentenceTransformerProvider` (pinned `all-MiniLM-L6-v2`, 384 dimensions,
+CPU, L2-normalized), a `build_embedding_provider(policy)` factory, and a
+`describe_available_providers()` probe. `cache.py` holds `EmbeddingCache`.
+
+Four decisions with failure modes worth naming:
+
+1. **Nothing optional is imported at module scope.** A test asserts
+   `sentence_transformers` and `torch` are absent from `sys.modules` after
+   importing `providers`. Without the lazy import, every CLI invocation on
+   every installation would pay a multi-second torch import, and a machine
+   without the extras could not start at all.
+2. **A disabled provider refuses; it does not return zeros.** A zero vector
+   ranks every candidate equally — indistinguishable from a working search
+   returning poor results. `NoEmbeddingProvider` raises `ProviderDisabledError`
+   (not retryable) and carries `dimensions = 0`, which is structurally
+   unable to hold a namespace since `embedding_namespace_id` rejects
+   non-positive widths.
+3. **The cache never calls a disabled provider, and writes no rows for one.**
+   Every default installation runs this path on every index; it is a quiet
+   no-op returning `skipped_because_disabled`. Writing `pending` rows for a
+   repository that will never embed would report a coverage figure that could
+   never reach 1.0.
+4. **A provider failure is recorded, not raised.** Gate condition 5 wants a
+   failing provider to degrade to a useful deterministic result, which an
+   exception reaching the indexing pipeline is the opposite of. The `except`
+   is deliberately broad — a provider is third-party code and a socket
+   timeout, a tokenizer assertion, and a CUDA error all mean the same thing
+   here — and a `PROVIDER_FAILED` *code* is stored rather than the provider's
+   message, because messages quote the payload that caused them and payloads
+   are repository content. A count mismatch is caught separately
+   (`PROVIDER_COUNT_MISMATCH`): zipping a short reply would assign vectors to
+   the wrong content, silently.
+
+Two new error codes, `PROVIDER_DISABLED` and `PROVIDER_UNAVAILABLE`. The
+distinction is not cosmetic: unavailable is retryable (install the extra) and
+disabled is not (someone chose the setting), so a client that retries can tell
+which one it is looking at.
+
+#### The cost contract, measured
+
+`tests/integration/test_embedding_cache.py` uses a fake provider that records
+every text it was asked to embed, because the assertion that matters is not
+"the right vectors came back" but "the wrong work never happened". Against
+three chunks with one edited, the provider is asked for exactly the edited
+one. Duplicate content inside a batch is embedded once. The store is real
+SQLite throughout, per Section 19.1 — a cache tested against a mocked store
+would prove nothing about the query that decides what is missing.
+
+#### `tests/semantic/`: skipped, not hidden
+
+The directory runs against the real model with no mocking. It is gated by
+`collect_ignore_glob` in the root conftest rather than `norecursedirs`, so
+`pytest -q` still names the skip in an environment without the extra — an
+excluded directory is invisible, and invisible tests are how a suite quietly
+stops covering something. The gating lives in `tests/conftest.py` because a
+second conftest module collides with it under mypy.
+
+Running them surfaced a real deprecation: `get_sentence_embedding_dimension`
+was renamed inside the pinned `>=5.6,<6` range. `_embedding_dimension` now
+tries both names. It reads the width from the model rather than trusting
+`LOCAL_MODEL_DIMENSIONS`, because the width is what the namespace is built
+from and a disagreement must be caught rather than assumed.
+
+#### Files created or changed
+
+- `src/codeatlas/semantic/__init__.py`, `providers.py`, `cache.py`
+- `src/codeatlas/domain/errors.py` (two codes, two exception classes)
+- `pyproject.toml` (mypy override for the optional provider packages, so type
+  checking passes in the environment the deterministic gate runs in)
+- `tests/unit/test_embedding_providers.py`,
+  `tests/integration/test_embedding_cache.py`,
+  `tests/semantic/test_local_provider.py`, `tests/conftest.py`
+
+#### Contracts and compatibility
+
+`contract_version` stays `"1.1"`; nothing here reaches a response envelope.
+`SCHEMA_VERSION` stays 10. The two new error codes are additive — no adapter
+raises them yet, since nothing constructs a real provider outside a test.
+
+#### Verification in this environment
+
+Tests written first and observed failing before each implementation.
+
+Deterministic environment (extras **not** installed — the environment gate
+condition 2 is about):
+
+- `uv run pytest -q` — **1451 passed**, 1 warning (1430 before P7-02).
+- `uv run ruff check src tests scripts apps` — All checks passed.
+- `uv run mypy --no-incremental src tests scripts apps` — no issues, 242 files.
+
+With `--extra semantic-local` installed, against the real model:
+
+- `uv run pytest -q tests/semantic` — **6 passed**, first run 142.87s
+  (model download), 17.43s once cached, no warnings after the rename fix.
+- The extras were then removed and the deterministic suite re-run to confirm
+  the default environment is unchanged.
+
+#### Limitations
+
+- Vectors are returned to the caller and thrown away: there is nowhere to put
+  them until P7-03 lands the `VectorStore`. `EmbeddingCache` is therefore not
+  yet wired into indexing — that is P7-04.
+- `build_embedding_provider` refuses `openai` with `PROVIDER_UNAVAILABLE`. The
+  setting is storable, so something has to answer for it; refusing until
+  P7-07 lands redaction, budgets, and opt-in is the honest answer, since the
+  provider must never be usable without them.
+- `describe_available_providers()` reports OpenAI as unavailable
+  unconditionally for the same reason, rather than probing for the package.
+
+- Next: **P7-03** — `VectorStore` interface, LanceDB adapter, base/delta
+  namespaces, and membership-authoritative filtering.
+
 
 ### 2026-07-29T13:40:00Z — P7-SETUP recovered and completed; P7-01 completed; P7-02 `ready`
 

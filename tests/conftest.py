@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,40 @@ import pytest
 PRIOR_VERSION_DATABASE = (
     Path(__file__).resolve().parent / "fixtures" / "upgrade" / "schema_0008.db"
 )
+
+
+def _is_installed(module: str) -> bool:
+    try:
+        return find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+# `tests/semantic/` drives a real embedding model and therefore needs the
+# optional `semantic-local` extra. Skipping the directory when the extra is
+# absent — rather than excluding it in `norecursedirs` — keeps the tests
+# *visible*: `pytest -q` still names them, so a suite that stopped covering
+# the provider says so instead of quietly shrinking.
+#
+# `check_phase7.ps1 -Semantic` installs the extra, at which point these run for
+# real. The gating lives here, in the one conftest this suite has, because a
+# second conftest module collides with this one under mypy.
+collect_ignore_glob: list[str] = []
+if not _is_installed("sentence_transformers"):
+    collect_ignore_glob.append("semantic/*")
+
+
+@pytest.fixture(scope="session")
+def local_provider() -> Any:
+    """A real, pinned local embedding model.
+
+    Session-scoped because loading it takes seconds and downloading it takes
+    considerably longer. Per-test construction would make the suite slow enough
+    that it stopped being run, which is the first step towards it not working.
+    """
+    from codeatlas.semantic.providers import LocalSentenceTransformerProvider
+
+    return LocalSentenceTransformerProvider()
 
 SERVICE_SOURCE = (
     "from .idempotency import IdempotencyStore\n"

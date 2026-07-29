@@ -103,3 +103,17 @@ module = [
     "tree_sitter_typescript",
 ]
 ignore_missing_imports = true
+
+# The Phase 7 extras are optional by design, so type checking must pass in an
+# environment where they are not installed — the same environment the
+# deterministic gate runs in. Scoped to the provider packages themselves;
+# everything in `codeatlas.semantic` that wraps them stays fully typed.
+[[tool.mypy.overrides]]
+module = [
+    "lancedb",
+    "lancedb.*",
+    "openai",
+    "openai.*",
+    "sentence_transformers",
+]
+ignore_missing_imports = true
