@@ -50,10 +50,10 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | 7 — **plan approved by the user 2026-07-29** |
-| Active task | P7-03 |
+| Active task | P7-04 |
 | Task status | `ready` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-29T15:10:00Z (P7-02) |
+| Started UTC | 2026-07-29T16:05:00Z (P7-03) |
 | Git state | Branch `main` at `600b903` plus the P7-SETUP/P7-01 commit below. `CLAUDE.md` is now `AGENTS.md` on the user's instruction; the in-text citations in 37 files still say `CLAUDE.md` and were deliberately left, because rewriting historical ADR and baseline records is not a rename. |
 | Next gate | The Phase 7 completion gate, per the phase plan's 12 conditions |
 
@@ -64,8 +64,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P7-SETUP | ADR-0009, optional deps, `check_phase7.ps1` skeleton, comparison baseline | Phase 6 | `complete` |
 | P7-01 | Semantic domain, migration `0010`, stores | P7-SETUP | `complete` |
 | P7-02 | `EmbeddingProvider` interface, NoOp + local provider, content-hash cache | P7-01 | `complete` |
-| P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces | P7-01 | `ready` |
-| P7-04 | Index-time embedding pipeline, coverage tracking, crash-safe jobs | P7-02, P7-03 | `pending` |
+| P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces | P7-01 | `complete` |
+| P7-04 | Index-time embedding pipeline, coverage tracking, crash-safe jobs | P7-02, P7-03 | `ready` |
 | P7-05 | Semantic retrieval channel, candidate-only fusion, fallback matrix | P7-04 | `pending` |
 | P7-06 | Uplift evaluation vs deterministic baseline, `baseline-phase-7`, admission decision | P7-05 | `pending` |
 | P7-07 | Privacy governance + OpenAI provider: opt-in, redaction, budgets, telemetry | P7-02, P7-05 | `pending` |
@@ -205,6 +205,123 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-29T16:05:00Z — P7-03 completed; P7-04 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `770a562`.
+- Transition: P7-03 `ready -> in_progress -> verifying -> complete`;
+  P7-04 `pending -> ready`.
+
+#### What was built
+
+`vector_store.py` (interface, `InMemoryVectorStore`, `build_lancedb_store`),
+`lancedb_store.py` (the adapter, lazily imported), and `membership.py`
+(`SnapshotMembershipFilter`).
+
+**A vector row carries three fields: embedding key, content hash, vector.**
+Blueprint 4.7.4 lists richer metadata and storing it would put a second copy of
+the repository outside the database that governs snapshot membership. Paths and
+line ranges come from SQLite at query time, where they are already snapshot-
+bound. A test reads the LanceDB schema directly and asserts those three names
+and nothing else. The consequence is that deleting the vectors directory costs
+re-embedding time and loses no truth.
+
+**Gate condition 4 is met structurally, not by prompt deletion.** A vector store
+is append-friendly and a repository is not: content is deleted, symbols renamed,
+branches switched. If eligibility depended on the store forgetting things
+promptly, each of those would be a race, and losing it means citing code that no
+longer exists. So eligibility never depends on it —
+`SnapshotMembershipFilter.keep_active` joins on content hash *within one
+snapshot*, and the test that matters asserts the stale vector is still
+physically present (`store.count() == 2`) while being unreturnable. Blueprint
+8.20's `old vector physically present != old vector eligible for retrieval`,
+executable.
+
+Also covered: a superseded snapshot's chunks cannot leak into the active one;
+content shared by two snapshots resolves to the chunk row of the snapshot
+actually asked for; and filtering never reorders the survivors.
+
+**Base and delta** are two physical tables per namespace (blueprint 4.7.5).
+New writes land in delta and are searchable immediately — the freshness
+contract — and compaction folds delta into base without changing any result,
+which a test asserts by comparing rankings across the operation. On a key
+collision delta wins, because it holds the newer vector for content re-embedded
+while the old one still sits in base; returning both would spend two of the
+caller's result slots on one chunk with one of them stale.
+
+Scores are only ever compared *within* a namespace, the one place they are
+comparable. The interface cannot express a cross-namespace comparison, which is
+blueprint 4.7.6's named error.
+
+#### `InMemoryVectorStore` is an implementation, not a test double
+
+The deterministic suite and the evaluation harness run against it, because
+LanceDB is behind an optional extra. That would be worthless if the two stores
+meant different things, so `tests/semantic/test_lancedb_store.py` holds the
+adapter to the same behaviours plus two only a real store can show —
+persistence across reopening the directory, and a parity test asserting both
+implementations return *identical rankings* for one query.
+
+#### Two upstream renames, one of which was a real bug
+
+Both inside pinned version ranges, and the second is worth recording because
+the first fix pattern did not transfer:
+
+- sentence-transformers renamed `get_sentence_embedding_dimension` (P7-02,
+  handled by trying both names).
+- LanceDB renamed `table_names` to `list_tables` — but `list_tables` is **not
+  a drop-in**. It returns a paginated `ListTablesResponse`, not a list.
+  Treating it as a list yields an empty sequence, so every `name in
+  self._table_names()` lookup silently decided the table did not exist: 11
+  tests failed at once, all reporting empty results rather than errors. The
+  helper now reads `.tables` and follows `page_token`. A silent-empty failure
+  mode is exactly what the parity suite is for.
+
+#### Files created or changed
+
+- `src/codeatlas/semantic/vector_store.py`, `lancedb_store.py`, `membership.py`
+- `tests/integration/test_vector_store.py`,
+  `tests/integration/test_vector_membership.py`,
+  `tests/semantic/test_lancedb_store.py`
+- `docs/plans/PLAN.md`, `docs/plans/phases/phase-07-measured-semantic-uplift.md`
+
+#### Contracts and compatibility
+
+`contract_version` `"1.1"`, `SCHEMA_VERSION` 10 — both unchanged. No migration.
+Nothing here is reachable from an adapter yet.
+
+#### Verification in this environment
+
+Tests written first and observed failing.
+
+Deterministic environment (extras **not** installed):
+
+- `uv run pytest -q` — **1473 passed**, 1 warning (1451 before P7-03).
+- `uv run ruff check src tests scripts apps` — All checks passed.
+- `uv run mypy --no-incremental src tests scripts apps` — no issues, 248 files.
+
+With `--extra semantic-local` installed, against real LanceDB and the real
+model:
+
+- `uv run pytest -q tests/semantic` — **21 passed**, 32.78s, no warnings.
+- The extras were then removed and the deterministic suite re-run.
+
+#### Limitations
+
+- Nothing writes to a vector store yet: `EmbeddingCache` returns vectors and
+  the store accepts them, but no pipeline connects the two. That is P7-04.
+- `InMemoryVectorStore` scans exactly and holds everything in memory. Fine at
+  fixture and small-repository scale, and honest at that scale — it has no
+  index to go stale — but it is not the answer for a large repository, which
+  is what the LanceDB adapter is for. No threshold currently chooses between
+  them; P7-04 wires the choice to the provider policy.
+- `compact()` exists and is tested but nothing calls it. Threshold-driven
+  compaction is P7-09's, alongside the migration cutover that needs it.
+
+- Next: **P7-04** — the index-time embedding pipeline: changed-chunk-only
+  queue, coverage tracking, crash-safe jobs, and the rule that deterministic
+  activation is never blocked by embedding.
+
 
 ### 2026-07-29T15:10:00Z — P7-02 completed; P7-03 `ready`
 
