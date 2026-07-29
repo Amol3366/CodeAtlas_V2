@@ -67,6 +67,11 @@ INDEX_VERSION: str = "1.0.0"
 # than a correctness one — so it is reported and does not fail the run.
 RETENTION_FAILED_WARNING: str = "SNAPSHOT_RETENTION_FAILED"
 
+# The semantic layer raised something the embedder itself did not expect. Like
+# retention, it is reported and does not fail the run: the snapshot is already
+# active and every deterministic channel answers without a vector.
+EMBEDDING_FAILED_WARNING: str = "SEMANTIC_EMBEDDING_FAILED"
+
 _RELATIVE_PATH_ADAPTER: TypeAdapter[str] = TypeAdapter(RepositoryRelativePath)
 
 
@@ -79,6 +84,19 @@ class SnapshotRetention(Protocol):
     """
 
     def prune(self, repository_id: str) -> object: ...
+
+
+class SnapshotEmbedding(Protocol):
+    """Just enough of the semantic layer for indexing to trigger it.
+
+    A protocol, and a narrow one, for the reason that governs all of Phase 7:
+    this module must not import the semantic package. Indexing is the
+    deterministic path, and the deterministic path may not acquire a dependency
+    — even an optional, lazily-imported one — on the layer that is allowed to
+    be absent.
+    """
+
+    def embed_snapshot(self, repository_id: str, snapshot_id: str) -> object: ...
 
 
 class SnapshotValidationError(CodeAtlasError):
@@ -138,8 +156,10 @@ class IndexRepositoryService:
         clock: Callable[[], datetime] | None = None,
         limits: ScanLimits | None = None,
         retention: SnapshotRetention | None = None,
+        embedding: SnapshotEmbedding | None = None,
     ) -> None:
         self._retention = retention
+        self._embedding = embedding
         self._repositories = repositories
         self._snapshots = snapshots
         self._files = files
@@ -179,6 +199,31 @@ class IndexRepositoryService:
             self._retention.prune(repository_id)
         except Exception:
             return (*warnings, RETENTION_FAILED_WARNING)
+        return warnings
+
+    def _apply_embedding(
+        self, repository_id: str, snapshot_id: str, warnings: tuple[str, ...]
+    ) -> tuple[str, ...]:
+        """Bring semantic coverage up to date, after activation.
+
+        Everything about the placement is deliberate. It runs *after* the
+        snapshot is active, so exact, lexical, graph, and Git retrieval are
+        already serving before a single vector exists — Section 4.2's
+        requirement that deterministic retrieval stay available while semantic
+        indexing is incomplete.
+
+        And it cannot fail the run. The embedder already returns warnings
+        rather than raising for the failures it anticipates; this catch is for
+        the ones it does not. Turning either into a failed index would report a
+        good snapshot as a bad one over a layer the product does not need to
+        answer.
+        """
+        if self._embedding is None:
+            return warnings
+        try:
+            self._embedding.embed_snapshot(repository_id, snapshot_id)
+        except Exception:
+            return (*warnings, EMBEDDING_FAILED_WARNING)
         return warnings
 
     def index(self, repository_id_value: str) -> IndexResult:
@@ -312,6 +357,7 @@ class IndexRepositoryService:
             self._snapshots.activate(snapshot_id, activated_at)
 
         warnings = self._apply_retention(repository_id_value, warnings)
+        warnings = self._apply_embedding(repository_id_value, snapshot_id, warnings)
 
         self._jobs.finish(
             job_id,

@@ -26,6 +26,13 @@ _DIGEST_LENGTH = 32
 # no bidirectional-override character can reach a path join.
 _NAMESPACE_TOKEN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
+# Model IDs are conventionally `org/name` — `sentence-transformers/all-MiniLM-L6-v2`
+# is the one this product pins. So a slash is legitimate and cannot simply be
+# banned; each side of it is validated as its own token instead, which keeps
+# `..`, a backslash, a drive letter, and a control character out while letting
+# a real model ID through.
+_MAX_MODEL_ID_LENGTH = 96
+
 
 def stable_hash(*parts: str) -> str:
     """Return a deterministic 32-character hex digest over the given fields.
@@ -211,19 +218,50 @@ def embedding_namespace_id(
     digest, because it names a directory an operator will read while deciding
     whether a migration is safe to cut over.
 
-    That readability is exactly why it is validated: the model ID arrives from
-    settings, and settings are untrusted input. A rejected value is better than
-    a sanitised one — silently rewriting ``text-embedding-3-small`` into
-    something else would leave a namespace whose name no longer identifies the
-    model that filled it.
+    That readability is exactly why the inputs are validated: a model ID can
+    arrive from settings, and settings are untrusted input. Nothing dangerous
+    is sanitised into something acceptable — a traversal segment, a backslash,
+    a drive letter, or a control character is rejected outright, because
+    quietly rewriting an attack into a plausible name hides that it happened.
+
+    The one transformation that *is* applied is the conventional ``org/name``
+    separator: a slash becomes ``__``. A real model ID contains one — the
+    pinned default is ``sentence-transformers/all-MiniLM-L6-v2`` — so banning
+    it would leave the shipped provider unable to name its own namespace. A
+    short digest of the exact inputs is appended so that mapping can never let
+    two model IDs share a namespace: vectors from different models in one
+    similarity space is blueprint 4.7.6's named error, and it is invisible when
+    it happens.
     """
     if dimensions <= 0:
         raise ValueError("dimensions must be positive")
-    model = _namespace_token(model_id, field="model_id")
+    model = _model_slug(model_id)
     normalization = _namespace_token(
         normalization_version, field="normalization_version"
     )
-    return f"{model}_{dimensions}d_{normalization}"
+    digest = stable_hash(model_id, str(dimensions), normalization_version)[:6]
+    return f"{model}_{dimensions}d_{normalization}_{digest}"
+
+
+def _model_slug(model_id: str) -> str:
+    """Validate a model ID and render it as a single path-safe segment."""
+    value = model_id.strip().casefold()
+    if not value or len(value) > _MAX_MODEL_ID_LENGTH:
+        raise PathSafetyError(
+            "A model identifier is missing or too long.",
+            details={"field": "model_id"},
+        )
+    segments = value.split("/")
+    for segment in segments:
+        # `.` and `..` are already excluded by the token pattern, which
+        # requires a leading letter or digit. Named here anyway, because they
+        # are the reason this validation exists at all.
+        if segment in {".", ".."} or not _NAMESPACE_TOKEN.match(segment):
+            raise PathSafetyError(
+                "A model identifier must be a name, optionally `org/name`.",
+                details={"field": "model_id"},
+            )
+    return "__".join(segments)
 
 
 def _namespace_token(value: str, *, field: str) -> str:

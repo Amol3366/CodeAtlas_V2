@@ -257,3 +257,86 @@ def test_timestamps_are_utc(harness: Harness, sample_repo: Path) -> None:
     activated_at = result.snapshot.activated_at
     assert activated_at is not None
     assert activated_at.utcoffset() == datetime.now(UTC).utcoffset()
+
+
+# --- the semantic layer cannot break a deterministic index ----------------
+
+
+def _repo_with_one_file(tmp_path: Path) -> Path:
+    root = tmp_path / "repo"
+    (root / "src").mkdir(parents=True)
+    (root / "src" / "a.py").write_text("def a():\n    return 1\n", encoding="utf-8")
+    return root
+
+
+def test_an_embedder_that_raises_does_not_fail_the_index(tmp_path: Path) -> None:
+    """The gate condition, at the point where it would actually be violated.
+
+    Everything the embedder anticipates is already returned as a warning, so
+    reaching this catch means the semantic layer raised something nobody
+    predicted — which is exactly when a deterministic product most needs to
+    keep working.
+    """
+
+    class ExplodingEmbedder:
+        def embed_snapshot(self, repository_id: str, snapshot_id: str) -> object:
+            raise RuntimeError("the semantic layer fell over")
+
+    root = _repo_with_one_file(tmp_path)
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        services = build_services(connection, embedding=ExplodingEmbedder())
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(root))
+        )
+
+        result = services.indexing.index(repository.repository_id)
+
+    assert result.snapshot.state is SnapshotState.ACTIVE
+    assert "SEMANTIC_EMBEDDING_FAILED" in result.warnings
+
+
+def test_the_embedder_sees_an_already_active_snapshot(tmp_path: Path) -> None:
+    """Ordering, asserted from inside. The snapshot must already be answering
+    queries before a single vector exists — Section 4.2."""
+    seen: list[str] = []
+
+    class RecordingEmbedder:
+        def __init__(self, connection: sqlite3.Connection) -> None:
+            self._connection = connection
+
+        def embed_snapshot(self, repository_id: str, snapshot_id: str) -> object:
+            row = self._connection.execute(
+                "SELECT state FROM snapshots WHERE snapshot_id = ?", (snapshot_id,)
+            ).fetchone()
+            seen.append(row[0])
+            return None
+
+    root = _repo_with_one_file(tmp_path)
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        services = build_services(connection, embedding=RecordingEmbedder(connection))
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(root))
+        )
+
+        services.indexing.index(repository.repository_id)
+
+    assert seen == ["active"]
+
+
+def test_indexing_without_an_embedder_is_unchanged(tmp_path: Path) -> None:
+    """The default wiring. Every installation that opted into nothing runs
+    this, and it must not mention the semantic layer at all."""
+    root = _repo_with_one_file(tmp_path)
+    with connect(tmp_path / "db.sqlite") as connection:
+        apply_migrations(connection)
+        services = build_services(connection)
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(root))
+        )
+
+        result = services.indexing.index(repository.repository_id)
+
+    assert result.snapshot.state is SnapshotState.ACTIVE
+    assert not any("SEMANTIC" in warning for warning in result.warnings)

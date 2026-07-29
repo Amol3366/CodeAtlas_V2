@@ -50,10 +50,10 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field | Value |
 | --- | --- |
 | Active phase | 7 — **plan approved by the user 2026-07-29** |
-| Active task | P7-04 |
+| Active task | P7-05 |
 | Task status | `ready` |
 | Agent | Claude Code `claude-opus-5` |
-| Started UTC | 2026-07-29T16:05:00Z (P7-03) |
+| Started UTC | 2026-07-29T17:20:00Z (P7-04) |
 | Git state | Branch `main` at `600b903` plus the P7-SETUP/P7-01 commit below. `CLAUDE.md` is now `AGENTS.md` on the user's instruction; the in-text citations in 37 files still say `CLAUDE.md` and were deliberately left, because rewriting historical ADR and baseline records is not a rename. |
 | Next gate | The Phase 7 completion gate, per the phase plan's 12 conditions |
 
@@ -65,8 +65,8 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P7-01 | Semantic domain, migration `0010`, stores | P7-SETUP | `complete` |
 | P7-02 | `EmbeddingProvider` interface, NoOp + local provider, content-hash cache | P7-01 | `complete` |
 | P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces | P7-01 | `complete` |
-| P7-04 | Index-time embedding pipeline, coverage tracking, crash-safe jobs | P7-02, P7-03 | `ready` |
-| P7-05 | Semantic retrieval channel, candidate-only fusion, fallback matrix | P7-04 | `pending` |
+| P7-04 | Index-time embedding pipeline, coverage tracking, crash-safe jobs | P7-02, P7-03 | `complete` |
+| P7-05 | Semantic retrieval channel, candidate-only fusion, fallback matrix | P7-04 | `ready` |
 | P7-06 | Uplift evaluation vs deterministic baseline, `baseline-phase-7`, admission decision | P7-05 | `pending` |
 | P7-07 | Privacy governance + OpenAI provider: opt-in, redaction, budgets, telemetry | P7-02, P7-05 | `pending` |
 | P7-08 | Settings surface (Section 12.5): REST, CLI, web settings page | P7-07 | `pending` |
@@ -205,6 +205,148 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-29T17:20:00Z — P7-04 completed; P7-05 `ready`
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `0a3c142`.
+- Transition: P7-04 `ready -> in_progress -> verifying -> complete`;
+  P7-05 `pending -> ready`.
+
+#### What was built
+
+`semantic/pipeline.py` — `SnapshotEmbedder` and `read_coverage` — plus the
+wiring that lets indexing trigger it without depending on it.
+
+**The ordering is the design.** Embedding runs *after* activation, against a
+snapshot that is already answering queries. Section 4.2 requires exact,
+lexical, graph, and Git retrieval to stay available while semantic indexing is
+incomplete, and the cheapest way to guarantee that is for the semantic work to
+be structurally incapable of affecting activation. A test asserts it from
+inside: the embedder reads the snapshot's state when called and sees `active`.
+
+**Indexing cannot import the semantic package.** `IndexRepositoryService` takes
+a `SnapshotEmbedding` protocol with one method, mirroring the `SnapshotRetention`
+precedent, and `build_services(..., embedding=...)` supplies it. The
+deterministic path may not acquire a dependency — even a lazy, optional one —
+on the layer that is allowed to be absent. Left unset, which is every
+installation that opted into nothing, indexing behaves exactly as in Phases
+0–6, and a test asserts the warnings never mention the semantic layer.
+
+**Nothing the embedder can do fails an index.** It returns warnings rather than
+raising for what it anticipates, and `_apply_embedding` catches what it does
+not — the retention precedent again, for the same reason: the snapshot is
+already active and turning a housekeeping failure into a failed index would
+report a good snapshot as a bad one.
+
+#### `embedded` now means "a vector exists"
+
+P7-02's cache marked a record embedded as soon as the provider returned. That
+was wrong once a vector store existed: a failed vector write would leave a
+record claiming coverage it did not have, the next run would skip that content,
+and the gap would be permanent and silent. `embed_missing` now takes a
+`persist` callback invoked *before* the record is marked, and a failing store
+marks `VECTOR_WRITE_FAILED` instead. The test drives it with a vector store
+that raises `OSError`.
+
+#### Coverage is computed, never stored
+
+Derived at read time from the snapshot's chunks joined against the cache. A
+column would be one more thing that can disagree with the truth, and "how
+current is that evidence?" is the product's third question.
+
+Three distinctions the type makes deliberately:
+
+- `None` versus `0.0` — a repository with no provider is not missing coverage;
+  the question does not apply to it. `0.0` would read as "indexed, nothing
+  found".
+- An empty snapshot is **complete**, not undefined. Nothing to embed is fully
+  embedded; reporting 0.0 would raise a partial-freshness banner over an empty
+  repository.
+- `pending` and `failed` are counted separately, because they need different
+  remedies: pending resolves itself, failed needs someone told.
+
+One of these corrected the implementation rather than the test. `read_coverage`
+originally returned `None` when no namespace existed yet — but "opted in,
+nothing embedded yet" is the state of every repository on the first index after
+switching a provider on, and the honest answer there is "none of it is
+covered", not "the question does not apply".
+
+#### A real bug, found only by the end-to-end test
+
+The pinned model is `sentence-transformers/all-MiniLM-L6-v2`. P7-01's namespace
+validator rejected `/` as a path separator — correct against traversal, and it
+made **the shipped default provider unable to name its own namespace**. Every
+real index failed with `SEMANTIC_EMBEDDING_FAILED` while all 39 fake-provider
+tests passed, because the fake's model ID was `fake`.
+
+Fixed by validating each `/`-separated segment as its own token and rendering
+the slash as `__`, so `..`, a backslash, a drive letter, a UNC prefix, and a
+control character are still rejected outright — nothing dangerous is sanitised
+into something acceptable — while a legitimate `org/name` passes. A six-character
+digest of the exact inputs is appended, because `org/name` and a literal
+`org__name` would otherwise render the same slug, and two models sharing one
+similarity space is blueprint 4.7.6's error at its most invisible.
+
+This is the case for `tests/semantic/` existing. A suite that only ever ran
+against a fake would have shipped a semantic layer that never once embedded
+anything.
+
+#### Files created or changed
+
+- `src/codeatlas/semantic/pipeline.py` (new), `cache.py` (persist callback),
+  `membership.py` (`retrieval_texts`), `../domain/ids.py` (model-ID validation)
+- `src/codeatlas/application/indexing.py` (`SnapshotEmbedding` protocol,
+  `_apply_embedding`, `SEMANTIC_EMBEDDING_FAILED`), `container.py`
+- `tests/integration/test_embedding_pipeline.py` (new),
+  `tests/semantic/test_index_to_coverage.py` (new),
+  `tests/integration/test_indexing.py`, `tests/unit/test_semantic_identity.py`
+
+#### Contracts and compatibility
+
+`contract_version` `"1.1"` and `SCHEMA_VERSION` 10, both unchanged. No
+migration. `SEMANTIC_EMBEDDING_FAILED` joins the existing warning vocabulary in
+`IndexResult.warnings`, which is additive. Coverage is not yet surfaced through
+any adapter — `semantic_coverage` in the envelope is still hardcoded `0.0`;
+wiring it is P7-05.
+
+#### Verification in this environment
+
+Tests written first and observed failing.
+
+Deterministic environment (extras **not** installed):
+
+- `uv run pytest -q` — **1498 passed**, 1 warning (1473 before P7-04).
+- `uv run ruff check src tests scripts apps` — All checks passed.
+- `uv run mypy --no-incremental src tests scripts apps` — no issues, 251 files.
+
+With `--extra semantic-local`, against real LanceDB and the real model:
+
+- `uv run pytest -q tests/semantic` — **25 passed**, 31.21s. Includes a real
+  repository indexed end to end reaching `coverage.is_complete`, and the same
+  repository indexed with no provider answering an exact symbol lookup with
+  `coverage is None`.
+- Extras removed and the deterministic suite re-run.
+
+#### Limitations
+
+- **Nothing retrieves through the vectors yet.** They are written, filtered,
+  and counted, but `AnswerPipeline` has no semantic channel — that is P7-05,
+  and until it lands the vectors affect no answer.
+- Coverage is invisible to every adapter for the same reason.
+- The embedder runs **synchronously inside the index call**. For the fixture
+  scale here that is milliseconds, but it is not the asynchronous queue the
+  blueprint describes, and a large first index would block on it. The failure
+  mode is bounded — the snapshot is already active, so a slow embed delays the
+  index call's *return*, not query availability — but P7-12's performance
+  measurement is where this has to be confronted honestly.
+- Nothing chooses between `InMemoryVectorStore` and the LanceDB adapter yet;
+  the caller supplies one. No adapter constructs an embedder at all, so in a
+  running CodeAtlas the semantic layer is still inert.
+
+- Next: **P7-05** — the semantic retrieval channel in `AnswerPipeline`:
+  intent-gated, candidate-only fusion, `semantic_coverage` surfaced along with
+  the `semantic-status` endpoint, and the deterministic fallback matrix.
+
 
 ### 2026-07-29T16:05:00Z — P7-03 completed; P7-04 `ready`
 

@@ -29,6 +29,7 @@ from codeatlas.domain.semantic import (
     EmbeddingStatus,
 )
 from codeatlas.semantic.providers import EmbeddingProvider
+from codeatlas.semantic.vector_store import VectorRecord
 from codeatlas.storage.sqlite.semantic_stores import EmbeddingStore
 
 
@@ -98,8 +99,20 @@ class EmbeddingCache:
         """
         return self._provider.dimensions > 0
 
-    def embed_missing(self, requests: Sequence[EmbeddingRequest]) -> EmbeddingBatch:
-        """Embed the content that has no vector yet in this namespace."""
+    def embed_missing(
+        self,
+        requests: Sequence[EmbeddingRequest],
+        *,
+        persist: Callable[[Sequence[VectorRecord]], None] | None = None,
+    ) -> EmbeddingBatch:
+        """Embed the content that has no vector yet in this namespace.
+
+        ``persist`` is called with each window's vectors *before* they are
+        marked embedded, so that ``embedded`` can only ever mean "a vector for
+        this content exists". Without that ordering a failed vector write would
+        leave a record claiming coverage it does not have, and the next run
+        would skip the content — a permanent, silent gap.
+        """
         if not self.is_enabled:
             # No rows are written. A `pending` row for a repository that will
             # never embed would report coverage that can never reach 1.0, and
@@ -127,7 +140,7 @@ class EmbeddingCache:
         for start in range(0, len(pending), self._batch_size):
             window = pending[start : start + self._batch_size]
             self._record_pending(window, keys)
-            self._embed_window(window, unique, keys, vectors, failed)
+            self._embed_window(window, unique, keys, vectors, failed, persist)
 
         return EmbeddingBatch(
             vectors=vectors,
@@ -196,6 +209,7 @@ class EmbeddingCache:
         keys: dict[str, str],
         vectors: dict[str, list[float]],
         failed: list[str],
+        persist: Callable[[Sequence[VectorRecord]], None] | None = None,
     ) -> None:
         texts = [unique[content_hash] for content_hash in window]
         try:
@@ -222,7 +236,36 @@ class EmbeddingCache:
                 failed.append(content_hash)
             return
 
+        window_vectors = {
+            content_hash: list(vector)
+            for content_hash, vector in zip(window, produced, strict=True)
+        }
+
+        if persist is not None:
+            try:
+                persist(
+                    [
+                        VectorRecord(
+                            embedding_key=keys[content_hash],
+                            content_hash=content_hash,
+                            vector=vector,
+                        )
+                        for content_hash, vector in window_vectors.items()
+                    ]
+                )
+            except Exception:
+                # The provider worked; storing the result did not. Recording
+                # `embedded` here would claim coverage for content that has no
+                # vector, and the next run would skip it — a gap that never
+                # closes and never announces itself.
+                for content_hash in window:
+                    self._store.mark_failed(
+                        keys[content_hash], failure_code="VECTOR_WRITE_FAILED"
+                    )
+                    failed.append(content_hash)
+                return
+
         moment = self._now()
-        for content_hash, vector in zip(window, produced, strict=True):
-            vectors[content_hash] = list(vector)
+        for content_hash, vector in window_vectors.items():
+            vectors[content_hash] = vector
             self._store.mark_embedded(keys[content_hash], embedded_at=moment)

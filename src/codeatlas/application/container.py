@@ -14,7 +14,10 @@ from codeatlas.application.change_analysis import ChangeAnalysisService
 from codeatlas.application.conversation_service import ConversationService
 from codeatlas.application.entities import EntityService
 from codeatlas.application.graph_queries import GraphQueryService
-from codeatlas.application.indexing import IndexRepositoryService
+from codeatlas.application.indexing import (
+    IndexRepositoryService,
+    SnapshotEmbedding,
+)
 from codeatlas.application.lookup import ExactSymbolLookupService
 from codeatlas.application.recovery import SnapshotRecoveryService
 from codeatlas.application.registration import RegisterRepositoryService
@@ -68,6 +71,7 @@ def build_services(
     *,
     hub: EventHub | None = None,
     executor: RunExecutor | None = None,
+    embedding: SnapshotEmbedding | None = None,
 ) -> ApplicationServices:
     """Construct the application services for one database connection.
 
@@ -82,6 +86,13 @@ def build_services(
     makes submission return as soon as the turn is committed (ADR-0008);
     leaving it out answers on the calling thread, which is what a one-shot
     caller wants and what keeps the pipeline directly testable.
+
+    ``embedding`` attaches the optional semantic layer to indexing. Left out —
+    the default, and what every installation that opted into nothing gets —
+    indexing behaves exactly as it did in Phases 0-6. It is a parameter rather
+    than something constructed here because this module must not import the
+    semantic package: the deterministic path may not acquire a dependency on
+    the layer that is allowed to be absent.
     """
     repositories = RepositoryStore(connection)
     snapshots = SnapshotStore(connection)
@@ -129,6 +140,7 @@ def build_services(
         # holds for every adapter. Before P6-08 nothing called `prune` at all,
         # and every index left its predecessor behind permanently.
         retention=recovery,
+        embedding=embedding,
     )
 
     # Hoisted because the conversation pipeline answers through these exact

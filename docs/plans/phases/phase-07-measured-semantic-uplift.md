@@ -224,7 +224,7 @@ Live status is `docs/plans/PLAN.md`; this table carries the deliverables.
 | P7-01 | Semantic domain model, migration `0010` (embedding records, namespaces, repository provider policy, provider usage — no content columns), stores, migration tests | P7-SETUP | `complete` |
 | P7-02 | `EmbeddingProvider` interface + `NoEmbeddingProvider` + pinned local sentence-transformers provider + content-hash cache | P7-01 | `complete` |
 | P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces, membership-authoritative filtering | P7-01 | `complete` |
-| P7-04 | Index-time embedding pipeline: changed-chunk-only queue, coverage tracking, deterministic activation never blocked, crash-safe embedding jobs | P7-02, P7-03 | `pending` |
+| P7-04 | Index-time embedding pipeline: changed-chunk-only queue, coverage tracking, deterministic activation never blocked, crash-safe embedding jobs | P7-02, P7-03 | `complete` |
 | P7-05 | Semantic retrieval channel in `AnswerPipeline`: intent-gated, candidate-only fusion, coverage surfaced (`semantic_coverage` no longer hardcoded, `semantic-status` endpoint), deterministic fallback matrix | P7-04 | `pending` |
 | P7-06 | **Uplift evaluation:** corpus re-run semantic-on vs the deterministic baseline, conceptual cases declared before measurement, `baseline-phase-7` recorded, admission decision for the semantic channel | P7-05 | `pending` |
 | P7-07 | Privacy governance + `OpenAIEmbeddingProvider`: per-repository opt-in, secret detection/redaction, budgets/timeouts/retries/cancellation, usage telemetry without content | P7-02, P7-05 | `pending` |

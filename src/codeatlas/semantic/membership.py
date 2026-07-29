@@ -110,6 +110,36 @@ class SnapshotMembershipFilter:
                 )
         return tuple(candidates)
 
+    def retrieval_texts(
+        self, snapshot_id: str, content_hashes: Sequence[str]
+    ) -> dict[str, str]:
+        """The retrieval text for each of these hashes, within one snapshot.
+
+        Asked for the *missing* hashes only. Loading every chunk's text to
+        embed a handful would make a one-symbol edit read the whole corpus off
+        disk — the cost the content-addressed design exists to avoid, moved
+        from the provider to the database.
+
+        Identical content shares a hash by definition, so an arbitrary one of
+        the matching rows is the right answer, not an approximation.
+        """
+        if not content_hashes:
+            return {}
+
+        wanted = list(dict.fromkeys(content_hashes))
+        texts: dict[str, str] = {}
+        for start in range(0, len(wanted), _MAX_PARAMETERS):
+            batch = wanted[start : start + _MAX_PARAMETERS]
+            placeholders = ", ".join("?" for _ in batch)
+            rows = self._connection.execute(
+                "SELECT content_hash, retrieval_text FROM chunks"
+                f" WHERE snapshot_id = ? AND content_hash IN ({placeholders})",
+                (snapshot_id, *batch),
+            ).fetchall()
+            for row in rows:
+                texts.setdefault(row["content_hash"], row["retrieval_text"])
+        return texts
+
     def content_hashes_in_snapshot(self, snapshot_id: str) -> tuple[str, ...]:
         """Every distinct content hash the snapshot's chunks carry.
 

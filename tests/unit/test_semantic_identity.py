@@ -59,10 +59,36 @@ def test_every_declared_input_participates_in_the_key(
 
 
 def test_a_namespace_id_is_readable_and_deterministic() -> None:
-    """It names a directory a human will see, so it is a slug, not a digest."""
+    """It names a directory a human will see, so it leads with a slug rather
+    than being a bare digest."""
     namespace = embedding_namespace_id("all-MiniLM-L6-v2", 384, "l2_v1")
-    assert namespace == "all-minilm-l6-v2_384d_l2_v1"
+
+    assert namespace.startswith("all-minilm-l6-v2_384d_l2_v1_")
     assert namespace == embedding_namespace_id("all-MiniLM-L6-v2", 384, "l2_v1")
+
+
+def test_a_conventional_org_slash_name_model_id_is_accepted() -> None:
+    """Real model IDs look like this — the pinned default included. Rejecting
+    the slash outright would leave the shipped provider unable to name its own
+    namespace, which is exactly how this was found.
+    """
+    namespace = embedding_namespace_id(
+        "sentence-transformers/all-MiniLM-L6-v2", 384, "l2_v1"
+    )
+
+    assert namespace.startswith("sentence-transformers__all-minilm-l6-v2_384d_l2_v1_")
+    assert "/" not in namespace
+    assert "\\" not in namespace
+
+
+def test_the_slash_mapping_cannot_make_two_models_collide() -> None:
+    """`org/name` and a literal `org__name` render the same slug. The appended
+    digest is what keeps them in separate similarity spaces — sharing one is
+    blueprint 4.7.6's error, and it would be invisible.
+    """
+    assert embedding_namespace_id("org/name", 384, "l2_v1") != (
+        embedding_namespace_id("org__name", 384, "l2_v1")
+    )
 
 
 def test_namespaces_differ_when_the_similarity_space_differs() -> None:
@@ -79,11 +105,13 @@ def test_namespaces_differ_when_the_similarity_space_differs() -> None:
     [
         "../../etc/passwd",
         "..\\..\\windows\\system32",
-        "a/b",
         "a\\b",
         "..",
         ".",
+        "../sibling",
+        "org/../escape",
         "C:/absolute",
+        "//server/share",
         "model\x00truncated",
         "  ",
         "",
@@ -93,11 +121,12 @@ def test_namespaces_differ_when_the_similarity_space_differs() -> None:
 def test_a_hostile_model_id_cannot_escape_the_vectors_root(
     hostile_model_id: str,
 ) -> None:
-    """The model ID is user input and the namespace is a directory name.
+    """The model ID can be user input and the namespace is a directory name.
 
-    Rejecting is right rather than sanitising: a silently rewritten model ID
-    would put vectors in a namespace whose name no longer identifies the model
-    that produced them, which is the mix-up 4.7.6 forbids.
+    Rejected outright rather than sanitised into something acceptable: quietly
+    rewriting an attack into a plausible directory name hides that it ever
+    arrived. A legitimate `org/name` is the one shape that passes, and it is
+    rendered as a single segment.
     """
     with pytest.raises(PathSafetyError):
         embedding_namespace_id(hostile_model_id, 384, "l2_v1")
