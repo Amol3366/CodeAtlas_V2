@@ -1,8 +1,11 @@
 # Phase 7 — Measured Semantic Uplift
 
-Status: `in_progress` — the activation gate (explicit product, privacy, and
-architecture approval) and this plan were both approved by the user on
-2026-07-29 and are recorded in `docs/plans/PLAN.md`. Tasks may run.
+Status: `awaiting_user_approval` — all 13 tasks are complete. The gate summary is the P7-12
+handoff in `docs/plans/PLAN.md`: ten conditions met, two satisfied as recorded
+declines, and one missed (condition 7, Recall@10 0.6667 against a >= 0.90 target).
+Only the user may approve this gate. The activation gate (explicit product,
+privacy, and architecture approval) and this plan were both approved by the
+user on 2026-07-29 and are recorded in `docs/plans/PLAN.md`.
 Gate authority: user
 Prerequisites: Phase 6 approved; `AGENTS.md` Sections 4.3, 4.4, 10, 16, 17, 18,
 19; blueprint Sections 4.7, 4.9, 8.20–8.23, 12–15 (phases 12–14 and the
@@ -232,7 +235,7 @@ Live status is `docs/plans/PLAN.md`; this table carries the deliverables.
 | P7-09 | Shadow embedding migration: shadow namespace, backfill, dual-write, independent evaluation, atomic cutover, rollback retention, the three `/v1/models/embedding-migrations` endpoints | P7-03, P7-04 | `complete` |
 | P7-10 | Optional bounded reranking: intent-gated top-N single call, digest-keyed cache, A/B uplift evaluation, admission decision | P7-06 | `complete` |
 | P7-11 | Optional evidence-grounded explanation: `AnswerProvider` interface + `NoAnswerProvider`, evidence-only prompts, pipeline steps 14–15 claim re-validation, uplift evaluation with 100% generated-citation validity, admission decline; concrete Ollama/OpenAI answer providers remain unadmitted until governed uplift is proven | P7-06, P7-07 | `complete` |
-| P7-12 | Performance and packaging re-validation on the artifact with embeddings enabled (`measure_phase7_perf.py`), security sweep incl. provider transmission paths, threat-model Phase 7 section, `docs/operations/semantic-search.md`, README, phase gate | P7-06, P7-08, P7-09, P7-10, P7-11 | `in_progress` |
+| P7-12 | Performance and packaging re-validation on the artifact with embeddings enabled (`measure_phase7_perf.py`), security sweep incl. provider transmission paths, threat-model Phase 7 section, `docs/operations/semantic-search.md`, README, phase gate | P7-06, P7-08, P7-09, P7-10, P7-11 | `complete` |
 
 Sequencing rationale: the embeddings vertical slice lands first (P7-01 →
 P7-05), and uplift is measured **immediately** (P7-06) — before the OpenAI

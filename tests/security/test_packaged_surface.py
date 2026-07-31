@@ -20,10 +20,12 @@ otherwise — the same rule as `tests/end_to_end/test_packaged_build.py`.
 from __future__ import annotations
 
 import json
+import os
 import socket
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
@@ -87,6 +89,31 @@ def _wait_until_listening(
         except (urllib.error.URLError, TimeoutError, ConnectionError):
             time.sleep(0.2)
     pytest.fail("the packaged server never started listening")
+
+
+def _send(
+    url: str,
+    method: str = "GET",
+    payload: dict[str, object] | None = None,
+) -> tuple[int, dict[str, str], str]:
+    """`_fetch` for the verbs the provider surface needs."""
+    body = None if payload is None else json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(url, data=body, method=method)
+    if body is not None:
+        request.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return (
+                response.status,
+                dict(response.headers),
+                response.read().decode("utf-8", errors="replace"),
+            )
+    except urllib.error.HTTPError as error:
+        return (
+            error.code,
+            dict(error.headers),
+            error.read().decode("utf-8", errors="replace"),
+        )
 
 
 def _fetch(url: str) -> tuple[int, dict[str, str], str]:
@@ -250,3 +277,138 @@ def test_the_migrations_are_the_only_sql_that_ships() -> None:
     ]
 
     assert stray == [], f"unexpected SQL in the bundle: {stray}"
+
+
+# --- what it can be told to transmit --------------------------------------
+
+# Phase 7 is the first phase in which the artifact can be configured to send
+# repository content off the machine. `tests/contract/test_settings_api.py`
+# proves the settings service withholds credentials and defaults to no
+# provider; it proves that of the *source tree*, in process, with a
+# `TestClient`. The properties that matter here are the ones a packaging
+# defect could break without touching a line of that code: whether the routes
+# survive freezing at all, and whether a frozen process that can read a
+# credential from its environment can be made to hand it back.
+
+# Shaped like the real thing, deliberately not usable. Nothing below asserts
+# it works — only that a value the process can read never becomes a value the
+# process returns.
+_CREDENTIAL = "sk-packagedsurfacetest" + "0" * 32
+_CREDENTIAL_PORT = 8597
+
+
+@pytest.fixture(scope="module")
+def provider_surface(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[tuple[str, str]]:
+    """The packaged build with a credential in its environment and one
+    repository registered. Yields the base URL and that repository's ID."""
+    if not _ARTIFACT.is_file():
+        pytest.skip("no packaged build")
+
+    workspace = tmp_path_factory.mktemp("packaged-provider")
+    repository = workspace / "repository"
+    repository.mkdir()
+    (repository / "example.py").write_text(
+        "def add(left, right):\n    return left + right\n", encoding="utf-8"
+    )
+
+    environment = dict(os.environ)
+    environment["OPENAI_API_KEY"] = _CREDENTIAL
+
+    # Fixed argv, no shell: nothing here comes from user input.
+    server = subprocess.Popen(
+        [
+            str(_ARTIFACT), "serve", "--web",
+            "--port", str(_CREDENTIAL_PORT),
+            "--db", str(workspace / "db.sqlite"),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+    )
+    base = f"http://127.0.0.1:{_CREDENTIAL_PORT}"
+    try:
+        _wait_until_listening(server, f"{base}/v1/repositories")
+        status, _, body = _send(
+            f"{base}/v1/repositories", "POST", {"path": str(repository)}
+        )
+        assert status in (200, 201), f"registration failed ({status}): {body}"
+        yield base, json.loads(body)["repository_id"]
+    finally:
+        server.terminate()
+        server.wait(timeout=30)
+
+
+@packaged
+def test_the_packaged_build_exposes_the_provider_settings_surface(
+    provider_surface: tuple[str, str],
+) -> None:
+    """If the settings router were dropped from the bundle, every privacy
+    assertion below would pass vacuously by never being reachable."""
+    base, repository_id = provider_surface
+    query = urllib.parse.urlencode({"repository_id": repository_id})
+
+    status, _, body = _send(f"{base}/v1/settings?{query}")
+
+    assert status == 200, body
+    assert json.loads(body)["repository_id"] == repository_id
+
+
+@packaged
+def test_a_freshly_registered_repository_transmits_nothing(
+    provider_surface: tuple[str, str],
+) -> None:
+    """Default off, on the artifact. A build that shipped defaulting to a
+    transmitting provider would send source off the machine of a user who
+    never opted in — the single failure this phase most needs to not have."""
+    base, repository_id = provider_surface
+    query = urllib.parse.urlencode({"repository_id": repository_id})
+
+    _, _, body = _send(f"{base}/v1/settings?{query}")
+    settings = json.loads(body)
+
+    assert settings["embedding_provider"] == "none"
+    assert settings["transmits_off_machine"] is False
+
+
+@packaged
+def test_a_credential_in_the_environment_never_reaches_a_response(
+    provider_surface: tuple[str, str],
+) -> None:
+    """The process can read it. No route may hand it back."""
+    base, repository_id = provider_surface
+    query = urllib.parse.urlencode({"repository_id": repository_id})
+
+    responses = {
+        "models": _send(f"{base}/v1/models"),
+        "settings": _send(f"{base}/v1/settings?{query}"),
+        "model test": _send(f"{base}/v1/models/test?{query}", "POST", {}),
+        "diagnostics": _send(
+            f"{base}/v1/repositories/{repository_id}/diagnostics"
+        ),
+    }
+
+    for label, (status, _, body) in responses.items():
+        # Asserted so this test cannot pass by never reaching the route. A
+        # 404 with a short body satisfies "the credential is absent" while
+        # proving nothing at all.
+        assert status == 200, f"{label} answered {status}: {body}"
+        assert _CREDENTIAL not in body, f"{label} returned the credential"
+        # The tail alone would still be a usable secret.
+        assert _CREDENTIAL[-16:] not in body, f"{label} leaked part of it"
+
+
+@packaged
+def test_an_unscoped_settings_call_is_refused(
+    provider_surface: tuple[str, str],
+) -> None:
+    """Provider choice is per repository (ADR-0009). A call that names no
+    repository has no default scope that would be safe to invent."""
+    base, _ = provider_surface
+
+    status, headers, body = _send(f"{base}/v1/settings")
+
+    assert status == 422, body
+    assert "application/json" in headers.get("content-type", "")
+    assert "<!doctype html" not in body.lower()

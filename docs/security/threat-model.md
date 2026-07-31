@@ -175,6 +175,7 @@ history exports, logs, or diagnostic bundles.
 | Reranking | declined | `NoReranker` is the only implementation; `docs/evaluation/rerank-phase-7.{json,md}` records no uplift and no provider call |
 | Generated explanations | declined | `NoAnswerProvider` is the only implementation; fake-provider tests reject unsupported generated claims and `docs/evaluation/explanation-phase-7.{json,md}` records no uplift |
 | Concrete answer providers | not shipped | Ollama/OpenAI answer providers require a governed answer-provider policy and measured uplift before admission |
+| Packaged provider surface | enforced on the artifact | `tests/security/test_packaged_surface.py` starts the real executable with a credential in its environment and asserts the settings routes survive freezing, a freshly registered repository reports provider `none` and `transmits_off_machine` false, no route returns the credential or its tail, and an unscoped `/v1/settings` call is refused as JSON |
 
 ## Logging and Diagnostics
 

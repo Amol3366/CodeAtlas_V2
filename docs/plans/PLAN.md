@@ -2,12 +2,12 @@
 
 Status: active
 Plan contract version: 1.0
-Policy authority: `AGENTS.md`
+Policy authority: `CLAUDE.md`
 Blueprint: `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`
 
 ## Rules for Every Coding Agent
 
-1. Read `AGENTS.md`, this file, and the active phase plan before acting.
+1. Read `CLAUDE.md`, this file, and the active phase plan before acting.
 2. Inspect the workspace, available Git state, and the latest handoff.
 3. Work only on the single task marked `ready`, `in_progress`, or `verifying`.
 4. Do not start a task until every declared dependency is `complete`.
@@ -43,7 +43,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 4 — Change assurance                            | [phase plan](phases/phase-04-change-assurance.md)                          | `complete`                                            | User           |
 | 5 — Persistent web application                  | [phase plan](phases/phase-05-persistent-web-application.md)                | `complete`                                            | User           |
 | 6 — Continuous freshness and hardening          | [phase plan](phases/phase-06-freshness-and-hardening.md)                   | `complete` (gate approved by the user 2026-07-29)     | User           |
-| 7 — Measured semantic uplift                    | [phase plan](phases/phase-07-measured-semantic-uplift.md)                  | `in_progress` — plan approved by the user 2026-07-29 | User           |
+| 7 — Measured semantic uplift                    | [phase plan](phases/phase-07-measured-semantic-uplift.md)                  | `awaiting_user_approval` — all 13 tasks complete    | User           |
 
 ## Active Work
 
@@ -51,11 +51,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | 7 —**plan approved by the user 2026-07-29**                                                                                                                                                                                                                                                                                                                                                                                      |
 | Active task     | P7-12                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Task status     | `in_progress`                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Agent           | Codex GPT-5                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Task status     | `complete` — Phase 7 `awaiting_user_approval`                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Agent           | Claude Code `claude-opus-5` (recovered P7-12 in place from Codex GPT-5, per rule 9) |
 | Started UTC     | 2026-07-30T18:51:46Z                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Git state       | Branch `main` at `344ab7d`. Working tree carries uncommitted P7-05 through P7-11 implementation, generated web API artifacts, Phase 7 baseline/rerank/explanation artifacts, doc/status edits, and a likely accidental blueprint heading change (`1111111Industry...`). Existing work is being preserved and continued.                                                                                                             |
-| Policy filename | The policy file has been both `CLAUDE.md` and `AGENTS.md`; it is `AGENTS.md` now. Citations to either name across 47 files mean that one file. Historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten — rewriting the evidence a gate was approved on is not a rename, and a 99-reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
+| Git state       | Branch `main` at `5ea8ab8`. P7-05 through P7-12 are now committed; the working tree carries only this task's packaged provider-surface tests, the live policy-pointer updates, and this status edit. |
+| Policy filename | The policy file has been both `CLAUDE.md` and `AGENTS.md`, and has now been renamed back: it is **`CLAUDE.md`** again as of 2026-07-31. Citations to either name mean that one file — 113 of them across 57 files. Only the *live* pointers were updated (this file's header and rule 1, and the README); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a 113-reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
 | Next gate       | The Phase 7 completion gate, per the phase plan's 12 conditions                                                                                                                                                                                                                                                                                                                                                                         |
 
 ### Phase 7 Task Board
@@ -74,7 +74,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | P7-09    | Shadow embedding migration, cutover/rollback, migration endpoints                    | P7-03, P7-04                      | `complete`    |
 | P7-10    | Optional bounded reranking, uplift A/B, admission decision                           | P7-06                             | `complete`    |
 | P7-11    | Optional evidence-grounded explanation, steps 14–15, admission decision             | P7-06, P7-07                      | `complete`    |
-| P7-12    | Perf/packaging/security validation, docs, phase gate                                 | P7-06, P7-08, P7-09, P7-10, P7-11 | `in_progress` |
+| P7-12    | Perf/packaging/security validation, docs, phase gate                                 | P7-06, P7-08, P7-09, P7-10, P7-11 | `complete`    |
 
 Detail, gate conditions, and the four user decisions behind the scope live in
 the [Phase 7 plan](phases/phase-07-measured-semantic-uplift.md).
@@ -206,6 +206,227 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-31T09:20:00Z — P7-12 complete; Phase 7 awaiting user approval
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `5ea8ab8`.
+- Transition: P7-12 `verifying -> complete`; Phase 7
+  `in_progress -> awaiting_user_approval`.
+- This entry records the gate run promised by the previous entry. The condition
+  table there is the gate summary and is not repeated.
+
+#### The gate run
+
+`powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipE2E` —
+**exit 0.** Sync was deliberately **not** skipped, which is the point of the
+run: `uv sync --all-groups --frozen` removes the optional extras, so the
+deterministic half of the gate executes on a machine that never opted in. Steps
+covered: frozen sync, contract-schema freshness, tests, lint, strict types,
+dataset validation, the Phase 0 null baseline, the Phase 3 and Phase 4 engine
+baselines, the Phase 7 rerank and explanation A/B artifacts, and web
+lint/types/tests/build.
+
+**Gate condition 2 is now proven rather than assumed.** After the sync,
+`sentence_transformers`, `torch`, and `lancedb` are all absent from the
+environment, and the three assertions in `tests/unit/test_embedding_providers.py`
+that exist precisely to check without-extras behaviour **ran and passed** — that
+file goes from 5 passed + 3 skipped to **8 passed**. In every earlier Phase 7
+handoff those three could only skip, because the agent's environment had the
+extras installed.
+
+Every `--check`-pinned artifact reproduced byte-for-byte: `git status` shows no
+modification to any file under `docs/evaluation/`, including the Phase 7
+semantic baseline and both A/B artifacts.
+
+#### The test count, reconciled
+
+- `uv run pytest -q` with the extras absent — exit 0, **1675 passed, 0
+  skipped**, 231.60 s.
+- `uv run pytest -q tests/security/test_packaged_surface.py` — exit 0, **13
+  passed** against the real executable, extras still absent.
+
+1675 is *lower* than the 1693 passed + 3 skipped recorded before this task, and
+the difference is worth stating rather than leaving as an oddity a later reader
+has to re-derive:
+
+| | Tests |
+| --- | ---: |
+| Collected with the extras installed, before this task | 1696 |
+| less `tests/semantic/*`, which `tests/conftest.py` sets `collect_ignore_glob` for when the extras are absent | −25 |
+| plus this task's packaged provider-surface tests | +4 |
+| **Collected and passing without the extras** | **1675** |
+
+Nothing is silently uncollected. The 25 semantic tests are deliberately
+excluded without their dependencies and are run by the gate's `-Semantic` step
+(`pytest -q tests/semantic`), which was not exercised in this run.
+
+#### What this run did not cover
+
+Stated because a green line should not imply more than it proves:
+
+- `-Semantic`, `-Package`, and `-Perf` were **not** re-run here. Their evidence
+  is the previous agent's 2026-07-30 measurement in
+  `docs/evaluation/baseline-phase-7-perf.json` and
+  `docs/evaluation/phase-7-baseline-environment.md`.
+- `-SkipE2E` means the Playwright suites did not run.
+- The environment now has the extras **removed**. Re-running the semantic half
+  requires `uv sync --all-groups --extra semantic-local --frozen` first.
+
+#### Phase 7 gate: the decision in front of the user
+
+Of the twelve conditions: **ten met, two satisfied as recorded declines, one
+missed.**
+
+The miss is condition 7. Primary evidence Recall@10 is **0.6667** against the
+Section 19.3 **>= 0.90** target. The semantic layer's uplift is real and
+positive on every recall metric (+0.0667 recall, +0.0714 abstention
+correctness, +0.0714 exact symbol resolution, zero unsupported claims), and it
+costs precision: evidence volume rose from 132 to 212 items over the corpus.
+The target is missed **with and without** the layer, so this is not a
+regression — no earlier phase measured conceptual retrieval at all.
+
+The declines are conditions 9 and 10, and they are the plan working as
+designed: reranking and generated explanation were built as seams, measured,
+shown to improve nothing over the admitted semantic baseline, and **not
+shipped**. The phase plan's wording admits a feature only on measured uplift,
+"otherwise declined with the measurement recorded". Both are recorded.
+
+Three qualifications carried from Phase 6 are unchanged: Chromium
+conversation-route skips, no pid-reuse detection in recovery, and an unsigned
+executable. Phase 7 adds its own: the packaged semantic tree is **1.05 GB**
+against the 44 MB deterministic installer, which is the torch cost accepted at
+the activation gate; the settings page is not routed in the web shell; and the
+`POST /v1/models/test` success path has no contract-suite coverage.
+
+- Next: **the user approves, rejects, or amends the Phase 7 gate.** No agent may
+  approve it. The open question is not whether the work is done but whether a
+  missed Section 19.3 target is acceptable for this phase, given that the
+  feature responsible for the shortfall (semantic retrieval) demonstrably helps
+  and the two features that did not help were declined rather than shipped. On
+  approval, an agent records it here, checks the Phase 7 boxes in `CLAUDE.md`,
+  and does not begin any Phase 8 work until told to.
+
+### 2026-07-31T08:57:29Z — P7-12 verifying; Phase 7 gate summary prepared
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `5ea8ab8`.
+- Transition: P7-12 `in_progress -> verifying`.
+- Context: this task was left `in_progress` by the previous agent with its
+  measurement and documentation work done but uncommitted and unsummarised.
+  Recovered in place per rule 9; existing work was preserved, not redone.
+
+#### What this task found and changed
+
+**1. The back half of the phase existed only in the working tree.** `HEAD` was
+`344ab7d` (P7-04). P7-05 through P7-12 — the semantic retrieval channel,
+governance, the settings surface, migration `0011`, the rerank and explanation
+seams, and every Phase 7 evaluation artifact — were uncommitted: 102 files,
+12,964 insertions. Committed as `5ea8ab8`. A phase whose evidence lives in one
+working tree is one `git checkout` from being unreproducible.
+
+Two unrelated edits were found in that diff and handled separately rather than
+committed silently:
+
+- `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md` carried a stray keystroke
+  (`**Initi2al repository scope:**`), already suspected in the previous
+  handoff's Git-state note. Reverted.
+- `AGENTS.md` had been renamed back to `CLAUDE.md`. Git tracks it as a rename;
+  the commit records it as one.
+
+**2. The packaged security sweep had no coverage of the Phase 7 provider
+surface.** `tests/security/test_packaged_surface.py` existed from P6-08 with
+nine tests, and a search for `settings|provider|credential` in it returned zero.
+Phase 7 is the first phase in which the artifact can be configured to send
+repository content off the machine, so the gap mattered: every privacy property
+in gate condition 6 was proven **in process against the source tree** and not
+once against the frozen binary. Phase 6's own stated rationale for that file is
+that "a packaging defect lives precisely in the gap between the source tree and
+the artifact."
+
+Four tests added, run against the real `dist/codeatlas-win64/codeatlas.exe`
+started with `OPENAI_API_KEY` in its environment:
+
+- the settings routes survive freezing (without this, the three below could
+  pass by never being reachable);
+- a freshly registered repository reports `embedding_provider: "none"` and
+  `transmits_off_machine: false` — default-off on the artifact, which is the
+  single failure this phase most needs not to have;
+- no route returns the credential **or its last 16 characters** — checked
+  across `/v1/models`, `/v1/settings`, `/v1/models/test`, and
+  `/v1/repositories/{id}/diagnostics`;
+- an unscoped `/v1/settings` call is refused as JSON, not HTML.
+
+The four endpoints were probed first and confirmed to answer `200` with real
+bodies; those statuses are then asserted inside the test, so a future routing
+change cannot convert "the credential is absent" into a silent pass on a 404.
+That was the specific risk of writing this test after the fact rather than
+test-first, and it is closed by construction rather than by inspection.
+
+**3. Live policy-file pointers were stale in both directions.** The rename back
+to `CLAUDE.md` left `README.md`, this file's header and rule 1, and
+`CLAUDE.md`'s own self-description all naming `AGENTS.md`. Those live pointers
+were updated. The other 113 references across 57 files were **not** touched, for
+the reason recorded at P7-09: rewriting the evidence a gate was approved on is
+not a rename, and the sweep is the unrelated refactor Section 4.5 forbids. The
+Active Work "Policy filename" row now records the round trip and the current
+count.
+
+#### Phase 7 completion gate — condition by condition
+
+| # | Condition | Result |
+| --- | --- | --- |
+| 1 | Product/privacy/architecture approval recorded | **met** — 2026-07-29 handoff |
+| 2 | Provider-neutral interface, `NoEmbeddingProvider` default, deterministic path needs no provider | **met** — three `test_embedding_providers.py` assertions run only when the extras are absent |
+| 3 | Content-hash cache; one-symbol edit embeds only changed hashes | **met** — P7-02/P7-04 incremental-embedding tests over the Phase 2 fixtures |
+| 4 | LanceDB base/delta, SQLite membership authoritative, stale vectors excluded | **met** — P7-03 stale-vector filtering tests |
+| 5 | Deterministic fallback; provider-disabled run scores identically to baseline | **met** — `test_a_disabled_repository_gets_back_the_identical_response` plus the failure/timeout/budget matrix |
+| 6 | Privacy governance: opt-in, redaction, budgets, telemetry without content | **met** — 35+ tests in `tests/security/`, now also proven **on the artifact** (item 2 above) |
+| 7 | Semantic uplift vs the deterministic baseline, against the >= 0.90 Recall@10 target | **MISSED on the absolute target; the uplift itself is real.** 0.6000 -> 0.6667 (+0.0667). Abstention correctness 0.9286 -> 1.0000, exact symbol resolution 0.2143 -> 0.2857, unsupported-claim rate 0.0000 both sides. Evidence volume rose 132 -> 212, so exact/containing evidence *rates* fell. The target is missed with and without the layer |
+| 8 | Shadow migration: backfill, dual-write, atomic cutover, retained rollback | **met** — migration `0011`, the three `/v1/models/embedding-migrations` endpoints, cutover/rollback tests |
+| 9 | Bounded reranking, admitted only on uplift | **satisfied as a decline** — only `NoReranker` exists; zero delta on every metric; recorded in `rerank-phase-7.{json,md}` |
+| 10 | Evidence-grounded explanation, admitted only on uplift, 100% citation validity | **satisfied as a decline** — only `NoAnswerProvider`; zero delta; generated-citation validity 1.0000; recorded in `explanation-phase-7.{json,md}` |
+| 11 | Evidence/snapshot contracts preserved, `contract_version` stays `"1.1"`, leakage 0 | **met** — no contract bump; `SCHEMA_VERSION` 11 additive |
+| 12 | Section 19.3 targets hold with embeddings enabled; artifact size and cold start re-measured | **met, with the size recorded honestly** — refresh p95 **0.975 s** (<= 2 s), preflight p95 **2.298 s** (<= 10 s), coverage 1.0, cold start 1.064 s, exe 81.7 MB, onedir tree **1.05 GB** |
+
+Ten conditions met, two admitted as recorded declines, **one missed**: the
+Section 19.3 Recall@10 target. The miss is not a regression — no earlier phase
+measured conceptual retrieval at all — and the honest framing is in
+`docs/evaluation/phase-7-baseline-environment.md`: fixing the lexical stopword
+defect found during P7-06 was worth **+0.53** recall, and the entire semantic
+layer on top of that fix is worth **+0.07**. Quoting the layer's uplift against
+the unfixed baseline would credit it with the bug fix's work.
+
+#### Verification in this environment
+
+- `uv run pytest -q` — exit 0, **1693 passed, 3 skipped**. The three skips are
+  the without-extras assertions, which cannot run while `semantic-local` is
+  installed; each states that reason.
+- `uv run pytest -q tests/security/test_packaged_surface.py` — exit 0,
+  **13 passed** against the real packaged executable (9 pre-existing + 4 new).
+- `uv run ruff check tests/security/test_packaged_surface.py` — exit 0.
+- `uv run mypy --no-incremental tests/security/test_packaged_surface.py` — exit
+  0, no issues.
+- `scripts/check_phase7.ps1 -SkipE2E` — **launched with sync deliberately not
+  skipped**, so the extras are genuinely removed and gate conditions 2 and 11
+  are proven rather than skipped. Result not yet recorded; this task stays
+  `verifying` until it is.
+
+#### Limitations carried to the gate
+
+- The `-Semantic`, `-Package`, and `-Perf` halves of the gate were measured by
+  the previous agent on 2026-07-30 and are recorded in
+  `docs/evaluation/baseline-phase-7-perf.json`; they were not re-run here.
+- The settings page is still not routed in the web shell — the component and
+  its hooks are tested, but nothing links to it.
+- `POST /v1/models/test` success path has no contract-suite coverage; only the
+  disabled and unavailable branches do.
+- No Playwright coverage for the settings flow.
+- The three Phase 6 qualifications stand unchanged: Chromium conversation-route
+  skips, no pid-reuse detection in recovery, unsigned executable.
+
+- Next: record the `check_phase7.ps1 -SkipE2E` result. If it exits 0, move
+  P7-12 to `complete` and Phase 7 to `awaiting_user_approval` with the table
+  above as the gate summary. **The Phase 7 gate is the user's decision, and
+  condition 7 is a miss that should be decided on, not absorbed.**
 
 ### 2026-07-30T18:51:46Z — P7-11 completed; P7-12 started
 

@@ -6,11 +6,14 @@ Status: Authoritative implementation context
 Last updated: 2026-07-30
 Product blueprint: `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`
 
-**This file has carried two names.** It was `CLAUDE.md` through Phase 6 and was
-renamed `AGENTS.md` during Phase 7 setup. Citations to
-either name — in ADRs, phase plans, handoff entries, and source comments — refer
-to **this file**. Historical records were deliberately not rewritten: a rename is
-not a reason to edit the evidence a gate was approved on.
+**This file has carried two names, and has now carried one of them twice.** It
+was `CLAUDE.md` through Phase 6, was renamed `AGENTS.md` during Phase 7 setup,
+and was renamed back to `CLAUDE.md` on 2026-07-31. Citations to either name —
+in ADRs, phase plans, handoff entries, and source comments — refer to **this
+file**. Only live pointers (the README and `docs/plans/PLAN.md`'s header and
+rule 1) track the current name; historical records were deliberately not
+rewritten, because a rename is not a reason to edit the evidence a gate was
+approved on.
 
 ## 1. Purpose of This File
 
@@ -213,7 +216,7 @@ For a greenfield repository, converge toward:
 
 ```text
 codeatlas/
-├── AGENTS.md
+├── CLAUDE.md
 ├── README.md
 ├── CODEATLAS_INDUSTRY_BLUEPRINT_2026.md
 ├── pyproject.toml
@@ -1190,8 +1193,8 @@ Only after an approval gate:
 Each optional feature needs evaluation showing measurable uplift over the
 deterministic baseline.
 
-**Progress as of 2026-07-30: 12 of 13 tasks delivered (P7-SETUP, P7-01 through
-P7-11); P7-12 is in progress.** Built and tested so far: provider-neutral
+**Progress as of 2026-07-31: all 13 tasks are `complete` and the phase is
+`awaiting_user_approval`.** Built and tested: provider-neutral
 embeddings, content-hash cache, LanceDB-backed vector interface, index-time
 embedding jobs, semantic status, intent-gated semantic retrieval, the Phase 7
 semantic baseline, OpenAI embedding governance, REST/CLI/web settings,
@@ -1201,10 +1204,21 @@ are both recorded as `declined` because their implemented no-provider defaults
 improve no metric over the admitted semantic baseline.
 
 The semantic layer is no longer inert: enabled repositories can write and query
-semantic candidates, with SQLite snapshot membership as the authority. The
-Phase 7 completion gate remains open until P7-12 finishes packaged
-performance/size measurement with embeddings enabled, the security sweep, and
-the final documentation/gate summary.
+semantic candidates, with SQLite snapshot membership as the authority.
+
+**Of the twelve gate conditions, ten are met, two are satisfied as recorded
+declines, and one is missed.** The miss is condition 7: primary evidence
+Recall@10 measured **0.6667** against the Section 19.3 **≥ 0.90** target. The
+semantic layer's uplift is real but modest (0.6000 → 0.6667), and the target is
+missed with and without it. A lexical stopword defect found while measuring was
+worth **+0.53** recall on its own; the semantic layer on top of that fix is
+worth **+0.07**. Packaged performance holds with embeddings enabled — refresh
+p95 0.975 s, preflight p95 2.298 s, coverage 1.0 — at a package tree of
+**1.05 GB**, the torch cost accepted at the activation gate.
+
+The full condition-by-condition summary is the P7-12 handoff in
+`docs/plans/PLAN.md`. **The gate is the user's decision, and the missed target
+is for the user to accept or reject — not to absorb.**
 
 ## 21. Fast Delivery Without Fragility
 

@@ -1,7 +1,7 @@
 # CodeAtlas
 
 CodeAtlas is a local-first repository-intelligence and change-assurance layer.
-The implementation follows the authoritative requirements in `AGENTS.md` and
+The implementation follows the authoritative requirements in `CLAUDE.md` and
 the shared execution state in `docs/plans/PLAN.md`.
 
 ## What works today (Phases 0–6 complete; Phase 7 in progress)
