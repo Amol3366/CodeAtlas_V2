@@ -13,6 +13,18 @@ powershell -ExecutionPolicy Bypass -File scripts/build_package.ps1
 
 Produces `dist/codeatlas-win64/` and `dist/codeatlas-win64.zip` (~44 MB).
 
+The semantic-local package is deliberately explicit:
+
+```powershell
+uv sync --all-groups --extra semantic-local --frozen
+powershell -ExecutionPolicy Bypass -File scripts/build_package.ps1 -SemanticLocal -SkipZip
+```
+
+That build includes the lazy optional dependency tree for local embeddings
+(`sentence-transformers`, torch, LanceDB, and their native dependencies). The
+default package stays deterministic and small; it lists semantic providers but
+does not silently ship a model stack the user did not ask for.
+
 **onedir, not onefile.** ADR-0007 says "a single executable", and `--onefile`
 matches that wording more literally — but it re-extracts the whole bundle to
 `%TEMP%` on *every* launch, which costs seconds of startup for a CLI and is a
@@ -34,13 +46,18 @@ The build verifies its own artifact — a build whose executable cannot answer
 ### In the gate
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -Package
+powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -Package
+powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -Semantic -Package
 ```
 
 Opt-in, because PyInstaller takes minutes and most runs of the gate change one
 Python file. Without `-Package` the packaged smoke tests **skip with their
 reason stated**, so a gate that never built the artifact does not read as one
 that verified it.
+
+Passing `-Semantic` with `-Package` builds the heavy semantic-local onedir
+artifact and skips the zip step. That folder is the artifact
+`scripts/measure_phase7_perf.py` starts.
 
 ## Installing
 
@@ -80,7 +97,7 @@ steal focus, and it must not try to in a script or on a headless machine;
 
 **Loopback only.** `--host` refuses anything but a loopback address. Binding
 beyond loopback needs authentication, a CSRF/CORS review, a revised threat
-model, and explicit approval (`CLAUDE.md` Section 25); until that exists the
+model, and explicit approval (`AGENTS.md` Section 25); until that exists the
 flag refuses rather than exposing an unauthenticated service.
 
 ### One origin, no CORS
@@ -114,11 +131,8 @@ answers from what that build indexed — the same fixture the source-level upgra
 tests use, run through the binary, which is what proves the *bundled* migrations
 are the ones being applied. See `docs/operations/upgrade-and-migration.md`.
 
-Not yet covered, and owned by later tasks:
+Known qualification:
 
-- **Performance and the security sweep measured on the packaged artifact**
-  rather than a source checkout — P6-08, which is what gate conditions 7 and 8
-  ask for.
 - The executable is **unsigned**. Windows SmartScreen will warn on first run.
   Code signing needs a certificate, which is a purchasing decision rather than
   an engineering one.

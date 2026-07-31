@@ -46,6 +46,8 @@ class ErrorCode(StrEnum):
     SCHEMA_VERSION_UNSUPPORTED = "SCHEMA_VERSION_UNSUPPORTED"
     PROVIDER_DISABLED = "PROVIDER_DISABLED"
     PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+    PROVIDER_BUDGET_EXCEEDED = "PROVIDER_BUDGET_EXCEEDED"
+    EMBEDDING_MIGRATION_NOT_FOUND = "EMBEDDING_MIGRATION_NOT_FOUND"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -341,3 +343,27 @@ class ProviderUnavailableError(CodeAtlasError):
 
     code = ErrorCode.PROVIDER_UNAVAILABLE
     retryable = True
+
+
+class ProviderBudgetExceededError(CodeAtlasError):
+    """A provider call would spend more than the repository allows.
+
+    Raised *before* the request is sent, which is the only point where the
+    refusal is worth anything: a budget checked afterwards has already been
+    exceeded.
+
+    Not retryable, and deliberately so. Section 10.3 reserves retries for
+    transient failures; this is a standing decision the user made about
+    spending, and retrying it would burn the allowance on an answer that
+    cannot change until someone raises the budget. Callers degrade to the
+    deterministic result instead.
+    """
+
+    code = ErrorCode.PROVIDER_BUDGET_EXCEEDED
+
+
+class EmbeddingMigrationNotFoundError(CodeAtlasError):
+    """No shadow embedding migration matches the supplied ID."""
+
+    code = ErrorCode.EMBEDDING_MIGRATION_NOT_FOUND
+

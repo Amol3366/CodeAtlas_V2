@@ -1,0 +1,56 @@
+{
+  "contract_version": "1.0",
+  "fixtures_root": "fixtures",
+  "variants_root": "variants",
+  "fixtures": [
+    {
+      "id": "orders_service",
+      "root": "orders_service",
+      "kind": "python",
+      "snapshots": [
+        {
+          "id": "orders-v1",
+          "members": [
+            "README.md",
+            "docs/architecture.md",
+            "docs/runbook.md",
+            "src/orders/__init__.py",
+            "src/orders/errors.py",
+            "src/orders/inventory.py",
+            "src/orders/models.py",
+            "src/orders/notifications.py",
+            "src/orders/pricing.py",
+            "src/orders/repository.py",
+            "src/orders/service.py",
+            "src/orders/validation.py",
+            "tests/test_pricing.py",
+            "tests/test_service.py"
+          ]
+        },
+        {
+          "id": "orders-v1-base",
+          "members": [
+            "README.md",
+            "docs/architecture.md",
+            "docs/runbook.md",
+            "src/orders/__init__.py",
+            "src/orders/errors.py",
+            "src/orders/inventory.py",
+            "src/orders/models.py",
+            "src/orders/notifications.py",
+            "src/orders/pricing.py",
+            "src/orders/repository.py",
+            "src/orders/service.py",
+            "src/orders/validation.py",
+            "tests/test_pricing.py",
+            "tests/test_service.py"
+          ]
+        }
+      ]
+    }
+  ],
+  "query_cases_file": "queries.json",
+  "change_cases_file": "changes.json",
+  "expected_query_count": 14,
+  "expected_change_count": 1
+}

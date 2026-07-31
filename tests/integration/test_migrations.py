@@ -60,11 +60,11 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_ten() -> None:
-    """Phase 7's migration 0010 adds the optional semantic layer's bookkeeping.
+def test_schema_version_is_eleven() -> None:
+    """Phase 7's migration 0011 adds embedding migration bookkeeping.
     The pin is deliberate: a version bump is a contract change someone must
     review."""
-    assert SCHEMA_VERSION == 10
+    assert SCHEMA_VERSION == 11
 
 
 def test_semantic_tables_exist(tmp_path: Path) -> None:
@@ -77,6 +77,7 @@ def test_semantic_tables_exist(tmp_path: Path) -> None:
     assert {
         "embedding_namespaces",
         "embeddings",
+        "embedding_migrations",
         "repository_provider_policy",
         "provider_usage",
     } <= names

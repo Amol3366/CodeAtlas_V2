@@ -3,8 +3,14 @@
 
 Version: 1.0
 Status: Authoritative implementation context
-Last updated: 2026-07-25
+Last updated: 2026-07-30
 Product blueprint: `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`
+
+**This file has carried two names.** It was `CLAUDE.md` through Phase 6 and was
+renamed `AGENTS.md` during Phase 7 setup. Citations to
+either name — in ADRs, phase plans, handoff entries, and source comments — refer
+to **this file**. Historical records were deliberately not rewritten: a rename is
+not a reason to edit the evidence a gate was approved on.
 
 ## 1. Purpose of This File
 
@@ -904,7 +910,7 @@ Execution is sequential:
 - task completion requires current verification evidence in the handoff log;
 - a phase remains `awaiting_user_approval` until the user explicitly approves
   its gate and an agent records that approval;
-- `AGENTS.md` remains the stable policy authority and MUST NOT be used for live
+- this file remains the stable policy authority and MUST NOT be used for live
   task status.
 
 ### Phase progress tracker
@@ -1154,11 +1160,10 @@ Four qualifications were carried into the approval rather than resolved by it.
   first run. Signing needs a certificate, which is a purchasing decision.
 
 **Phase 7's activation gate has been granted** — product, privacy, and
-architecture approval recorded 2026-07-29 in `docs/plans/PLAN.md` — and its
-phase plan is drafted at
-`docs/plans/phases/phase-07-measured-semantic-uplift.md`. No task may start
-until the user approves that plan. Live task status lives in
-`docs/plans/PLAN.md`, never here.
+architecture approval recorded 2026-07-29 in `docs/plans/PLAN.md` — and the user
+approved its phase plan the same day, at
+`docs/plans/phases/phase-07-measured-semantic-uplift.md`. Tasks are running.
+Live task status lives in `docs/plans/PLAN.md`, never here.
 
 ### Phase 7 — Measured semantic uplift
 
@@ -1166,16 +1171,16 @@ Only after an approval gate:
 
 - [x] Explicit product, privacy, and architecture approval recorded
   (2026-07-29, `docs/plans/PLAN.md` handoff)
-- [ ] Provider-neutral embedding interface
-- [ ] Content-hash embedding cache
-- [ ] LanceDB base/delta namespaces with authoritative SQLite membership
-- [ ] Shadow embedding migration and atomic cutover/rollback
-- [ ] Optional bounded reranking
-- [ ] Optional evidence-grounded explanation
-- [ ] Provider budgets, timeouts, retries, and cancellation
-- [ ] Secret detection, redaction, and repository-level opt-in
-- [ ] Provider telemetry without source, prompt, or answer content
-- [ ] Deterministic fallback for disablement, failure, timeout, or budget
+- [x] Provider-neutral embedding interface
+- [x] Content-hash embedding cache
+- [x] LanceDB base/delta namespaces with authoritative SQLite membership
+- [x] Shadow embedding migration and atomic cutover/rollback
+- [x] Optional bounded reranking seam, declined by A/B measurement
+- [x] Optional evidence-grounded explanation seam, declined by A/B measurement
+- [x] Provider budgets, timeouts, retries, and cancellation
+- [x] Secret detection, redaction, and repository-level opt-in
+- [x] Provider telemetry without source, prompt, or answer content
+- [x] Deterministic fallback for disablement, failure, timeout, or budget
   exhaustion
 - [ ] **Completion gate:** Every admitted semantic or generation feature shows
   measurable evaluation uplift over the deterministic baseline, preserves
@@ -1184,6 +1189,22 @@ Only after an approval gate:
 
 Each optional feature needs evaluation showing measurable uplift over the
 deterministic baseline.
+
+**Progress as of 2026-07-30: 12 of 13 tasks delivered (P7-SETUP, P7-01 through
+P7-11); P7-12 is in progress.** Built and tested so far: provider-neutral
+embeddings, content-hash cache, LanceDB-backed vector interface, index-time
+embedding jobs, semantic status, intent-gated semantic retrieval, the Phase 7
+semantic baseline, OpenAI embedding governance, REST/CLI/web settings,
+repository-level opt-in, budgets/redaction/telemetry, shadow embedding
+migrations, and rerank/explanation seams. Reranking and generated explanations
+are both recorded as `declined` because their implemented no-provider defaults
+improve no metric over the admitted semantic baseline.
+
+The semantic layer is no longer inert: enabled repositories can write and query
+semantic candidates, with SQLite snapshot membership as the authority. The
+Phase 7 completion gate remains open until P7-12 finishes packaged
+performance/size measurement with embeddings enabled, the security sweep, and
+the final documentation/gate summary.
 
 ## 21. Fast Delivery Without Fragility
 

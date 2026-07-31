@@ -19,6 +19,8 @@ be indistinguishable from a working search returning poor results.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 from codeatlas.domain.errors import ProviderDisabledError, ProviderUnavailableError
@@ -136,6 +138,135 @@ class LocalSentenceTransformerProvider:
         return [[float(value) for value in vector] for vector in vectors]
 
 
+OPENAI_MODEL_ID = "text-embedding-3-small"
+OPENAI_DIMENSIONS = 1536
+OPENAI_TIMEOUT_SECONDS = 30.0
+OPENAI_API_KEY_VARIABLE = "OPENAI_API_KEY"
+
+
+class OpenAIEmbeddingProvider:
+    """The transmitting provider. Never construct one outside `ProviderFactory`.
+
+    Reaching this class directly skips redaction, budgets, and telemetry, which
+    is why the only supported route to it applies all three. It is public so it
+    can be tested against a fake transport, not so it can be used.
+
+    **The credential is never held here.** It is read once, handed to the
+    client, and forgotten: an API key kept as an attribute reaches a `repr`, a
+    traceback, and a diagnostic bundle, all of which Section 4.4 says it must
+    not. It is read from the environment rather than the database because
+    storing it in SQLite would put a live credential in every backup the
+    product takes.
+    """
+
+    model_id = OPENAI_MODEL_ID
+    dimensions = OPENAI_DIMENSIONS
+    normalization_version = NORMALIZATION_VERSION
+
+    def __init__(
+        self,
+        *,
+        model_id: str = OPENAI_MODEL_ID,
+        client: object | None = None,
+        timeout: float = OPENAI_TIMEOUT_SECONDS,
+    ) -> None:
+        self.model_id = model_id
+        if client is not None:
+            self._client = client
+            return
+
+        # The credential is checked before the import, and the order is chosen
+        # so each real misconfiguration gets its own accurate message. Reading
+        # an environment variable is free and needs no package; a user with a
+        # key but no package is told to install it, and a user with the package
+        # but no key is told to set it. Importing first would answer the second
+        # user's problem with the first user's instruction.
+        import os
+
+        api_key = os.environ.get(OPENAI_API_KEY_VARIABLE)
+        if not api_key:
+            raise ProviderUnavailableError(
+                f"The OpenAI provider needs {OPENAI_API_KEY_VARIABLE} in the "
+                "environment.",
+                details={"provider": EmbeddingProviderKind.OPENAI.value},
+            )
+
+        try:
+            from openai import OpenAI
+        except ImportError as error:  # pragma: no cover - exercised without extra
+            raise ProviderUnavailableError(
+                "The OpenAI provider needs the 'semantic-openai' extra. "
+                "Install it with: uv sync --extra semantic-openai",
+                details={"provider": EmbeddingProviderKind.OPENAI.value},
+            ) from error
+        # Handed over, not retained. `api_key` goes out of scope with this call.
+        self._client = OpenAI(api_key=api_key, timeout=timeout)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self._encode(texts)
+
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        return self._encode(texts)
+
+    def _encode(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            # A request with nothing in it is a billable no-op.
+            return []
+        response = self._client.embeddings.create(  # type: ignore[attr-defined]
+            model=self.model_id, input=texts
+        )
+        return [_normalize(list(item.embedding)) for item in response.data]
+
+
+def _normalize(vector: list[float]) -> list[float]:
+    """Scale to unit length, matching every other provider.
+
+    The vector store compares within a namespace by cosine similarity, and the
+    local provider normalizes at write time. A provider that did not would put
+    differently-scaled vectors into one similarity space.
+    """
+    length = sum(value * value for value in vector) ** 0.5
+    if length == 0.0:
+        return vector
+    return [value / length for value in vector]
+
+
+class ProviderFactory:
+    """The only supported way to obtain a provider for a repository policy.
+
+    It exists because governance needs a database connection — to read the
+    month's spending and to record usage — and `build_embedding_provider` has
+    none. Rather than widen that function's signature and leave an ungoverned
+    path next to a governed one, the transmitting provider is reachable *only*
+    from here, and only wrapped.
+    """
+
+    def __init__(
+        self,
+        connection: object,
+        *,
+        open_client: Callable[[], object] | None = None,
+    ) -> None:
+        self._connection = connection
+        # Injection point for the fake transport the tests use. Left unset in
+        # production, so a real client is built with a real credential.
+        self._open_client = open_client
+
+    def build(self, policy: ProviderPolicy) -> EmbeddingProvider:
+        kind = policy.embedding_provider
+        if kind is not EmbeddingProviderKind.OPENAI:
+            return build_embedding_provider(policy)
+
+        from codeatlas.semantic.governance import GovernedEmbeddingProvider
+
+        client = self._open_client() if self._open_client is not None else None
+        return GovernedEmbeddingProvider(
+            inner=OpenAIEmbeddingProvider(client=client),
+            policy=policy,
+            connection=self._connection,  # type: ignore[arg-type]
+        )
+
+
 def build_embedding_provider(policy: ProviderPolicy) -> EmbeddingProvider:
     """Return the provider one repository's policy selects.
 
@@ -149,13 +280,15 @@ def build_embedding_provider(policy: ProviderPolicy) -> EmbeddingProvider:
     if kind is EmbeddingProviderKind.NONE:
         return NoEmbeddingProvider()
     if kind is EmbeddingProviderKind.LOCAL:
-        return LocalSentenceTransformerProvider()
+        return _cached_local_provider()
 
-    # OPENAI lands in P7-07 together with the redaction, budget, and opt-in
-    # machinery it must never be usable without. Refusing until then is the
-    # honest state: the setting is storable, so something must answer for it.
+    # OPENAI is deliberately unreachable from here, and stays that way. This
+    # function has no database connection, so it cannot read a budget or record
+    # usage — a provider returned from it would transmit ungoverned. `ProviderFactory`
+    # is the supported route, and it wraps.
     raise ProviderUnavailableError(
-        "The OpenAI embedding provider is not available in this build.",
+        "The OpenAI embedding provider must be built through ProviderFactory, "
+        "which applies redaction, budgets, and usage telemetry.",
         details={"provider": kind.value},
     )
 
@@ -192,6 +325,19 @@ def _embedding_dimension(model: object) -> int:
         "embedding dimension.",
         details={"provider": EmbeddingProviderKind.LOCAL.value},
     )
+
+
+@lru_cache(maxsize=1)
+def _cached_local_provider(
+    model_id: str = LOCAL_MODEL_ID,
+) -> LocalSentenceTransformerProvider:
+    """Reuse the local model inside one process.
+
+    Loading sentence-transformers is the expensive part of local embeddings.
+    Reconstructing it for every index and every semantic query makes the
+    optional layer dominate latency even when only one content hash changed.
+    """
+    return LocalSentenceTransformerProvider(model_id=model_id)
 
 
 def _module_is_importable(name: str) -> bool:

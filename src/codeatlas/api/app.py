@@ -32,6 +32,7 @@ from codeatlas.api.routers import (
     query,
     repositories,
     search,
+    settings,
     stream,
 )
 from codeatlas.api.web import mount_web_application
@@ -40,6 +41,7 @@ from codeatlas.application.watching import WatchService
 from codeatlas.conversations.events import EventHub
 from codeatlas.conversations.executor import RunExecutor, ThreadedRunExecutor
 from codeatlas.domain.errors import CodeAtlasError, ErrorCode
+from codeatlas.semantic.vector_store import LazyVectorStore, VectorStore
 from codeatlas.storage.sqlite.connection import default_database_path
 
 API_TITLE = "CodeAtlas local API"
@@ -115,6 +117,7 @@ def create_app(
 
     app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
     app.state.database_path = resolved_path
+    app.state.vector_store = LazyVectorStore(resolved_path.parent / "vectors")
     # Recorded so a caller can see what was mounted without inspecting routes.
     app.state.web_assets = web_assets
     app.state.services_factory = _services_factory(app, resolved_path)
@@ -126,6 +129,7 @@ def create_app(
     app.include_router(graph.router)
     app.include_router(change_analysis.router)
     app.include_router(conversations.router)
+    app.include_router(settings.router)
     app.include_router(stream.router)
 
     # Mounted after every router, so no API route can be shadowed by a file
@@ -269,7 +273,13 @@ def _services_factory(
     def factory() -> Iterator[ApplicationServices]:
         connection = _open(database_path)
         try:
-            yield build_services(connection, hub=hub(), executor=executor())
+            vectors: VectorStore = app.state.vector_store
+            yield build_services(
+                connection,
+                hub=hub(),
+                executor=executor(),
+                vectors=vectors,
+            )
         finally:
             connection.close()
 

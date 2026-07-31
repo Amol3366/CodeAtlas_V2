@@ -1,0 +1,366 @@
+{
+  "contract_version": "1.0",
+  "cases": [
+    {
+      "id": "s001",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "How do we stop two shoppers buying the last one of something?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["InventoryLedger.reserve"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/inventory.py",
+          "symbol": "InventoryLedger.reserve",
+          "start_line": 20,
+          "end_line": 28,
+          "evidence_id": "s001-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Stock is locked with a database transaction.",
+        "Reservations expire automatically."
+      ]
+    },
+    {
+      "id": "s002",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "What prevents an empty basket from being submitted?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["check_order"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/validation.py",
+          "symbol": "check_order",
+          "start_line": 22,
+          "end_line": 27,
+          "evidence_id": "s002-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "An empty basket is silently discarded."
+      ]
+    },
+    {
+      "id": "s003",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "When does a customer avoid paying for delivery?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["shipping_for"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/pricing.py",
+          "symbol": "shipping_for",
+          "start_line": 23,
+          "end_line": 27,
+          "evidence_id": "s003-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Delivery is always free.",
+        "Shipping is calculated by weight."
+      ]
+    },
+    {
+      "id": "s004",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "Is sales tax rounded up or down?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["tax_for"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/pricing.py",
+          "symbol": "tax_for",
+          "start_line": 18,
+          "end_line": 20,
+          "evidence_id": "s004-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Tax is rounded to the nearest cent.",
+        "Tax rates vary by region."
+      ]
+    },
+    {
+      "id": "s005",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "Can a promotion ever push the price below nothing?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["apply_discount"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/pricing.py",
+          "symbol": "apply_discount",
+          "start_line": 30,
+          "end_line": 36,
+          "evidence_id": "s005-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Discounts above 100 percent produce a refund."
+      ]
+    },
+    {
+      "id": "s006",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "In what sequence do things happen when somebody buys?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["OrderService.place"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/service.py",
+          "symbol": "OrderService.place",
+          "start_line": 40,
+          "end_line": 54,
+          "evidence_id": "s006-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "The customer is emailed before stock is held.",
+        "Payment is taken before validation."
+      ]
+    },
+    {
+      "id": "s007",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "What happens to held stock if somebody changes their mind?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["OrderService.cancel"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/service.py",
+          "symbol": "OrderService.cancel",
+          "start_line": 56,
+          "end_line": 69,
+          "evidence_id": "s007-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Cancelling an order refunds the card automatically."
+      ]
+    },
+    {
+      "id": "s008",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "Why are amounts kept as whole numbers instead of decimals?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["Money is stored in minor units"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "docs/architecture.md",
+          "symbol": "Money is stored in minor units",
+          "start_line": 14,
+          "end_line": 18,
+          "evidence_id": "s008-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Amounts are stored as floating point."
+      ]
+    },
+    {
+      "id": "s009",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "What comes back when someone looks up a reference that was never created?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["OrderRepository.get"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/repository.py",
+          "symbol": "OrderRepository.get",
+          "start_line": 16,
+          "end_line": 20,
+          "evidence_id": "s009-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "A missing order returns None."
+      ]
+    },
+    {
+      "id": "s010",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "Can we warn a shopper that their parcel will arrive late?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["Notifier.send_delay_notice"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/notifications.py",
+          "symbol": "Notifier.send_delay_notice",
+          "start_line": 20,
+          "end_line": 22,
+          "evidence_id": "s010-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [
+        "Nothing calls the delay notice automatically."
+      ],
+      "forbidden_claims": [
+        "Delay notices are sent automatically when an order is late."
+      ]
+    },
+    {
+      "id": "s011",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "What happens if the same purchase is submitted twice?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["Retry and idempotency"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "docs/architecture.md",
+          "symbol": "Retry and idempotency",
+          "start_line": 20,
+          "end_line": 24,
+          "evidence_id": "s011-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [
+        "The duplicate-submission gap is documented but not fixed."
+      ],
+      "forbidden_claims": [
+        "Duplicate submissions are rejected.",
+        "Orders are idempotent by reference."
+      ]
+    },
+    {
+      "id": "s012",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "A shopper was billed but never received an email. Where do I start?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": [
+        "A customer says they were charged but got no email"
+      ],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "docs/runbook.md",
+          "symbol": "A customer says they were charged but got no email",
+          "start_line": 3,
+          "end_line": 6,
+          "evidence_id": "s012-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "The charge is reversed automatically."
+      ]
+    },
+    {
+      "id": "s013",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "What stages can an order move through?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["OrderStatus"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/models.py",
+          "symbol": "OrderStatus",
+          "start_line": 6,
+          "end_line": 12,
+          "evidence_id": "s013-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "An order can be refunded."
+      ]
+    },
+    {
+      "id": "s014",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "question": "How would I spot the same product added on two separate rows?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["is_duplicate_sku"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/validation.py",
+          "symbol": "is_duplicate_sku",
+          "start_line": 30,
+          "end_line": 33,
+          "evidence_id": "s014-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Duplicate lines are merged automatically."
+      ]
+    }
+  ]
+}

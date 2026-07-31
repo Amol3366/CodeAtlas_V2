@@ -105,6 +105,20 @@ Invoke-Checked "Phase 4 engine baseline (Phase 7 comparison point)" @(
     "--markdown-output", "docs/evaluation/baseline-phase-4.md",
     "--check"
 )
+Invoke-Checked "Phase 7 rerank A/B artifact" @(
+    "run", "python", "scripts/run_phase7_rerank_ab.py",
+    "--semantic-baseline", "docs/evaluation/baseline-phase-7.json",
+    "--json-output", "docs/evaluation/rerank-phase-7.json",
+    "--markdown-output", "docs/evaluation/rerank-phase-7.md",
+    "--check"
+)
+Invoke-Checked "Phase 7 explanation A/B artifact" @(
+    "run", "python", "scripts/run_phase7_explanation_ab.py",
+    "--semantic-baseline", "docs/evaluation/baseline-phase-7.json",
+    "--json-output", "docs/evaluation/explanation-phase-7.json",
+    "--markdown-output", "docs/evaluation/explanation-phase-7.md",
+    "--check"
+)
 
 if ($SkipWeb) {
     Write-Output "Phase 7 backend verification completed (web skipped)."
@@ -161,6 +175,24 @@ if ($Semantic) {
     } else {
         Write-Output "==> Semantic suites (none yet; P7-02 lands the first)"
     }
+
+    # Gate condition 7. Both sides of this comparison run here rather than
+    # above, because running the deterministic side in a different environment
+    # from the semantic side would compare two things differing in more than
+    # the switch under test.
+    #
+    # `--check` pins the measurement the same way the Phase 3 and 4 baselines
+    # are pinned: the artifact is committed, and a run that no longer
+    # reproduces it is a change to the answer that has to be reviewed rather
+    # than absorbed. The real model's embeddings reproduce byte-for-byte on
+    # CPU, which is what makes that possible.
+    Invoke-Checked "Phase 7 semantic uplift baseline" @(
+        "run", "python", "scripts/run_phase7_baseline.py",
+        "--dataset", "tests/evaluation/semantic_cases",
+        "--json-output", "docs/evaluation/baseline-phase-7.json",
+        "--markdown-output", "docs/evaluation/baseline-phase-7.md",
+        "--check"
+    )
 } else {
     Write-Output "==> Semantic layer (skipped; pass -Semantic to install the extras and verify)"
 }
@@ -169,7 +201,12 @@ if ($Semantic) {
 
 if ($Package) {
     Write-Output "==> Packaged build"
-    & (Join-Path $PSScriptRoot "build_package.ps1") -SkipWebBuild
+    $packageArgs = @("-SkipWebBuild")
+    if ($Semantic) {
+        $packageArgs += "-SemanticLocal"
+        $packageArgs += "-SkipZip"
+    }
+    & (Join-Path $PSScriptRoot "build_package.ps1") @packageArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Packaging failed with exit code $LASTEXITCODE."
     }
@@ -183,14 +220,13 @@ if ($Package) {
 
 # --- Performance ----------------------------------------------------------
 
-# Still Phase 6's measurement until P7-12 lands `measure_phase7_perf.py`. Gate
-# condition 12 asks whether the Section 19.3 targets still hold *with
-# embeddings enabled*, which cannot be measured before the embeddings exist —
-# so this deliberately keeps measuring the deterministic artifact rather than
-# reporting a number that would silently answer a different question.
+# Gate condition 12 asks for the packaged artifact with embeddings enabled.
+# The script refuses to substitute a deterministic-only number when the local
+# model or the semantic package build is missing.
 if ($Perf) {
-    Invoke-Checked "Packaged performance (deterministic; Phase 6 measurement)" @(
-        "run", "python", "scripts/measure_phase6_perf.py"
+    Invoke-Checked "Packaged performance with local embeddings enabled" @(
+        "run", "python", "scripts/measure_phase7_perf.py",
+        "--json-output", "docs/evaluation/baseline-phase-7-perf.json"
     )
 } else {
     Write-Output "==> Packaged performance (skipped; pass -Perf to measure)"

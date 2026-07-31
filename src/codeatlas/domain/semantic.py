@@ -72,6 +72,16 @@ class NamespaceStatus(StrEnum):
     RETIRED = "retired"
 
 
+class EmbeddingMigrationStatus(StrEnum):
+    """Lifecycle of a shadow namespace migration."""
+
+    BACKFILLING = "backfilling"
+    READY_FOR_CUTOVER = "ready_for_cutover"
+    ACTIVE = "active"
+    ROLLED_BACK = "rolled_back"
+    FAILED = "failed"
+
+
 @dataclass(frozen=True)
 class EmbeddingNamespace:
     """One similarity space, identified by what makes vectors comparable."""
@@ -104,6 +114,22 @@ class EmbeddingRecord:
     embedded_at: datetime | None
     # A code, never a provider message: a message can quote the payload that
     # caused it, and payloads are repository content.
+    failure_code: str | None
+
+
+@dataclass(frozen=True)
+class EmbeddingMigration:
+    """A repository-specific request to move from one namespace to another."""
+
+    migration_id: str
+    repository_id: str
+    source_namespace_id: str
+    target_namespace_id: str
+    status: EmbeddingMigrationStatus
+    created_at: datetime
+    updated_at: datetime
+    activated_at: datetime | None
+    rolled_back_at: datetime | None
     failure_code: str | None
 
 

@@ -30,7 +30,10 @@ from codeatlas.domain.errors import RepositoryNotFoundError, SnapshotNotReadyErr
 from codeatlas.domain.repository import Repository
 from codeatlas.domain.search import ChunkSearchHit
 from codeatlas.domain.snapshot import Snapshot
-from codeatlas.retrieval.fts_query import build_match_expression
+from codeatlas.retrieval.fts_query import (
+    build_match_expression,
+    build_relaxed_match_expression,
+)
 from codeatlas.storage.sqlite.stores import (
     EvidenceStore,
     FileStore,
@@ -81,12 +84,35 @@ class LexicalSearchService:
         self._files = files
 
     def search_text(self, request: SearchRequest) -> QueryResponse:
-        """Find chunks whose retrieval text matches the query."""
+        """Find chunks whose retrieval text matches the query.
+
+        Two passes, and the order is the design. The strict pass ANDs every
+        term, which is what makes a targeted lookup precise. Only when it
+        matches *nothing* is the query re-read broadly, with function words
+        dropped and the remainder ORed — the reading a typed sentence needs,
+        since no chunk contains all twelve words of a question.
+
+        Because the second pass runs only after the first returned nothing, a
+        query that finds results today finds exactly the same results after
+        this change. That is what let the fallback land without moving a single
+        committed baseline, and it is the property to preserve if this is ever
+        reworked.
+        """
         repository, snapshot, expression, limit = self._prepare(request)
         started = time.perf_counter()
         hits = self._search.search_chunks(snapshot.snapshot_id, expression, limit)
+        relaxed = False
+        if not hits:
+            broadened = build_relaxed_match_expression(request.query)
+            if broadened is not None and broadened != expression:
+                hits = self._search.search_chunks(
+                    snapshot.snapshot_id, broadened, limit
+                )
+                relaxed = bool(hits)
         elapsed = (time.perf_counter() - started) * 1000
-        return self._from_chunk_hits(request, repository, snapshot, hits, elapsed)
+        return self._from_chunk_hits(
+            request, repository, snapshot, hits, elapsed, relaxed=relaxed
+        )
 
     def search_symbols(self, request: SearchRequest) -> QueryResponse:
         """Resolve a symbol exactly, falling back to lexical name matching."""
@@ -215,6 +241,8 @@ class LexicalSearchService:
         snapshot: Snapshot,
         hits: Sequence[ChunkSearchHit],
         elapsed: float,
+        *,
+        relaxed: bool = False,
     ) -> QueryResponse:
         outcome = self._evidence.build(
             repository_root=Path(repository.canonical_root),
@@ -251,6 +279,7 @@ class LexicalSearchService:
             claims=claims,
             outcome=outcome,
             elapsed=elapsed,
+            relaxed=relaxed,
         )
 
     def _respond(
@@ -262,10 +291,16 @@ class LexicalSearchService:
         claims: Sequence[Claim],
         outcome: EvidenceOutcome,
         elapsed: float,
+        relaxed: bool = False,
     ) -> QueryResponse:
         warnings = list(outcome.warnings)
         if not outcome.items:
             warnings.append("NO_LEXICAL_MATCH")
+        if relaxed:
+            # The answer came from a broader reading than the user typed, so it
+            # answers a slightly different question. Section 4.1: say so rather
+            # than present it as an exact match.
+            warnings.append("LEXICAL_QUERY_RELAXED")
         return QueryResponse(
             request_id=request.request_id,
             repository_id=request.repository_id,

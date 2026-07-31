@@ -243,6 +243,22 @@ def embedding_namespace_id(
     return f"{model}_{dimensions}d_{normalization}_{digest}"
 
 
+def embedding_migration_id(
+    repository_id_value: str,
+    source_namespace_id: str,
+    target_namespace_id: str,
+) -> str:
+    """Identify one requested namespace migration for one repository.
+
+    Deterministic so retrying a start request for the same source and target
+    resumes the same migration record rather than creating duplicates.
+    """
+    digest = stable_hash(
+        repository_id_value, source_namespace_id, target_namespace_id
+    )
+    return f"mig_{digest}"
+
+
 def _model_slug(model_id: str) -> str:
     """Validate a model ID and render it as a single path-safe segment."""
     value = model_id.strip().casefold()

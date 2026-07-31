@@ -28,6 +28,7 @@ _STATUS_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.FILE_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.SYMBOL_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.CHANGE_ANALYSIS_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+    ErrorCode.EMBEDDING_MIGRATION_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.GIT_REF_UNRESOLVABLE: status.HTTP_400_BAD_REQUEST,
     ErrorCode.ANALYSIS_RULES_INVALID: status.HTTP_422_UNPROCESSABLE_CONTENT,
     ErrorCode.REPOSITORY_ALREADY_REGISTERED: status.HTTP_409_CONFLICT,
@@ -50,6 +51,9 @@ _STATUS_BY_CODE: dict[ErrorCode, int] = {
     # service is running; it is the database on disk that this build cannot
     # serve, and no retry or rewording changes that.
     ErrorCode.SCHEMA_VERSION_UNSUPPORTED: status.HTTP_409_CONFLICT,
+    ErrorCode.PROVIDER_DISABLED: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.PROVIDER_UNAVAILABLE: status.HTTP_409_CONFLICT,
+    ErrorCode.PROVIDER_BUDGET_EXCEEDED: status.HTTP_409_CONFLICT,
     ErrorCode.INTERNAL_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

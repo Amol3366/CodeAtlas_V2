@@ -50,7 +50,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from measure_phase4_perf import _edit_one_file, _git, _p95, generate_repository
+try:
+    from scripts.measure_phase4_perf import (
+        _edit_one_file,
+        _git,
+        _p95,
+        generate_repository,
+    )
+except ModuleNotFoundError:  # pragma: no cover - direct script execution
+    from measure_phase4_perf import (  # type: ignore[import-not-found,no-redef]
+        _edit_one_file,
+        _git,
+        _p95,
+        generate_repository,
+    )
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 _ARTIFACT = _REPOSITORY_ROOT / "dist" / "codeatlas-win64" / "codeatlas.exe"

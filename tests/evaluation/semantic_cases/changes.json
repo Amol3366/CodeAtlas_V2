@@ -1,0 +1,35 @@
+{
+  "contract_version": "1.0",
+  "cases": [
+    {
+      "id": "sc001",
+      "repository_fixture": "orders_service",
+      "snapshot_id": "orders-v1",
+      "base_ref": "HEAD",
+      "target_ref": "working-tree:shipping-signature",
+      "expected_symbols": ["shipping_for"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/orders/pricing.py",
+          "symbol": "shipping_for",
+          "start_line": 23,
+          "end_line": 27,
+          "evidence_id": "sc001-e1",
+          "snapshot_id": "orders-v1"
+        }
+      ],
+      "expected_changed_symbols": ["shipping_for"],
+      "expected_impact_paths": [["shipping_for", "total_for"]],
+      "expected_findings": ["PUBLIC_SIGNATURE_CHANGED"],
+      "warnings": [],
+      "limitations": [
+        "The variant is a mid-refactor state: total_for still calls shipping_for with one argument. Fixture content is never executed."
+      ],
+      "forbidden_claims": [
+        "Existing call sites remain valid.",
+        "The change is backward compatible."
+      ]
+    }
+  ]
+}

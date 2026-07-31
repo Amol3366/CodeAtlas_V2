@@ -16,7 +16,8 @@
 [CmdletBinding()]
 param(
     [switch]$SkipWebBuild,
-    [switch]$SkipZip
+    [switch]$SkipZip,
+    [switch]$SemanticLocal
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,16 +56,33 @@ if (Test-Path $release) { Remove-Item -Recurse -Force $release }
 
 $migrations = Join-Path $root "src/codeatlas/storage/sqlite/migrations"
 
-& uv run pyinstaller `
-    --noconfirm `
-    --name codeatlas `
-    --distpath $dist `
-    --workpath (Join-Path $dist "build") `
-    --specpath (Join-Path $dist "spec") `
-    --add-data "$assets;web" `
-    --add-data "$migrations;codeatlas/storage/sqlite/migrations" `
-    --collect-submodules uvicorn `
-    (Join-Path $root "packaging/entry.py")
+$pyinstallerArgs = @(
+    "--noconfirm",
+    "--name", "codeatlas",
+    "--distpath", $dist,
+    "--workpath", (Join-Path $dist "build"),
+    "--specpath", (Join-Path $dist "spec"),
+    "--add-data", "$assets;web",
+    "--add-data", "$migrations;codeatlas/storage/sqlite/migrations",
+    "--collect-submodules", "uvicorn"
+)
+
+if ($SemanticLocal) {
+    Write-Output "==> Including semantic-local optional dependencies"
+    $pyinstallerArgs += @(
+        "--collect-all", "huggingface_hub",
+        "--collect-all", "lancedb",
+        "--collect-all", "pyarrow",
+        "--collect-all", "safetensors",
+        "--collect-all", "sentence_transformers",
+        "--collect-all", "sklearn",
+        "--collect-all", "tokenizers",
+        "--collect-all", "torch",
+        "--collect-all", "transformers"
+    )
+}
+
+& uv run pyinstaller @pyinstallerArgs (Join-Path $root "packaging/entry.py")
 
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE."

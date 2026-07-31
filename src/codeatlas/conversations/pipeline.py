@@ -21,6 +21,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from codeatlas.application.graph_queries import GraphQueryRequest, GraphQueryService
 from codeatlas.application.lookup import ExactSymbolLookupService, SymbolLookupRequest
@@ -35,6 +36,41 @@ from codeatlas.retrieval.lexical import (
 )
 
 DEFAULT_GRAPH_DEPTH: int = 2
+
+# The one intent the semantic channel serves. Section 10.2 gives every other
+# intent a resolution — an exact symbol, a call edge, a diff — and blueprint
+# 15.6 rejects letting a similarity score participate in those.
+#
+# A frozen set rather than a check at the call site, because the safe default
+# for an intent added later is *exclusion*: a new intent that nobody thought
+# about must not silently acquire a provider call.
+SEMANTIC_INTENTS: frozenset[Intent] = frozenset({Intent.TEXT})
+GENERATION_INTENTS: frozenset[Intent] = frozenset({Intent.TEXT, Intent.TRACE})
+
+
+class SemanticFusion(Protocol):
+    """The one method this pipeline needs from the optional semantic layer.
+
+    A protocol rather than an import, for the reason the whole phase turns on:
+    the deterministic answer path must remain buildable and runnable on an
+    installation where the semantic package's dependencies were never
+    installed. A concrete import here would end that, quietly, the first time
+    someone ran the CLI without the extras.
+
+    The implementation is `application.semantic_fusion.SemanticFusionService`.
+    """
+
+    def augment(
+        self, response: QueryResponse, *, question: str
+    ) -> QueryResponse: ...
+
+
+class AnswerExplainer(Protocol):
+    """The optional generation seam for steps 14-15."""
+
+    def explain(
+        self, response: QueryResponse, *, question: str
+    ) -> QueryResponse: ...
 
 
 class CancelledError(Exception):
@@ -106,10 +142,18 @@ class AnswerPipeline:
         lookup: ExactSymbolLookupService,
         graph: GraphQueryService,
         search: LexicalSearchService,
+        fusion: SemanticFusion | None = None,
+        explainer: AnswerExplainer | None = None,
     ) -> None:
         self._lookup = lookup
         self._graph = graph
         self._search = search
+        # Optional, and typed as a protocol, so this module never imports the
+        # semantic package. The deterministic path may not acquire a dependency
+        # on the layer that is allowed to be absent — the same rule that shapes
+        # `IndexRepositoryService.embedding`.
+        self._fusion = fusion
+        self._explainer = explainer
 
     def execute(
         self,
@@ -136,6 +180,9 @@ class AnswerPipeline:
 
         token.raise_if_cancelled()
         response = self._retrieve(request, classification.intent, classification.target)
+
+        token.raise_if_cancelled()
+        response = self._fuse(response, request, classification.intent)
         emit(
             PipelineEvent(
                 "retrieval.progress",
@@ -146,6 +193,9 @@ class AnswerPipeline:
                 },
             )
         )
+
+        token.raise_if_cancelled()
+        response = self._explain(response, request, classification.intent)
 
         token.raise_if_cancelled()
         markdown = render_answer(response, intent=classification.intent)
@@ -159,6 +209,28 @@ class AnswerPipeline:
             policy_version=classification.policy_version,
             latency_ms=(time.perf_counter() - started) * 1000,
         )
+
+    def _fuse(
+        self, response: QueryResponse, request: AnswerRequest, intent: Intent
+    ) -> QueryResponse:
+        """Add semantic candidates, for the one intent that may have them.
+
+        The gate is checked *before* the channel is reached rather than by
+        discarding its results afterwards. Filtering after the fact would still
+        have spent the latency and, for a transmitting provider, would already
+        have sent the question off the machine.
+        """
+        if self._fusion is None or intent not in SEMANTIC_INTENTS:
+            return response
+        return self._fusion.augment(response, question=request.question)
+
+    def _explain(
+        self, response: QueryResponse, request: AnswerRequest, intent: Intent
+    ) -> QueryResponse:
+        """Optionally rewrite answer prose from verified evidence only."""
+        if self._explainer is None or intent not in GENERATION_INTENTS:
+            return response
+        return self._explainer.explain(response, question=request.question)
 
     def _retrieve(
         self, request: AnswerRequest, intent: Intent, target: str
@@ -211,10 +283,14 @@ class AnswerPipeline:
 
 __all__ = [
     "DEFAULT_GRAPH_DEPTH",
+    "GENERATION_INTENTS",
+    "SEMANTIC_INTENTS",
+    "AnswerExplainer",
     "AnswerPipeline",
     "AnswerRequest",
     "AnswerResult",
     "CancelToken",
     "CancelledError",
     "PipelineEvent",
+    "SemanticFusion",
 ]

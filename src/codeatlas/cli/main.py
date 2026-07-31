@@ -50,6 +50,7 @@ from codeatlas.domain.errors import (
     SnapshotNotReadyError,
 )
 from codeatlas.domain.repository import Repository
+from codeatlas.domain.semantic import EmbeddingProviderKind
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.storage.sqlite.backup import create_backup, restore
@@ -1212,3 +1213,122 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+@app.command("settings")
+def settings_command(
+    repository_id: Annotated[str, typer.Argument()],
+    provider: Annotated[
+        str | None,
+        typer.Option(
+            "--provider",
+            help="Embedding provider: none, local, or openai.",
+        ),
+    ] = None,
+    monthly_budget: Annotated[
+        int | None,
+        typer.Option("--monthly-budget", help="Monthly token budget."),
+    ] = None,
+    per_run_budget: Annotated[
+        int | None,
+        typer.Option("--per-run-budget", help="Per-run token budget."),
+    ] = None,
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """Show or change one repository's provider settings.
+
+    With no options this only reads. Every rule about what may be enabled lives
+    in the application service, so this command and `PATCH /v1/settings` refuse
+    exactly the same things — a CLI that could enable a transmitting provider on
+    easier terms would make the opt-in a suggestion.
+    """
+    kind: EmbeddingProviderKind | None = None
+    if provider is not None:
+        try:
+            kind = EmbeddingProviderKind(provider)
+        except ValueError:
+            typer.echo(
+                f"INVALID_REQUEST: unknown provider '{provider}'."
+                " Choose none, local, or openai.",
+                err=True,
+            )
+            raise typer.Exit(EXIT_INVALID_INPUT) from None
+
+    changing = (
+        kind is not None or monthly_budget is not None or per_run_budget is not None
+    )
+    try:
+        with _services(database) as services:
+            result = (
+                services.settings.update(
+                    repository_id,
+                    embedding_provider=kind,
+                    monthly_token_budget=monthly_budget,
+                    per_run_token_budget=per_run_budget,
+                )
+                if changing
+                else services.settings.get(repository_id)
+            )
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    payload = {
+        "repository_id": result.repository_id,
+        "embedding_provider": result.embedding_provider.value,
+        "monthly_token_budget": result.monthly_token_budget,
+        "per_run_token_budget": result.per_run_token_budget,
+        "transmits_off_machine": result.transmits_off_machine,
+        "updated_at": result.updated_at.isoformat(),
+    }
+    transmits = " (transmits off machine)" if result.transmits_off_machine else ""
+    text = (
+        f"{result.repository_id}: provider={result.embedding_provider.value}"
+        f"{transmits}, monthly={result.monthly_token_budget},"
+        f" per-run={result.per_run_token_budget}"
+    )
+    _emit(payload, text, as_json=as_json)
+
+
+@app.command("models")
+def models_command(
+    database: DatabaseOption = None,
+    as_json: JsonOption = False,
+) -> None:
+    """List embedding providers and whether each can run on this machine.
+
+    Unavailable providers are listed too, with what they need. Hiding them
+    would leave a user unable to discover that installing an extra is all that
+    stands between them and the feature.
+    """
+    try:
+        with _services(database) as services:
+            models = services.settings.models()
+    except CodeAtlasError as error:
+        _fail(error)
+        return
+
+    payload = {
+        "models": [
+            {
+                "provider": model.provider.value,
+                "model_id": model.model_id,
+                "dimensions": model.dimensions,
+                "available": model.available,
+                "transmits_off_machine": model.transmits_off_machine,
+                "requires": model.requires,
+            }
+            for model in models
+        ]
+    }
+    lines = []
+    for model in models:
+        state = "available" if model.available else f"needs {model.requires}"
+        transmits = (
+            "transmits off machine"
+            if model.transmits_off_machine
+            else "local only"
+        )
+        lines.append(f"{model.provider.value}: {state}; {transmits}")
+    _emit(payload, "\n".join(lines), as_json=as_json)

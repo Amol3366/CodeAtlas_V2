@@ -103,6 +103,30 @@ class DiagnosticsResponse(StrictModel):
     open_jobs: list[OpenJobResponse] = []
 
 
+class SemanticStatusResponse(StrictModel):
+    """The semantic index's state for one repository.
+
+    Every count is nullable, and that is the contract's point rather than
+    laziness: ``null`` means "no provider is enabled, so the question does not
+    apply", which is a different fact from 0. A client that rendered 0 as a
+    coverage bar would show every deterministic-only installation as 0%
+    indexed.
+    """
+
+    repository_id: str
+    provider: str
+    enabled: bool
+    snapshot_id: str | None
+    coverage: float | None
+    total_count: int | None
+    embedded_count: int | None
+    pending_count: int | None
+    failed_count: int | None
+    namespace_id: str | None
+    model_id: str | None
+    is_complete: bool
+
+
 def get_services(request: Request) -> Iterator[ApplicationServices]:
     """Provide application services bound to this request's connection.
 
@@ -282,6 +306,31 @@ def active_snapshot(
             "The repository has no active snapshot. Index it first."
         )
     return status_result.snapshot
+
+
+@router.get("/{repository_id}/semantic-status")
+def semantic_status(repository_id: str, services: Services) -> SemanticStatusResponse:
+    """How much of the active snapshot the semantic index covers.
+
+    Never refuses for an unindexed or opted-out repository: both are ordinary
+    states with ordinary answers, and a 409 would make a client treat the
+    default configuration as a fault.
+    """
+    result = services.semantic_status.status(repository_id)
+    return SemanticStatusResponse(
+        repository_id=result.repository_id,
+        provider=result.provider.value,
+        enabled=result.enabled,
+        snapshot_id=result.snapshot_id,
+        coverage=result.coverage,
+        total_count=result.total_count,
+        embedded_count=result.embedded_count,
+        pending_count=result.pending_count,
+        failed_count=result.failed_count,
+        namespace_id=result.namespace_id,
+        model_id=result.model_id,
+        is_complete=result.is_complete,
+    )
 
 
 @router.post("/{repository_id}/rollback")

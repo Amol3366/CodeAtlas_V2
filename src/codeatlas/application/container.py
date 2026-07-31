@@ -12,6 +12,7 @@ from sqlite3 import Connection
 
 from codeatlas.application.change_analysis import ChangeAnalysisService
 from codeatlas.application.conversation_service import ConversationService
+from codeatlas.application.embedding_migrations import EmbeddingMigrationService
 from codeatlas.application.entities import EntityService
 from codeatlas.application.graph_queries import GraphQueryService
 from codeatlas.application.indexing import (
@@ -21,15 +22,25 @@ from codeatlas.application.indexing import (
 from codeatlas.application.lookup import ExactSymbolLookupService
 from codeatlas.application.recovery import SnapshotRecoveryService
 from codeatlas.application.registration import RegisterRepositoryService
+from codeatlas.application.semantic_fusion import SemanticFusionService
+from codeatlas.application.semantic_status import SemanticStatusService
+from codeatlas.application.settings import SettingsService
 from codeatlas.application.status import RepositoryStatusService
 from codeatlas.conversations.events import EventHub
 from codeatlas.conversations.executor import RunExecutor
-from codeatlas.conversations.pipeline import AnswerPipeline
+from codeatlas.conversations.pipeline import (
+    AnswerExplainer,
+    AnswerPipeline,
+    SemanticFusion,
+)
 from codeatlas.parsing.registry import default_registry
 from codeatlas.repositories.git_diff import GitDiffAdapter
 from codeatlas.repositories.git_state import GitAdapter
 from codeatlas.repositories.scanner import RepositoryScanner
 from codeatlas.retrieval.lexical import LexicalSearchService
+from codeatlas.retrieval.semantic import SemanticSearchService
+from codeatlas.semantic.pipeline import SnapshotEmbedder
+from codeatlas.semantic.vector_store import InMemoryVectorStore, VectorStore
 from codeatlas.storage.sqlite.stores import (
     ChangeAnalysisStore,
     ChunkStore,
@@ -59,6 +70,17 @@ class ApplicationServices:
     entities: EntityService
     change_analysis: ChangeAnalysisService
     conversations: ConversationService
+    # Built here rather than injected like `embedding`, because it reads SQLite
+    # and constructs no provider and no vector store: there is nothing optional
+    # in it that could be missing. A repository with no provider gets an honest
+    # "not applicable" from it, on every installation.
+    semantic_status: SemanticStatusService
+    # Built here for the same reason as `semantic_status`: it reads and
+    # writes SQLite and constructs no provider until asked to test one.
+    settings: SettingsService
+    # Same application boundary as the settings service: model changes create
+    # and activate shadow namespaces, and all adapters must share that logic.
+    embedding_migrations: EmbeddingMigrationService
     # The repository store itself, for the few operations that are settings on a
     # repository rather than behavior over one — the watch switch is the first.
     # Wrapping a single boolean column in a service would add a layer that only
@@ -72,6 +94,9 @@ def build_services(
     hub: EventHub | None = None,
     executor: RunExecutor | None = None,
     embedding: SnapshotEmbedding | None = None,
+    fusion: SemanticFusion | None = None,
+    explainer: AnswerExplainer | None = None,
+    vectors: VectorStore | None = None,
 ) -> ApplicationServices:
     """Construct the application services for one database connection.
 
@@ -93,6 +118,12 @@ def build_services(
     than something constructed here because this module must not import the
     semantic package: the deterministic path may not acquire a dependency on
     the layer that is allowed to be absent.
+
+    ``fusion`` is the query-time half of the same arrangement, and is injected
+    for the same reason: it needs a vector store, and choosing one is a
+    deployment decision this module has no input for. Left out — the default —
+    the answer pipeline is exactly the Phase 5 pipeline, and a test asserts that
+    a question answered without it completes normally.
     """
     repositories = RepositoryStore(connection)
     snapshots = SnapshotStore(connection)
@@ -105,6 +136,12 @@ def build_services(
     evidence = EvidenceStore(connection)
     analyses = ChangeAnalysisStore(connection)
     conversations = ConversationStore(connection)
+    vector_store = vectors or InMemoryVectorStore()
+    semantic_status = SemanticStatusService(connection)
+    settings = SettingsService(connection)
+
+    if embedding is None and vectors is not None:
+        embedding = SnapshotEmbedder(connection=connection, vectors=vector_store)
 
     recovery = SnapshotRecoveryService(
         repositories=repositories,
@@ -169,6 +206,18 @@ def build_services(
         search=search_store,
         evidence=evidence,
     )
+    if fusion is None and vectors is not None:
+        fusion = SemanticFusionService(
+            repositories=repositories,
+            snapshots=snapshots,
+            files=files,
+            evidence=evidence,
+            status=semantic_status,
+            semantic=SemanticSearchService(
+                connection=connection,
+                vectors=vector_store,
+            ),
+        )
 
     return ApplicationServices(
         repositories=repositories,
@@ -206,7 +255,13 @@ def build_services(
             # uses. That is what makes the conversation answer and the
             # `/v1/query` answer the same answer rather than two that agree
             # by coincidence.
-            pipeline=AnswerPipeline(lookup=lookup, graph=graph, search=search),
+            pipeline=AnswerPipeline(
+                lookup=lookup,
+                graph=graph,
+                search=search,
+                fusion=fusion,
+                explainer=explainer,
+            ),
             hub=hub if hub is not None else EventHub(),
             executor=executor,
         ),
@@ -221,4 +276,10 @@ def build_services(
         ),
         graph=graph,
         search=search,
+        semantic_status=semantic_status,
+        settings=settings,
+        embedding_migrations=EmbeddingMigrationService(
+            connection=connection,
+            vectors=vector_store,
+        ),
     )

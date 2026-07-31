@@ -19,6 +19,8 @@ from datetime import datetime
 
 from codeatlas.domain.ids import validate_namespace_id
 from codeatlas.domain.semantic import (
+    EmbeddingMigration,
+    EmbeddingMigrationStatus,
     EmbeddingNamespace,
     EmbeddingProviderKind,
     EmbeddingRecord,
@@ -90,6 +92,28 @@ class NamespaceStore:
         self._connection.execute(
             "UPDATE embedding_namespaces SET status = ? WHERE namespace_id = ?",
             (status.value, namespace_id),
+        )
+
+    def activate(self, namespace_id: str, *, activated_at: datetime) -> None:
+        """Make one namespace active and retire any previous active one.
+
+        The caller owns the transaction. Both updates must commit together or
+        not at all, because two active namespaces would compare scores across
+        models and zero active namespaces would silently disable semantic
+        retrieval.
+        """
+        self._connection.execute(
+            "UPDATE embedding_namespaces SET status = ? WHERE status = ?",
+            (NamespaceStatus.RETIRED.value, NamespaceStatus.ACTIVE.value),
+        )
+        self._connection.execute(
+            "UPDATE embedding_namespaces SET status = ?, activated_at = ?"
+            " WHERE namespace_id = ?",
+            (
+                NamespaceStatus.ACTIVE.value,
+                to_utc_text(activated_at),
+                namespace_id,
+            ),
         )
 
     def delete(self, namespace_id: str) -> None:
@@ -209,6 +233,83 @@ class EmbeddingStore:
             (namespace_id, EmbeddingStatus.EMBEDDED.value),
         ).fetchone()
         return int(row[0])
+
+
+class EmbeddingMigrationStore:
+    """Repository-specific model migration records."""
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def upsert(self, migration: EmbeddingMigration) -> None:
+        self._connection.execute(
+            "INSERT INTO embedding_migrations ("
+            " migration_id, repository_id, source_namespace_id,"
+            " target_namespace_id, status, created_at, updated_at,"
+            " activated_at, rolled_back_at, failure_code"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT (repository_id, source_namespace_id, target_namespace_id)"
+            " DO UPDATE SET"
+            " status = excluded.status,"
+            " updated_at = excluded.updated_at,"
+            " activated_at = COALESCE(embedding_migrations.activated_at,"
+            "                         excluded.activated_at),"
+            " rolled_back_at = COALESCE(embedding_migrations.rolled_back_at,"
+            "                          excluded.rolled_back_at),"
+            " failure_code = excluded.failure_code",
+            (
+                migration.migration_id,
+                migration.repository_id,
+                migration.source_namespace_id,
+                migration.target_namespace_id,
+                migration.status.value,
+                to_utc_text(migration.created_at),
+                to_utc_text(migration.updated_at),
+                (
+                    to_utc_text(migration.activated_at)
+                    if migration.activated_at
+                    else None
+                ),
+                (
+                    to_utc_text(migration.rolled_back_at)
+                    if migration.rolled_back_at
+                    else None
+                ),
+                migration.failure_code,
+            ),
+        )
+
+    def get(self, migration_id: str) -> EmbeddingMigration | None:
+        row = self._connection.execute(
+            "SELECT * FROM embedding_migrations WHERE migration_id = ?",
+            (migration_id,),
+        ).fetchone()
+        return _migration_from_row(row) if row is not None else None
+
+    def set_status(
+        self,
+        migration_id: str,
+        *,
+        status: EmbeddingMigrationStatus,
+        updated_at: datetime,
+        activated_at: datetime | None = None,
+        rolled_back_at: datetime | None = None,
+        failure_code: str | None = None,
+    ) -> None:
+        self._connection.execute(
+            "UPDATE embedding_migrations"
+            " SET status = ?, updated_at = ?, activated_at = COALESCE(?, activated_at),"
+            " rolled_back_at = COALESCE(?, rolled_back_at), failure_code = ?"
+            " WHERE migration_id = ?",
+            (
+                status.value,
+                to_utc_text(updated_at),
+                to_utc_text(activated_at) if activated_at else None,
+                to_utc_text(rolled_back_at) if rolled_back_at else None,
+                failure_code,
+                migration_id,
+            ),
+        )
 
 
 class ProviderPolicyStore:
@@ -361,6 +462,29 @@ def _embedding_from_row(row: sqlite3.Row) -> EmbeddingRecord:
         embedded_at=(
             from_utc_text(row["embedded_at"])
             if row["embedded_at"] is not None
+            else None
+        ),
+        failure_code=row["failure_code"],
+    )
+
+
+def _migration_from_row(row: sqlite3.Row) -> EmbeddingMigration:
+    return EmbeddingMigration(
+        migration_id=row["migration_id"],
+        repository_id=row["repository_id"],
+        source_namespace_id=row["source_namespace_id"],
+        target_namespace_id=row["target_namespace_id"],
+        status=EmbeddingMigrationStatus(row["status"]),
+        created_at=from_utc_text(row["created_at"]),
+        updated_at=from_utc_text(row["updated_at"]),
+        activated_at=(
+            from_utc_text(row["activated_at"])
+            if row["activated_at"] is not None
+            else None
+        ),
+        rolled_back_at=(
+            from_utc_text(row["rolled_back_at"])
+            if row["rolled_back_at"] is not None
             else None
         ),
         failure_code=row["failure_code"],

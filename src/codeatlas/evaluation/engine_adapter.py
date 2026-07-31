@@ -33,6 +33,7 @@ from codeatlas.contracts import (
     FileChangeKind,
     SymbolKind,
 )
+from codeatlas.conversations.pipeline import AnswerPipeline, AnswerRequest
 from codeatlas.domain.errors import CodeAtlasError
 from codeatlas.evaluation.dataset import (
     ChangeCase,
@@ -230,6 +231,209 @@ def _fixture_root(dataset: Dataset, fixture_id: str) -> str:
         if fixture.id == fixture_id:
             return fixture.root
     raise KeyError(f"unknown fixture: {fixture_id}")
+
+
+# --- Phase 7: conceptual prediction, with and without the semantic layer ------
+
+
+def predict_conceptual(
+    dataset: Dataset,
+    *,
+    semantic: bool,
+    reranker: object | None = None,
+    record_timings: bool = True,
+) -> PredictionFile:
+    """Answer every case through `AnswerPipeline`, optionally with fusion.
+
+    **One switch, one difference.** Both runs use the same pipeline, the same
+    services, the same corpus, and the verbatim question; ``semantic`` decides
+    only whether a fusion layer is attached. Any other difference between the
+    two runs would make the measured uplift an artifact of this function rather
+    than a property of semantic retrieval, which is the one thing P7-06 exists
+    to find out.
+
+    The question is asked **verbatim**. `predict_exact_symbols` substitutes the
+    declared symbol, which measures resolution rather than understanding;
+    doing that here would hand the answer to both runs and guarantee they tie.
+    """
+    predictions: list[QueryPrediction] = []
+
+    with tempfile.TemporaryDirectory(prefix="codeatlas-conceptual-") as workspace:
+        database_path = Path(workspace) / "evaluation.sqlite"
+        with connect(database_path) as connection:
+            apply_migrations(connection)
+            services = build_services(connection)
+            indexed: dict[str, str] = {}
+            pipelines: dict[str, AnswerPipeline] = {}
+
+            for case in dataset.query_cases:
+                repository_id = indexed.get(case.repository_fixture)
+                if repository_id is None:
+                    fixture_root = dataset.fixtures_root / _fixture_root(
+                        dataset, case.repository_fixture
+                    )
+                    repository = services.registration.register(
+                        RegisterRepositoryRequest(path=str(fixture_root))
+                    )
+                    services.indexing.index(repository.repository_id)
+                    repository_id = repository.repository_id
+                    indexed[case.repository_fixture] = repository_id
+                    pipelines[case.repository_fixture] = _conceptual_pipeline(
+                        connection,
+                        services,
+                        repository_id,
+                        semantic=semantic,
+                        reranker=reranker,
+                    )
+
+                predictions.append(
+                    _answer_conceptually(
+                        pipelines[case.repository_fixture],
+                        repository_id,
+                        case,
+                        record_timings=record_timings,
+                    )
+                )
+
+    return PredictionFile(
+        implementation_status="implemented",
+        query_predictions=predictions,
+        change_predictions=[],
+    )
+
+
+def _conceptual_pipeline(
+    connection: object,
+    services: object,
+    repository_id: str,
+    *,
+    semantic: bool,
+    reranker: object | None = None,
+) -> AnswerPipeline:
+    """Build the pipeline for one run, attaching fusion only when asked.
+
+    Imports of the semantic package are deliberately local: the deterministic
+    run must work on an installation where the optional extras were never
+    installed, and a module-scope import would break that before the first
+    case ran.
+    """
+    lookup = services.lookup  # type: ignore[attr-defined]
+    graph = services.graph  # type: ignore[attr-defined]
+    search = services.search  # type: ignore[attr-defined]
+    if not semantic:
+        return AnswerPipeline(lookup=lookup, graph=graph, search=search)
+
+    from datetime import UTC, datetime
+
+    from codeatlas.application.semantic_fusion import SemanticFusionService
+    from codeatlas.application.semantic_status import SemanticStatusService
+    from codeatlas.domain.semantic import EmbeddingProviderKind, ProviderPolicy
+    from codeatlas.retrieval.semantic import SemanticSearchService
+    from codeatlas.semantic.pipeline import SnapshotEmbedder
+    from codeatlas.semantic.vector_store import InMemoryVectorStore
+    from codeatlas.storage.sqlite.semantic_stores import ProviderPolicyStore
+    from codeatlas.storage.sqlite.stores import (
+        EvidenceStore,
+        FileStore,
+        RepositoryStore,
+        SnapshotStore,
+    )
+
+    ProviderPolicyStore(connection).set(  # type: ignore[arg-type]
+        ProviderPolicy(
+            repository_id=repository_id,
+            embedding_provider=EmbeddingProviderKind.LOCAL,
+            monthly_token_budget=None,
+            per_run_token_budget=None,
+            updated_at=datetime.now(UTC),
+        )
+    )
+    snapshots = SnapshotStore(connection)  # type: ignore[arg-type]
+    active = snapshots.get_active(repository_id)
+    if active is None:  # pragma: no cover - the index above just activated one
+        raise EvaluationAdapterError("the fixture has no active snapshot")
+
+    vectors = InMemoryVectorStore()
+    outcome = SnapshotEmbedder(
+        connection=connection,  # type: ignore[arg-type]
+        vectors=vectors,
+    ).embed_snapshot(repository_id, active.snapshot_id)
+    if outcome.warning is not None or outcome.coverage != 1.0:
+        # A partially embedded corpus would understate the layer, and reporting
+        # that number as "semantic uplift" would be measuring an installation
+        # problem. Refuse rather than publish it.
+        raise EvaluationAdapterError(
+            "the semantic run needs complete coverage; got "
+            f"coverage={outcome.coverage} warning={outcome.warning}"
+        )
+
+    return AnswerPipeline(
+        lookup=lookup,
+        graph=graph,
+        search=search,
+        fusion=SemanticFusionService(
+            repositories=RepositoryStore(connection),  # type: ignore[arg-type]
+            snapshots=snapshots,
+            files=FileStore(connection),  # type: ignore[arg-type]
+            evidence=EvidenceStore(connection),  # type: ignore[arg-type]
+            status=SemanticStatusService(connection),  # type: ignore[arg-type]
+            semantic=SemanticSearchService(
+                connection=connection,  # type: ignore[arg-type]
+                vectors=vectors,
+            ),
+            reranker=reranker,  # type: ignore[arg-type]
+        ),
+    )
+
+
+def _answer_conceptually(
+    pipeline: AnswerPipeline,
+    repository_id: str,
+    case: QueryCase,
+    *,
+    record_timings: bool,
+) -> QueryPrediction:
+    started = time.perf_counter()
+    try:
+        result = pipeline.execute(
+            AnswerRequest(
+                repository_id=repository_id,
+                question=case.question,
+                request_id=f"eval_{case.id}",
+            )
+        )
+    except CodeAtlasError:
+        return _abstention(case)
+
+    response = result.response
+    duration_ms = (time.perf_counter() - started) * 1000 if record_timings else 0.0
+    return QueryPrediction(
+        case_id=case.id,
+        ranked_symbols=[
+            item.symbol for item in response.evidence if item.symbol is not None
+        ],
+        ranked_evidence=[
+            EvidencePrediction(
+                evidence_id=item.evidence_id,
+                snapshot_id=case.snapshot_id,
+                file_path=item.file_path,
+                start_line=item.start_line,
+                end_line=item.end_line,
+            )
+            for item in response.evidence
+        ],
+        relation_paths=[
+            " -> ".join(step.target for step in path.steps)
+            for path in response.relation_paths
+        ],
+        claims=[claim.text for claim in response.answer.claims],
+        abstained=not response.evidence,
+        duration_ms=duration_ms,
+    )
+
+
+class EvaluationAdapterError(RuntimeError):
+    """The harness could not produce a measurement it would stand behind."""
 
 
 # --- Phase 4: change prediction -----------------------------------------------

@@ -1,6 +1,22 @@
 {
   "components": {
     "schemas": {
+      "ActivateEmbeddingMigrationBody": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "default": "target",
+            "enum": [
+              "target",
+              "source"
+            ],
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "title": "ActivateEmbeddingMigrationBody",
+        "type": "object"
+      },
       "AnalysisSide": {
         "description": "Which side of a change a piece of evidence belongs to.\n\nBase-side evidence is hash-verified at analysis time and historical by\nconstruction; it is labeled as base so a reader never mistakes it for the\ncurrent snapshot's content.",
         "enum": [
@@ -657,6 +673,22 @@
         "title": "CreateConversationRequest",
         "type": "object"
       },
+      "CreateEmbeddingMigrationBody": {
+        "additionalProperties": false,
+        "properties": {
+          "repository_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Repository Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository_id"
+        ],
+        "title": "CreateEmbeddingMigrationBody",
+        "type": "object"
+      },
       "Derivation": {
         "enum": [
           "deterministic",
@@ -738,6 +770,207 @@
         ],
         "title": "DiagnosticsResponse",
         "type": "object"
+      },
+      "EmbeddingMigrationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "activated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "active_namespace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Namespace Id"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          },
+          "migration_id": {
+            "title": "Migration Id",
+            "type": "string"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "rolled_back_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolled Back At"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "source_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Coverage"
+          },
+          "source_namespace_id": {
+            "title": "Source Namespace Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Coverage"
+          },
+          "target_dimensions": {
+            "title": "Target Dimensions",
+            "type": "integer"
+          },
+          "target_embedded_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Embedded Count"
+          },
+          "target_failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Failed Count"
+          },
+          "target_model_id": {
+            "title": "Target Model Id",
+            "type": "string"
+          },
+          "target_namespace_id": {
+            "title": "Target Namespace Id",
+            "type": "string"
+          },
+          "target_normalization_version": {
+            "title": "Target Normalization Version",
+            "type": "string"
+          },
+          "target_pending_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Pending Count"
+          },
+          "target_total_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Total Count"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "migration_id",
+          "repository_id",
+          "status",
+          "source_namespace_id",
+          "target_namespace_id",
+          "active_namespace_id",
+          "snapshot_id",
+          "source_coverage",
+          "target_coverage",
+          "target_total_count",
+          "target_embedded_count",
+          "target_pending_count",
+          "target_failed_count",
+          "target_model_id",
+          "target_dimensions",
+          "target_normalization_version",
+          "failure_code",
+          "created_at",
+          "updated_at",
+          "activated_at",
+          "rolled_back_at"
+        ],
+        "title": "EmbeddingMigrationResponse",
+        "type": "object"
+      },
+      "EmbeddingProviderKind": {
+        "description": "Which embedding provider a repository has opted into.\n\n``NONE`` is the default everywhere, and it is the value a missing policy\nrow resolves to. ``LOCAL`` transmits nothing by construction. Only\n``OPENAI`` sends repository-derived content off the machine, which is why\nit can never be reached by default or by omission.",
+        "enum": [
+          "none",
+          "local",
+          "openai"
+        ],
+        "title": "EmbeddingProviderKind",
+        "type": "string"
       },
       "Evidence": {
         "additionalProperties": false,
@@ -1616,6 +1849,83 @@
         "title": "MessageSubmission",
         "type": "object"
       },
+      "ModelResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "dimensions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimensions"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "requires": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires"
+          },
+          "transmits_off_machine": {
+            "title": "Transmits Off Machine",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "model_id",
+          "dimensions",
+          "available",
+          "transmits_off_machine",
+          "requires"
+        ],
+        "title": "ModelResponse",
+        "type": "object"
+      },
+      "ModelsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelResponse"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "ModelsResponse",
+        "type": "object"
+      },
       "OpenJobResponse": {
         "additionalProperties": false,
         "description": "An index run that is still open. `owner_pid` is null when unrecorded.",
@@ -1665,6 +1975,42 @@
         ],
         "title": "OverallRisk",
         "type": "string"
+      },
+      "ProviderTestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detail_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail Code"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "ok",
+          "detail_code",
+          "latency_ms"
+        ],
+        "title": "ProviderTestResponse",
+        "type": "object"
       },
       "QueryBody": {
         "additionalProperties": false,
@@ -1917,6 +2263,185 @@
           "created_at"
         ],
         "title": "RepositoryResponse",
+        "type": "object"
+      },
+      "SemanticStatusResponse": {
+        "additionalProperties": false,
+        "description": "The semantic index's state for one repository.\n\nEvery count is nullable, and that is the contract's point rather than\nlaziness: ``null`` means \"no provider is enabled, so the question does not\napply\", which is a different fact from 0. A client that rendered 0 as a\ncoverage bar would show every deterministic-only installation as 0%\nindexed.",
+        "properties": {
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "embedded_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedded Count"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Count"
+          },
+          "is_complete": {
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "namespace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Namespace Id"
+          },
+          "pending_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Count"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          }
+        },
+        "required": [
+          "repository_id",
+          "provider",
+          "enabled",
+          "snapshot_id",
+          "coverage",
+          "total_count",
+          "embedded_count",
+          "pending_count",
+          "failed_count",
+          "namespace_id",
+          "model_id",
+          "is_complete"
+        ],
+        "title": "SemanticStatusResponse",
+        "type": "object"
+      },
+      "SettingsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "embedding_provider": {
+            "title": "Embedding Provider",
+            "type": "string"
+          },
+          "monthly_token_budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Token Budget"
+          },
+          "per_run_token_budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Run Token Budget"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "transmits_off_machine": {
+            "title": "Transmits Off Machine",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository_id",
+          "embedding_provider",
+          "monthly_token_budget",
+          "per_run_token_budget",
+          "transmits_off_machine",
+          "updated_at"
+        ],
+        "title": "SettingsResponse",
         "type": "object"
       },
       "Severity": {
@@ -2218,6 +2743,48 @@
           }
         },
         "title": "UpdateConversationRequest",
+        "type": "object"
+      },
+      "UpdateSettingsBody": {
+        "additionalProperties": false,
+        "description": "A partial change. An unmentioned field is left alone.\n\n``monthly_token_budget: null`` means *clear it*, which is a different\nrequest from not mentioning it \u2014 so the handler inspects\n``model_fields_set`` rather than reading the value.",
+        "properties": {
+          "embedding_provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmbeddingProviderKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "monthly_token_budget": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Token Budget"
+          },
+          "per_run_token_budget": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Run Token Budget"
+          }
+        },
+        "title": "UpdateSettingsBody",
         "type": "object"
       },
       "ValidationError": {
@@ -3201,6 +3768,216 @@
         ]
       }
     },
+    "/v1/models": {
+      "get": {
+        "description": "Every provider, including those that cannot run on this machine.\n\nHiding an unavailable option would leave a user unable to discover that\ninstalling an extra is all that stands between them and the feature.",
+        "operationId": "list_models_v1_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/models/embedding-migrations": {
+      "post": {
+        "description": "Backfill the configured model in a shadow namespace.\n\nThe active namespace keeps serving until the caller explicitly activates\nthe migration. That keeps model changes reversible and makes partial\nbackfills visible instead of hidden behind a setting flip.",
+        "operationId": "start_embedding_migration_v1_models_embedding_migrations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmbeddingMigrationBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingMigrationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Embedding Migration",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/models/embedding-migrations/{migration_id}": {
+      "get": {
+        "operationId": "get_embedding_migration_v1_models_embedding_migrations__migration_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "migration_id",
+            "required": true,
+            "schema": {
+              "title": "Migration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingMigrationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Embedding Migration",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/models/embedding-migrations/{migration_id}/activate": {
+      "post": {
+        "operationId": "activate_embedding_migration_v1_models_embedding_migrations__migration_id__activate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "migration_id",
+            "required": true,
+            "schema": {
+              "title": "Migration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ActivateEmbeddingMigrationBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingMigrationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate Embedding Migration",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/models/test": {
+      "post": {
+        "description": "Ask the configured provider to embed one fixed probe string.\n\nA failure is reported in the body with `ok: false`, not as an HTTP error:\nthe request succeeded, and what it discovered is that the provider does not\nwork. Returning 5xx would make a client retry a question that has already\nbeen answered.",
+        "operationId": "test_model_v1_models_test_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Model",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/v1/query": {
       "post": {
         "operationId": "query_v1_query_post",
@@ -3559,6 +4336,49 @@
           }
         },
         "summary": "Rollback",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/v1/repositories/{repository_id}/semantic-status": {
+      "get": {
+        "description": "How much of the active snapshot the semantic index covers.\n\nNever refuses for an unindexed or opted-out repository: both are ordinary\nstates with ordinary answers, and a 409 would make a client treat the\ndefault configuration as a fault.",
+        "operationId": "semantic_status_v1_repositories__repository_id__semantic_status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SemanticStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Semantic Status",
         "tags": [
           "repositories"
         ]
@@ -3937,6 +4757,102 @@
         "summary": "Search Text",
         "tags": [
           "search"
+        ]
+      }
+    },
+    "/v1/settings": {
+      "get": {
+        "operationId": "get_settings_v1_settings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "update_settings_v1_settings_patch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Settings",
+        "tags": [
+          "settings"
         ]
       }
     },

@@ -161,6 +161,21 @@ cancellation, telemetry without content, deterministic fallback, and a
 revocation path. Credentials never appear in GET responses, browser storage,
 history exports, logs, or diagnostic bundles.
 
+## Phase 7 Enforcement Status
+
+| Control | Status | Evidence |
+| --- | --- | --- |
+| Provider default off | enforced | missing `repository_provider_policy` rows resolve to provider `none`; settings/API/CLI tests assert the default |
+| Local provider boundary | enforced | `LocalSentenceTransformerProvider` has no network client and is reached only through explicit repository opt-in |
+| OpenAI embedding boundary | enforced for embeddings | `ProviderFactory` wraps OpenAI with redaction, budgets, retries, timeouts, and usage telemetry; direct ungoverned construction is refused by tests |
+| Secret redaction | enforced for transmitting embedding calls | outbound texts pass through `semantic.redaction.redact`; tests assert common secret shapes are replaced before the fake provider sees them |
+| Provider telemetry without content | enforced | `provider_usage` stores provider, model, operation, counts, token estimate, latency, outcome, and time; schema tests assert no prompt/source/answer columns exist |
+| Semantic snapshot authority | enforced | vector candidates are filtered against SQLite active snapshot membership; stale-vector tests assert physically retained vectors cannot answer |
+| Shadow embedding migration | enforced | migration endpoints create a shadow namespace, backfill, dual-write, activate atomically, and retain rollback |
+| Reranking | declined | `NoReranker` is the only implementation; `docs/evaluation/rerank-phase-7.{json,md}` records no uplift and no provider call |
+| Generated explanations | declined | `NoAnswerProvider` is the only implementation; fake-provider tests reject unsupported generated claims and `docs/evaluation/explanation-phase-7.{json,md}` records no uplift |
+| Concrete answer providers | not shipped | Ollama/OpenAI answer providers require a governed answer-provider policy and measured uplift before admission |
+
 ## Logging and Diagnostics
 
 Default telemetry may contain opaque repository/snapshot/request IDs, operation,
@@ -173,6 +188,7 @@ absolute local paths. User-facing errors use stable codes without stack traces.
 - Fixture validation demonstrably does not execute repository code.
 - Traversal, absolute Windows paths, backslashes, invalid lines, invented
   evidence, cross-repository evidence, and cross-snapshot evidence are rejected.
-- Provider and network exposure remain absent in Phase 0.
+- Provider and network exposure remain absent by default and require explicit
+  repository-level opt-in plus the Provider Opt-In Gate above.
 - Any future change to these boundaries requires an ADR, security tests,
   rollback implications, and explicit user approval.

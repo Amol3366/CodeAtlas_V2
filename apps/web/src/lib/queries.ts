@@ -112,3 +112,108 @@ export function useDiagnostics(repositoryId: string | null) {
     enabled: repositoryId !== null,
   });
 }
+
+export interface RepositorySettings {
+  readonly repository_id: string;
+  readonly embedding_provider: string;
+  readonly monthly_token_budget: number | null;
+  readonly per_run_token_budget: number | null;
+  readonly transmits_off_machine: boolean;
+  readonly updated_at: string;
+}
+
+export interface EmbeddingModel {
+  readonly provider: string;
+  readonly model_id: string | null;
+  readonly dimensions: number | null;
+  readonly available: boolean;
+  readonly transmits_off_machine: boolean;
+  readonly requires: string | null;
+}
+
+export interface SemanticStatus {
+  readonly repository_id: string;
+  readonly provider: string;
+  readonly enabled: boolean;
+  readonly snapshot_id: string | null;
+  readonly coverage: number | null;
+  readonly total_count: number | null;
+  readonly embedded_count: number | null;
+  readonly pending_count: number | null;
+  readonly failed_count: number | null;
+  readonly namespace_id: string | null;
+  readonly model_id: string | null;
+  readonly is_complete: boolean;
+}
+
+export interface ProviderTest {
+  readonly provider: string;
+  readonly ok: boolean;
+  readonly detail_code: string | null;
+  readonly latency_ms: number;
+}
+
+export interface SettingsUpdate {
+  readonly embedding_provider?: string;
+  readonly monthly_token_budget?: number | null;
+  readonly per_run_token_budget?: number | null;
+}
+
+export function useSettings(repositoryId: string | null) {
+  return useQuery({
+    queryKey: ["settings", repositoryId] as const,
+    queryFn: () =>
+      api.get<RepositorySettings>(
+        `/v1/settings?repository_id=${encodeURIComponent(repositoryId!)}`,
+      ),
+    enabled: repositoryId !== null,
+  });
+}
+
+export function useModels() {
+  return useQuery({
+    queryKey: ["models"] as const,
+    // The list is a property of the installation, not of a repository, so it
+    // is fetched once rather than per selected repository.
+    queryFn: () => api.get<{ models: EmbeddingModel[] }>("/v1/models"),
+  });
+}
+
+export function useSemanticStatus(repositoryId: string | null) {
+  return useQuery({
+    queryKey: ["semantic-status", repositoryId] as const,
+    queryFn: () =>
+      api.get<SemanticStatus>(
+        `/v1/repositories/${encodeURIComponent(repositoryId!)}/semantic-status`,
+      ),
+    enabled: repositoryId !== null,
+  });
+}
+
+export function useUpdateSettings(repositoryId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (update: SettingsUpdate) =>
+      api.patch<RepositorySettings>(
+        `/v1/settings?repository_id=${encodeURIComponent(repositoryId)}`,
+        update,
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["settings", repositoryId] });
+      // Coverage depends on which provider is selected, so it is stale the
+      // moment the provider changes.
+      void client.invalidateQueries({
+        queryKey: ["semantic-status", repositoryId],
+      });
+    },
+  });
+}
+
+export function useTestProvider(repositoryId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api.post<ProviderTest>(
+        `/v1/models/test?repository_id=${encodeURIComponent(repositoryId)}`,
+      ),
+  });
+}

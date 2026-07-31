@@ -1,10 +1,10 @@
 # CodeAtlas
 
 CodeAtlas is a local-first repository-intelligence and change-assurance layer.
-The implementation follows the authoritative requirements in `CLAUDE.md` and
+The implementation follows the authoritative requirements in `AGENTS.md` and
 the shared execution state in `docs/plans/PLAN.md`.
 
-## What works today (Phases 0–5 complete; Phase 6 in progress)
+## What works today (Phases 0–6 complete; Phase 7 in progress)
 
 Register a local repository, index Python/TypeScript/JavaScript into a
 validated snapshot with a cross-file relation graph, search it, traverse it,
@@ -82,7 +82,18 @@ all now fixed — including a server that stopped answering under sustained load
 which took a wrong diagnosis before the right one
 (`docs/evaluation/phase-6-baseline-environment.md`).
 
-Not built yet: embeddings or any model provider (Phase 7).
+Phase 7 adds optional semantic retrieval. The default provider is still `none`;
+deterministic behavior does not need an embedding model. Repositories can opt
+into local embeddings or governed OpenAI embeddings through the settings
+surface, semantic coverage is reported per active snapshot, and shadow
+embedding migrations support cutover/rollback. Reranking and generated
+explanations have seams and validation but are recorded as declined until a real
+provider shows measured uplift (`docs/operations/semantic-search.md`).
+
+Phase 7 packaged semantic-local performance has been measured on the onedir
+artifact: refresh p95 0.975 s, preflight p95 2.298 s, semantic coverage 1.0,
+and package tree size 1.05 GB. Final Phase 7 gate approval is still a user
+decision.
 `docs/plans/PLAN.md` is the live phase and task status.
 
 ## Windows development
@@ -93,7 +104,7 @@ the web application in `apps/web`.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
-powershell -ExecutionPolicy Bypass -File scripts/check_phase6.ps1 -SkipSync
+powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync
 ```
 
 The quality command validates the tracked contract schema, the Python tests,
@@ -115,7 +126,10 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/upgrade-and-migration.md` — upgrading, the checkpoint, and the refusal
 - `docs/operations/release-validation.md` — what to run before a release, and what each step proves
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
+- `docs/operations/semantic-search.md` — semantic providers, coverage, migrations, and admission state
 - `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers
-- `docs/evaluation/phase-6-baseline-environment.md` — packaged performance, and the one open defect
+- `docs/evaluation/phase-6-baseline-environment.md` — packaged performance and fixed release defects
+- `docs/evaluation/phase-7-baseline-environment.md` — semantic uplift measurement and its limits
+- `docs/evaluation/phase-7-performance-environment.md` — semantic-local package/perf method and measured results
 - `docs/security/threat-model.md` — controls and their enforcement status

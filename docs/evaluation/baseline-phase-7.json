@@ -1,0 +1,105 @@
+{
+  "comparison": {
+    "abstention_correctness": {
+      "delta": 0.0714285714285714,
+      "deterministic": 0.9285714285714286,
+      "semantic": 1.0
+    },
+    "containing_evidence_rate": {
+      "delta": -0.019838328214903445,
+      "deterministic": 0.12781954887218044,
+      "semantic": 0.107981220657277
+    },
+    "exact_evidence_rate": {
+      "delta": -0.01884994175579794,
+      "deterministic": 0.07518796992481203,
+      "semantic": 0.056338028169014086
+    },
+    "exact_symbol_resolution": {
+      "delta": 0.07142857142857142,
+      "deterministic": 0.21428571428571427,
+      "semantic": 0.2857142857142857
+    },
+    "primary_evidence_recall_at_10": {
+      "delta": 0.06666666666666665,
+      "deterministic": 0.6,
+      "semantic": 0.6666666666666666
+    },
+    "unsupported_claim_rate": {
+      "delta": 0.0,
+      "deterministic": 0.0,
+      "semantic": 0.0
+    }
+  },
+  "contract_version": "1.0",
+  "corpus": {
+    "change_cases": 1,
+    "query_cases": 14
+  },
+  "deterministic": {
+    "case_counts": {
+      "changes": 1,
+      "queries": 14
+    },
+    "contract_version": "1.0",
+    "implementation_status": "implemented",
+    "metrics": {
+      "abstention_correctness": 0.9285714285714286,
+      "changed_symbol_precision": 0.2,
+      "changed_symbol_recall": 1.0,
+      "containing_evidence_rate": 0.12781954887218044,
+      "direct_impact_recall": 1.0,
+      "exact_evidence_rate": 0.07518796992481203,
+      "exact_symbol_resolution": 0.21428571428571427,
+      "finding_precision": 1.0,
+      "mean_reciprocal_rank": 0.37142857142857144,
+      "ndcg_at_10": 0.4556525483537704,
+      "primary_evidence_recall_at_10": 0.6,
+      "relation_path_correctness": null,
+      "symbol_recall_at_10": 0.7142857142857143,
+      "total_duration_ms": 0.0,
+      "unsupported_claim_rate": 0.0,
+      "valid_evidence_rate": 0.07518796992481203
+    },
+    "targets_met": false,
+    "unmet_targets": [
+      "exact_symbol_resolution",
+      "primary_evidence_recall_at_10",
+      "changed_symbol_precision",
+      "valid_evidence_rate"
+    ]
+  },
+  "semantic": {
+    "case_counts": {
+      "changes": 1,
+      "queries": 14
+    },
+    "contract_version": "1.0",
+    "implementation_status": "implemented",
+    "metrics": {
+      "abstention_correctness": 1.0,
+      "changed_symbol_precision": 0.2,
+      "changed_symbol_recall": 1.0,
+      "containing_evidence_rate": 0.107981220657277,
+      "direct_impact_recall": 1.0,
+      "exact_evidence_rate": 0.056338028169014086,
+      "exact_symbol_resolution": 0.2857142857142857,
+      "finding_precision": 1.0,
+      "mean_reciprocal_rank": 0.4428571428571429,
+      "ndcg_at_10": 0.5270811197823418,
+      "primary_evidence_recall_at_10": 0.6666666666666666,
+      "relation_path_correctness": null,
+      "symbol_recall_at_10": 0.7857142857142857,
+      "total_duration_ms": 0.0,
+      "unsupported_claim_rate": 0.0,
+      "valid_evidence_rate": 0.056338028169014086
+    },
+    "targets_met": false,
+    "unmet_targets": [
+      "exact_symbol_resolution",
+      "primary_evidence_recall_at_10",
+      "changed_symbol_precision",
+      "valid_evidence_rate"
+    ]
+  }
+}

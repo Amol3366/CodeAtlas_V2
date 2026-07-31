@@ -225,14 +225,14 @@ Live status is `docs/plans/PLAN.md`; this table carries the deliverables.
 | P7-02 | `EmbeddingProvider` interface + `NoEmbeddingProvider` + pinned local sentence-transformers provider + content-hash cache | P7-01 | `complete` |
 | P7-03 | `VectorStore` interface, LanceDB adapter, base/delta namespaces, membership-authoritative filtering | P7-01 | `complete` |
 | P7-04 | Index-time embedding pipeline: changed-chunk-only queue, coverage tracking, deterministic activation never blocked, crash-safe embedding jobs | P7-02, P7-03 | `complete` |
-| P7-05 | Semantic retrieval channel in `AnswerPipeline`: intent-gated, candidate-only fusion, coverage surfaced (`semantic_coverage` no longer hardcoded, `semantic-status` endpoint), deterministic fallback matrix | P7-04 | `pending` |
-| P7-06 | **Uplift evaluation:** corpus re-run semantic-on vs the deterministic baseline, conceptual cases declared before measurement, `baseline-phase-7` recorded, admission decision for the semantic channel | P7-05 | `pending` |
-| P7-07 | Privacy governance + `OpenAIEmbeddingProvider`: per-repository opt-in, secret detection/redaction, budgets/timeouts/retries/cancellation, usage telemetry without content | P7-02, P7-05 | `pending` |
-| P7-08 | Settings surface (Section 12.5 spec gap): `GET/PATCH /v1/settings`, `GET /v1/models`, `POST /v1/models/test`, CLI `settings`/`models` commands, web settings page (opt-in, coverage, model test) with component tests | P7-07 | `pending` |
-| P7-09 | Shadow embedding migration: shadow namespace, backfill, dual-write, independent evaluation, atomic cutover, rollback retention, the three `/v1/models/embedding-migrations` endpoints | P7-03, P7-04 | `pending` |
-| P7-10 | Optional bounded reranking: intent-gated top-N single call, digest-keyed cache, A/B uplift evaluation, admission decision | P7-06 | `pending` |
-| P7-11 | Optional evidence-grounded explanation: `AnswerProvider` interface + `NoAnswerProvider` + Ollama/OpenAI providers, evidence-only prompts, pipeline steps 14–15 claim re-validation, uplift evaluation with 100% citation validity, admission decision | P7-06, P7-07 | `pending` |
-| P7-12 | Performance and packaging re-validation on the artifact with embeddings enabled (`measure_phase7_perf.py`), security sweep incl. provider transmission paths, threat-model Phase 7 section, `docs/operations/semantic-search.md`, README, phase gate | P7-06, P7-08, P7-09, P7-10, P7-11 | `pending` |
+| P7-05 | Semantic retrieval channel in `AnswerPipeline`: intent-gated, candidate-only fusion, coverage surfaced (`semantic_coverage` no longer hardcoded, `semantic-status` endpoint), deterministic fallback matrix | P7-04 | `complete` |
+| P7-06 | **Uplift evaluation:** corpus re-run semantic-on vs the deterministic baseline, conceptual cases declared before measurement, `baseline-phase-7` recorded, admission decision for the semantic channel | P7-05 | `complete` |
+| P7-07 | Privacy governance + `OpenAIEmbeddingProvider`: per-repository opt-in, secret detection/redaction, budgets/timeouts/retries/cancellation, usage telemetry without content | P7-02, P7-05 | `complete` |
+| P7-08 | Settings surface (Section 12.5 spec gap): `GET/PATCH /v1/settings`, `GET /v1/models`, `POST /v1/models/test`, CLI `settings`/`models` commands, web settings page (opt-in, coverage, model test) with component tests | P7-07 | `complete` |
+| P7-09 | Shadow embedding migration: shadow namespace, backfill, dual-write, independent evaluation, atomic cutover, rollback retention, the three `/v1/models/embedding-migrations` endpoints | P7-03, P7-04 | `complete` |
+| P7-10 | Optional bounded reranking: intent-gated top-N single call, digest-keyed cache, A/B uplift evaluation, admission decision | P7-06 | `complete` |
+| P7-11 | Optional evidence-grounded explanation: `AnswerProvider` interface + `NoAnswerProvider`, evidence-only prompts, pipeline steps 14–15 claim re-validation, uplift evaluation with 100% generated-citation validity, admission decline; concrete Ollama/OpenAI answer providers remain unadmitted until governed uplift is proven | P7-06, P7-07 | `complete` |
+| P7-12 | Performance and packaging re-validation on the artifact with embeddings enabled (`measure_phase7_perf.py`), security sweep incl. provider transmission paths, threat-model Phase 7 section, `docs/operations/semantic-search.md`, README, phase gate | P7-06, P7-08, P7-09, P7-10, P7-11 | `in_progress` |
 
 Sequencing rationale: the embeddings vertical slice lands first (P7-01 →
 P7-05), and uplift is measured **immediately** (P7-06) — before the OpenAI

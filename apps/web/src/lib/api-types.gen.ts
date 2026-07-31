@@ -261,6 +261,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Models
+         * @description Every provider, including those that cannot run on this machine.
+         *
+         *     Hiding an unavailable option would leave a user unable to discover that
+         *     installing an extra is all that stands between them and the feature.
+         */
+        get: operations["list_models_v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/embedding-migrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Embedding Migration
+         * @description Backfill the configured model in a shadow namespace.
+         *
+         *     The active namespace keeps serving until the caller explicitly activates
+         *     the migration. That keeps model changes reversible and makes partial
+         *     backfills visible instead of hidden behind a setting flip.
+         */
+        post: operations["start_embedding_migration_v1_models_embedding_migrations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/embedding-migrations/{migration_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Embedding Migration */
+        get: operations["get_embedding_migration_v1_models_embedding_migrations__migration_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/embedding-migrations/{migration_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Embedding Migration */
+        post: operations["activate_embedding_migration_v1_models_embedding_migrations__migration_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Model
+         * @description Ask the configured provider to embed one fixed probe string.
+         *
+         *     A failure is reported in the body with `ok: false`, not as an HTTP error:
+         *     the request succeeded, and what it discovered is that the provider does not
+         *     work. Returning 5xx would make a client retry a question that has already
+         *     been answered.
+         */
+        post: operations["test_model_v1_models_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/query": {
         parameters: {
             query?: never;
@@ -401,6 +507,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/repositories/{repository_id}/semantic-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Semantic Status
+         * @description How much of the active snapshot the semantic index covers.
+         *
+         *     Never refuses for an unindexed or opted-out repository: both are ordinary
+         *     states with ordinary answers, and a 409 would make a client treat the
+         *     default configuration as a fault.
+         */
+        get: operations["semantic_status_v1_repositories__repository_id__semantic_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/repositories/{repository_id}/snapshots/active": {
         parameters: {
             query?: never;
@@ -513,6 +643,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_v1_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Settings */
+        patch: operations["update_settings_v1_settings_patch"];
+        trace?: never;
+    };
     "/v1/symbols/{symbol_id}": {
         parameters: {
             query?: never;
@@ -551,6 +699,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivateEmbeddingMigrationBody */
+        ActivateEmbeddingMigrationBody: {
+            /**
+             * Target
+             * @default target
+             * @enum {string}
+             */
+            target: "target" | "source";
+        };
         /**
          * AnalysisSide
          * @description Which side of a change a piece of evidence belongs to.
@@ -807,6 +964,11 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** CreateEmbeddingMigrationBody */
+        CreateEmbeddingMigrationBody: {
+            /** Repository Id */
+            repository_id: string;
+        };
         /**
          * Derivation
          * @enum {string}
@@ -834,6 +996,62 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** EmbeddingMigrationResponse */
+        EmbeddingMigrationResponse: {
+            /** Activated At */
+            activated_at: string | null;
+            /** Active Namespace Id */
+            active_namespace_id: string | null;
+            /** Created At */
+            created_at: string;
+            /** Failure Code */
+            failure_code: string | null;
+            /** Migration Id */
+            migration_id: string;
+            /** Repository Id */
+            repository_id: string;
+            /** Rolled Back At */
+            rolled_back_at: string | null;
+            /** Snapshot Id */
+            snapshot_id: string | null;
+            /** Source Coverage */
+            source_coverage: number | null;
+            /** Source Namespace Id */
+            source_namespace_id: string;
+            /** Status */
+            status: string;
+            /** Target Coverage */
+            target_coverage: number | null;
+            /** Target Dimensions */
+            target_dimensions: number;
+            /** Target Embedded Count */
+            target_embedded_count: number | null;
+            /** Target Failed Count */
+            target_failed_count: number | null;
+            /** Target Model Id */
+            target_model_id: string;
+            /** Target Namespace Id */
+            target_namespace_id: string;
+            /** Target Normalization Version */
+            target_normalization_version: string;
+            /** Target Pending Count */
+            target_pending_count: number | null;
+            /** Target Total Count */
+            target_total_count: number | null;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * EmbeddingProviderKind
+         * @description Which embedding provider a repository has opted into.
+         *
+         *     ``NONE`` is the default everywhere, and it is the value a missing policy
+         *     row resolves to. ``LOCAL`` transmits nothing by construction. Only
+         *     ``OPENAI`` sends repository-derived content off the machine, which is why
+         *     it can never be reached by default or by omission.
+         * @enum {string}
+         */
+        EmbeddingProviderKind: "none" | "local" | "openai";
         /** Evidence */
         Evidence: {
             /** Confidence */
@@ -1163,6 +1381,26 @@ export interface components {
             /** Warnings */
             warnings?: string[];
         };
+        /** ModelResponse */
+        ModelResponse: {
+            /** Available */
+            available: boolean;
+            /** Dimensions */
+            dimensions: number | null;
+            /** Model Id */
+            model_id: string | null;
+            /** Provider */
+            provider: string;
+            /** Requires */
+            requires: string | null;
+            /** Transmits Off Machine */
+            transmits_off_machine: boolean;
+        };
+        /** ModelsResponse */
+        ModelsResponse: {
+            /** Models */
+            models: components["schemas"]["ModelResponse"][];
+        };
         /**
          * OpenJobResponse
          * @description An index run that is still open. `owner_pid` is null when unrecorded.
@@ -1186,6 +1424,17 @@ export interface components {
          * @enum {string}
          */
         OverallRisk: "critical" | "high" | "medium" | "low" | "info" | "none";
+        /** ProviderTestResponse */
+        ProviderTestResponse: {
+            /** Detail Code */
+            detail_code: string | null;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Ok */
+            ok: boolean;
+            /** Provider */
+            provider: string;
+        };
         /**
          * QueryBody
          * @description A bounded query request.
@@ -1282,6 +1531,57 @@ export interface components {
             display_name: string;
             /** Repository Id */
             repository_id: string;
+        };
+        /**
+         * SemanticStatusResponse
+         * @description The semantic index's state for one repository.
+         *
+         *     Every count is nullable, and that is the contract's point rather than
+         *     laziness: ``null`` means "no provider is enabled, so the question does not
+         *     apply", which is a different fact from 0. A client that rendered 0 as a
+         *     coverage bar would show every deterministic-only installation as 0%
+         *     indexed.
+         */
+        SemanticStatusResponse: {
+            /** Coverage */
+            coverage: number | null;
+            /** Embedded Count */
+            embedded_count: number | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Failed Count */
+            failed_count: number | null;
+            /** Is Complete */
+            is_complete: boolean;
+            /** Model Id */
+            model_id: string | null;
+            /** Namespace Id */
+            namespace_id: string | null;
+            /** Pending Count */
+            pending_count: number | null;
+            /** Provider */
+            provider: string;
+            /** Repository Id */
+            repository_id: string;
+            /** Snapshot Id */
+            snapshot_id: string | null;
+            /** Total Count */
+            total_count: number | null;
+        };
+        /** SettingsResponse */
+        SettingsResponse: {
+            /** Embedding Provider */
+            embedding_provider: string;
+            /** Monthly Token Budget */
+            monthly_token_budget: number | null;
+            /** Per Run Token Budget */
+            per_run_token_budget: number | null;
+            /** Repository Id */
+            repository_id: string;
+            /** Transmits Off Machine */
+            transmits_off_machine: boolean;
+            /** Updated At */
+            updated_at: string;
         };
         /**
          * Severity
@@ -1385,6 +1685,21 @@ export interface components {
             archived?: boolean | null;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * UpdateSettingsBody
+         * @description A partial change. An unmentioned field is left alone.
+         *
+         *     ``monthly_token_budget: null`` means *clear it*, which is a different
+         *     request from not mentioning it — so the handler inspects
+         *     ``model_fields_set`` rather than reading the value.
+         */
+        UpdateSettingsBody: {
+            embedding_provider?: components["schemas"]["EmbeddingProviderKind"] | null;
+            /** Monthly Token Budget */
+            monthly_token_budget?: number | null;
+            /** Per Run Token Budget */
+            per_run_token_budget?: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2005,6 +2320,156 @@ export interface operations {
             };
         };
     };
+    list_models_v1_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelsResponse"];
+                };
+            };
+        };
+    };
+    start_embedding_migration_v1_models_embedding_migrations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEmbeddingMigrationBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingMigrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_embedding_migration_v1_models_embedding_migrations__migration_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                migration_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingMigrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_embedding_migration_v1_models_embedding_migrations__migration_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                migration_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ActivateEmbeddingMigrationBody"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingMigrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_model_v1_models_test_post: {
+        parameters: {
+            query: {
+                repository_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     query_v1_query_post: {
         parameters: {
             query?: never;
@@ -2278,6 +2743,37 @@ export interface operations {
             };
         };
     };
+    semantic_status_v1_repositories__repository_id__semantic_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repository_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SemanticStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     active_snapshot_v1_repositories__repository_id__snapshots_active_get: {
         parameters: {
             query?: never;
@@ -2492,6 +2988,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_v1_settings_get: {
+        parameters: {
+            query: {
+                repository_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_settings_v1_settings_patch: {
+        parameters: {
+            query: {
+                repository_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSettingsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
                 };
             };
             /** @description Validation Error */

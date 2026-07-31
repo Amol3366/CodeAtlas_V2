@@ -20,7 +20,7 @@ from importlib.resources import files
 from codeatlas.domain.errors import SchemaVersionUnsupportedError
 from codeatlas.storage.sqlite.connection import to_utc_text
 
-SCHEMA_VERSION: int = 10
+SCHEMA_VERSION: int = 11
 
 _MIGRATION_PACKAGE = "codeatlas.storage.sqlite"
 _MIGRATION_DIRECTORY = "migrations"

@@ -31,7 +31,7 @@ from codeatlas.domain.semantic import (
 )
 from codeatlas.semantic.cache import EmbeddingCache, EmbeddingRequest
 from codeatlas.semantic.membership import SnapshotMembershipFilter
-from codeatlas.semantic.providers import EmbeddingProvider, build_embedding_provider
+from codeatlas.semantic.providers import EmbeddingProvider, ProviderFactory
 from codeatlas.semantic.vector_store import VectorStore
 from codeatlas.storage.sqlite.semantic_stores import (
     EmbeddingStore,
@@ -95,14 +95,20 @@ class SnapshotEmbedder:
         *,
         connection: sqlite3.Connection,
         vectors: VectorStore,
-        build_provider: Callable[[ProviderPolicy], EmbeddingProvider] = (
-            build_embedding_provider
-        ),
+        build_provider: Callable[[ProviderPolicy], EmbeddingProvider] | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._connection = connection
         self._vectors = vectors
-        self._build_provider = build_provider
+        # Defaults to the factory rather than the bare builder, because the
+        # factory is what wraps a transmitting provider in redaction,
+        # budgets, and telemetry. A default that skipped it would make the
+        # governed path opt-in, which is exactly backwards.
+        self._build_provider = (
+            build_provider
+            if build_provider is not None
+            else ProviderFactory(connection).build
+        )
         self._now = now
 
     def embed_snapshot(
@@ -230,13 +236,32 @@ def read_coverage(
         # complete, because nothing to embed is fully embedded.
         return SemanticCoverage(total=total, embedded=0, pending=0, failed=0)
 
+    return read_namespace_coverage(connection, namespace.namespace_id, snapshot_id)
+
+
+def read_namespace_coverage(
+    connection: sqlite3.Connection, namespace_id: str, snapshot_id: str
+) -> SemanticCoverage:
+    """How much of ``snapshot_id`` is covered in one namespace.
+
+    Used by model migrations to evaluate source and target namespaces
+    independently. The function does not compare scores or rankings across
+    namespaces; it counts membership and embedding states only.
+    """
+    hashes = SnapshotMembershipFilter(connection).content_hashes_in_snapshot(
+        snapshot_id
+    )
+    total = len(hashes)
+    if total == 0:
+        return SemanticCoverage(total=0, embedded=0, pending=0, failed=0)
+
     counts = {status: 0 for status in EmbeddingStatus}
     placeholders = ", ".join("?" for _ in hashes)
     rows = connection.execute(
         "SELECT status, COUNT(DISTINCT content_hash) FROM embeddings"
         f" WHERE namespace_id = ? AND content_hash IN ({placeholders})"
         " GROUP BY status",
-        (namespace.namespace_id, *hashes),
+        (namespace_id, *hashes),
     ).fetchall()
     for row in rows:
         counts[EmbeddingStatus(row[0])] = int(row[1])

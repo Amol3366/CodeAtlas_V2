@@ -25,6 +25,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 from codeatlas.domain.errors import ProviderUnavailableError
@@ -156,6 +157,42 @@ class InMemoryVectorStore:
             if records:
                 return len(next(iter(records.values())).vector)
         return None
+
+
+class LazyVectorStore:
+    """Open the durable vector store only when semantic work actually runs.
+
+    The API process should be able to start, register repositories, and answer
+    deterministic queries on a machine without semantic extras installed. The
+    first vector operation is the point where the optional dependency becomes
+    required, so construction stays cheap and dependency-free.
+    """
+
+    def __init__(self, directory: Path) -> None:
+        self._directory = directory
+        self._store: VectorStore | None = None
+
+    def upsert(self, namespace_id: str, records: Sequence[VectorRecord]) -> None:
+        self._inner().upsert(namespace_id, records)
+
+    def search(
+        self, namespace_id: str, query_vector: Sequence[float], *, limit: int
+    ) -> tuple[VectorMatch, ...]:
+        return self._inner().search(namespace_id, query_vector, limit=limit)
+
+    def compact(self, namespace_id: str) -> None:
+        self._inner().compact(namespace_id)
+
+    def delete_namespace(self, namespace_id: str) -> None:
+        self._inner().delete_namespace(namespace_id)
+
+    def count(self, namespace_id: str) -> int:
+        return self._inner().count(namespace_id)
+
+    def _inner(self) -> VectorStore:
+        if self._store is None:
+            self._store = build_lancedb_store(self._directory)
+        return self._store
 
 
 def _cosine(left: Sequence[float], right: Sequence[float]) -> float:
