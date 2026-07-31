@@ -928,7 +928,7 @@ have been satisfied with current verification evidence.
 - [X] [Phase 4 — Change assurance](#phase-4--change-assurance)
 - [X] [Phase 5 — Persistent ChatGPT-style web application](#phase-5--persistent-chatgpt-style-web-application)
 - [X] [Phase 6 — Continuous freshness and hardening](#phase-6--continuous-freshness-and-hardening)
-- [ ] [Phase 7 — Measured semantic uplift](#phase-7--measured-semantic-uplift)
+- [X] [Phase 7 — Measured semantic uplift](#phase-7--measured-semantic-uplift)
 
 ### Phase 0 — Product contract and evaluation
 
@@ -1185,7 +1185,7 @@ Only after an approval gate:
 - [x] Provider telemetry without source, prompt, or answer content
 - [x] Deterministic fallback for disablement, failure, timeout, or budget
   exhaustion
-- [ ] **Completion gate:** Every admitted semantic or generation feature shows
+- [x] **Completion gate:** Every admitted semantic or generation feature shows
   measurable evaluation uplift over the deterministic baseline, preserves
   evidence and snapshot contracts, and passes privacy, fallback, and rollback
   tests.
@@ -1193,8 +1193,34 @@ Only after an approval gate:
 Each optional feature needs evaluation showing measurable uplift over the
 deterministic baseline.
 
-**Progress as of 2026-07-31: all 13 tasks are `complete` and the phase is
-`awaiting_user_approval`.** Built and tested: provider-neutral
+Gate approved by the user 2026-07-31 **with one condition reported as missed**,
+following the Phase 4 and Phase 6 precedent of carrying a known miss into an
+approval rather than resolving it silently. Ten conditions met, two satisfied as
+recorded declines, one missed. Evidence: ADR-0009, migrations `0010`–`0011`,
+`scripts/check_phase7.ps1`, `docs/evaluation/baseline-phase-7.{json,md}`,
+`docs/evaluation/phase-7-baseline-environment.md`,
+`docs/evaluation/baseline-phase-7-perf.json`,
+`docs/evaluation/rerank-phase-7.{json,md}`,
+`docs/evaluation/explanation-phase-7.{json,md}`,
+`docs/operations/semantic-search.md`.
+
+**The missed condition is 7: primary evidence Recall@10 is 0.6667 against a
+≥ 0.90 target.** The uplift is real on every recall metric, and the target is
+missed with *and* without the semantic layer — so it is not a regression; no
+earlier phase measured conceptual retrieval at all. Never cite the uplift
+without `docs/evaluation/phase-7-baseline-environment.md`, which records that
+the lexical stopword defect fixed during P7-06 was worth **+0.53** recall while
+the entire semantic layer on top of it is worth **+0.07**.
+
+**Phase 7 was the last phase in this section. Phases 0–7 are all complete with
+user-approved gates, and no Phase 8 exists.** Seven items were carried into the
+approval as open work with no later phase to absorb them: the three Phase 6
+qualifications (Chromium conversation-route skips, no pid-reuse detection,
+unsigned executable), the 1.05 GB packaged semantic tree, the unrouted web
+settings page, the untested `POST /v1/models/test` success branch, and the
+absent settings Playwright coverage.
+
+**All 13 tasks are `complete`.** Built and tested: provider-neutral
 embeddings, content-hash cache, LanceDB-backed vector interface, index-time
 embedding jobs, semantic status, intent-gated semantic retrieval, the Phase 7
 semantic baseline, OpenAI embedding governance, REST/CLI/web settings,

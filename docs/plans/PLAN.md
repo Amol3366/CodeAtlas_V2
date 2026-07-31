@@ -43,20 +43,20 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | 4 — Change assurance                            | [phase plan](phases/phase-04-change-assurance.md)                          | `complete`                                            | User           |
 | 5 — Persistent web application                  | [phase plan](phases/phase-05-persistent-web-application.md)                | `complete`                                            | User           |
 | 6 — Continuous freshness and hardening          | [phase plan](phases/phase-06-freshness-and-hardening.md)                   | `complete` (gate approved by the user 2026-07-29)     | User           |
-| 7 — Measured semantic uplift                    | [phase plan](phases/phase-07-measured-semantic-uplift.md)                  | `awaiting_user_approval` — all 13 tasks complete    | User           |
+| 7 — Measured semantic uplift                    | [phase plan](phases/phase-07-measured-semantic-uplift.md)                  | `complete` (gate approved by the user 2026-07-31)   | User           |
 
 ## Active Work
 
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active phase    | 7 —**plan approved by the user 2026-07-29**                                                                                                                                                                                                                                                                                                                                                                                      |
-| Active task     | P7-12                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Task status     | `complete` — Phase 7 `awaiting_user_approval`                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Active phase    | none — Phases 0–7 are all `complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                      |
+| Active task     | none — Phase 7 approved; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Task status     | `complete` — Phase 7 gate approved by the user 2026-07-31                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Agent           | Claude Code `claude-opus-5` (recovered P7-12 in place from Codex GPT-5, per rule 9) |
 | Started UTC     | 2026-07-30T18:51:46Z                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Git state       | Branch `main` at `5ea8ab8`. P7-05 through P7-12 are now committed; the working tree carries only this task's packaged provider-surface tests, the live policy-pointer updates, and this status edit. |
 | Policy filename | The policy file has been both `CLAUDE.md` and `AGENTS.md`, and has now been renamed back: it is **`CLAUDE.md`** again as of 2026-07-31. Citations to either name mean that one file — 113 of them across 57 files. Only the *live* pointers were updated (this file's header and rule 1, and the README); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a 113-reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | The Phase 7 completion gate, per the phase plan's 12 conditions                                                                                                                                                                                                                                                                                                                                                                         |
+| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision                                                                                                                                                                                                                                                                                                                                                                         |
 
 ### Phase 7 Task Board
 
@@ -206,6 +206,90 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-31T09:08:23Z — Phase 7 gate approved by the user; Phase 7 complete
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `f0840ef`.
+- Transition: Phase 7 `awaiting_user_approval -> complete`.
+- **Approval: the user approved the Phase 7 completion gate on 2026-07-31**,
+  after the condition-by-condition summary in the two P7-12 handoff entries
+  below was presented.
+
+#### What was approved, stated plainly
+
+The gate was approved **with condition 7 reported as missed**, not with all
+twelve conditions met. Recording it any other way would misrepresent what the
+user agreed to, and the Phase 4 and Phase 6 gates set the precedent for
+carrying a known miss into an approval rather than quietly resolving it.
+
+| | Conditions |
+| --- | --- |
+| Met | 1, 2, 3, 4, 5, 6, 8, 11, 12 — and 2 was proven in a genuinely extras-free environment, not assumed |
+| Satisfied as recorded declines | 9 (reranking) and 10 (explanation) — both built as seams, measured, shown to improve nothing, and **not shipped** |
+| **Missed** | **7 — primary evidence Recall@10 0.6667 against the Section 19.3 >= 0.90 target** |
+
+On the miss: the semantic layer's uplift is real and positive on every recall
+metric (0.6000 -> 0.6667 recall, 0.9286 -> 1.0000 abstention correctness,
+0.2143 -> 0.2857 exact symbol resolution, 0.0000 unsupported claims on both
+sides) and it costs precision, taking evidence volume from 132 to 212 items
+over the corpus. The target is missed **with and without** the semantic layer,
+so this is not a regression: no phase before this one measured conceptual
+retrieval at all. The full reading, including why the lexical stopword fix
+found during P7-06 was worth +0.53 recall against the layer's +0.07, is in
+`docs/evaluation/phase-7-baseline-environment.md` and must travel with any
+citation of these numbers.
+
+#### Qualifications carried into the approval
+
+Three inherited from the Phase 6 gate, unchanged and still open:
+
+- four conversation-route browser tests skipped on Chromium (a browser defect;
+  Firefox proves all seven);
+- recovery does not detect pid reuse — `codeatlas doctor` makes it visible, not
+  automatic;
+- the packaged executable is unsigned, so SmartScreen warns on first run.
+
+Four added by Phase 7:
+
+- the packaged semantic tree is **1.05 GB** against the 44 MB deterministic
+  installer — the torch cost the user accepted at the activation gate, measured
+  and recorded rather than estimated;
+- the web settings page is built and tested but **not routed** in the shell, so
+  a user cannot reach it by clicking;
+- `POST /v1/models/test` has contract coverage for its disabled and unavailable
+  branches only, not its success branch;
+- no Playwright coverage for the settings flow.
+
+#### Phase 7 evidence
+
+ADR-0009; migrations `0010` and `0011`; `scripts/check_phase7.ps1`;
+`docs/evaluation/baseline-phase-7.{json,md}`,
+`docs/evaluation/phase-7-baseline-environment.md`,
+`docs/evaluation/baseline-phase-7-perf.json`,
+`docs/evaluation/phase-7-performance-environment.md`,
+`docs/evaluation/rerank-phase-7.{json,md}`,
+`docs/evaluation/explanation-phase-7.{json,md}`;
+`docs/operations/semantic-search.md`; the Phase 7 enforcement table in
+`docs/security/threat-model.md`; commits `5ea8ab8` and `f0840ef`.
+
+#### This closes the development order
+
+Phase 7 was the last phase in `CLAUDE.md` Section 20. **Phases 0 through 7 are
+now all `complete` with user-approved gates.** No Phase 8 exists, and none is
+implied by this approval.
+
+Four gates carried a stated qualification into their approval (Phase 3's
+evidence-granularity measure, Phase 4's changed-symbol precision, Phase 5's
+absent Playwright suites, Phase 6's four items) and Phase 7 now carries a fifth.
+Three of those five were later paid off in a subsequent phase rather than
+forgotten. The seven items listed above have no subsequent phase to absorb them,
+so they are open work items rather than scheduled ones, and the next agent
+should treat them as such rather than assuming a plan exists.
+
+- Next: **await user instruction.** No agent may open a new phase, plan Phase 8,
+  or start any of the open items above without an explicit request. The
+  remaining known work is enumerated in the qualifications section of this entry
+  and in `docs/operations/release-validation.md`.
 
 ### 2026-07-31T09:20:00Z — P7-12 complete; Phase 7 awaiting user approval
 

@@ -92,9 +92,15 @@ provider shows measured uplift (`docs/operations/semantic-search.md`).
 
 Phase 7 packaged semantic-local performance has been measured on the onedir
 artifact: refresh p95 0.975 s, preflight p95 2.298 s, semantic coverage 1.0,
-and package tree size 1.05 GB. Final Phase 7 gate approval is still a user
-decision.
-`docs/plans/PLAN.md` is the live phase and task status.
+and package tree size 1.05 GB.
+
+The Phase 7 gate was approved on 2026-07-31, **with one target recorded as
+missed**: primary evidence Recall@10 is 0.6667 against a ≥ 0.90 target. The
+semantic layer moves that number in the right direction, and the target is
+missed with and without it — read
+`docs/evaluation/phase-7-baseline-environment.md` before quoting either figure.
+That completes Phases 0–7; `docs/plans/PLAN.md` is the live phase and task
+status.
 
 ## Windows development
 

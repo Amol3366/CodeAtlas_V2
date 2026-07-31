@@ -1,11 +1,11 @@
 # Phase 7 — Measured Semantic Uplift
 
-Status: `awaiting_user_approval` — all 13 tasks are complete. The gate summary is the P7-12
-handoff in `docs/plans/PLAN.md`: ten conditions met, two satisfied as recorded
-declines, and one missed (condition 7, Recall@10 0.6667 against a >= 0.90 target).
-Only the user may approve this gate. The activation gate (explicit product,
-privacy, and architecture approval) and this plan were both approved by the
-user on 2026-07-29 and are recorded in `docs/plans/PLAN.md`.
+Status: `complete` — the user approved the Phase 7 completion gate on
+2026-07-31, **with condition 7 recorded as missed** (primary evidence
+Recall@10 0.6667 against a >= 0.90 target). Ten conditions met, two
+satisfied as recorded declines, one missed. The gate summary and the
+approval are the Phase 7 entries in `docs/plans/PLAN.md`. The activation
+gate and this plan were both approved by the user on 2026-07-29.
 Gate authority: user
 Prerequisites: Phase 6 approved; `AGENTS.md` Sections 4.3, 4.4, 10, 16, 17, 18,
 19; blueprint Sections 4.7, 4.9, 8.20–8.23, 12–15 (phases 12–14 and the
