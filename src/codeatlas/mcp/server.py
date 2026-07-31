@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.mcp.tools import TOOL_SCHEMA_VERSION, ToolRegistry, build_registry
+from codeatlas.semantic.vector_store import LazyVectorStore
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.upgrade import upgrade_database
 
@@ -43,7 +44,12 @@ def open_services(database: Path | None = None) -> Iterator[ApplicationServices]
     path = database or default_database_path()
     upgrade_database(path)
     with connect(path) as connection:
-        yield build_services(connection)
+        # Same wiring as the CLI and the API: an adapter that omitted this
+        # would answer without the semantic layer that the other two have,
+        # which is exactly the duplicated repository logic Section 4.5 forbids.
+        yield build_services(
+            connection, vectors=LazyVectorStore(path.parent / "vectors")
+        )
 
 
 class McpServer:

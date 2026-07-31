@@ -217,14 +217,22 @@ def build_lancedb_store(directory: object) -> VectorStore:
     Lazily imported like every other optional dependency: importing this module
     must stay free on an installation that never opted in.
     """
+    from pathlib import Path
+
+    # The guard has to wrap *construction*, not just this import.
+    # `lancedb_store` imports nothing optional at module scope — `import
+    # lancedb` lives inside `LanceDBVectorStore.__init__`. Wrapping only the
+    # module import therefore never fired, and a bare `ModuleNotFoundError`
+    # escaped to a caller that had asked a question this function exists to
+    # answer. In the embed path that surfaced as every content hash marked
+    # `failed` with `VECTOR_WRITE_FAILED`, so coverage reported permanent
+    # failure where it should have reported a missing extra.
     try:
         from codeatlas.semantic.lancedb_store import LanceDBVectorStore
-    except ImportError as error:  # pragma: no cover - exercised without the extra
+
+        return LanceDBVectorStore(Path(str(directory)))
+    except ImportError as error:
         raise ProviderUnavailableError(
             "Vector storage needs the 'semantic-local' or 'semantic-openai' "
             "extra. Install one with: uv sync --extra semantic-local",
         ) from error
-
-    from pathlib import Path
-
-    return LanceDBVectorStore(Path(str(directory)))

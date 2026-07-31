@@ -31,6 +31,7 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 | [0007](0007-freshness-and-hardening-design.md) | The watcher is a trigger, never an authority; recovery, backup, and packaging decisions | 6 |
 | [0008](0008-accept-then-stream-message-submission.md) | Accept-then-stream message submission; `contract_version` 1.0 → 1.1 | 6 |
 | [0009](0009-measured-semantic-uplift.md) | Optional semantic layer admitted: provider-neutral embeddings, LanceDB base/delta with SQLite membership authoritative, per-repository privacy governance, shadow migration, measurement-admitted rerank/explanation | 7 |
+| [0010](0010-repository-scoped-embedding-namespaces.md) | Which similarity space answers is a per-repository pointer, not a global active flag; migration `0012` drops the one-active index and backfills existing databases | 7 (post-gate) |
 
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.

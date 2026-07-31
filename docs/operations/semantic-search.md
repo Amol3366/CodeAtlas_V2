@@ -47,7 +47,13 @@ Invoke-RestMethod -Method Post "http://127.0.0.1:8000/v1/models/test?repository_
 For a repository with provider `none`, `/semantic-status` reports
 `enabled=false` and `coverage=null`. For an enabled repository, coverage is tied
 to the active snapshot and is complete only when every active unique content
-hash has an embedded record in the active namespace.
+hash has an embedded record in the namespace serving that repository.
+
+Each repository is pointed at exactly one namespace, and repositories on
+different providers keep separate ones (ADR-0010). Namespaces themselves
+are shared across repositories on the same model, which is what makes the
+content-hash cache reusable. Switching a repository's provider retargets it
+on its next index.
 
 ## Retrieval behavior
 

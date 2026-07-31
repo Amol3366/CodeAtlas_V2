@@ -165,7 +165,22 @@ export function SemanticSettings({ repositoryId }: Props) {
       ) : null}
 
       <h3>Coverage</h3>
-      {status.data && status.data.coverage !== null ? (
+      {/*
+        Four states, not two. "No provider is enabled" is a claim about
+        privacy, so it may only be rendered when the server has actually said
+        so. Collapsing loading and error into it told a user that nothing was
+        being transmitted while the request that would have revealed otherwise
+        was still in flight.
+      */}
+      {status.isPending ? (
+        <p role="status">Checking coverage…</p>
+      ) : status.isError ? (
+        <p role="status">
+          Coverage could not be read, so this page cannot say whether a
+          provider is enabled. Retry, or check{" "}
+          <code>codeatlas settings {repositoryId}</code>.
+        </p>
+      ) : status.data && status.data.coverage !== null ? (
         <p>
           {Math.round(status.data.coverage * 100)}% of this snapshot is
           embedded ({status.data.embedded_count} of {status.data.total_count}

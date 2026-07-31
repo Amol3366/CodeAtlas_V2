@@ -116,7 +116,7 @@ class EmbeddingMigrationService:
             )
         provider = self._build_provider(policy)
 
-        source = self._namespaces.get_active()
+        source = self._namespaces.get_for_repository(repository_id)
         if source is None:
             raise InvalidRequestError(
                 "There is no active embedding namespace to migrate from."
@@ -208,6 +208,11 @@ class EmbeddingMigrationService:
         moment = self._now()
         with write_transaction(self._connection):
             self._namespaces.activate(namespace_id, activated_at=moment)
+            # The pointer is what actually redirects this repository's
+            # queries; the status flag alone would cut over nothing.
+            self._namespaces.set_for_repository(
+                migration.repository_id, namespace_id, updated_at=moment
+            )
             self._migrations.set_status(
                 migration_id,
                 status=(
@@ -281,7 +286,7 @@ class EmbeddingMigrationService:
         )
 
     def _view(self, migration: EmbeddingMigration) -> EmbeddingMigrationView:
-        active = self._namespaces.get_active()
+        active = self._namespaces.get_for_repository(migration.repository_id)
         snapshot = self._snapshots.get_active(migration.repository_id)
         target_namespace = self._namespaces.get(migration.target_namespace_id)
         if target_namespace is None:

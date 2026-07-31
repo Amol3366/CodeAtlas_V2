@@ -176,16 +176,39 @@ def restore(backup: Path, target: Path) -> RestoreResult:
     _require_not_in_use(target)
 
     target.parent.mkdir(parents=True, exist_ok=True)
-    replaced = _preserve_replaced(target)
 
+    # Build the replacement completely before disturbing what is already
+    # there. The earlier order preserved the target first, so a copy that
+    # failed — a full disk, a revoked handle, a sharing violation — left
+    # nothing at the expected path and only a `.replaced` file the user had no
+    # reason to know about. Staging first means every failure below this point
+    # either changes nothing or is rolled back.
     staging = target.with_name(f"{target.name}.incoming")
     _remove_quietly(staging)
     try:
         with _opened(backup) as origin, _opened(staging) as copy:
             origin.backup(copy)
+    except (sqlite3.Error, OSError) as error:
+        _remove_quietly(staging)
+        raise RestoreIncompatibleError("The backup could not be restored.") from error
+
+    # Something must move for a restore to happen, so this window cannot be
+    # removed — only made recoverable.
+    replaced = _preserve_replaced(target)
+    try:
         os.replace(staging, target)
     except (sqlite3.Error, OSError) as error:
         _remove_quietly(staging)
+        if replaced is not None:
+            # Put the user back where they started rather than leaving them
+            # with no database at all.
+            try:
+                os.replace(replaced, target)
+            except OSError:  # pragma: no cover - the rollback itself failing
+                raise RestoreIncompatibleError(
+                    "The backup could not be restored, and the database it "
+                    f"replaced is at {replaced}.",
+                ) from error
         raise RestoreIncompatibleError("The backup could not be restored.") from error
 
     # The restored file is a fresh copy, so any side files still beside the

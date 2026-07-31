@@ -53,6 +53,7 @@ from codeatlas.domain.repository import Repository
 from codeatlas.domain.semantic import EmbeddingProviderKind
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
+from codeatlas.semantic.vector_store import LazyVectorStore
 from codeatlas.storage.sqlite.backup import create_backup, restore
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.upgrade import (
@@ -142,7 +143,16 @@ def _services(database: Path | None) -> Iterator[ApplicationServices]:
     path = database or default_database_path()
     upgrade_database(path)
     with connect(path) as connection:
-        yield build_services(connection)
+        # The vector store is passed for the same reason the API passes one:
+        # without it `build_services` leaves the semantic layer unbuilt, so a
+        # repository opted into `local` would index with no embeddings written
+        # and report 0% coverage forever — the documented CLI workflow in
+        # `docs/operations/semantic-search.md` silently doing nothing.
+        # `LazyVectorStore` opens nothing until something asks it to, so a
+        # deterministic-only installation still never imports the extra.
+        yield build_services(
+            connection, vectors=LazyVectorStore(path.parent / "vectors")
+        )
 
 
 def _fail(error: CodeAtlasError) -> None:
@@ -1209,12 +1219,6 @@ def main() -> None:
     except sqlite3.Error:
         typer.echo("INTERNAL_ERROR: the local database could not be used.", err=True)
         raise typer.Exit(EXIT_INTERNAL_FAILURE) from None
-
-
-if __name__ == "__main__":
-    main()
-
-
 @app.command("settings")
 def settings_command(
     repository_id: Annotated[str, typer.Argument()],
@@ -1332,3 +1336,7 @@ def models_command(
         )
         lines.append(f"{model.provider.value}: {state}; {transmits}")
     _emit(payload, "\n".join(lines), as_json=as_json)
+
+
+if __name__ == "__main__":
+    main()

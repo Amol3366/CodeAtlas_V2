@@ -472,3 +472,107 @@ def test_an_embedding_status_is_one_of_the_three_declared_states(
     ).fetchall()
 
     assert {row[0] for row in rows} <= {status.value for status in EmbeddingStatus}
+
+
+class WiderProvider(FakeProvider):
+    """A second provider whose vectors are a different width."""
+
+    model_id = "wider"
+    dimensions = 5
+    normalization_version = "l2_v1"
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        self.embedded.extend(texts)
+        return [[1.0, 0.0, 0.0, 0.0, 0.0] for _ in texts]
+
+
+def test_two_repositories_on_different_providers_each_get_their_own_namespace(
+    connection: sqlite3.Connection,
+) -> None:
+    """The bug this pins was reachable from the shipped settings API.
+
+    Namespaces were global and exactly one could be `active`, but the provider
+    setting is per repository. The second repository to opt in therefore got a
+    *shadow* namespace, because the unique index permitted nothing else, and a
+    shadow answers no query: its embeddings went somewhere real and its
+    coverage was computed against the *other* repository's namespace, reading
+    0% forever. Queries embedded at one width and searched a space of another.
+    """
+    connection.execute(
+        "INSERT INTO repositories"
+        " (repository_id, display_name, canonical_root, created_at)"
+        " VALUES ('repo_2', 'other', 'C:/repos/other', '2026-07-29T00:00:00Z')"
+    )
+    connection.execute(
+        "INSERT INTO snapshots ("
+        " snapshot_id, repository_id, state, git_head, git_branch, git_dirty,"
+        " working_tree_fingerprint, file_count, parsed_file_count,"
+        " skipped_file_count, parse_error_count, parser_bundle_version,"
+        " index_version, created_at, activated_at"
+        ") VALUES ('snap_2', 'repo_2', 'active', NULL, NULL, 0, 'fp2', 1, 1, 0,"
+        " 0, '1.0.0', '1.0.0', '2026-07-29T00:00:00Z', '2026-07-29T00:00:00Z')"
+    )
+    connection.execute(
+        "INSERT INTO files ("
+        " snapshot_id, file_id, relative_path, display_path, content_hash,"
+        " size_bytes, line_count, language, classification"
+        ") VALUES ('snap_2', 'file_2', 'b.py', 'b.py', 'fh2', 1, 10, 'python',"
+        " 'source_code')"
+    )
+    connection.execute(
+        "INSERT INTO chunks ("
+        " snapshot_id, logical_chunk_id, chunk_version_id, file_id, symbol_id,"
+        " role, qualified_name, heading_path, start_line, end_line, content_hash,"
+        " retrieval_text, part_index, part_count"
+        ") VALUES ('snap_2', 'chunk_b', 'chunkv_hash_b', 'file_2', NULL, 'symbol',"
+        " 'chunk_b', '', 1, 5, 'hash_b', 'text of hash_b', 0, 1)"
+    )
+    ProviderPolicyStore(connection).set(
+        ProviderPolicy(
+            repository_id="repo_2",
+            embedding_provider=EmbeddingProviderKind.OPENAI,
+            monthly_token_budget=1_000,
+            per_run_token_budget=None,
+            updated_at=_NOW,
+        )
+    )
+
+    _chunk(connection, "chunk_a", "hash_a")
+    _opt_in(connection, EmbeddingProviderKind.LOCAL)
+    _embedder(connection, FakeProvider()).embed_snapshot("repo_1", "snap_1")
+    _embedder(connection, WiderProvider()).embed_snapshot("repo_2", "snap_2")
+
+    namespaces = NamespaceStore(connection)
+    first = namespaces.get_for_repository("repo_1")
+    second = namespaces.get_for_repository("repo_2")
+
+    assert first is not None and second is not None
+    assert first.namespace_id != second.namespace_id
+    assert first.dimensions == 3
+    assert second.dimensions == 5
+
+    # The point of the fix: each repository's coverage is measured against the
+    # space its own vectors are in. The second one used to read 0.0 forever.
+    first_coverage = read_coverage(connection, "repo_1", "snap_1")
+    second_coverage = read_coverage(connection, "repo_2", "snap_2")
+    assert first_coverage is not None and first_coverage.ratio == 1.0
+    assert second_coverage is not None and second_coverage.ratio == 1.0
+
+
+def test_switching_a_repositorys_provider_retargets_it_on_the_next_index(
+    connection: sqlite3.Connection,
+) -> None:
+    """A provider switch is a supported action, not a migration-only one."""
+    _chunk(connection, "chunk_a", "hash_a")
+    _opt_in(connection, EmbeddingProviderKind.LOCAL)
+    _embedder(connection, FakeProvider()).embed_snapshot("repo_1", "snap_1")
+    before = NamespaceStore(connection).get_for_repository("repo_1")
+
+    _embedder(connection, WiderProvider()).embed_snapshot("repo_1", "snap_1")
+    after = NamespaceStore(connection).get_for_repository("repo_1")
+
+    assert before is not None and after is not None
+    assert after.namespace_id != before.namespace_id
+    assert after.dimensions == 5
+    coverage = read_coverage(connection, "repo_1", "snap_1")
+    assert coverage is not None and coverage.ratio == 1.0

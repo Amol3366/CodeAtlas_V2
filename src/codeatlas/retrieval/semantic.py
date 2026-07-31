@@ -121,7 +121,14 @@ class SemanticSearchService:
                 enabled=True, warnings=(PROVIDER_UNAVAILABLE_WARNING,)
             )
 
-        namespace = NamespaceStore(self._connection).get_active()
+        # This repository's namespace. The global lookup this replaced meant a
+        # repository on a second provider embedded its query with one model and
+        # searched a space built by another: the width check rejected it and
+        # the caller saw SEMANTIC_INDEX_UNAVAILABLE, which named the wrong
+        # cause (ADR-0010).
+        namespace = NamespaceStore(self._connection).get_for_repository(
+            request.repository_id
+        )
         if namespace is None:
             # Opted in, nothing embedded yet. Every repository looks like this
             # between switching the provider on and the next index.

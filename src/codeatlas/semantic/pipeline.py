@@ -136,7 +136,7 @@ class SnapshotEmbedder:
             # something to report, not something to fail.
             return EmbeddingRunResult(warning=PROVIDER_UNAVAILABLE_WARNING)
 
-        namespace = self._ensure_namespace(provider)
+        namespace = self._ensure_namespace(provider, repository_id)
         membership = SnapshotMembershipFilter(self._connection)
         embeddings = EmbeddingStore(self._connection)
 
@@ -175,37 +175,48 @@ class SnapshotEmbedder:
             warning=EMBEDDING_INCOMPLETE_WARNING if batch.failed else None,
         )
 
-    def _ensure_namespace(self, provider: EmbeddingProvider) -> EmbeddingNamespace:
-        """Find or create the namespace this provider writes into.
+    def _ensure_namespace(
+        self, provider: EmbeddingProvider, repository_id: str
+    ) -> EmbeddingNamespace:
+        """Find or create the namespace this provider writes into, and point
+        this repository at it.
 
         Derived from the provider's own identity rather than from
         configuration: a namespace has to describe the vectors actually in it,
         and a configured name could outlive the model it was chosen for.
+
+        The namespace is shared — two repositories on the same model use the
+        same one, which is what makes the content-hash cache reusable across
+        repositories. The *pointer* is per repository, because the provider
+        setting is (ADR-0009 decision 5, ADR-0010). Before migration `0012`
+        this method marked any second namespace `shadow`, since a global
+        one-active index left no alternative; the effect was that the second
+        repository to opt in embedded into a space nothing ever queried.
         """
         namespaces = NamespaceStore(self._connection)
         namespace_id = embedding_namespace_id(
             provider.model_id, provider.dimensions, provider.normalization_version
         )
-        existing = namespaces.get(namespace_id)
-        if existing is not None:
-            return existing
-
         moment = self._now()
-        # The first namespace becomes active. A second one arrives only through
-        # a model migration, which creates it as a shadow and cuts over
-        # explicitly (P7-09) — never as a side effect of an index.
-        has_active = namespaces.get_active() is not None
-        namespace = EmbeddingNamespace(
-            namespace_id=namespace_id,
-            model_id=provider.model_id,
-            dimensions=provider.dimensions,
-            normalization_version=provider.normalization_version,
-            status=NamespaceStatus.SHADOW if has_active else NamespaceStatus.ACTIVE,
-            created_at=moment,
-            activated_at=None if has_active else moment,
+        existing = namespaces.get(namespace_id)
+        if existing is None:
+            existing = EmbeddingNamespace(
+                namespace_id=namespace_id,
+                model_id=provider.model_id,
+                dimensions=provider.dimensions,
+                normalization_version=provider.normalization_version,
+                status=NamespaceStatus.ACTIVE,
+                created_at=moment,
+                activated_at=moment,
+            )
+            namespaces.add(existing)
+
+        # Re-asserted every run, so a provider switch retargets the repository
+        # on its next index rather than needing a separate step.
+        namespaces.set_for_repository(
+            repository_id, existing.namespace_id, updated_at=moment
         )
-        namespaces.add(namespace)
-        return namespace
+        return existing
 
 
 def read_coverage(
@@ -227,7 +238,10 @@ def read_coverage(
     )
     total = len(hashes)
 
-    namespace = NamespaceStore(connection).get_active()
+    # The repository's own namespace, not whichever one happens to be
+    # active: with two repositories on different providers the global
+    # lookup computed each one's coverage against the other's space.
+    namespace = NamespaceStore(connection).get_for_repository(repository_id)
     if namespace is None or total == 0:
         # Opted in, but nothing embedded yet — the first index after switching
         # a provider on looks exactly like this. Reporting `None` would say the

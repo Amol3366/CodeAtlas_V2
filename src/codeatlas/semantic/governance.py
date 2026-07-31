@@ -105,17 +105,36 @@ class GovernedEmbeddingProvider:
         self._enforce_budgets(estimated)
 
         started = time.perf_counter()
+        # Counted rather than assumed. `_call` may transmit the payload up to
+        # `_max_attempts` times, and recording `requests=1` for three real
+        # transmissions let a repository exceed its monthly budget by up to 3x
+        # while `tokens_since` reported it as within bounds — which defeats the
+        # one control standing between an opted-in repository and an unbounded
+        # metered account.
+        attempts: list[int] = []
         try:
-            vectors = self._call(operation, safe)
+            vectors = self._call(operation, safe, attempts)
         except Exception:
             self._record(
-                operation, estimated, started, outcome="error", requests=1
+                operation,
+                estimated * max(len(attempts), 1),
+                started,
+                outcome="error",
+                requests=max(len(attempts), 1),
             )
             raise
-        self._record(operation, estimated, started, outcome="success", requests=1)
+        self._record(
+            operation,
+            estimated * len(attempts),
+            started,
+            outcome="success",
+            requests=len(attempts),
+        )
         return vectors
 
-    def _call(self, operation: str, texts: list[str]) -> list[list[float]]:
+    def _call(
+        self, operation: str, texts: list[str], attempts: list[int]
+    ) -> list[list[float]]:
         """Invoke the provider, retrying transient failures a bounded number of times.
 
         A `CodeAtlasError` is never retried: those are decisions — disabled,
@@ -126,6 +145,10 @@ class GovernedEmbeddingProvider:
         method = getattr(self._inner, operation)
         last: Exception | None = None
         for attempt in range(self._max_attempts):
+            # Appended before the call: the payload leaves the machine when the
+            # call is made, not when it returns, and a timeout is precisely the
+            # case where it was sent and no answer came back.
+            attempts.append(attempt)
             try:
                 result: list[list[float]] = method(texts)
                 return result

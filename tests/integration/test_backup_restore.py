@@ -11,6 +11,7 @@ a torn page — so backup uses the online backup API (ADR-0007 decision 4).
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from codeatlas.domain.errors import (
     IntegrityCheckFailedError,
     RestoreIncompatibleError,
 )
+from codeatlas.storage.sqlite import backup as backup_module
 from codeatlas.storage.sqlite.backup import (
     check_integrity,
     create_backup,
@@ -291,6 +293,81 @@ def test_restore_refuses_a_corrupted_backup_without_touching_the_target(
         services = build_services(connection)
         found = services.lookup.lookup(
             SymbolLookupRequest(repository_id, "PaymentService.capture", "req-2")
+        )
+    assert found.evidence
+
+
+def test_a_failed_copy_leaves_the_live_database_where_it_was(
+    tmp_path: Path, sample_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pre-checks are not the only way a restore can fail.
+
+    A corrupted backup is refused before anything moves, and the test above
+    covers that. This covers the other half: the backup passes every check and
+    the *copy* then fails — a full disk, a revoked handle, a sharing violation.
+    Until this was fixed the live database had already been renamed to
+    `.replaced` by then, so the failure left nothing at the expected path at
+    all and the user had to know to go looking for a file they were never told
+    about.
+    """
+    database = tmp_path / "db.sqlite"
+    repository_id = _populate(database, sample_repo)
+    backup = tmp_path / "atlas.sqlite"
+    create_backup(database, backup)
+
+    real_opened = backup_module._opened
+
+    def fail_on_staging(path: Path, *, read_only: bool = False):  # type: ignore[no-untyped-def]
+        if path.name.endswith(".incoming"):
+            raise sqlite3.OperationalError("disk I/O error")
+        return real_opened(path, read_only=read_only)
+
+    monkeypatch.setattr(backup_module, "_opened", fail_on_staging)
+
+    with pytest.raises(RestoreIncompatibleError):
+        restore(backup, database)
+
+    assert database.is_file(), "the live database was moved away and not put back"
+    assert not database.with_name(f"{database.name}.incoming").exists()
+    with connect(database) as connection:
+        services = build_services(connection)
+        found = services.lookup.lookup(
+            SymbolLookupRequest(repository_id, "PaymentService.capture", "req-3")
+        )
+    assert found.evidence
+
+
+def test_a_failed_final_swap_puts_the_preserved_database_back(
+    tmp_path: Path, sample_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The narrowest window: the copy succeeded, the swap did not.
+
+    Something has to be moved for a restore to happen, so this window cannot be
+    eliminated — but it can be rolled back, and a user left with no database is
+    not "exactly where they started".
+    """
+    database = tmp_path / "db.sqlite"
+    repository_id = _populate(database, sample_repo)
+    backup = tmp_path / "atlas.sqlite"
+    create_backup(database, backup)
+
+    real_replace = os.replace
+
+    def fail_the_swap(src, dst):  # type: ignore[no-untyped-def]
+        if str(src).endswith(".incoming"):
+            raise OSError("sharing violation")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", fail_the_swap)
+
+    with pytest.raises(RestoreIncompatibleError):
+        restore(backup, database)
+
+    assert database.is_file(), "the preserved database was not rolled back"
+    with connect(database) as connection:
+        services = build_services(connection)
+        found = services.lookup.lookup(
+            SymbolLookupRequest(repository_id, "PaymentService.capture", "req-4")
         )
     assert found.evidence
 

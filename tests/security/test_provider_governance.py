@@ -223,6 +223,37 @@ def test_retries_are_bounded(connection: sqlite3.Connection) -> None:
         _governed(connection, inner, max_attempts=3).embed_documents(["text"])
 
 
+def test_every_transmitted_attempt_is_billed(connection: sqlite3.Connection) -> None:
+    """A retry is another payload on the wire, and the budget has to see it.
+
+    Recording one request for three transmissions let a repository run at up to
+    three times its stated monthly budget while the usage table reported it as
+    compliant — the budget is the only thing bounding an opted-in repository's
+    spend, so under-counting it is the failure that matters.
+    """
+    inner = FlakyProvider(failures=2)
+
+    _governed(connection, inner).embed_documents(["text"])
+
+    requests, tokens = connection.execute(
+        "SELECT SUM(request_count), SUM(token_count) FROM provider_usage"
+    ).fetchone()
+    assert requests == 3, "two failed attempts were transmitted and not counted"
+    assert tokens > 0
+
+
+def test_a_failed_call_bills_each_attempt_too(connection: sqlite3.Connection) -> None:
+    inner = FlakyProvider(failures=99)
+
+    with pytest.raises(TimeoutError):
+        _governed(connection, inner, max_attempts=3).embed_documents(["text"])
+
+    requests = connection.execute(
+        "SELECT SUM(request_count) FROM provider_usage"
+    ).fetchone()[0]
+    assert requests == 3
+
+
 # --- telemetry records counts, never content -----------------------------
 
 

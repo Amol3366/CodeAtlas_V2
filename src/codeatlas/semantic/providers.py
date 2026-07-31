@@ -300,10 +300,22 @@ def describe_available_providers() -> dict[EmbeddingProviderKind, bool]:
     exceptions from a constructor would mean loading a multi-hundred-megabyte
     model to render a checkbox.
     """
+    import os
+
     return {
         EmbeddingProviderKind.NONE: True,
         EmbeddingProviderKind.LOCAL: _module_is_importable("sentence_transformers"),
-        EmbeddingProviderKind.OPENAI: False,
+        # Both halves are required, and neither is sufficient. The package
+        # decides whether the call *could* be made; the credential decides
+        # whether it would succeed. Reporting the package alone would offer the
+        # user a provider that fails at the first embed, and reporting `False`
+        # unconditionally — which this did until the OpenAI provider shipped in
+        # P7-07 — leaves the option permanently disabled in the web settings
+        # form, which binds its radio to this flag.
+        EmbeddingProviderKind.OPENAI: (
+            _module_is_importable("openai")
+            and bool(os.environ.get(OPENAI_API_KEY_VARIABLE))
+        ),
     }
 
 

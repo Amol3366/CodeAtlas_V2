@@ -89,37 +89,50 @@ def test_one_similarity_space_cannot_be_registered_twice(
         store.add(_namespace())
 
 
-def test_exactly_one_namespace_is_active(connection: sqlite3.Connection) -> None:
-    """A shadow namespace exists precisely so that two can be populated at once
-    while only one answers queries (blueprint 15.5)."""
+def test_exactly_one_namespace_answers_for_a_repository(
+    connection: sqlite3.Connection,
+) -> None:
+    """The invariant is per repository, not global (ADR-0010).
+
+    It used to be global, enforced by a unique index over `status = 'active'`.
+    That contradicted the per-repository provider setting: with one repository
+    already active, the second to opt in could only get a *shadow* namespace,
+    and shadows answer nothing — so it embedded into a space no query read.
+    The pointer replaces the index, and a repository still has exactly one.
+    """
     store = NamespaceStore(connection)
     store.add(_namespace())
-    shadow = EmbeddingNamespace(
+    bigger = EmbeddingNamespace(
         namespace_id=embedding_namespace_id("bigger", 768, "l2_v1"),
         model_id="bigger",
         dimensions=768,
         normalization_version="l2_v1",
-        status=NamespaceStatus.SHADOW,
+        status=NamespaceStatus.ACTIVE,
         created_at=_NOW,
-        activated_at=None,
+        activated_at=_NOW,
     )
-    store.add(shadow)
+    # Two active namespaces are now legal, because two repositories may sit on
+    # different providers at the same time.
+    store.add(bigger)
 
-    assert store.get_active() is not None
-    assert store.get_active().namespace_id == _namespace().namespace_id  # type: ignore[union-attr]
+    store.set_for_repository("repo_1", _namespace().namespace_id, updated_at=_NOW)
+    assert store.get_for_repository("repo_1") is not None
+    assert store.get_for_repository("repo_1").namespace_id == _namespace().namespace_id  # type: ignore[union-attr]
 
-    with pytest.raises(sqlite3.IntegrityError):
-        store.add(
-            EmbeddingNamespace(
-                namespace_id="third_1d_v",
-                model_id="third",
-                dimensions=1,
-                normalization_version="v",
-                status=NamespaceStatus.ACTIVE,
-                created_at=_NOW,
-                activated_at=_NOW,
-            )
-        )
+    # Re-pointing replaces rather than accumulating: a repository cannot end up
+    # being served by two spaces whose scores are not comparable.
+    store.set_for_repository("repo_1", bigger.namespace_id, updated_at=_NOW)
+    assert store.get_for_repository("repo_1").namespace_id == bigger.namespace_id  # type: ignore[union-attr]
+    assert (
+        connection.execute(
+            "SELECT COUNT(*) FROM repository_namespaces WHERE repository_id = ?",
+            ("repo_1",),
+        ).fetchone()[0]
+        == 1
+    )
+
+    # A repository that has never opted in is served by nothing at all.
+    assert store.get_for_repository("repo_absent") is None
 
 
 # --- embedding records ---------------------------------------------------

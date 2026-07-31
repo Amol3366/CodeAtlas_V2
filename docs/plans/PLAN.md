@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-07-30T18:51:46Z                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Git state       | Branch `main` at `5ea8ab8`. P7-05 through P7-12 are now committed; the working tree carries only this task's packaged provider-surface tests, the live policy-pointer updates, and this status edit. |
 | Policy filename | The policy file has been both `CLAUDE.md` and `AGENTS.md`, and has now been renamed back: it is **`CLAUDE.md`** again as of 2026-07-31. Citations to either name mean that one file — 113 of them across 57 files. Only the *live* pointers were updated (this file's header and rule 1, and the README); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a 113-reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision                                                                                                                                                                                                                                                                                                                                                                         |
+| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision. Post-gate review findings (2026-07-31) are fixed; see the top handoff entry                                                                                                                                                                                                                                                                                                                                                                         |
 
 ### Phase 7 Task Board
 
@@ -206,6 +206,102 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-07-31T09:45:00Z — Post-gate code review: eight findings, all fixed
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `a51a7bf`.
+- Transition: none. Phase 7 stays `complete`; this is post-gate remediation, not
+  a reopened task.
+- Trigger: the user ran a code review over the unpushed range after approving
+  the Phase 7 gate. It returned eight findings. **All eight were verified
+  against the source before any fix** — a review is evidence to check, not a
+  work order — and all eight were real.
+
+#### Two findings bear on gate claims already approved
+
+Recorded because a gate approved on incomplete evidence should say so.
+
+- **Finding 1 contradicts a Phase 6 gate claim.** That gate was approved on
+  "backup, restore, and deletion refuse rather than half-finish". `restore()`
+  called `_preserve_replaced(target)` *before* copying the backup into staging,
+  so a copy that failed — full disk, revoked handle, sharing violation — left
+  **no database at the target path at all**, only a `.replaced` file the user
+  was never told about. Its own docstring promised "a restore that fails must
+  leave the user exactly where they started." The tests covered a *pre-check*
+  failure (corrupted backup) and never a failure during the copy, so the gate
+  evidence was incomplete rather than wrong.
+- **Findings 5, 7, and 8 touch Phase 7 condition 6** (opt-in, budgets,
+  telemetry). None is a leak. Finding 5 failed *safe*; findings 7 and 8 did not.
+
+#### The eight, and what each one actually was
+
+1. **Restore could destroy the database.** Fixed by staging the copy first and
+   preserving the target only once the copy has succeeded, with a rollback that
+   puts the preserved file back if the final swap fails. Two tests added, both
+   observed failing first — "the live database was moved away and not put back".
+2. **CLI and MCP never wired the semantic layer.** `build_services` only builds
+   `embedding`/`fusion` when a `vectors` store is passed, and only
+   `api/app.py` passed one. A user following the documented CLI workflow in
+   `docs/operations/semantic-search.md` got no embeddings written and no
+   warning: coverage 0% forever. Contradicted Section 4.5 directly. Both
+   adapters now pass a `LazyVectorStore`, which opens nothing until used, so a
+   deterministic-only installation still never imports the extra.
+3. **Namespaces were global while provider policy is per repository.** The
+   largest of the eight and the only one needing a schema change: a global
+   unique index over `status = 'active'` made it *impossible* for a second
+   repository on a different provider to have an answering namespace. See
+   **ADR-0010** and migration `0012`. `SCHEMA_VERSION` 11 → 12.
+4. **The `ImportError` guard in `build_lancedb_store` wrapped the wrong
+   import.** `lancedb_store` imports nothing optional at module scope, so the
+   friendly `ProviderUnavailableError` was unreachable and a raw
+   `ModuleNotFoundError` escaped — surfacing as every content hash marked
+   `failed` with `VECTOR_WRITE_FAILED` instead of "install the extra". The
+   guard now wraps construction.
+5. **`describe_available_providers` hardcoded `OPENAI: False`.** Never updated
+   after P7-07 shipped the provider. Because `SemanticSettings.tsx` binds its
+   radio to `available`, **OpenAI could not be enabled from the browser at all**
+   while `PATCH /v1/settings` accepted it. Now probes the package and the
+   credential, as the local branch does.
+6. **`settings` and `models` were registered after the `__main__` guard.** Fine
+   through the console script, "No such command" via `python -m`. Guard moved
+   below the commands.
+7. **Retries were transmitted but not billed.** `_call` sent the payload up to
+   three times; `_record` wrote `requests=1`. A repository could run at up to
+   3x its stated monthly budget while the usage table reported compliance.
+   Attempts are now counted and billed, appended *before* each call because a
+   timeout is precisely the case where the payload left and no answer came back.
+8. **The settings page claimed "No provider is enabled" while loading.** The
+   fallback covered every non-success state, so a repository that may have been
+   transmitting was described as transmitting nothing whenever the status query
+   was merely in flight. Loading and error are now distinct states.
+
+#### Verification in this environment
+
+- `uv run pytest -q` — exit 0, **1682 passed** (1675 before; seven regression
+  tests added). Extras absent, as the Phase 7 gate requires.
+- `uv run ruff check src tests scripts apps` — exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` — exit 0, 289 files.
+- `pnpm exec eslint . --max-warnings 0`, `pnpm exec tsc --noEmit` — exit 0.
+- `pnpm exec vitest run` — **107 passed** (106 before).
+- Every fix for a behavioural defect has a test that was observed failing
+  against the unfixed code first. Findings 4 and 6 are covered by existing
+  suites rather than new tests: both are reachability defects whose fix is
+  structural, and a test for either would assert an import layout rather than a
+  behaviour.
+
+#### Not done
+
+- The packaged security suite was not re-run against a rebuilt artifact; the
+  binary in `dist/` predates these fixes. Migration `0012` means the next
+  packaged run also exercises an upgrade path from `11`.
+- `check_phase7.ps1 -Semantic -Package -Perf` was not re-run. The semantic
+  extras are absent from this environment and the perf measurement is the
+  previous agent's 2026-07-30 artifact.
+
+- Next: **await user instruction.** The Phase 7 gate remains approved; nothing
+  here reopens it. If a release is cut from this state, the packaged artifact
+  should be rebuilt and `check_phase7.ps1 -Semantic -Package -Perf` re-run,
+  because migration `0012` has not been exercised on a packaged upgrade.
 
 ### 2026-07-31T09:08:23Z — Phase 7 gate approved by the user; Phase 7 complete
 

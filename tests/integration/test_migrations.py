@@ -60,11 +60,38 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_eleven() -> None:
-    """Phase 7's migration 0011 adds embedding migration bookkeeping.
+def test_schema_version_is_twelve() -> None:
+    """Migration 0012 scopes the answering namespace to a repository.
     The pin is deliberate: a version bump is a contract change someone must
     review."""
-    assert SCHEMA_VERSION == 11
+    assert SCHEMA_VERSION == 12
+
+
+def test_repository_namespaces_replaces_the_global_active_index() -> None:
+    """The invariant moved rather than disappearing (ADR-0010).
+
+    Two repositories may sit on different providers, so a single globally
+    active namespace was never expressible. What must still hold is that one
+    repository is served by exactly one namespace, which the primary key gives.
+    """
+    with connect(Path(":memory:")) as connection:
+        apply_migrations(connection)
+
+        indexes = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+            ).fetchall()
+        }
+        assert "embedding_namespaces_one_active" not in indexes
+
+        columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(repository_namespaces)"
+            ).fetchall()
+        }
+        assert columns == {"repository_id", "namespace_id", "updated_at"}
 
 
 def test_semantic_tables_exist(tmp_path: Path) -> None:

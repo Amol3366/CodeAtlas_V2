@@ -103,7 +103,12 @@ def _active_namespace(connection: sqlite3.Connection) -> EmbeddingNamespace:
         created_at=_NOW,
         activated_at=_NOW,
     )
-    NamespaceStore(connection).add(namespace)
+    store = NamespaceStore(connection)
+    store.add(namespace)
+    # Point the repository at it, which is what indexing does. Since
+    # migration `0012` the pointer -- not the status flag -- is what makes
+    # a namespace the one serving this repository (ADR-0010).
+    store.set_for_repository('repo_1', namespace.namespace_id, updated_at=_NOW)
     return namespace
 
 
@@ -170,7 +175,7 @@ def test_start_backfills_a_shadow_namespace_without_moving_active(
     target = NamespaceStore(connection).get(migration.target_namespace_id)
     assert target is not None
     assert target.status is NamespaceStatus.SHADOW
-    assert NamespaceStore(connection).get_active() == source
+    assert NamespaceStore(connection).get_for_repository('repo_1') == source
     assert sorted(provider.embedded) == ["text hash_a", "text hash_b"]
     assert vectors.count(migration.target_namespace_id) == 2
     assert migration.status == "ready_for_cutover"
@@ -192,15 +197,17 @@ def test_cutover_is_atomic_and_retains_the_previous_namespace_for_rollback(
     activated = service.activate(migration.migration_id, target="target")
 
     namespaces = NamespaceStore(connection)
-    assert namespaces.get_active() is not None
-    assert namespaces.get_active().namespace_id == migration.target_namespace_id  # type: ignore[union-attr]
+    serving = namespaces.get_for_repository('repo_1')
+    assert serving is not None
+    assert serving.namespace_id == migration.target_namespace_id
     assert namespaces.get(source.namespace_id).status is NamespaceStatus.RETIRED  # type: ignore[union-attr]
     assert activated.status == "active"
 
     rolled_back = service.activate(migration.migration_id, target="source")
 
-    assert namespaces.get_active() is not None
-    assert namespaces.get_active().namespace_id == source.namespace_id  # type: ignore[union-attr]
+    serving = namespaces.get_for_repository('repo_1')
+    assert serving is not None
+    assert serving.namespace_id == source.namespace_id
     assert (
         namespaces.get(migration.target_namespace_id).status  # type: ignore[union-attr]
         is NamespaceStatus.RETIRED

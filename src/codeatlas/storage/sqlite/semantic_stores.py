@@ -71,16 +71,54 @@ class NamespaceStore:
         return _namespace_from_row(row) if row is not None else None
 
     def get_active(self) -> EmbeddingNamespace | None:
-        """The one namespace that answers queries, or ``None`` if none does.
+        """Any namespace currently marked active.
 
-        ``None`` is an ordinary state, not an error: it is what every
-        installation looks like until a provider is enabled.
+        Kept for the migration lifecycle, which reasons about namespace status
+        directly. **Not** the way to find what answers a repository's queries:
+        provider policy is per repository, so ask
+        :meth:`get_for_repository`. Since migration `0012` more than one
+        namespace may be active at a time, and this returns an arbitrary one of
+        them.
         """
         row = self._connection.execute(
-            "SELECT * FROM embedding_namespaces WHERE status = ?",
+            "SELECT * FROM embedding_namespaces WHERE status = ?"
+            " ORDER BY activated_at, namespace_id",
             (NamespaceStatus.ACTIVE.value,),
         ).fetchone()
         return _namespace_from_row(row) if row is not None else None
+
+    def get_for_repository(self, repository_id: str) -> EmbeddingNamespace | None:
+        """The namespace that answers this repository's queries.
+
+        ``None`` is an ordinary state: it is what every repository looks like
+        until a provider is enabled and something has embedded into it.
+        """
+        row = self._connection.execute(
+            "SELECT namespaces.* FROM repository_namespaces AS pointer"
+            " JOIN embedding_namespaces AS namespaces"
+            "   ON namespaces.namespace_id = pointer.namespace_id"
+            " WHERE pointer.repository_id = ?",
+            (repository_id,),
+        ).fetchone()
+        return _namespace_from_row(row) if row is not None else None
+
+    def set_for_repository(
+        self, repository_id: str, namespace_id: str, *, updated_at: datetime
+    ) -> None:
+        """Point a repository at the namespace that answers for it.
+
+        Idempotent, because indexing re-asserts the pointer on every run and a
+        run that changed nothing must not be a write conflict.
+        """
+        validate_namespace_id(namespace_id)
+        self._connection.execute(
+            "INSERT INTO repository_namespaces"
+            " (repository_id, namespace_id, updated_at) VALUES (?, ?, ?)"
+            " ON CONFLICT (repository_id) DO UPDATE SET"
+            "  namespace_id = excluded.namespace_id,"
+            "  updated_at = excluded.updated_at",
+            (repository_id, namespace_id, to_utc_text(updated_at)),
+        )
 
     def list_all(self) -> tuple[EmbeddingNamespace, ...]:
         rows = self._connection.execute(

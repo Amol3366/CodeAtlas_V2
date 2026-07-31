@@ -179,6 +179,32 @@ describe("SemanticSettings", () => {
     });
   });
 
+  it("never claims no provider is enabled while coverage is still unknown", async () => {
+    // The claim is about privacy, so it may only be made on the server's word.
+    // Rendering it as the fallback for every non-success state told a user that
+    // nothing was leaving their machine whenever the status request had merely
+    // not answered yet — on a repository that may well be transmitting.
+    stubBackend({
+      "/v1/repositories/repo_1/semantic-status": {
+        status: 500,
+        body: {
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "boom",
+            request_id: "req_test",
+            retryable: true,
+          },
+        },
+      },
+    });
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    await screen.findByText(/coverage could not be read/i);
+    expect(
+      screen.queryByText(/no provider is enabled/i),
+    ).not.toBeInTheDocument();
+  });
+
   it("has no accessibility violations", async () => {
     stubBackend();
     const { container } = renderWithProviders(
