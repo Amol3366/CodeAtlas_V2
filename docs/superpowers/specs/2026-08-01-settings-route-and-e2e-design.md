@@ -205,6 +205,36 @@ powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync
 
 The gate is the place these are required to pass.
 
+## Amendment — 2026-08-01, approved by the user during implementation
+
+Decision 4 (seed a repository whose policy transmits) and decision 5 (run on both
+engines with no skip) collided in practice: **selecting that repository and
+navigating client-side to `/settings` kills the Chromium renderer.**
+
+Eight single-variable probes isolated it. The same React tree renders correctly
+on a full page load on both engines; only client-side navigation into the
+transmitting branch dies. Repository identity and repository switching were both
+exonerated — moving the policy onto the default repository with no switch
+anywhere still crashed, and turning the seeded repository's policy off stopped
+it. It is the conversation-route defect's class, on a second route.
+
+Given the choice between skipping the test on Chromium and reaching the same
+rendering by full page load, the user chose the full page load. So:
+
+- **Decision 4 is withdrawn.** No repository is seeded; commit `9ea1c33` was
+  reverted by `2f962c7`. The transmitting test sets the policy through the real
+  API on whichever repository a fresh load will show, and restores it in a
+  `finally` block.
+- **Decision 5 holds, and cost nothing.** Both tests run on both engines and no
+  new skip was added.
+- The "Harness seeding" section above is therefore historical. The Playwright
+  section's two tests are as built, except that the second reaches the page by
+  `page.goto("/settings")` rather than by clicking.
+
+Everything else — the route, the wrapper, the empty state, the naming
+requirement, the records, and the five-not-four carried-item count — is as
+approved.
+
 ## Acceptance criteria
 
 1. `/settings` is reachable from the sidebar in a browser and renders the

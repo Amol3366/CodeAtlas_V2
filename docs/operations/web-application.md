@@ -32,6 +32,12 @@ then web lint, types, tests, and build.
   excerpt as text.
 - **Change preflight** — runs a working-tree analysis and renders the persisted
   report, findings grouped by severity, warnings and limitations visible.
+- **Settings** — `/settings`, reached from the sidebar header. Chooses the
+  embedding provider for **one** repository: the active one, which the page
+  names rather than implies, because this is the only screen that can cause
+  repository content to leave the machine. With no repository selected it links
+  back to the home page, where that choice is made; the repository selector is
+  not duplicated onto this route.
 
 ## Architecture
 
@@ -40,7 +46,7 @@ then web lint, types, tests, and build.
 | Build | Vite + React 18 + TypeScript strict (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`) |
 | Styling | Tailwind 4 with CSS custom-property tokens |
 | Server state | TanStack Query; the server is the source of truth |
-| Routing | react-router; `/conversations/:conversationId` |
+| Routing | react-router; `/conversations/:conversationId`, `/settings` |
 | API types | generated from the live OpenAPI schema, checked in, `--check` gated |
 | Markdown | `react-markdown` + `rehype-sanitize`, **no `rehype-raw`** |
 | Tests | Vitest + Testing Library + `vitest-axe` |

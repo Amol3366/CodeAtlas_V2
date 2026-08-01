@@ -1214,11 +1214,16 @@ the entire semantic layer on top of it is worth **+0.07**.
 
 **Phase 7 was the last phase in this section. Phases 0–7 are all complete with
 user-approved gates, and no Phase 8 exists.** Seven items were carried into the
-approval as open work with no later phase to absorb them: the three Phase 6
-qualifications (Chromium conversation-route skips, no pid-reuse detection,
-unsigned executable), the 1.05 GB packaged semantic tree, the unrouted web
-settings page, the untested `POST /v1/models/test` success branch, and the
-absent settings Playwright coverage.
+approval as open work with no later phase to absorb them; **five remain.** They
+are the three Phase 6 qualifications (Chromium conversation-route skips, no
+pid-reuse detection, unsigned executable), the 1.05 GB packaged semantic tree,
+and the untested `POST /v1/models/test` success branch.
+
+Two of the original seven closed on 2026-08-01: the web settings page is routed
+at `/settings` and covered by `apps/web/e2e/settings.spec.ts`, which passes on
+both browser engines. The `POST /v1/models/test` success branch is **not** among
+them — it needs an available provider, and no optional extra is installed, so
+only the `PROVIDER_DISABLED` branch is exercised.
 
 **All 13 tasks are `complete`.** Built and tested: provider-neutral
 embeddings, content-hash cache, LanceDB-backed vector interface, index-time
