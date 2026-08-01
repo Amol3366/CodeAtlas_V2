@@ -65,7 +65,8 @@ asserts it.
 | --- | --- | --- |
 | 1 | Credential keeps its universal name `OPENAI_API_KEY`; CodeAtlas settings are namespaced `CODEATLAS_*`, matching `CODEATLAS_DB_PATH` | `CODEATLAS_OPENAI_API_KEY` with a fallback — two names for one secret, and a precedence rule to explain |
 | 2 | Precedence is **real environment > `.env` > pinned default**, implemented with `os.environ.setdefault` | `.env` winning — a stale file would silently outrank a deliberate export, and CI could not override |
-| 3 | `.env` is read from `$CODEATLAS_ENV_FILE`, else `<data-dir>/.env`. **Never the current directory** | Current-directory search — running CodeAtlas inside an indexed repository would let that repository's `.env` become application configuration, inverting §4.4 |
+| 3 | `.env` is read from `$CODEATLAS_ENV_FILE`, else **the CodeAtlas root** — the project folder in a source checkout, the install folder beside `codeatlas.exe` when packaged. Resolved from the package's own location, **never from the current directory** | Current-directory search — running CodeAtlas inside an indexed repository would let that repository's `.env` become application configuration, inverting §4.4. A fixed root is not the current directory and does not have this property |
+| 7 | `.env`, `.env.*`, and `*.env` join `DEFAULT_IGNORE_PATTERNS` | Leaving them scannable. Blueprint §8.11 names "exclude `.env` by default" as a required control, and this design puts a credential file at a repository root — an unignored one would surface in file search results |
 | 4 | A custom OpenAI model **requires** an explicit dimensions setting | Assuming 1536, which silently corrupts the similarity space; or probing the API, which bills a call per provider construction |
 | 5 | Hand-rolled ~40-line parser, no new runtime dependency | `python-dotenv` — the repo hand-rolls a YAML line scanner and uses stdlib `tomllib` only, precisely to keep untrusted-input parsers small and auditable |
 | 6 | A new ADR-0011 amends ADR-0009 decision 4 | Editing ADR-0009, which the ADR process forbids |
@@ -122,18 +123,27 @@ def load_env_file(path: Path | None = None) -> LoadedEnv:
 Behavior:
 
 1. Resolve the path: explicit argument, else `$CODEATLAS_ENV_FILE`, else
-   **the directory containing the database file** — `default_database_path().parent`,
-   which is `%LOCALAPPDATA%\CodeAtlas\data\.env` by default.
+   `<codeatlas-root>/.env`.
 
-   One rule, not a walk up the tree. "The parent of the data directory" would
-   be `%LOCALAPPDATA%\CodeAtlas\.env` normally but `C:\.env` when
-   `CODEATLAS_DB_PATH` points at `C:\tmp\x.db` — a surprising location and a
-   file the user never put there. Following the database means a test profile
-   or an alternate install gets its own `.env` beside its own database, which
-   is the behavior `CODEATLAS_DB_PATH` exists to provide.
+   **The CodeAtlas root is resolved from the package's own location, not from
+   the current directory.** In a source checkout that is the project folder
+   containing `pyproject.toml` — walking up from `codeatlas.__file__` through
+   `src/codeatlas` — so a developer's `.env` sits at the repository root where
+   they expect it. In a PyInstaller build `sys.frozen` is set and the root is
+   the folder containing the executable.
 
-   The credential does **not** thereby enter backups: `codeatlas backup` copies
-   the database file, not its directory.
+   The distinction from a current-directory search is the whole point and is
+   easy to lose: this path is **fixed for a given installation**. Running
+   `codeatlas` from inside some other repository reads CodeAtlas's `.env`, not
+   that repository's, so no indexed repository can supply configuration. A test
+   asserts exactly this by planting a `.env` in a repository root, running from
+   there, and observing that nothing was applied.
+
+   If the install folder is not writable, `CODEATLAS_ENV_FILE` is the answer;
+   it is checked first for that reason.
+
+   The credential does not enter backups: `codeatlas backup` copies the
+   database file, which lives under the data directory, not the CodeAtlas root.
 2. A missing file is normal and returns an empty result. It is not an error and
    emits no warning.
 3. Parse `KEY=VALUE` lines. Support `#` comments, blank lines, `export ` prefix,
@@ -175,6 +185,33 @@ Reading happens through small helpers in `settings/env_file.py`
 `local_embedding_model()`) so no provider code calls `os.environ` directly and
 the defaults live in one place.
 
+### `.env.example`
+
+Committed at the repository root, and the file a user copies and edits. It
+lists **every** variable this design introduces — including the optional ones —
+each with a comment saying what it does, whether it is required, and what the
+pinned default is. Values are placeholders (`sk-your-key-here`), never real.
+
+It is documentation that happens to be executable: someone who reads only this
+file should be able to configure both providers without opening the operations
+guide.
+
+### Keeping `.env` out of the scan
+
+`.env`, `.env.*`, and `*.env` join `DEFAULT_IGNORE_PATTERNS` in
+`repositories/ignore_rules.py`.
+
+Scope of the change, stated precisely so it is not oversold: a `.env` file
+classifies as `unknown` with no parser, so its **contents are already never
+parsed, chunked, indexed into FTS, or embedded**. What an unignored `.env`
+does today is appear in file-path search results. Ignoring it is
+blueprint §8.11 conformance and good hygiene for a design that asks users to
+put a credential at a repository root — it is not the closing of a live leak,
+and the ADR says so.
+
+Users who deliberately want their `.env` indexed can override this through
+`.codeatlasignore`, which already takes precedence over built-in patterns.
+
 ### What the settings surface reports
 
 `SettingsService.models()` reports the **configured** model ID rather than the
@@ -196,7 +233,8 @@ committed.
 | The credential never reaches a response | Tests assert it is absent from `GET /v1/settings`, `GET /v1/models`, `/v1/repositories/{id}/diagnostics`, and the error envelope |
 | The credential is never logged | The loader returns key *names*; no value is returned, stored, or formatted anywhere |
 | The credential is not retained in memory | Unchanged — `OpenAIEmbeddingProvider` still hands it to the client and lets it go out of scope |
-| Repository content cannot become configuration | The current directory is never searched; a test places a hostile `.env` in a repository root, indexes it, and asserts nothing was applied |
+| Repository content cannot become configuration | The current directory is never searched — the root is resolved from the package's own location. A test plants a `.env` in a repository root, runs from that directory, and asserts nothing was applied |
+| A credential file is not surfaced by search | `.env`, `.env.*`, and `*.env` are ignored by default; a test scans a fixture containing one and asserts it is absent from the manifest with a skip reason |
 | A malformed file cannot deny service | Malformed lines are skipped; a test feeds binary, a 1 MB line, and unterminated quotes |
 | Consent still comes only from SQLite | A test sets every variable, leaves the repository policy `none`, and asserts the provider built is `NoEmbeddingProvider` |
 
@@ -210,7 +248,10 @@ committed.
   raises `ProviderUnavailableError` naming the variable.
 - **Integration** (`tests/integration/test_settings_service.py`, extended):
   `models()` reports configured IDs and the `available: false` case.
-- **Security** (`tests/security/test_env_configuration.py`, new): the six
+- **Unit** (`tests/unit/test_ignore_rules.py`, extended): `.env`, `.env.local`,
+  and `app.env` are ignored by default, and `.codeatlasignore` can still
+  un-ignore them.
+- **Security** (`tests/security/test_env_configuration.py`, new): the seven
   controls in the table above.
 - **Contract**: `GET /v1/models` shape is unchanged — `dimensions` was already
   `int | None`.
@@ -225,7 +266,8 @@ persistence contract.
 | `docs/adr/0011-configurable-embedding-models.md` | New. Amends ADR-0009 decision 4; records why configurable models are safe (namespace identity derives from model identity, so a change creates a new namespace and shadow migration moves between them) |
 | `docs/adr/README.md` | Index row |
 | `.env.example` | New, at the repository root, committed, with no real values |
-| `.gitignore` | `.env` |
+| `.gitignore` | `.env`, `.env.*` (keeping `!.env.example`) |
+| `src/codeatlas/repositories/ignore_rules.py` | `.env` patterns in `DEFAULT_IGNORE_PATTERNS` |
 | `docs/operations/semantic-search.md` | Configuring a provider and a model |
 | `docs/security/threat-model.md` | Phase 7 table gains the `.env` controls |
 | `docs/plans/PLAN.md` | Handoff entry |
@@ -257,7 +299,11 @@ existing fake-transport and import-failure paths, exactly as they are today.
    the local provider loads.
 4. A custom OpenAI model without `CODEATLAS_OPENAI_EMBEDDING_DIMENSIONS` is
    refused with an error naming the missing variable — never embedded.
-5. A `.env` in the current directory, or in an indexed repository, is not read.
+5. `.env` at the CodeAtlas root is read in a source checkout and in a packaged
+   build. A `.env` in the current working directory — when that is some other
+   repository — is **not** read.
+5a. `.env`, `.env.local`, and `app.env` are excluded from repository scans by
+   default, and `.codeatlasignore` can still override that.
 6. No variable in `.env` can cause a repository whose policy is `none` to
    transmit.
 7. The credential appears in no API response, diagnostic, or log.
