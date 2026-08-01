@@ -42,6 +42,7 @@ from codeatlas.conversations.events import EventHub
 from codeatlas.conversations.executor import RunExecutor, ThreadedRunExecutor
 from codeatlas.domain.errors import CodeAtlasError, ErrorCode
 from codeatlas.semantic.vector_store import LazyVectorStore, VectorStore
+from codeatlas.settings.env_file import load_env_file
 from codeatlas.storage.sqlite.connection import default_database_path
 
 API_TITLE = "CodeAtlas local API"
@@ -74,6 +75,12 @@ def create_app(
     it with "stale, and you were not told" (ADR-0007 decision 2). Turning it off
     is for callers that want the API without background threads.
     """
+    # Before anything reads the environment. `describe_available_providers`
+    # decides whether the settings surface may offer OpenAI by looking for
+    # OPENAI_API_KEY, and it must see what `.env` supplies. Idempotent, so a
+    # process that also ran the CLI loses nothing.
+    load_env_file()
+
     resolved_path = database_path or default_database_path()
 
     @asynccontextmanager

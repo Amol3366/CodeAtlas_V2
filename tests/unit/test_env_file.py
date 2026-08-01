@@ -206,3 +206,19 @@ class TestConfiguredValues:
 
         with pytest.raises(InvalidRequestError):
             configured_openai_dimensions()
+
+
+class TestEntryPoints:
+    def test_creating_the_app_loads_the_env_file(self, tmp_path, monkeypatch):
+        # The payoff: a key in `.env` reaches the code that decides whether the
+        # settings page may offer OpenAI, with no shell export.
+        from codeatlas.api.app import create_app
+
+        monkeypatch.delenv("EXAMPLE_APP_KEY", raising=False)
+        env = tmp_path / "custom.env"
+        env.write_text("EXAMPLE_APP_KEY=loaded\n", encoding="utf-8")
+        monkeypatch.setenv(ENV_FILE_VARIABLE, str(env))
+
+        create_app(tmp_path / "codeatlas.db", watch=False)
+
+        assert os.environ["EXAMPLE_APP_KEY"] == "loaded"
