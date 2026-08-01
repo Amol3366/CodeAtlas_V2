@@ -25,6 +25,13 @@ from typing import Protocol, runtime_checkable
 
 from codeatlas.domain.errors import ProviderDisabledError, ProviderUnavailableError
 from codeatlas.domain.semantic import EmbeddingProviderKind, ProviderPolicy
+from codeatlas.settings.env_file import (
+    OPENAI_DIMENSIONS_VARIABLE,
+    OPENAI_MODEL_VARIABLE,
+    configured_local_model,
+    configured_openai_dimensions,
+    configured_openai_model,
+)
 
 # Pinned, per ADR-0009 decision 4: the model ID is recorded on every embedding
 # record, and changing it changes the similarity space. A float here would
@@ -144,6 +151,56 @@ OPENAI_TIMEOUT_SECONDS = 30.0
 OPENAI_API_KEY_VARIABLE = "OPENAI_API_KEY"
 
 
+def resolve_local_embedding_model() -> str:
+    """Which sentence-transformers model the local provider loads.
+
+    Safe to configure freely: the provider reads the true width from the model
+    it loaded, and the namespace is derived from that. A different model simply
+    means a different namespace.
+    """
+    return configured_local_model() or LOCAL_MODEL_ID
+
+
+def resolve_openai_embedding_model() -> tuple[str, int]:
+    """The configured OpenAI model and the width its vectors will have.
+
+    The width cannot be discovered for free — asking OpenAI costs a billable
+    call per construction — so a non-default model must declare it. Refusing is
+    the only safe answer: `embedding_namespace_id` labels the namespace with
+    this number, and a wrong label puts vectors of one width into a space
+    describing another. That never raises; it just returns worse results,
+    indefinitely.
+    """
+    model = configured_openai_model()
+    width = configured_openai_dimensions()
+
+    if model is None or model == OPENAI_MODEL_ID:
+        if width is not None and width != OPENAI_DIMENSIONS:
+            raise ProviderUnavailableError(
+                f"{OPENAI_DIMENSIONS_VARIABLE} is {width}, but "
+                f"{OPENAI_MODEL_ID} returns {OPENAI_DIMENSIONS}. CodeAtlas does "
+                "not request shortened embeddings, so the two must agree.",
+                details={
+                    "provider": EmbeddingProviderKind.OPENAI.value,
+                    "variable": OPENAI_DIMENSIONS_VARIABLE,
+                },
+            )
+        return OPENAI_MODEL_ID, OPENAI_DIMENSIONS
+
+    if width is None:
+        raise ProviderUnavailableError(
+            f"{OPENAI_MODEL_VARIABLE} is set to '{model}', so "
+            f"{OPENAI_DIMENSIONS_VARIABLE} must also be set — CodeAtlas labels "
+            "its vector index with that width and will not guess it. "
+            "text-embedding-3-large is 3072.",
+            details={
+                "provider": EmbeddingProviderKind.OPENAI.value,
+                "variable": OPENAI_DIMENSIONS_VARIABLE,
+            },
+        )
+    return model, width
+
+
 class OpenAIEmbeddingProvider:
     """The transmitting provider. Never construct one outside `ProviderFactory`.
 
@@ -167,10 +224,14 @@ class OpenAIEmbeddingProvider:
         self,
         *,
         model_id: str = OPENAI_MODEL_ID,
+        dimensions: int | None = None,
         client: object | None = None,
         timeout: float = OPENAI_TIMEOUT_SECONDS,
     ) -> None:
         self.model_id = model_id
+        # Instance-level, because the class attribute describes the pinned
+        # model only. The namespace is built from this number.
+        self.dimensions = OPENAI_DIMENSIONS if dimensions is None else dimensions
         if client is not None:
             self._client = client
             return
@@ -260,8 +321,11 @@ class ProviderFactory:
         from codeatlas.semantic.governance import GovernedEmbeddingProvider
 
         client = self._open_client() if self._open_client is not None else None
+        model_id, dimensions = resolve_openai_embedding_model()
         return GovernedEmbeddingProvider(
-            inner=OpenAIEmbeddingProvider(client=client),
+            inner=OpenAIEmbeddingProvider(
+                client=client, model_id=model_id, dimensions=dimensions
+            ),
             policy=policy,
             connection=self._connection,  # type: ignore[arg-type]
         )
@@ -280,7 +344,7 @@ def build_embedding_provider(policy: ProviderPolicy) -> EmbeddingProvider:
     if kind is EmbeddingProviderKind.NONE:
         return NoEmbeddingProvider()
     if kind is EmbeddingProviderKind.LOCAL:
-        return _cached_local_provider()
+        return _cached_local_provider(resolve_local_embedding_model())
 
     # OPENAI is deliberately unreachable from here, and stays that way. This
     # function has no database connection, so it cannot read a budget or record

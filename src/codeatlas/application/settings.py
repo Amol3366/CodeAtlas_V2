@@ -176,16 +176,30 @@ class SettingsService:
         an option cannot explain why it is missing, and "install the extra" is
         the whole answer for most users who go looking.
         """
+        from codeatlas.domain.errors import CodeAtlasError
         from codeatlas.semantic.providers import (
             LOCAL_MODEL_DIMENSIONS,
             LOCAL_MODEL_ID,
             OPENAI_API_KEY_VARIABLE,
-            OPENAI_DIMENSIONS,
-            OPENAI_MODEL_ID,
             describe_available_providers,
+            resolve_local_embedding_model,
+            resolve_openai_embedding_model,
         )
 
         available = describe_available_providers()
+        local_model = resolve_local_embedding_model()
+        openai_model: str | None
+        openai_dimensions: int | None
+        try:
+            openai_model, openai_dimensions = resolve_openai_embedding_model()
+            openai_requires: str | None = None
+        except CodeAtlasError as error:
+            # A misconfigured custom model is reported the same way a missing
+            # extra is: the option stays visible and explains itself, rather
+            # than disappearing or crashing the settings page.
+            openai_model, openai_dimensions = None, None
+            openai_requires = error.message
+
         return (
             ModelDescriptor(
                 provider=EmbeddingProviderKind.NONE,
@@ -197,8 +211,12 @@ class SettingsService:
             ),
             ModelDescriptor(
                 provider=EmbeddingProviderKind.LOCAL,
-                model_id=LOCAL_MODEL_ID,
-                dimensions=LOCAL_MODEL_DIMENSIONS,
+                model_id=local_model,
+                # Known only for the pinned model. Loading a custom one to
+                # measure it is exactly the cost this function avoids.
+                dimensions=(
+                    LOCAL_MODEL_DIMENSIONS if local_model == LOCAL_MODEL_ID else None
+                ),
                 available=available[EmbeddingProviderKind.LOCAL],
                 transmits_off_machine=False,
                 requires=(
@@ -209,14 +227,21 @@ class SettingsService:
             ),
             ModelDescriptor(
                 provider=EmbeddingProviderKind.OPENAI,
-                model_id=OPENAI_MODEL_ID,
-                dimensions=OPENAI_DIMENSIONS,
-                available=available[EmbeddingProviderKind.OPENAI],
+                model_id=openai_model,
+                dimensions=openai_dimensions,
+                available=(
+                    available[EmbeddingProviderKind.OPENAI]
+                    and openai_requires is None
+                ),
                 transmits_off_machine=True,
                 requires=(
-                    None
-                    if available[EmbeddingProviderKind.OPENAI]
-                    else f"extra:semantic-openai and {OPENAI_API_KEY_VARIABLE}"
+                    openai_requires
+                    if openai_requires is not None
+                    else (
+                        None
+                        if available[EmbeddingProviderKind.OPENAI]
+                        else f"extra:semantic-openai and {OPENAI_API_KEY_VARIABLE}"
+                    )
                 ),
             ),
         )
