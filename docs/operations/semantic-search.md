@@ -30,6 +30,48 @@ The settings and model APIs never return credentials. Provider telemetry records
 provider, operation, request count, token estimate, latency, outcome, and time;
 it has no columns for source text, prompts, evidence, answers, paths, or secrets.
 
+## Configuring credentials and models (`.env`)
+
+Copy `.env.example` to `.env` in the CodeAtlas project folder and edit it.
+
+```ini
+OPENAI_API_KEY=sk-...
+# CODEATLAS_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+# CODEATLAS_OPENAI_EMBEDDING_DIMENSIONS=1536
+# CODEATLAS_LOCAL_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+```
+
+**`.env` grants no permission.** It supplies a credential and model identity;
+whether a repository may transmit is the per-repository setting above, stored
+in SQLite. No variable can switch a repository from `none`.
+
+**Where it is read from.** `$CODEATLAS_ENV_FILE` if set, otherwise `.env` in the
+CodeAtlas root — the project folder in a source checkout, the folder beside
+`codeatlas.exe` in a packaged build. The **current directory is never
+searched**: running CodeAtlas from inside a repository you index must not let
+that repository configure the tool. Use `CODEATLAS_ENV_FILE` when the install
+folder is not writable.
+
+**Precedence** is real environment > `.env` > pinned default, so
+`set OPENAI_API_KEY=... && codeatlas ...` overrides the file for one command.
+
+**A custom OpenAI model must declare its width.** The vector namespace is
+labelled with it, and CodeAtlas will not guess: set
+`CODEATLAS_OPENAI_EMBEDDING_DIMENSIONS` alongside
+`CODEATLAS_OPENAI_EMBEDDING_MODEL` or the provider refuses to build and names
+the variable. `text-embedding-3-small` is 1536; `text-embedding-3-large` is
+3072. The local provider needs no such setting — it reads the width from the
+model it loaded.
+
+**Changing a model changes the namespace**, which is what makes it safe
+(ADR-0011). Existing vectors are not reinterpreted; the new model starts an
+empty namespace, and a model migration backfills it with rollback — see
+[Model migrations](#model-migrations).
+
+Env files are excluded from repository scans by default (`.env`, `.env.*`,
+`*.env`), with `.env.example` still indexed. `.codeatlasignore` can override
+that.
+
 ## Indexing and coverage
 
 Embeddings are derived data. Deterministic snapshot activation never waits on

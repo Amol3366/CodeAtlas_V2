@@ -207,6 +207,114 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-01T12:10:10Z — `.env` configuration for provider credentials and models
+
+- Agent: Claude Code `claude-opus-5`, branch `env-provider-configuration` off
+  `main` at `bb1580f`.
+- Transition: none. Phase 7 stays `complete`; this is post-gate work on the
+  user's request, not a reopened task.
+- ADR: **ADR-0011**, which amends ADR-0009 decision 4 rather than editing it.
+
+#### Outcome and user-visible behavior
+
+A user can now put their OpenAI key and their model choices in a `.env` file at
+the CodeAtlas project root and have both providers honour it. Before this, the
+credential had to be a machine-wide environment variable before the settings
+surface would even *offer* OpenAI, and both model IDs were constants that
+required editing source to change.
+
+```ini
+OPENAI_API_KEY=sk-...
+CODEATLAS_LOCAL_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+```
+
+`.env.example` is committed and documents every variable, including the two
+facts that surprise people: the file grants no permission to transmit, and it
+is read from the CodeAtlas folder rather than the working directory.
+
+#### The three boundaries this work refused to cross
+
+- **Configuration is not consent.** `.env` supplies a credential and model
+  identity. Whether a repository may transmit stays in
+  `repository_provider_policy` in SQLite, per repository.
+  `build_embedding_provider` already documented that there is deliberately no
+  environment override; a security test now sets every variable, leaves the
+  policy at `none`, and asserts `NoEmbeddingProvider`.
+- **A repository is not configuration.** The current working directory is never
+  searched. The file comes from `$CODEATLAS_ENV_FILE` or from the CodeAtlas
+  root resolved through the package's own location — fixed for an installation,
+  so running `codeatlas` inside some other repository reads CodeAtlas's `.env`,
+  never that repository's. A test plants one and asserts nothing was applied.
+- **A guess is not a width.** `embedding_namespace_id` labels the namespace
+  with the vector width, so a custom OpenAI model whose width was assumed to be
+  1536 would put 3072-float vectors into a space describing 1536 — a corrupted
+  similarity space that raises nothing and surfaces months later as poor
+  results. A non-default model must declare
+  `CODEATLAS_OPENAI_EMBEDDING_DIMENSIONS`; construction refuses and names the
+  variable. A width disagreeing with the *default* model is refused too, since
+  CodeAtlas does not send OpenAI's `dimensions` request parameter. The local
+  provider needs no such setting — it reads the width from the model it loaded.
+
+#### Files
+
+- Created: `.env.example`, `src/codeatlas/settings/{__init__,env_file}.py`,
+  `tests/unit/test_env_file.py`, `tests/security/test_env_configuration.py`,
+  `docs/adr/0011-configurable-embedding-models.md`,
+  `docs/superpowers/specs/2026-08-01-env-provider-configuration-design.md`,
+  `docs/superpowers/plans/2026-08-01-env-provider-configuration.md`.
+- Changed: `.gitignore`, `src/codeatlas/semantic/providers.py` (resolvers, a
+  `dimensions` constructor parameter, factory wiring),
+  `src/codeatlas/application/settings.py` (`models()` reports configured
+  identity), `src/codeatlas/api/app.py`, `src/codeatlas/cli/main.py`,
+  `src/codeatlas/mcp/server.py` (load at entry),
+  `src/codeatlas/repositories/ignore_rules.py`, `docs/adr/README.md`,
+  `docs/operations/semantic-search.md`, `docs/security/threat-model.md`,
+  and the four extended test files.
+
+#### Contracts, migrations, compatibility
+
+None. No schema change, no migration, no REST contract change.
+`ModelDescriptor` already typed `model_id` and `dimensions` as optional. No new
+runtime dependency: the parser is ~40 lines of stdlib, matching the
+repository's hand-rolled YAML scanner and stdlib-`tomllib`-only precedent.
+
+#### Verification
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `uv run pytest` | 0 | 1724 passed |
+| `uv run ruff check .` | 0 | clean |
+| `uv run mypy --no-incremental src tests scripts apps` | 0 | 293 files, clean |
+| `scripts/check_phase7.ps1 -SkipSync` | **0** | 1724 Python tests, 113 web tests, 14 e2e passed / 4 skipped, lint and types clean |
+
+The gate failed once on types before passing: the new test files lacked the
+annotations this repository requires on `tests/`, which `mypy src` alone does
+not check. Fixed by annotating and wrapping the signatures, then re-run.
+
+#### Limitations
+
+- **The semantic extras are not installed**, so both providers are exercised
+  through fakes and their import-failure paths, exactly as the rest of the
+  suite does. The end-to-end "key in `.env` → settings page offers OpenAI"
+  path is asserted in halves: that the key becomes visible without a shell
+  export, and separately that a missing extra still reports unavailable.
+- **Out of scope, recorded in ADR-0011 as decisions rather than omissions:**
+  OpenAI-compatible base URLs (Ollama/LM Studio/vLLM as embedding backends),
+  because `transmits_off_machine` would become URL-dependent and a privacy
+  label that can be wrong in the reassuring direction is worse than no feature;
+  and LLM answer generation, which Phase 7 recorded as `declined` and which
+  needs its own ADR, governed policy, and measured uplift.
+- **The ignore-rule change is hygiene, not a leak fix.** A `.env` classifies as
+  `unknown` with no parser, so its contents were never parsed, chunked, written
+  to FTS, or embedded; only its path was searchable. Blueprint §8.11 asked for
+  the exclusion and nothing had implemented it.
+- Making OpenAI the *default* provider was not done and was not requested;
+  `CLAUDE.md` §25 lists transmission-by-default as needing explicit approval.
+
+#### Next
+
+None required. Awaiting user instruction; the branch is unmerged.
+
 ### 2026-08-01T10:26:17Z — Two carried items closed: the settings route and its coverage
 
 - Agent: Claude Code `claude-opus-5`, branch `settings-route-and-e2e` off `main`

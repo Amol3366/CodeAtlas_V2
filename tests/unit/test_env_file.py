@@ -28,7 +28,11 @@ def write(tmp_path: Path, text: str) -> Path:
 
 
 class TestParsing:
-    def test_applies_simple_assignments(self, tmp_path, monkeypatch):
+    def test_applies_simple_assignments(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("EXAMPLE_KEY", raising=False)
         path = write(tmp_path, "EXAMPLE_KEY=value\n")
 
@@ -38,7 +42,11 @@ class TestParsing:
         assert result.applied == ("EXAMPLE_KEY",)
         assert result.path == path
 
-    def test_ignores_comments_and_blank_lines(self, tmp_path, monkeypatch):
+    def test_ignores_comments_and_blank_lines(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("EXAMPLE_KEY", raising=False)
         write(tmp_path, "# a comment\n\n   \nEXAMPLE_KEY=value\n")
 
@@ -46,7 +54,11 @@ class TestParsing:
 
         assert os.environ["EXAMPLE_KEY"] == "value"
 
-    def test_accepts_export_prefix(self, tmp_path, monkeypatch):
+    def test_accepts_export_prefix(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("EXAMPLE_KEY", raising=False)
         write(tmp_path, "export EXAMPLE_KEY=value\n")
 
@@ -54,7 +66,11 @@ class TestParsing:
 
         assert os.environ["EXAMPLE_KEY"] == "value"
 
-    def test_strips_matching_quotes_but_keeps_inner_text(self, tmp_path, monkeypatch):
+    def test_strips_matching_quotes_but_keeps_inner_text(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("SINGLE", raising=False)
         monkeypatch.delenv("DOUBLE", raising=False)
         write(tmp_path, "SINGLE='a # b'\nDOUBLE=\"c d\"\n")
@@ -66,8 +82,10 @@ class TestParsing:
         assert os.environ["DOUBLE"] == "c d"
 
     def test_strips_a_trailing_comment_from_an_unquoted_value(
-        self, tmp_path, monkeypatch
-    ):
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("EXAMPLE_KEY", raising=False)
         write(tmp_path, "EXAMPLE_KEY=value   # trailing\n")
 
@@ -75,7 +93,11 @@ class TestParsing:
 
         assert os.environ["EXAMPLE_KEY"] == "value"
 
-    def test_keeps_equals_signs_inside_the_value(self, tmp_path, monkeypatch):
+    def test_keeps_equals_signs_inside_the_value(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("EXAMPLE_KEY", raising=False)
         write(tmp_path, "EXAMPLE_KEY=a=b=c\n")
 
@@ -83,7 +105,11 @@ class TestParsing:
 
         assert os.environ["EXAMPLE_KEY"] == "a=b=c"
 
-    def test_tolerates_crlf_and_a_byte_order_mark(self, tmp_path, monkeypatch):
+    def test_tolerates_crlf_and_a_byte_order_mark(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("EXAMPLE_KEY", raising=False)
         target = tmp_path / ".env"
         target.write_bytes(b"\xef\xbb\xbfEXAMPLE_KEY=value\r\n")
@@ -92,7 +118,11 @@ class TestParsing:
 
         assert os.environ["EXAMPLE_KEY"] == "value"
 
-    def test_skips_malformed_lines_without_raising(self, tmp_path, monkeypatch):
+    def test_skips_malformed_lines_without_raising(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         # A broken config line must not stop a deterministic tool from starting.
         monkeypatch.delenv("GOOD_KEY", raising=False)
         write(tmp_path, "not an assignment\n1BAD=x\n=novalue\nGOOD_KEY=good\n")
@@ -102,13 +132,13 @@ class TestParsing:
         assert os.environ["GOOD_KEY"] == "good"
         assert result.applied == ("GOOD_KEY",)
 
-    def test_a_missing_file_is_normal(self, tmp_path):
+    def test_a_missing_file_is_normal(self, tmp_path: Path) -> None:
         result = load_env_file(tmp_path / "absent")
 
         assert result.applied == ()
         assert result.path is None
 
-    def test_an_unreadable_file_is_not_fatal(self, tmp_path):
+    def test_an_unreadable_file_is_not_fatal(self, tmp_path: Path) -> None:
         # A directory where a file is expected: readable path, unreadable content.
         target = tmp_path / ".env"
         target.mkdir()
@@ -119,7 +149,11 @@ class TestParsing:
 
 
 class TestPrecedence:
-    def test_the_real_environment_wins(self, tmp_path, monkeypatch):
+    def test_the_real_environment_wins(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.setenv("EXAMPLE_KEY", "from-shell")
         write(tmp_path, "EXAMPLE_KEY=from-file\n")
 
@@ -128,7 +162,11 @@ class TestPrecedence:
         assert os.environ["EXAMPLE_KEY"] == "from-shell"
         assert result.applied == ()
 
-    def test_loading_twice_changes_nothing(self, tmp_path, monkeypatch):
+    def test_loading_twice_changes_nothing(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.delenv("EXAMPLE_KEY", raising=False)
         path = write(tmp_path, "EXAMPLE_KEY=value\n")
 
@@ -140,20 +178,28 @@ class TestPrecedence:
 
 
 class TestLocation:
-    def test_the_root_is_this_checkout(self):
+    def test_the_root_is_this_checkout(self) -> None:
         root = codeatlas_root()
 
         assert root is not None
         assert (root / "pyproject.toml").is_file()
 
-    def test_the_override_is_honoured(self, tmp_path, monkeypatch):
+    def test_the_override_is_honoured(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         target = tmp_path / "custom.env"
         target.write_text("EXAMPLE_KEY=value\n", encoding="utf-8")
         monkeypatch.setenv(ENV_FILE_VARIABLE, str(target))
 
         assert env_file_path() == target
 
-    def test_the_working_directory_is_never_searched(self, tmp_path, monkeypatch):
+    def test_the_working_directory_is_never_searched(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         # The rule this whole design turns on: a repository you index must not
         # be able to configure the tool that indexes it.
         monkeypatch.delenv(ENV_FILE_VARIABLE, raising=False)
@@ -169,7 +215,10 @@ class TestLocation:
 
 
 class TestConfiguredValues:
-    def test_absent_variables_read_as_none(self, monkeypatch):
+    def test_absent_variables_read_as_none(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         for name in (
             OPENAI_MODEL_VARIABLE,
             OPENAI_DIMENSIONS_VARIABLE,
@@ -181,23 +230,33 @@ class TestConfiguredValues:
         assert configured_openai_dimensions() is None
         assert configured_local_model() is None
 
-    def test_blank_and_whitespace_read_as_none(self, monkeypatch):
+    def test_blank_and_whitespace_read_as_none(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "   ")
 
         assert configured_openai_model() is None
 
-    def test_values_are_trimmed(self, monkeypatch):
+    def test_values_are_trimmed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(LOCAL_MODEL_VARIABLE, "  BAAI/bge-small-en-v1.5  ")
 
         assert configured_local_model() == "BAAI/bge-small-en-v1.5"
 
-    def test_dimensions_parse_as_an_integer(self, monkeypatch):
+    def test_dimensions_parse_as_an_integer(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         monkeypatch.setenv(OPENAI_DIMENSIONS_VARIABLE, "3072")
 
         assert configured_openai_dimensions() == 3072
 
     @pytest.mark.parametrize("value", ["abc", "0", "-5", "1536.5"])
-    def test_an_unusable_dimension_is_refused(self, monkeypatch, value):
+    def test_an_unusable_dimension_is_refused(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        value: str,
+    ) -> None:
         # Silently falling back to the default would label 3072-wide vectors
         # 1536 — the exact corruption this setting exists to prevent.
         from codeatlas.domain.errors import InvalidRequestError
@@ -209,7 +268,11 @@ class TestConfiguredValues:
 
 
 class TestEntryPoints:
-    def test_creating_the_app_loads_the_env_file(self, tmp_path, monkeypatch):
+    def test_creating_the_app_loads_the_env_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         # The payoff: a key in `.env` reaches the code that decides whether the
         # settings page may offer OpenAI, with no shell export.
         from codeatlas.api.app import create_app

@@ -239,7 +239,10 @@ def test_the_model_list_names_the_variable_a_user_must_set(
     assert "OPENAI_API_KEY" in requires
 
 
-def test_models_report_the_configured_local_model(connection, monkeypatch):
+def test_models_report_the_configured_local_model(
+    connection: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from codeatlas.settings.env_file import LOCAL_MODEL_VARIABLE
 
     monkeypatch.setenv(LOCAL_MODEL_VARIABLE, "BAAI/bge-small-en-v1.5")
@@ -254,8 +257,9 @@ def test_models_report_the_configured_local_model(connection, monkeypatch):
 
 
 def test_models_explain_a_custom_openai_model_missing_its_width(
-    connection, monkeypatch
-):
+    connection: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from codeatlas.settings.env_file import (
         OPENAI_DIMENSIONS_VARIABLE,
         OPENAI_MODEL_VARIABLE,
