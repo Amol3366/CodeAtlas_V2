@@ -53,6 +53,25 @@ one origin.
 it, and deliberately so: suites that exercise an entry point invented for them
 prove less than suites that exercise the one users run.
 
+## What each suite proves
+
+| Suite | What it proves |
+| --- | --- |
+| `onboarding-to-citation.spec.ts` | The critical workflow: add a repository, index it, ask a question, open the evidence behind the answer. |
+| `restart-persistence.spec.ts` | Conversations and messages survive a real process kill and come back from the server, not a client cache. |
+| `stream-reconnection.spec.ts` | The typed SSE contract as a browser sees it: named frames, gapless sequences, resumption, and citations restored after a reload. |
+| `settings.spec.ts` | The settings route against the real API: the provider list and each provider's availability, `POST /v1/models/test` reporting `PROVIDER_DISABLED`, a `PATCH` that survives a reload, and — with a transmitting policy set through the API — the warning, the stored budget, and real coverage numbers. |
+
+The settings suite reaches the transmitting rendering by loading `/settings`
+directly rather than clicking into it. Chromium kills its renderer when a
+*client-side* navigation mounts that branch; the identical tree renders
+correctly on a full page load on both engines. Loading the URL keeps the
+assertion running everywhere instead of skipping the browser most people use.
+The isolation evidence is in the suite's header comment.
+
+The transmitting policy is set on whichever repository a fresh load will show,
+and restored in a `finally` block — the database outlives the test.
+
 ## Debugging a failure
 
 Backend request logs land in `.e2e-tmp/api.log`, next to the fixture database,
@@ -70,9 +89,13 @@ pnpm exec playwright show-trace test-results/<test-dir>/trace.zip
 
 ## Scope
 
-Chromium only. Firefox and WebKit are untested, and the suites cover the three
-workflows Phase 5 deferred rather than the whole of Section 14 — P6-08 may
-propose widening that now the harness exists.
+Chromium and Firefox; WebKit is untested. The suites cover the three workflows
+Phase 5 deferred plus the settings route, rather than the whole of Section 14.
+
+Four conversation-route tests are skipped on Chromium, whose renderer crashes on
+client-side navigation to `/conversations/{id}` (`e2e/support/chromium-crash.ts`).
+Firefox proves all of them. The settings suite needs no such skip: it avoids the
+one client-side navigation Chromium cannot survive.
 
 The stream suite proves the transport contract as a browser sees it. It does not
 prove the conversation UI reconnects mid-run, because submission runs inline and

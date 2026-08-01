@@ -111,6 +111,23 @@ describe("Shell", () => {
     expect(disclosure).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("offers a link to settings from the sidebar", async () => {
+    // Section 14.1 puts settings in the left sidebar. It sits in the header row
+    // rather than the conversation list, because that list is wrapped in a
+    // navigation landmark named "Conversations" and a settings link inside it
+    // would misdescribe the landmark.
+    stubBackend();
+
+    renderWithProviders(
+      <ThemeProvider>
+        <Shell />
+      </ThemeProvider>,
+    );
+
+    const link = await screen.findByRole("link", { name: "Settings" });
+    expect(link).toHaveAttribute("href", "/settings");
+  });
+
   it("lets the theme be chosen explicitly rather than only following the system", async () => {
     const user = userEvent.setup();
     stubBackend();

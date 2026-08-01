@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 
 import { Sidebar } from "../features/conversations/Sidebar";
 import { EvidenceDrawer } from "../features/evidence/EvidenceDrawer";
@@ -43,7 +43,18 @@ export function Shell() {
               <span className="text-sm font-semibold tracking-tight">
                 CodeAtlas
               </span>
-              <ThemeToggle />
+              <div className="flex items-center gap-[var(--space-2)]">
+                {/* `NavLink` rather than `Link`: it sets aria-current="page" on
+                    the active route, the same way the conversation list marks
+                    the active thread. */}
+                <NavLink
+                  to="/settings"
+                  className="rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-xs text-text-muted hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-medium"
+                >
+                  Settings
+                </NavLink>
+                <ThemeToggle />
+              </div>
             </div>
             <Sidebar repositoryId={repositoryId} />
           </nav>

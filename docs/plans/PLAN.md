@@ -207,6 +207,114 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-01T10:26:17Z — Two carried items closed: the settings route and its coverage
+
+- Agent: Claude Code `claude-opus-5`, branch `settings-route-and-e2e` off `main`
+  at `30900c6`.
+- Transition: none. Phase 7 stays `complete`; this is post-gate remediation of
+  work carried into the approval, not a reopened task. No task ID was created,
+  because the Section 20 development order is finished and reopening the board
+  would imply a phase that does not exist.
+
+#### Outcome and user-visible behavior
+
+The web settings page is reachable. Before this it existed, was tested, and was
+rendered by nothing: a user could not choose an embedding provider from the
+browser at all. It is now at `/settings`, reached from a link in the sidebar
+header, and it **names the repository it is configuring** — the page can cause
+repository content to leave the machine, so which repository that is may not be
+left implicit. With no repository selected it links back to the home page,
+where that choice is made.
+
+`apps/web/e2e/settings.spec.ts` proves the page against a running API rather
+than against stubs: the provider list and each provider's availability, a real
+`POST /v1/models/test` reporting `PROVIDER_DISABLED`, a real `PATCH` that
+survives a reload, and — with a transmitting policy set through the API — the
+warning, the stored budget, and real coverage numbers.
+
+#### A Chromium renderer crash, isolated rather than assumed
+
+The first version of the suite seeded a third repository whose policy already
+transmitted, selected it, and navigated to settings. **Chromium killed its
+renderer.** The pre-authorized response was to skip that test on Chromium, as
+four conversation-route tests already are. That would have been wrong, and
+eight single-variable probes showed why:
+
+| Navigation | Settings render | Chromium |
+| --- | --- | --- |
+| full load | provider `none` | pass |
+| client-side | provider `none` | pass |
+| full load | transmitting | pass |
+| client-side | transmitting | **renderer death** |
+
+Repository identity and repository switching were both exonerated: moving the
+transmitting policy onto the *default* repository, with no switch anywhere,
+still crashed; turning the seeded repository's policy off stopped it. Firefox
+does all four. The identical React tree renders correctly on a full page load,
+and a renderer process death is not something application JavaScript can
+cause — a React error reaches the `ErrorBoundary` instead.
+
+So it is the same class as the 2026-07-28 conversation-route defect, on a second
+route, with a newly characterized trigger: **a client-side navigation that
+mounts the transmitting branch** (whose distinguishing element is an
+`<input type="number">`). The suite loads `/settings` directly for that case and
+runs on both engines. **No new skip was added**, and the seeded fixture was
+reverted as unnecessary — the policy is set through the real API on whichever
+repository a fresh load will show, and restored in a `finally` block.
+
+#### Files
+
+- Created: `apps/web/src/routes/SettingsRoute.tsx`,
+  `apps/web/src/routes/SettingsRoute.test.tsx`,
+  `apps/web/e2e/settings.spec.ts`,
+  `docs/superpowers/specs/2026-08-01-settings-route-and-e2e-design.md`,
+  `docs/superpowers/plans/2026-08-01-settings-route-and-e2e.md`.
+- Changed: `apps/web/src/app/App.tsx` (the `settings` child route, before the
+  catch-all), `apps/web/src/app/Shell.tsx` (the sidebar `NavLink`),
+  `apps/web/src/app/Shell.test.tsx`, `docs/operations/end-to-end-tests.md`,
+  `docs/operations/web-application.md`, `CLAUDE.md`.
+- Reverted in place: `scripts/e2e_backend.py` and
+  `apps/web/e2e/support/backend.ts` (commit `9ea1c33`, reverted by `2f962c7`).
+
+#### Contracts, migrations, compatibility
+
+None. No REST contract, no schema, no migration, no change to
+`SemanticSettings`, the settings service, or any application service. No
+optional extra was installed and nothing is transmitted: the transmitting policy
+is a stored row and no provider is ever constructed.
+
+#### Verification
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `pnpm exec vitest run src/routes/SettingsRoute.test.tsx` | 0 | 5 passed |
+| `pnpm test` (apps/web) | 0 | 113 passed, 10 files |
+| `pnpm lint` / `pnpm typecheck` | 0 / 0 | clean |
+| `pnpm exec vite build` | 0 | built |
+| `pnpm exec playwright test` | 0 | 14 passed, 4 skipped (pre-existing Chromium conversation-route skips) |
+| `scripts/check_phase7.ps1 -SkipSync` | **0** | 1682 Python tests, 113 web tests, 14 e2e passed / 4 skipped, lint and types clean |
+
+The three pre-existing browser suites were also run against the seeded third
+repository before it was reverted, to prove the new fixture had not changed any
+suite's default active repository: 10 passed, 4 skipped, unchanged.
+
+#### Limitations
+
+- **Five of the original seven carried items remain**, not four. The untested
+  `POST /v1/models/test` **success** branch is *not* closed: it needs an
+  available provider, and no optional extra is installed, so only the
+  `PROVIDER_DISABLED` branch is exercised. `CLAUDE.md` says five and says why.
+- The new Chromium trigger is characterized but not reported upstream, and the
+  `<input type="number">` hypothesis for the specific element involved was not
+  isolated further — it was not needed once the browser was established as the
+  cause and a full page load was shown to work on both engines.
+- The settings route is not covered by an accessibility audit in a real browser;
+  `vitest-axe` covers it in jsdom, as it does every other component.
+
+#### Next
+
+None required. Awaiting user instruction; the branch is unmerged.
+
 ### 2026-07-31T09:45:00Z — Post-gate code review: eight findings, all fixed
 
 - Agent: Claude Code `claude-opus-5`, branch `main` at `a51a7bf`.
