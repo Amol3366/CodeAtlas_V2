@@ -31,9 +31,6 @@ export interface SeedResult {
   readonly repository_id: string;
   readonly repository_path: string;
   readonly onboarding_repository_path: string;
-  /** Registered and indexed, with a stored provider policy that transmits. */
-  readonly transmitting_repository_id: string;
-  readonly transmitting_repository_path: string;
   readonly snapshot_id: string;
   readonly file_count: number;
   readonly symbol_count: number;

@@ -25,7 +25,6 @@ import uvicorn
 from codeatlas.api.app import create_app
 from codeatlas.application.container import build_services
 from codeatlas.application.registration import RegisterRepositoryRequest
-from codeatlas.domain.semantic import EmbeddingProviderKind
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
@@ -120,24 +119,10 @@ def seed(workdir: Path) -> dict[str, str | int]:
     # an already-registered path would only prove the duplicate check works.
     onboarding_root = workdir / "fixture-repo-onboarding"
 
-    # A third repository whose provider policy already transmits. Nothing is
-    # sent and no provider is constructed — the policy is a row, and setting one
-    # for a provider whose extra is absent is a state a user can genuinely reach
-    # (embedding then reports SEMANTIC_PROVIDER_UNAVAILABLE and deterministic
-    # retrieval is unaffected). It exists so the settings suite can exercise the
-    # transmitting disclosure without adding a gigabyte of torch to the gate.
-    #
-    # The display name is load-bearing: repositories list by display_name and
-    # the shell defaults to the first, so a name sorting after
-    # "payments-fixture" leaves every existing suite's default unchanged.
-    transmitting_root = workdir / "fixture-repo-transmitting"
-
     if not repository_root.exists():
         _write_fixture_repository(repository_root)
     if not onboarding_root.exists():
         _write_fixture_repository(onboarding_root)
-    if not transmitting_root.exists():
-        _write_fixture_repository(transmitting_root)
 
     with connect(database) as connection:
         apply_migrations(connection)
@@ -149,27 +134,11 @@ def seed(workdir: Path) -> dict[str, str | int]:
         )
         result = services.indexing.index(repository.repository_id)
 
-        transmitting = services.registration.register(
-            RegisterRepositoryRequest(
-                path=str(transmitting_root), display_name="transmitting-fixture"
-            )
-        )
-        # Indexed before the policy is set, so the snapshot exists and coverage
-        # is a real fraction of real chunks rather than an empty answer.
-        services.indexing.index(transmitting.repository_id)
-        services.settings.update(
-            transmitting.repository_id,
-            embedding_provider=EmbeddingProviderKind.OPENAI,
-            monthly_token_budget=1000,
-        )
-
     return {
         "database": str(database),
         "repository_id": repository.repository_id,
         "repository_path": str(repository_root),
         "onboarding_repository_path": str(onboarding_root),
-        "transmitting_repository_id": transmitting.repository_id,
-        "transmitting_repository_path": str(transmitting_root),
         "snapshot_id": result.snapshot.snapshot_id,
         "file_count": result.snapshot.file_count,
         "symbol_count": result.snapshot.parsed_file_count,
