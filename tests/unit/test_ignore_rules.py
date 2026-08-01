@@ -78,3 +78,35 @@ def test_comments_and_blank_lines_are_skipped(tmp_path: Path) -> None:
     rules = IgnoreRules.load(tmp_path)
     assert rules.is_ignored("app.log", is_directory=False) is True
     assert rules.warnings == ()
+
+
+class TestEnvFiles:
+    """Blueprint 8.11 asks for `.env` to be excluded by default.
+
+    Scope, stated so it is not oversold: a `.env` has no parser, so its
+    contents were never parsed, chunked, indexed, or embedded. What an
+    unignored one does is appear in file-path search results. This is hygiene
+    for a design that puts a credential file at a project root.
+    """
+
+    def test_env_files_are_ignored_by_default(self, tmp_path: Path) -> None:
+        rules = IgnoreRules.load(tmp_path)
+
+        assert rules.is_ignored(".env", is_directory=False) is True
+        assert rules.is_ignored(".env.local", is_directory=False) is True
+        assert rules.is_ignored("config/.env", is_directory=False) is True
+        assert rules.is_ignored("app.env", is_directory=False) is True
+
+    def test_the_example_stays_indexable(self, tmp_path: Path) -> None:
+        # It is documentation and holds no secret; a project's `.env.example`
+        # is exactly the kind of file impact analysis should see.
+        rules = IgnoreRules.load(tmp_path)
+
+        assert rules.is_ignored(".env.example", is_directory=False) is False
+
+    def test_a_repository_can_override(self, tmp_path: Path) -> None:
+        (tmp_path / ".codeatlasignore").write_text("!.env\n", encoding="utf-8")
+
+        rules = IgnoreRules.load(tmp_path)
+
+        assert rules.is_ignored(".env", is_directory=False) is False
