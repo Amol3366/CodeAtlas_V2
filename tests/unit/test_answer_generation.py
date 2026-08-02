@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from codeatlas.contracts import (
     Answer,
     Claim,
@@ -22,6 +24,7 @@ from codeatlas.generation.providers import (
     GeneratedClaim,
     NoAnswerProvider,
     build_evidence_prompt,
+    collect_stream,
 )
 
 
@@ -80,15 +83,37 @@ class RecordingProvider:
         self.prompts.append(prompt)
         return self.answer
 
+    def generate_stream(self, prompt: object) -> Iterator[str]:
+        self.prompts.append(prompt)
+        yield self.answer.summary
+
 
 class ExplodingProvider(RecordingProvider):
     def generate(self, prompt: object) -> GeneratedAnswer:
         self.prompts.append(prompt)
         raise TimeoutError("provider unavailable")
 
+    def generate_stream(self, prompt: object) -> Iterator[str]:
+        self.prompts.append(prompt)
+        raise TimeoutError("provider unavailable")
+        yield ""  # pragma: no cover - unreachable, keeps this a generator
+
 
 def test_no_answer_provider_is_identity() -> None:
     assert NoAnswerProvider().generate(build_evidence_prompt(_response(), "q")) is None
+
+
+def test_no_answer_provider_streams_nothing() -> None:
+    prompt = build_evidence_prompt(_response(), "q")
+    assert list(NoAnswerProvider().generate_stream(prompt)) == []
+
+
+def test_collect_stream_joins_chunks_in_order() -> None:
+    assert collect_stream(["Hel", "lo ", "world"]) == "Hello world"
+
+
+def test_collect_stream_of_nothing_is_empty() -> None:
+    assert collect_stream([]) == ""
 
 
 def test_prompt_contains_only_verified_evidence_and_warnings() -> None:

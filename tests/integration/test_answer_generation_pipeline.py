@@ -126,6 +126,9 @@ def test_generated_answer_remains_contract_valid(fixture: Fixture) -> None:
                 ),
             )
 
+        def generate_stream(self, prompt: object) -> Iterator[str]:
+            yield "The generated answer cites verified evidence."
+
     pipeline = AnswerPipeline(
         lookup=fixture.services.lookup,  # type: ignore[attr-defined]
         graph=fixture.services.graph,  # type: ignore[attr-defined]
