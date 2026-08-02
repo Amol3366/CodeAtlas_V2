@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 import time
 from collections.abc import Callable
+from dataclasses import replace
 
 from codeatlas.contracts import Answer, QueryResponse
 from codeatlas.generation.failures import AnswerProviderFailure
@@ -31,6 +32,11 @@ from codeatlas.generation.providers import (
     build_evidence_prompt,
     collect_stream,
 )
+
+# Pure string work: `redaction` imports only `re`, `dataclasses`, and `typing`,
+# so the deterministic generation path takes on no optional dependency by
+# reaching into the semantic package for it.
+from codeatlas.semantic.redaction import redact
 
 ANSWER_GENERATION_FAILED_WARNING = "ANSWER_GENERATION_FAILED"
 GENERATED_CLAIM_INVALID_WARNING = "GENERATED_CLAIM_INVALID"
@@ -78,7 +84,7 @@ class EvidenceGroundedExplanationService:
             # is the easiest way to lose it.
             return response
 
-        prompt = build_evidence_prompt(response, question)
+        prompt = _redacted_prompt(response, question)
         started = time.perf_counter()
         try:
             text = self._produce(prompt, on_token)
@@ -125,6 +131,30 @@ class EvidenceGroundedExplanationService:
             chunks.append(chunk)
             on_token(chunk)
         return collect_stream(chunks)
+
+
+def _redacted_prompt(
+    response: QueryResponse, question: str
+) -> EvidenceGroundedPrompt:
+    """Build the provider payload with secrets removed from every excerpt.
+
+    Applied here rather than inside each provider, so there is one place to
+    audit and no way to add a third provider that forgets. Applied for local
+    providers too: a local model transmits nothing, but it can still write a
+    secret into an answer that is then pasted into a ticket or a pull request.
+
+    Only the *prompt* is redacted. The response keeps its real excerpts,
+    because the evidence drawer shows the user their own file on their own
+    machine, and blanking it there would hide something they already have.
+    """
+    prompt = build_evidence_prompt(response, question)
+    return replace(
+        prompt,
+        evidence=tuple(
+            replace(item, excerpt=redact(item.excerpt).text)
+            for item in prompt.evidence
+        ),
+    )
 
 
 def _cites_unknown_evidence(text: str, response: QueryResponse) -> bool:
