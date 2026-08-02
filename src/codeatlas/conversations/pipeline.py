@@ -55,7 +55,6 @@ PROJECT_OVERVIEW_LIMITATION: str = (
 # for an intent added later is *exclusion*: a new intent that nobody thought
 # about must not silently acquire a provider call.
 SEMANTIC_INTENTS: frozenset[Intent] = frozenset({Intent.PROJECT_OVERVIEW, Intent.TEXT})
-GENERATION_INTENTS: frozenset[Intent] = frozenset({Intent.TEXT, Intent.TRACE})
 
 
 class SemanticFusion(Protocol):
@@ -76,7 +75,13 @@ class SemanticFusion(Protocol):
 class AnswerExplainer(Protocol):
     """The optional generation seam for steps 14-15."""
 
-    def explain(self, response: QueryResponse, *, question: str) -> QueryResponse: ...
+    def explain(
+        self,
+        response: QueryResponse,
+        *,
+        question: str,
+        on_token: Callable[[str], None] | None = None,
+    ) -> QueryResponse: ...
 
 
 class CancelledError(Exception):
@@ -203,11 +208,11 @@ class AnswerPipeline:
         )
 
         token.raise_if_cancelled()
-        response = self._explain(response, request, classification.intent)
+        response = self._explain(response, request, emit)
 
         token.raise_if_cancelled()
         markdown = render_answer(response, intent=classification.intent)
-        emit(PipelineEvent("generation.delta", {"length": len(markdown)}))
+        emit(PipelineEvent("answer.completed", {"length": len(markdown)}))
 
         return AnswerResult(
             response=response,
@@ -233,12 +238,35 @@ class AnswerPipeline:
         return self._fusion.augment(response, question=request.question)
 
     def _explain(
-        self, response: QueryResponse, request: AnswerRequest, intent: Intent
+        self,
+        response: QueryResponse,
+        request: AnswerRequest,
+        emit: Callable[[PipelineEvent], None],
     ) -> QueryResponse:
-        """Optionally rewrite answer prose from verified evidence only."""
-        if self._explainer is None or intent not in GENERATION_INTENTS:
+        """Optionally rewrite answer prose from verified evidence only.
+
+        **Every intent is eligible.** There is no gate here, unlike `_fuse`,
+        and the asymmetry is deliberate. Semantic retrieval changes *which*
+        evidence an answer rests on, so letting it reach a resolved intent
+        would let a similarity score influence a deterministic result.
+        Generation changes only the prose above evidence that is already
+        settled: claims and citations pass through untouched whatever the
+        intent, so generating over an exact lookup costs latency, never
+        accuracy.
+
+        Tokens are emitted as they arrive. The event stage is the one the
+        stream vocabulary already publishes, so a client that renders partial
+        text needs no change.
+        """
+        if self._explainer is None:
             return response
-        return self._explainer.explain(response, question=request.question)
+        return self._explainer.explain(
+            response,
+            question=request.question,
+            on_token=lambda chunk: emit(
+                PipelineEvent("generation.delta", {"text": chunk})
+            ),
+        )
 
     def _retrieve(
         self, request: AnswerRequest, intent: Intent, target: str
@@ -326,7 +354,6 @@ def _project_overview_response(response: QueryResponse) -> QueryResponse:
 
 __all__ = [
     "DEFAULT_GRAPH_DEPTH",
-    "GENERATION_INTENTS",
     "GREETING_SUMMARY",
     "PROJECT_OVERVIEW_LIMITATION",
     "PROJECT_OVERVIEW_SEARCH_RESULTS",

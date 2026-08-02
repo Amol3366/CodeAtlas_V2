@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
@@ -11,7 +11,11 @@ import pytest
 from codeatlas.application.container import build_services
 from codeatlas.application.registration import RegisterRepositoryRequest
 from codeatlas.contracts import QueryResponse
-from codeatlas.conversations.pipeline import AnswerPipeline, AnswerRequest
+from codeatlas.conversations.pipeline import (
+    AnswerPipeline,
+    AnswerRequest,
+    PipelineEvent,
+)
 from codeatlas.generation.providers import GeneratedAnswer, GeneratedClaim
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
@@ -21,7 +25,13 @@ class RecordingExplainer:
     def __init__(self) -> None:
         self.questions: list[str] = []
 
-    def explain(self, response: QueryResponse, *, question: str) -> QueryResponse:
+    def explain(
+        self,
+        response: QueryResponse,
+        *,
+        question: str,
+        on_token: Callable[[str], None] | None = None,
+    ) -> QueryResponse:
         self.questions.append(question)
         return response
 
@@ -77,9 +87,18 @@ def test_conceptual_questions_reach_the_optional_explainer(
         "what changed",
     ],
 )
-def test_resolved_intents_do_not_reach_the_optional_explainer(
+def test_resolved_intents_also_reach_the_explainer(
     fixture: Fixture, question: str
 ) -> None:
+    """Every intent is eligible, including the deterministic ones.
+
+    This test asserted the opposite until generation became prose-only. The
+    reason it could change is that the explainer no longer touches claims: a
+    resolved intent keeps its exact result and its citations whether or not a
+    model writes the paragraph above them. What must never happen is a
+    *retrieval* channel reaching a resolved intent, which `SEMANTIC_INTENTS`
+    still prevents.
+    """
     explainer = RecordingExplainer()
 
     _pipeline(fixture, explainer).execute(
@@ -90,7 +109,58 @@ def test_resolved_intents_do_not_reach_the_optional_explainer(
         )
     )
 
-    assert explainer.questions == []
+    assert explainer.questions == [question]
+
+
+def test_generated_tokens_are_emitted_as_stream_events(fixture: Fixture) -> None:
+    class _Streaming:
+        def explain(
+            self,
+            response: QueryResponse,
+            *,
+            question: str,
+            on_token: Callable[[str], None] | None = None,
+        ) -> QueryResponse:
+            if on_token is not None:
+                on_token("Hello ")
+                on_token("world")
+            return response
+
+    events: list[PipelineEvent] = []
+
+    _pipeline(fixture, _Streaming()).execute(  # type: ignore[arg-type]
+        AnswerRequest(
+            repository_id=fixture.repository_id,
+            question="what is this project",
+            request_id="req_2",
+        ),
+        on_event=events.append,
+    )
+
+    deltas = [
+        event.payload["text"]
+        for event in events
+        if event.stage == "generation.delta" and "text" in event.payload
+    ]
+    assert "".join(str(delta) for delta in deltas) == "Hello world"
+
+
+def test_every_pipeline_stage_has_a_stream_mapping() -> None:
+    """An unmapped stage raises KeyError at publish time and fails the run.
+
+    `conversation_service` publishes with `_STREAM_STAGES[event.stage]`, so a
+    stage the pipeline emits but the table omits does not drop an event — it
+    kills the answer. Cheap to assert, invisible until a run executes.
+    """
+    from codeatlas.application.conversation_service import _STREAM_STAGES
+
+    for stage in (
+        "retrieval.started",
+        "retrieval.progress",
+        "generation.delta",
+        "answer.completed",
+    ):
+        assert stage in _STREAM_STAGES
 
 
 def test_container_leaves_generation_out_by_default(

@@ -199,7 +199,8 @@ def test_ordinary_brackets_are_not_mistaken_for_citations() -> None:
     assert generated.answer.summary == "The list [1] and the map [2] are used."
 
 
-def test_empty_generated_text_falls_back_to_the_verified_answer() -> None:
+def test_empty_text_from_a_configured_provider_is_reported() -> None:
+    """A provider that was asked and produced nothing has failed, visibly."""
     provider = RecordingProvider(GeneratedAnswer(summary="   ", claims=()))
     original = _response()
 
@@ -209,6 +210,24 @@ def test_empty_generated_text_falls_back_to_the_verified_answer() -> None:
 
     assert generated.answer == original.answer
     assert GENERATED_CLAIM_INVALID_WARNING in generated.warnings
+
+
+def test_the_no_op_provider_adds_no_warning_at_all() -> None:
+    """Declining to generate is the default, not a fault.
+
+    The conversation/query parity test caught this: with no provider
+    configured, every conversation answer carried a GENERATED_CLAIM_INVALID
+    warning that the identical `/v1/query` answer did not, because "the
+    provider returned nothing" was being treated as "the provider returned
+    something invalid".
+    """
+    original = _response()
+
+    generated = EvidenceGroundedExplanationService(NoAnswerProvider()).explain(
+        original, question="What places an order?"
+    )
+
+    assert generated is original
 
 
 def test_a_typed_failure_reports_its_own_cause() -> None:

@@ -25,6 +25,7 @@ from collections.abc import Callable
 from codeatlas.contracts import Answer, QueryResponse
 from codeatlas.generation.failures import AnswerProviderFailure
 from codeatlas.generation.providers import (
+    NO_ANSWER_MODEL_ID,
     AnswerProvider,
     EvidenceGroundedPrompt,
     build_evidence_prompt,
@@ -63,6 +64,14 @@ class EvidenceGroundedExplanationService:
         on_token: Callable[[str], None] | None = None,
     ) -> QueryResponse:
         """Return the response with generated prose, or unchanged with a cause."""
+        if self._provider.model_id == NO_ANSWER_MODEL_ID:
+            # No provider is configured, which is the default and not a fault.
+            # Checked before anything else so the common case builds no prompt
+            # and reports nothing: a repository that opted into no generation
+            # must produce exactly the answer it produced before this feature
+            # existed, warnings included.
+            return response
+
         if not response.evidence:
             # An abstention is never dressed up. "What CodeAtlas does not know"
             # is one of the product's five questions, and prose over no evidence
