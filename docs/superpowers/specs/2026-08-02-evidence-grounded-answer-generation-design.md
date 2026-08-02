@@ -94,11 +94,32 @@ a transmitting one.
 
 | Decision | Choice |
 | --- | --- |
-| Provider | All three — `none` (default), Ollama, OpenAI — chosen in settings |
+| Provider | All three — `none`, Ollama, OpenAI — chosen in settings |
+| Primary model | **Ollama running `llama3.2:3b`**, local and free |
+| Default state | **Off.** Ollama + `llama3.2:3b` is pre-selected but not enabled |
 | Scope of generation | Every intent, not only conceptual ones |
 | Trust model | Prose on top; claims and evidence untouched |
 | Failure reporting | Situation-specific cause, always with the verified answer |
 | Delivery | Token-by-token streaming |
+| Configuration | Settings page and `.env`, matching the embedding provider |
+
+**Why local is primary.** A local model is the only option consistent with the
+product's first sentence — source code does not leave the workstation. OpenAI
+remains available for users who want stronger reasoning and accept the
+trade-off, exactly as it is for embeddings.
+
+**Why the default is still off.** Ollama is installed separately. A default-on
+setting would show "Can't connect to the model" on every question for every
+user who has not installed it, and would declare the feature admitted without
+the measurement the threat model requires. `embedding_provider` already
+defaults to `none` for the same reason; this follows it.
+
+**An honest limit on the primary model.** `llama3.2:3b` is small. Its 128K
+context easily holds a 25-item evidence set, but at three billion parameters it
+produces clear, simple summaries rather than deep cross-file reasoning. That
+suits the motivating question — "what is this project" — and is weaker for
+subtle architectural questions. Offering both providers is the answer to this,
+not pretending the gap is absent.
 
 The scope decision carries a cost the user accepted knowingly: a slow local
 model adds latency to lookups that were previously instant. Recorded under
@@ -131,6 +152,15 @@ field (see Scope).
   carrying `{"text": chunk}`.
 - `application/container.py` — build the explainer from the factory.
 - `application/settings.py` and migration `0013` — per-repository settings.
+- `settings/env_file.py` — three model-identity readers, alongside the existing
+  embedding ones.
+- `.env.example` — a documented "Answer generation" section.
+- `apps/web/src/features/settings/SemanticSettings.tsx` — an answer-provider
+  fieldset reusing the existing transmit-labelling and availability rules.
+
+Note this is the one place the frontend is touched, and it is the settings
+form only. The chat view needs no change, because it already renders streamed
+text.
 
 **The structural subtlety.** `AnswerPipeline` is constructed per request, before
 the repository is known — it arrives inside `AnswerRequest`. The explainer
@@ -139,7 +169,9 @@ construction. `SemanticFusionService` already does this
 (`application/semantic_fusion.py:101,120,280`); this follows that pattern rather
 than inventing one.
 
-**No frontend work.** The streaming path is already complete end to end: the
+**No frontend work for streaming.** The settings form is the only UI change
+(listed above); the chat view needs none, because the streaming path is already
+complete end to end: the
 contract defines `GENERATION_DELTA` (`contracts.py:584`), the service maps it
 (`conversation_service.py:87`) and publishes payloads verbatim (line 544), and
 `Thread.tsx:235-240` accumulates `payload["text"]`. The only gap is that
@@ -171,6 +203,30 @@ surprise.
 A per-repository `answer_provider` setting (`none` | `ollama` | `openai`), a
 model name, and an optional token budget. Default `none`, so no existing
 repository changes behavior until switched on.
+
+**Two configuration surfaces, matching the embedding provider exactly.**
+
+*The settings page* gains an "Answer provider" fieldset beside the existing
+embedding one, built on the same rules `SemanticSettings.tsx` already follows:
+every option states whether it transmits, in words and with an icon; an option
+that cannot run here is shown with what it needs rather than hidden, because "a
+missing option reads as a broken product"; and choosing a transmitting provider
+reveals the budget field. Ollama with `llama3.2:3b` is pre-selected and labelled
+recommended, showing "requires Ollama" when it is not reachable.
+
+*`.env.example`* gains a documented section for model identity, following the
+existing file's structure and its standing rule that the file supplies
+credentials and model identity but never consent:
+
+| Variable | Default when unset |
+| --- | --- |
+| `CODEATLAS_OLLAMA_ANSWER_MODEL` | `llama3.2:3b` |
+| `CODEATLAS_OLLAMA_BASE_URL` | `http://127.0.0.1:11434` |
+| `CODEATLAS_OPENAI_ANSWER_MODEL` | `gpt-4o-mini` |
+
+These select *which* model runs. They cannot enable generation for a repository
+whose stored setting is `none` — the same boundary `build_embedding_provider`
+already documents, and a test asserts it.
 
 Selecting `openai` requires the same explicit per-repository opt-in embeddings
 require, because it transmits source. The OpenAI provider is wrapped in the
