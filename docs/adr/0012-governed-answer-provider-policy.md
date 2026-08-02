@@ -89,11 +89,36 @@ because the evidence drawer shows the user their own file.
 policy is the only thing that decides whether generation happens. This extends
 ADR-0011's boundary to the answering path unchanged.
 
-**9. The feature ships available, not admitted.** The Phase 7 explanation A/B
-is not re-run here, so `docs/evaluation/explanation-phase-7.{json,md}` stands
-and the recorded `declined` status is unchanged. The threat-model row moves
-from "not shipped" to "available, opt-in, uplift unmeasured" — not to
-"admitted". A user switching it on for one repository is exercising an opt-in,
+**9. The feature ships available, not admitted** — and the A/B has now been run
+against a real model to establish that, rather than assumed.
+
+The original A/B script never ran an evaluation. It compared the semantic
+baseline against itself (`after = before`, literally) and recorded `declined`
+because every delta was zero by construction; it would have returned the same
+verdict whatever was built. It has been replaced with a measurement that
+answers the same corpus twice — once with an Ollama provider attached, once
+without — and `docs/evaluation/explanation-phase-7.{json,md}` now records that
+run, naming the model.
+
+The result confirms decision 1 rather than praising the model: **all six
+metrics moved by exactly 0.0000.** That is the desired outcome, because those
+metrics are computed from evidence and structured claims, which generation
+never touches. A non-zero delta would have meant the summary-only boundary
+leaked.
+
+The genuinely new signal is that the generated prose repeated no declared
+forbidden sentence across the 40 cases that declare one — checked on the
+summary, which the retrieval suite cannot cover because a model never writes
+structured claims. That check is exact-substring: a paraphrase passes it, so it
+is evidence of not repeating a sentence, not evidence of factual safety, and
+the artifact says so.
+
+The status therefore stays `declined`, for a reason now measured rather than
+inherited: **no metric in this corpus can move under generation, and the corpus
+declares no ground truth for explanation quality.** Admission would require
+metrics that measure what generation actually changes, which do not exist yet.
+The threat-model row moves from "not shipped" to "available, opt-in, uplift
+unmeasurable on this corpus". A user switching it on is exercising an opt-in,
 not clearing a release gate.
 
 ## Consequences

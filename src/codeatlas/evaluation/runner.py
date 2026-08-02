@@ -59,6 +59,14 @@ class QueryPrediction(ContractModel):
     claims: list[NonEmptyText]
     abstained: bool
     duration_ms: NonNegativeDuration
+    # Additive and optional, so `contract_version` stays "1.0" and an existing
+    # prediction file parses unchanged (the ADR-0004 precedent). No metric reads
+    # it: the scored suite is computed from evidence and claims. It exists so
+    # the explanation A/B can check a *model-written* summary against a case's
+    # forbidden claims — the one surface generation can introduce an
+    # unsupported statement on, and one the structured claims cannot cover
+    # because a model never writes them.
+    answer_summary: str = ""
 
 
 class FindingPrediction(ContractModel):

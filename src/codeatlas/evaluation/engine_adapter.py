@@ -241,6 +241,7 @@ def predict_conceptual(
     *,
     semantic: bool,
     reranker: object | None = None,
+    explainer: object | None = None,
     record_timings: bool = True,
 ) -> PredictionFile:
     """Answer every case through `AnswerPipeline`, optionally with fusion.
@@ -284,6 +285,7 @@ def predict_conceptual(
                         repository_id,
                         semantic=semantic,
                         reranker=reranker,
+                        explainer=explainer,
                     )
 
                 predictions.append(
@@ -309,6 +311,7 @@ def _conceptual_pipeline(
     *,
     semantic: bool,
     reranker: object | None = None,
+    explainer: object | None = None,
 ) -> AnswerPipeline:
     """Build the pipeline for one run, attaching fusion only when asked.
 
@@ -316,12 +319,22 @@ def _conceptual_pipeline(
     run must work on an installation where the optional extras were never
     installed, and a module-scope import would break that before the first
     case ran.
+
+    ``explainer`` is threaded through for the same reason ``reranker`` is: an
+    A/B must differ in exactly one thing, and the only honest way to measure
+    what generation changes is to run the identical corpus, services, and
+    questions with it attached and detached.
     """
     lookup = services.lookup  # type: ignore[attr-defined]
     graph = services.graph  # type: ignore[attr-defined]
     search = services.search  # type: ignore[attr-defined]
     if not semantic:
-        return AnswerPipeline(lookup=lookup, graph=graph, search=search)
+        return AnswerPipeline(
+            lookup=lookup,
+            graph=graph,
+            search=search,
+            explainer=explainer,  # type: ignore[arg-type]
+        )
 
     from datetime import UTC, datetime
 
@@ -383,6 +396,7 @@ def _conceptual_pipeline(
             ),
             reranker=reranker,  # type: ignore[arg-type]
         ),
+        explainer=explainer,  # type: ignore[arg-type]
     )
 
 
@@ -429,6 +443,7 @@ def _answer_conceptually(
         claims=[claim.text for claim in response.answer.claims],
         abstained=not response.evidence,
         duration_ms=duration_ms,
+        answer_summary=response.answer.summary,
     )
 
 

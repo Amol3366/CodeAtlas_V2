@@ -2,121 +2,61 @@
   "admission": {
     "admitted": false,
     "decision": "declined",
-    "reason": "No metric improved over the admitted semantic baseline; the only implemented answer provider performs no provider call and returns no generated answer."
+    "reason": "Generation replaces answer.summary only, so every retrieval metric is invariant by construction and the measured deltas confirm it. The generated prose repeated no declared forbidden sentence, though that check is exact-substring and a paraphrase would pass it. Reader-quality uplift is not measurable from this corpus, which declares no ground truth for explanation quality, so generation remains declined and available only as an opt-in."
   },
   "answer_provider": {
-    "model_id": "none",
-    "policy": "identity_no_provider_call",
-    "prompt_version": "none"
-  },
-  "citation_validation": {
-    "citation_validity": 1.0,
-    "generated_answers": 0,
-    "generated_claims": 0,
-    "invalid_citations": 0,
-    "note": "NoAnswerProvider produced no generated citations; fake-provider tests cover claim and citation rejection paths."
+    "model_id": "llama3.2:3b",
+    "policy": "prose_over_untouched_evidence",
+    "provider": "ollama"
   },
   "comparison": {
     "containing_evidence_rate": {
       "delta": 0.0,
-      "explained": 0.107981220657277,
-      "semantic": 0.107981220657277
+      "with_generation": 0.40939597315436244,
+      "without_generation": 0.40939597315436244
     },
     "exact_evidence_rate": {
       "delta": 0.0,
-      "explained": 0.056338028169014086,
-      "semantic": 0.056338028169014086
+      "with_generation": 0.18120805369127516,
+      "without_generation": 0.18120805369127516
     },
     "exact_symbol_resolution": {
       "delta": 0.0,
-      "explained": 0.2857142857142857,
-      "semantic": 0.2857142857142857
+      "with_generation": 0.5128205128205128,
+      "without_generation": 0.5128205128205128
     },
     "primary_evidence_recall_at_10": {
       "delta": 0.0,
-      "explained": 0.6666666666666666,
-      "semantic": 0.6666666666666666
+      "with_generation": 0.40476190476190477,
+      "without_generation": 0.40476190476190477
     },
     "unsupported_claim_rate": {
       "delta": 0.0,
-      "explained": 0.0,
-      "semantic": 0.0
+      "with_generation": 0.0,
+      "without_generation": 0.0
     },
     "valid_evidence_rate": {
       "delta": 0.0,
-      "explained": 0.056338028169014086,
-      "semantic": 0.056338028169014086
+      "with_generation": 0.18120805369127516,
+      "without_generation": 0.18120805369127516
     }
   },
-  "contract_version": "1.0",
+  "contract_version": "1.1",
   "corpus": {
-    "change_cases": 1,
-    "query_cases": 14
+    "change_cases": 24,
+    "query_cases": 40
   },
-  "explained": {
-    "case_counts": {
-      "changes": 1,
-      "queries": 14
-    },
-    "contract_version": "1.0",
-    "implementation_status": "implemented",
-    "metrics": {
-      "abstention_correctness": 1.0,
-      "changed_symbol_precision": 0.2,
-      "changed_symbol_recall": 1.0,
-      "containing_evidence_rate": 0.107981220657277,
-      "direct_impact_recall": 1.0,
-      "exact_evidence_rate": 0.056338028169014086,
-      "exact_symbol_resolution": 0.2857142857142857,
-      "finding_precision": 1.0,
-      "mean_reciprocal_rank": 0.4428571428571429,
-      "ndcg_at_10": 0.5270811197823418,
-      "primary_evidence_recall_at_10": 0.6666666666666666,
-      "relation_path_correctness": null,
-      "symbol_recall_at_10": 0.7857142857142857,
-      "total_duration_ms": 0.0,
-      "unsupported_claim_rate": 0.0,
-      "valid_evidence_rate": 0.056338028169014086
-    },
-    "targets_met": false,
-    "unmet_targets": [
-      "exact_symbol_resolution",
-      "primary_evidence_recall_at_10",
-      "changed_symbol_precision",
-      "valid_evidence_rate"
-    ]
+  "cost": {
+    "added_seconds": 92.52,
+    "added_seconds_per_case": 2.31,
+    "baseline_seconds": 0.42,
+    "generated_seconds": 92.94
   },
-  "semantic": {
-    "case_counts": {
-      "changes": 1,
-      "queries": 14
-    },
-    "contract_version": "1.0",
-    "implementation_status": "implemented",
-    "metrics": {
-      "abstention_correctness": 1.0,
-      "changed_symbol_precision": 0.2,
-      "changed_symbol_recall": 1.0,
-      "containing_evidence_rate": 0.107981220657277,
-      "direct_impact_recall": 1.0,
-      "exact_evidence_rate": 0.056338028169014086,
-      "exact_symbol_resolution": 0.2857142857142857,
-      "finding_precision": 1.0,
-      "mean_reciprocal_rank": 0.4428571428571429,
-      "ndcg_at_10": 0.5270811197823418,
-      "primary_evidence_recall_at_10": 0.6666666666666666,
-      "relation_path_correctness": null,
-      "symbol_recall_at_10": 0.7857142857142857,
-      "total_duration_ms": 0.0,
-      "unsupported_claim_rate": 0.0,
-      "valid_evidence_rate": 0.056338028169014086
-    },
-    "targets_met": false,
-    "unmet_targets": [
-      "exact_symbol_resolution",
-      "primary_evidence_recall_at_10",
-      "changed_symbol_precision",
-      "valid_evidence_rate"
-    ]
+  "prose_safety": {
+    "cases_with_forbidden_claims": 40,
+    "limitation": "The comparison casefolds and collapses whitespace; it does not stem, strip punctuation, or compare meaning. A paraphrase of a forbidden statement passes. Zero violations means the model did not repeat a declared sentence \u2014 not that its prose is factually safe.",
+    "note": "Checks the generated summary against each case's declared forbidden claims. The structured claims are not model-written and are covered by the retrieval suite.",
+    "offenders": [],
+    "violations": 0
   }
 }
