@@ -96,6 +96,39 @@ def test_supported_declaration_kinds_map_onto_existing_symbol_kinds() -> None:
     assert symbols["handler"][0] is SymbolKind.FUNCTION
 
 
+def test_property_signatures_are_qualified_by_nearest_declaration() -> None:
+    result = _parse(
+        "type Draft = { id: string; meta: { id: string } };\n"
+        "function save(input: { id: string }) { return input.id; }\n"
+        "function load(input: { id: string }) { return input.id; }\n",
+        "src/props.ts",
+    )
+
+    symbols = _by_name(result)
+    assert symbols["Draft.id"][0] is SymbolKind.PROPERTY
+    assert symbols["Draft.meta"][0] is SymbolKind.PROPERTY
+    assert symbols["Draft.meta.id"][0] is SymbolKind.PROPERTY
+    assert symbols["save.id"][0] is SymbolKind.PROPERTY
+    assert symbols["load.id"][0] is SymbolKind.PROPERTY
+    assert len({symbol.symbol_id for symbol in result.symbols}) == len(result.symbols)
+
+
+def test_repeated_union_member_properties_are_position_disambiguated() -> None:
+    result = _parse(
+        "type Status =\n"
+        "  | { kind: 'idle' }\n"
+        "  | { kind: 'saving' }\n"
+        "  | { kind: 'saved' };\n",
+        "src/status.ts",
+    )
+
+    names = {symbol.qualified_name for symbol in result.symbols}
+    assert "Status.kind#L2" in names
+    assert "Status.kind#L3" in names
+    assert "Status.kind#L4" in names
+    assert len({symbol.symbol_id for symbol in result.symbols}) == len(result.symbols)
+
+
 def test_a_class_field_is_a_field_symbol() -> None:
     result = _parse(
         "class Service {\n  limit: number = 3;\n}\n",
