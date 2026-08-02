@@ -25,8 +25,30 @@ from codeatlas.domain.errors import QueryTooLongError
 def test_the_policy_version_is_recorded() -> None:
     """A run stores this; changing the rules without changing the version
     would make old runs claim to have used rules they never saw."""
-    assert RETRIEVAL_POLICY_VERSION == "5.0"
-    assert classify("PaymentService.capture").policy_version == "5.0"
+    assert RETRIEVAL_POLICY_VERSION == "5.2"
+    assert classify("PaymentService.capture").policy_version == "5.2"
+
+
+@pytest.mark.parametrize("text", ["Hi", "hello!", "hey there", "good morning"])
+def test_greetings_do_not_route_to_repository_search(text: str) -> None:
+    result = classify(text)
+    assert result.intent is Intent.GREETING
+    assert result.target == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "tell me about prelegal project",
+        "what is this repository?",
+        "summarize the codebase",
+        "give me an overview of the project",
+    ],
+)
+def test_project_overview_questions_use_the_overview_intent(text: str) -> None:
+    result = classify(text)
+    assert result.intent is Intent.PROJECT_OVERVIEW
+    assert result.target == " ".join(text.split())
 
 
 @pytest.mark.parametrize(
@@ -61,7 +83,7 @@ def test_caller_phrasing_routes_to_the_graph(text: str) -> None:
 
 
 def test_callee_phrasing_is_distinct_from_caller_phrasing() -> None:
-    """"who calls X" and "what does X call" are opposite directions; a rule
+    """Caller and callee phrasing are opposite directions; a rule
     that confused them would report the dependency graph backwards."""
     assert classify("what does PaymentService.capture call").intent is Intent.CALLEES
     assert classify("who calls PaymentService.capture").intent is Intent.CALLERS

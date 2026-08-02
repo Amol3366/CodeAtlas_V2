@@ -24,7 +24,7 @@ from typing import Final
 
 from codeatlas.domain.errors import QueryTooLongError
 
-RETRIEVAL_POLICY_VERSION: Final[str] = "5.0"
+RETRIEVAL_POLICY_VERSION: Final[str] = "5.2"
 
 # Bounded input (`AGENTS.md` Section 10.3). Truncating instead would answer a
 # question the user did not ask.
@@ -34,6 +34,8 @@ MAX_QUERY_CHARACTERS: Final[int] = 4000
 class Intent(StrEnum):
     """What kind of question this is, and therefore which channel answers it."""
 
+    GREETING = "greeting"
+    PROJECT_OVERVIEW = "project_overview"
     EXACT_SYMBOL = "exact_symbol"
     CALLERS = "callers"
     CALLEES = "callees"
@@ -74,9 +76,7 @@ _RULES: Final[tuple[tuple[re.Pattern[str], Intent], ...]] = (
         Intent.CHANGE,
     ),
     (
-        re.compile(
-            r"^(?:who|what)\s+calls\s+(?P<subject>\S+)\s*$", re.IGNORECASE
-        ),
+        re.compile(r"^(?:who|what)\s+calls\s+(?P<subject>\S+)\s*$", re.IGNORECASE),
         Intent.CALLERS,
     ),
     (
@@ -84,9 +84,7 @@ _RULES: Final[tuple[tuple[re.Pattern[str], Intent], ...]] = (
         Intent.CALLERS,
     ),
     (
-        re.compile(
-            r"^what\s+does\s+(?P<subject>\S+)\s+call\s*$", re.IGNORECASE
-        ),
+        re.compile(r"^what\s+does\s+(?P<subject>\S+)\s+call\s*$", re.IGNORECASE),
         Intent.CALLEES,
     ),
     (
@@ -94,15 +92,11 @@ _RULES: Final[tuple[tuple[re.Pattern[str], Intent], ...]] = (
         Intent.CALLEES,
     ),
     (
-        re.compile(
-            r"^what\s+does\s+(?P<subject>\S+)\s+depend\s+on\s*$", re.IGNORECASE
-        ),
+        re.compile(r"^what\s+does\s+(?P<subject>\S+)\s+depend\s+on\s*$", re.IGNORECASE),
         Intent.DEPENDENCIES,
     ),
     (
-        re.compile(
-            r"^dependencies\s+(?:of|for)\s+(?P<subject>\S+)\s*$", re.IGNORECASE
-        ),
+        re.compile(r"^dependencies\s+(?:of|for)\s+(?P<subject>\S+)\s*$", re.IGNORECASE),
         Intent.DEPENDENCIES,
     ),
     (
@@ -124,9 +118,7 @@ _RULES: Final[tuple[tuple[re.Pattern[str], Intent], ...]] = (
         Intent.DOCUMENTS,
     ),
     (
-        re.compile(
-            r"^what\s+documents\s+(?P<subject>\S+)\s*$", re.IGNORECASE
-        ),
+        re.compile(r"^what\s+documents\s+(?P<subject>\S+)\s*$", re.IGNORECASE),
         Intent.DOCUMENTS,
     ),
     (
@@ -143,6 +135,16 @@ _RULES: Final[tuple[tuple[re.Pattern[str], Intent], ...]] = (
 # identifier or repository-relative path uses. Anything looser would swallow
 # ordinary prose.
 _SYMBOL_SHAPED: Final[re.Pattern[str]] = re.compile(r"^[\w./\\:$-]+$")
+_GREETING: Final[re.Pattern[str]] = re.compile(
+    r"^(?:hi|hello|hey|hi\s+there|hello\s+there|hey\s+there|good\s+morning|"
+    r"good\s+afternoon|good\s+evening)[\s,.!?]*$",
+    re.IGNORECASE,
+)
+_PROJECT_OVERVIEW: Final[re.Pattern[str]] = re.compile(
+    r"^(?:(?:tell|show)\s+me\s+about|summarize|give\s+me\s+(?:an\s+)?"
+    r"overview\s+of|what\s+is)\b.*\b(?:project|repo|repository|codebase)\b",
+    re.IGNORECASE,
+)
 
 
 def classify(text: str) -> Classification:
@@ -164,6 +166,12 @@ def classify(text: str) -> Classification:
 
     # A trailing question mark is punctuation, not meaning.
     stripped = normalized.rstrip("?").strip() or normalized
+
+    if _GREETING.match(stripped):
+        return Classification(intent=Intent.GREETING, target=stripped)
+
+    if _PROJECT_OVERVIEW.match(stripped):
+        return Classification(intent=Intent.PROJECT_OVERVIEW, target=normalized)
 
     for pattern, intent in _RULES:
         match = pattern.match(stripped)

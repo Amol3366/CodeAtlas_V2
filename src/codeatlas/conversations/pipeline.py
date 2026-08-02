@@ -36,6 +36,16 @@ from codeatlas.retrieval.lexical import (
 )
 
 DEFAULT_GRAPH_DEPTH: int = 2
+PROJECT_OVERVIEW_SEARCH_RESULTS: int = 12
+GREETING_SUMMARY: str = (
+    "Hi. Ask me a question about the active repository, and I will answer from "
+    "its indexed snapshot with citations when repository evidence is available."
+)
+PROJECT_OVERVIEW_LIMITATION: str = (
+    "This overview is synthesized from indexed documentation, entry points, and "
+    "symbols in the active snapshot; ask about a specific flow for graph-backed "
+    "details."
+)
 
 # The one intent the semantic channel serves. Section 10.2 gives every other
 # intent a resolution — an exact symbol, a call edge, a diff — and blueprint
@@ -44,7 +54,7 @@ DEFAULT_GRAPH_DEPTH: int = 2
 # A frozen set rather than a check at the call site, because the safe default
 # for an intent added later is *exclusion*: a new intent that nobody thought
 # about must not silently acquire a provider call.
-SEMANTIC_INTENTS: frozenset[Intent] = frozenset({Intent.TEXT})
+SEMANTIC_INTENTS: frozenset[Intent] = frozenset({Intent.PROJECT_OVERVIEW, Intent.TEXT})
 GENERATION_INTENTS: frozenset[Intent] = frozenset({Intent.TEXT, Intent.TRACE})
 
 
@@ -60,17 +70,13 @@ class SemanticFusion(Protocol):
     The implementation is `application.semantic_fusion.SemanticFusionService`.
     """
 
-    def augment(
-        self, response: QueryResponse, *, question: str
-    ) -> QueryResponse: ...
+    def augment(self, response: QueryResponse, *, question: str) -> QueryResponse: ...
 
 
 class AnswerExplainer(Protocol):
     """The optional generation seam for steps 14-15."""
 
-    def explain(
-        self, response: QueryResponse, *, question: str
-    ) -> QueryResponse: ...
+    def explain(self, response: QueryResponse, *, question: str) -> QueryResponse: ...
 
 
 class CancelledError(Exception):
@@ -183,6 +189,8 @@ class AnswerPipeline:
 
         token.raise_if_cancelled()
         response = self._fuse(response, request, classification.intent)
+        if classification.intent is Intent.PROJECT_OVERVIEW:
+            response = _project_overview_response(response)
         emit(
             PipelineEvent(
                 "retrieval.progress",
@@ -253,6 +261,28 @@ class AnswerPipeline:
                 )
             )
 
+        if intent is Intent.GREETING:
+            return self._search.response_without_evidence(
+                SearchRequest(
+                    repository_id=request.repository_id,
+                    query=target,
+                    request_id=request.request_id,
+                    limit=1,
+                ),
+                summary=GREETING_SUMMARY,
+                timing_ms={"conversation": 0.0},
+            )
+
+        if intent is Intent.PROJECT_OVERVIEW:
+            return self._search.search_text(
+                SearchRequest(
+                    repository_id=request.repository_id,
+                    query=target,
+                    request_id=request.request_id,
+                    limit=PROJECT_OVERVIEW_SEARCH_RESULTS,
+                )
+            )
+
         if intent is Intent.TEXT:
             return self._search.search_text(
                 SearchRequest(
@@ -281,9 +311,25 @@ class AnswerPipeline:
         return handler(graph_request)
 
 
+def _project_overview_response(response: QueryResponse) -> QueryResponse:
+    return response.model_copy(
+        update={
+            "warnings": [
+                warning
+                for warning in response.warnings
+                if warning != "LEXICAL_QUERY_RELAXED"
+            ],
+            "limitations": [PROJECT_OVERVIEW_LIMITATION],
+        }
+    )
+
+
 __all__ = [
     "DEFAULT_GRAPH_DEPTH",
     "GENERATION_INTENTS",
+    "GREETING_SUMMARY",
+    "PROJECT_OVERVIEW_LIMITATION",
+    "PROJECT_OVERVIEW_SEARCH_RESULTS",
     "SEMANTIC_INTENTS",
     "AnswerExplainer",
     "AnswerPipeline",

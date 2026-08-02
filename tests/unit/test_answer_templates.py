@@ -154,7 +154,7 @@ def test_warnings_and_limitations_are_shown_not_hidden() -> None:
 
 
 def test_an_abstention_names_what_was_tried() -> None:
-    """"I don't know" is only useful with the reason attached (Section 4.1)."""
+    """An abstention is only useful with the reason attached (Section 4.1)."""
     rendered = render_answer(
         _response(
             summary="No symbol named 'missing' exists in the active snapshot.",
@@ -168,6 +168,54 @@ def test_an_abstention_names_what_was_tried() -> None:
     assert "exact symbol" in rendered.lower()
     # An abstention must not present an empty evidence list as a finding.
     assert "[1]" not in rendered
+
+
+def test_a_greeting_renders_without_abstention_language() -> None:
+    rendered = render_answer(
+        _response(
+            summary="Hi. Ask me about the active repository.",
+            claims=[],
+            evidence=[],
+        ),
+        intent=Intent.GREETING,
+    )
+
+    assert rendered == "Hi. Ask me about the active repository.\n"
+    assert "not answering rather than guessing" not in rendered
+
+
+def test_a_project_overview_groups_evidence_into_an_answer() -> None:
+    rendered = render_answer(
+        _response(
+            summary="Found 4 locations matching 'tell me about the project' by text.",
+            claims=[],
+            evidence=[
+                _evidence("e1", symbol="Overview"),
+                _evidence(
+                    "e2",
+                    symbol="backend.src.prelegal.main",
+                    excerpt="from fastapi import FastAPI",
+                ).model_copy(update={"file_path": "backend/src/prelegal/main.py"}),
+                _evidence(
+                    "e3",
+                    symbol="PreviewForCurrentDoc",
+                    excerpt="export function PreviewForCurrentDoc",
+                ).model_copy(update={"file_path": "frontend/src/app/page.tsx"}),
+                _evidence("e4", symbol="Running").model_copy(
+                    update={"file_path": "docs/run.md"}
+                ),
+            ],
+            limitations=["Project overview limitation."],
+        ),
+        intent=Intent.PROJECT_OVERVIEW,
+    )
+
+    assert "Here is the project-level view" in rendered
+    assert "Project documentation is concentrated" in rendered
+    assert "Backend or Python evidence appears" in rendered
+    assert "Frontend evidence appears" in rendered
+    assert "Found 4 locations matching" not in rendered
+    assert "contains text matching" not in rendered
 
 
 def test_rendering_is_deterministic() -> None:
@@ -189,9 +237,7 @@ def test_the_rendered_answer_is_bounded() -> None:
         )
         for index in range(500)
     ]
-    rendered = render_answer(
-        _response(claims=many), intent=Intent.EXACT_SYMBOL
-    )
+    rendered = render_answer(_response(claims=many), intent=Intent.EXACT_SYMBOL)
 
     assert len(rendered.encode("utf-8")) <= 64 * 1024
 
