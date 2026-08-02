@@ -30,7 +30,11 @@ from datetime import UTC, datetime
 from typing import Final
 
 from codeatlas.domain.errors import InvalidRequestError, RepositoryNotFoundError
-from codeatlas.domain.semantic import EmbeddingProviderKind, ProviderPolicy
+from codeatlas.domain.semantic import (
+    AnswerProviderKind,
+    EmbeddingProviderKind,
+    ProviderPolicy,
+)
 from codeatlas.storage.sqlite.semantic_stores import ProviderPolicyStore
 from codeatlas.storage.sqlite.stores import RepositoryStore
 
@@ -48,10 +52,17 @@ class RepositorySettings:
     monthly_token_budget: int | None
     per_run_token_budget: int | None
     updated_at: datetime
+    answer_provider: AnswerProviderKind = AnswerProviderKind.NONE
+    answer_model: str | None = None
+    answer_timeout_seconds: int | None = None
 
     @property
     def transmits_off_machine(self) -> bool:
-        return self.embedding_provider.transmits_off_machine
+        """True when either decision transmits. See `ProviderPolicy`."""
+        return (
+            self.embedding_provider.transmits_off_machine
+            or self.answer_provider.transmits_off_machine
+        )
 
 
 @dataclass(frozen=True)
@@ -116,6 +127,9 @@ class SettingsService:
         per_run_token_budget: int | None = None,
         clear_monthly: bool = False,
         clear_per_run: bool = False,
+        answer_provider: AnswerProviderKind | None = None,
+        answer_model: str | None = None,
+        answer_timeout_seconds: int | None = None,
     ) -> RepositorySettings:
         """Apply a partial change, refusing anything that would leave it unsafe.
 
@@ -146,7 +160,36 @@ class SettingsService:
                     details={"field": f"{label}_token_budget"},
                 )
 
-        if provider.transmits_off_machine and monthly is None:
+        answering = (
+            current.answer_provider if answer_provider is None else answer_provider
+        )
+        answer_model_value = (
+            current.answer_model if answer_model is None else answer_model
+        )
+        answer_timeout = (
+            current.answer_timeout_seconds
+            if answer_timeout_seconds is None
+            else answer_timeout_seconds
+        )
+
+        if answer_timeout is not None and answer_timeout <= 0:
+            # Zero would fail every generation instantly, which is
+            # indistinguishable from the feature being broken.
+            raise InvalidRequestError(
+                "The answer timeout must be a positive number of seconds.",
+                details={"field": "answer_timeout_seconds"},
+            )
+
+        # Either decision reaching a metered account requires the budget. The
+        # answer provider is checked by the same rule and for the same reason:
+        # an unbounded metered account is how a local tool produces a
+        # surprising bill, and it does not matter which call made it.
+        transmitting: EmbeddingProviderKind | AnswerProviderKind | None = None
+        if provider.transmits_off_machine:
+            transmitting = provider
+        elif answering.transmits_off_machine:
+            transmitting = answering
+        if transmitting is not None and monthly is None:
             # Checked against the *resolved* state rather than the request, so
             # removing the budget later is refused exactly like never setting
             # one. Both routes reach the same unbounded account.
@@ -154,7 +197,7 @@ class SettingsService:
                 "A provider that sends content off the machine requires a"
                 " monthly token budget.",
                 details={
-                    "provider": provider.value,
+                    "provider": transmitting.value,
                     "field": "monthly_token_budget",
                 },
             )
@@ -165,6 +208,9 @@ class SettingsService:
             monthly_token_budget=monthly,
             per_run_token_budget=per_run,
             updated_at=self._now(),
+            answer_provider=answering,
+            answer_model=answer_model_value,
+            answer_timeout_seconds=answer_timeout,
         )
         self._policies.set(policy)
         return _from_policy(policy)
@@ -313,6 +359,9 @@ def _from_policy(policy: ProviderPolicy) -> RepositorySettings:
         monthly_token_budget=policy.monthly_token_budget,
         per_run_token_budget=policy.per_run_token_budget,
         updated_at=policy.updated_at,
+        answer_provider=policy.answer_provider,
+        answer_model=policy.answer_model,
+        answer_timeout_seconds=policy.answer_timeout_seconds,
     )
 
 
