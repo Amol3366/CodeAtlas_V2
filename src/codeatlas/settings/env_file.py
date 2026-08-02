@@ -36,6 +36,14 @@ OPENAI_MODEL_VARIABLE = "CODEATLAS_OPENAI_EMBEDDING_MODEL"
 OPENAI_DIMENSIONS_VARIABLE = "CODEATLAS_OPENAI_EMBEDDING_DIMENSIONS"
 LOCAL_MODEL_VARIABLE = "CODEATLAS_LOCAL_EMBEDDING_MODEL"
 
+# Answer generation. These name *which* model writes the prose; whether a
+# repository generates at all is stored per repository in SQLite, and no
+# variable here can change that.
+OLLAMA_ANSWER_MODEL_VARIABLE = "CODEATLAS_OLLAMA_ANSWER_MODEL"
+OLLAMA_BASE_URL_VARIABLE = "CODEATLAS_OLLAMA_BASE_URL"
+OPENAI_ANSWER_MODEL_VARIABLE = "CODEATLAS_OPENAI_ANSWER_MODEL"
+ANSWER_TIMEOUT_VARIABLE = "CODEATLAS_ANSWER_TIMEOUT_SECONDS"
+
 # Bounds, because this file is read before anything else and a pathological one
 # must not become a startup hang. Generous enough that no honest config trips
 # them.
@@ -161,6 +169,44 @@ def configured_openai_dimensions() -> int | None:
     return width
 
 
+def configured_ollama_answer_model() -> str | None:
+    """The configured local answer model, or ``None`` for the default."""
+    return _text(OLLAMA_ANSWER_MODEL_VARIABLE)
+
+
+def configured_ollama_base_url() -> str | None:
+    """Where Ollama listens, or ``None`` for loopback on its default port."""
+    return _text(OLLAMA_BASE_URL_VARIABLE)
+
+
+def configured_openai_answer_model() -> str | None:
+    """The configured hosted answer model, or ``None`` for the default."""
+    return _text(OPENAI_ANSWER_MODEL_VARIABLE)
+
+
+def configured_answer_timeout_seconds() -> int | None:
+    """The generation timeout in seconds, or ``None`` for the built-in bound.
+
+    Refuses anything that is not a positive integer rather than falling back.
+    A zero or negative timeout would fail every generation instantly, which is
+    indistinguishable from the feature being broken — and a typo here is much
+    likelier than a deliberate zero.
+    """
+    raw = _text(ANSWER_TIMEOUT_VARIABLE)
+    if raw is None:
+        return None
+    try:
+        seconds = int(raw)
+    except ValueError:
+        seconds = 0
+    if seconds <= 0:
+        raise InvalidRequestError(
+            f"{ANSWER_TIMEOUT_VARIABLE} must be a positive whole number.",
+            details={"variable": ANSWER_TIMEOUT_VARIABLE},
+        )
+    return seconds
+
+
 def _text(variable: str) -> str | None:
     value = os.environ.get(variable, "").strip()
     return value or None
@@ -192,14 +238,22 @@ def _parse_value(raw: str) -> str:
 
 
 __all__ = [
+    "ANSWER_TIMEOUT_VARIABLE",
     "ENV_FILE_NAME",
     "ENV_FILE_VARIABLE",
     "LOCAL_MODEL_VARIABLE",
+    "OLLAMA_ANSWER_MODEL_VARIABLE",
+    "OLLAMA_BASE_URL_VARIABLE",
+    "OPENAI_ANSWER_MODEL_VARIABLE",
     "OPENAI_DIMENSIONS_VARIABLE",
     "OPENAI_MODEL_VARIABLE",
     "LoadedEnv",
     "codeatlas_root",
+    "configured_answer_timeout_seconds",
     "configured_local_model",
+    "configured_ollama_answer_model",
+    "configured_ollama_base_url",
+    "configured_openai_answer_model",
     "configured_openai_dimensions",
     "configured_openai_model",
     "env_file_path",
