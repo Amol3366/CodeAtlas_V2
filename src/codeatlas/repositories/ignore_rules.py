@@ -43,6 +43,14 @@ DEFAULT_IGNORE_PATTERNS: tuple[str, ...] = (
     "*.dylib",
     "*.min.js",
     "*.map",
+    # Credential files. Blueprint 8.11 names excluding `.env` by default as a
+    # required control. The negation must come last: within one precedence
+    # group the final matching pattern decides, which is what lets the example
+    # — documentation, no secret — stay indexable.
+    ".env",
+    ".env.*",
+    "*.env",
+    "!.env.example",
 )
 
 # Impact analysis needs these even though build tooling often ignores them.

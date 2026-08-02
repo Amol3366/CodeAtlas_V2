@@ -114,6 +114,43 @@ class LexicalSearchService:
             request, repository, snapshot, hits, elapsed, relaxed=relaxed
         )
 
+    def response_without_evidence(
+        self,
+        request: SearchRequest,
+        *,
+        summary: str,
+        warnings: Sequence[str] = (),
+        limitations: Sequence[str] = (),
+        timing_ms: dict[str, float] | None = None,
+    ) -> QueryResponse:
+        """Return a snapshot-bound conversational answer without searching.
+
+        Chat-level turns such as greetings still need the active snapshot in
+        their run record, but they should not be treated as repository lookup
+        requests. This keeps that response contract-valid without inventing an
+        evidence row or running a lexical query that the user did not ask for.
+        """
+        repository = self._repositories.get(request.repository_id)
+        if repository is None:
+            raise RepositoryNotFoundError("The repository is not registered.")
+
+        snapshot = self._snapshots.get_active(request.repository_id)
+        if snapshot is None:
+            raise SnapshotNotReadyError(
+                "The repository has no active snapshot. Index it first."
+            )
+
+        return QueryResponse(
+            request_id=request.request_id,
+            repository_id=request.repository_id,
+            snapshot=snapshot_reference(snapshot, stale=False),
+            answer=Answer(summary=summary, claims=[]),
+            evidence=[],
+            warnings=list(warnings),
+            limitations=list(limitations),
+            timing_ms={} if timing_ms is None else timing_ms,
+        )
+
     def search_symbols(self, request: SearchRequest) -> QueryResponse:
         """Resolve a symbol exactly, falling back to lexical name matching."""
         repository, snapshot, expression, limit = self._prepare(request)
@@ -217,9 +254,7 @@ class LexicalSearchService:
             elapsed=elapsed,
         )
 
-    def _prepare(
-        self, request: SearchRequest
-    ) -> tuple[Repository, Snapshot, str, int]:
+    def _prepare(self, request: SearchRequest) -> tuple[Repository, Snapshot, str, int]:
         repository = self._repositories.get(request.repository_id)
         if repository is None:
             raise RepositoryNotFoundError("The repository is not registered.")
@@ -325,7 +360,5 @@ def _exact_summary(query: str, evidence: Sequence[Evidence]) -> str:
 
 def _lexical_summary(query: str, count: int, noun: str) -> str:
     if count == 0:
-        return (
-            f"CodeAtlas found no {noun} matching '{query}' in the active snapshot."
-        )
+        return f"CodeAtlas found no {noun} matching '{query}' in the active snapshot."
     return f"Found {count} {noun} matching '{query}' by text."

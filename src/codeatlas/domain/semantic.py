@@ -50,6 +50,36 @@ class EmbeddingProviderKind(StrEnum):
         return self is EmbeddingProviderKind.OPENAI
 
 
+class AnswerProviderKind(StrEnum):
+    """Which model, if any, writes a repository's answer prose.
+
+    ``NONE`` is the default everywhere, and it is what a database written
+    before answer generation existed upgrades to. ``OLLAMA`` runs on this
+    machine and transmits nothing. Only ``OPENAI`` sends evidence excerpts off
+    the machine, which is why it can never be reached by default or by
+    omission.
+
+    Deliberately not merged with `EmbeddingProviderKind`: they share two member
+    names and nothing else. Retrieval and answering have different costs,
+    different failure modes, and different providers — Ollama serves answers
+    but is not an embedding backend here — so one enum would have members that
+    are invalid for half its uses.
+    """
+
+    NONE = "none"
+    OLLAMA = "ollama"
+    OPENAI = "openai"
+
+    @property
+    def transmits_off_machine(self) -> bool:
+        """Whether choosing this provider sends content to another party.
+
+        A property rather than an ``is OPENAI`` check at each call site, so
+        that adding a second remote provider cannot silently miss one.
+        """
+        return self is AnswerProviderKind.OPENAI
+
+
 class EmbeddingStatus(StrEnum):
     """Where one piece of content sits in the embedding queue.
 
@@ -149,10 +179,37 @@ class ProviderPolicy:
     monthly_token_budget: int | None
     per_run_token_budget: int | None
     updated_at: datetime
+    # Answering is a separate decision from retrieving, with separate costs. A
+    # repository may reasonably retrieve locally and answer remotely, or the
+    # reverse, so this is its own field rather than a mode of the one above.
+    answer_provider: AnswerProviderKind = AnswerProviderKind.NONE
+    # ``None`` means "the configured default for this provider", which is what
+    # lets a machine-wide default exist without every repository storing a copy.
+    answer_model: str | None = None
+    answer_timeout_seconds: int | None = None
 
     @property
     def transmits_off_machine(self) -> bool:
+        """Whether *either* decision sends content to another party.
+
+        Both, deliberately. Every existing caller asks this to decide whether a
+        repository is transmitting at all, and answering "no" because only the
+        answer provider transmits would be wrong in the reassuring direction.
+        """
+        return (
+            self.embedding_provider.transmits_off_machine
+            or self.answer_provider.transmits_off_machine
+        )
+
+    @property
+    def embedding_transmits_off_machine(self) -> bool:
+        """Whether the retrieval decision alone transmits."""
         return self.embedding_provider.transmits_off_machine
+
+    @property
+    def answer_transmits_off_machine(self) -> bool:
+        """Whether the answering decision alone transmits."""
+        return self.answer_provider.transmits_off_machine
 
 
 @dataclass(frozen=True)

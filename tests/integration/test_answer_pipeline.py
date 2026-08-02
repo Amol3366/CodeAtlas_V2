@@ -199,6 +199,41 @@ def test_an_unanswerable_question_completes_with_an_abstention(
     assert "not answering rather than guessing" in result.content
 
 
+def test_a_greeting_completes_without_search_abstention(
+    services: Fixture,
+) -> None:
+    built, repository_id, _ = services
+    conversation = built.conversations.create(repository_id)
+
+    result = built.conversations.submit(conversation.conversation_id, "Hi")
+
+    assert result.status is MessageStatus.COMPLETE
+    assert result.intent == "greeting"
+    assert result.evidence == ()
+    assert result.warnings == ()
+    assert "Ask me a question about the active repository" in result.content
+    assert "not answering rather than guessing" not in result.content
+
+
+def test_a_project_overview_reads_like_an_answer_not_search_results(
+    services: Fixture,
+) -> None:
+    built, repository_id, _ = services
+    conversation = built.conversations.create(repository_id)
+
+    result = built.conversations.submit(
+        conversation.conversation_id, "tell me about sample project"
+    )
+
+    assert result.status is MessageStatus.COMPLETE
+    assert result.intent == "project_overview"
+    assert result.evidence
+    assert "Here is the project-level view" in result.content
+    assert "Found" not in result.content
+    assert "contains text matching" not in result.content
+    assert "LEXICAL_QUERY_RELAXED" not in result.warnings
+
+
 def test_feedback_requires_a_known_message(services: Fixture) -> None:
     built, _, _ = services
     with pytest.raises(MessageNotFoundError):

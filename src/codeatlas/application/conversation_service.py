@@ -85,6 +85,10 @@ _STREAM_STAGES: dict[str, StreamEventType] = {
     "retrieval.started": StreamEventType.RETRIEVAL_STARTED,
     "retrieval.progress": StreamEventType.RETRIEVAL_PROGRESS,
     "generation.delta": StreamEventType.GENERATION_DELTA,
+    # Publishing looks the stage up directly, so an unmapped stage raises
+    # KeyError and fails the whole run rather than dropping one event. Every
+    # stage the pipeline emits must appear here; a test asserts it.
+    "answer.completed": StreamEventType.ANSWER_COMPLETED,
 }
 
 

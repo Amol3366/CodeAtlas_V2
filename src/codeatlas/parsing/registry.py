@@ -23,7 +23,11 @@ from codeatlas.domain.symbols import SymbolRecord
 # 1.1.0 bundle is stale. The behavior lands in P4-05; the constant lands in
 # P4-SETUP so the identity change is in place before the behavior that depends
 # on it, following the Phase 3 precedent.
-PARSER_BUNDLE_VERSION: str = "1.2.0"
+# 1.2.1: TypeScript/JavaScript property signatures inherit the nearest named
+# declaration as context, and repeated anonymous type members are position
+# disambiguated. This prevents unrelated inline object/type properties with the
+# same name from colliding inside one snapshot.
+PARSER_BUNDLE_VERSION: str = "1.2.1"
 
 
 @dataclass(frozen=True)

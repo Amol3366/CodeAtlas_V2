@@ -28,6 +28,7 @@ from codeatlas.application.lookup import ExactSymbolLookupService, SymbolLookupR
 from codeatlas.contracts import QueryResponse
 from codeatlas.conversations.intent import Intent, classify
 from codeatlas.conversations.templates import render_answer
+from codeatlas.generation.explanations import ANSWER_GENERATION_TIMING_KEY
 from codeatlas.retrieval.graph import TraversalLimits
 from codeatlas.retrieval.lexical import (
     MAX_SEARCH_RESULTS,
@@ -36,6 +37,16 @@ from codeatlas.retrieval.lexical import (
 )
 
 DEFAULT_GRAPH_DEPTH: int = 2
+PROJECT_OVERVIEW_SEARCH_RESULTS: int = 12
+GREETING_SUMMARY: str = (
+    "Hi. Ask me a question about the active repository, and I will answer from "
+    "its indexed snapshot with citations when repository evidence is available."
+)
+PROJECT_OVERVIEW_LIMITATION: str = (
+    "This overview is synthesized from indexed documentation, entry points, and "
+    "symbols in the active snapshot; ask about a specific flow for graph-backed "
+    "details."
+)
 
 # The one intent the semantic channel serves. Section 10.2 gives every other
 # intent a resolution — an exact symbol, a call edge, a diff — and blueprint
@@ -44,8 +55,7 @@ DEFAULT_GRAPH_DEPTH: int = 2
 # A frozen set rather than a check at the call site, because the safe default
 # for an intent added later is *exclusion*: a new intent that nobody thought
 # about must not silently acquire a provider call.
-SEMANTIC_INTENTS: frozenset[Intent] = frozenset({Intent.TEXT})
-GENERATION_INTENTS: frozenset[Intent] = frozenset({Intent.TEXT, Intent.TRACE})
+SEMANTIC_INTENTS: frozenset[Intent] = frozenset({Intent.PROJECT_OVERVIEW, Intent.TEXT})
 
 
 class SemanticFusion(Protocol):
@@ -60,16 +70,18 @@ class SemanticFusion(Protocol):
     The implementation is `application.semantic_fusion.SemanticFusionService`.
     """
 
-    def augment(
-        self, response: QueryResponse, *, question: str
-    ) -> QueryResponse: ...
+    def augment(self, response: QueryResponse, *, question: str) -> QueryResponse: ...
 
 
 class AnswerExplainer(Protocol):
     """The optional generation seam for steps 14-15."""
 
     def explain(
-        self, response: QueryResponse, *, question: str
+        self,
+        response: QueryResponse,
+        *,
+        question: str,
+        on_token: Callable[[str], None] | None = None,
     ) -> QueryResponse: ...
 
 
@@ -183,6 +195,8 @@ class AnswerPipeline:
 
         token.raise_if_cancelled()
         response = self._fuse(response, request, classification.intent)
+        if classification.intent is Intent.PROJECT_OVERVIEW:
+            response = _project_overview_response(response)
         emit(
             PipelineEvent(
                 "retrieval.progress",
@@ -195,11 +209,19 @@ class AnswerPipeline:
         )
 
         token.raise_if_cancelled()
-        response = self._explain(response, request, classification.intent)
+        response = self._explain(response, request, emit)
 
         token.raise_if_cancelled()
-        markdown = render_answer(response, intent=classification.intent)
-        emit(PipelineEvent("generation.delta", {"length": len(markdown)}))
+        # The timing key appears only when a generated summary was accepted, so
+        # it is the one honest signal that a model wrote this prose. A provider
+        # that failed, declined, or was cited-invalid leaves it absent and the
+        # deterministic summary renders exactly as it always did.
+        markdown = render_answer(
+            response,
+            intent=classification.intent,
+            generated=ANSWER_GENERATION_TIMING_KEY in response.timing_ms,
+        )
+        emit(PipelineEvent("answer.completed", {"length": len(markdown)}))
 
         return AnswerResult(
             response=response,
@@ -225,12 +247,35 @@ class AnswerPipeline:
         return self._fusion.augment(response, question=request.question)
 
     def _explain(
-        self, response: QueryResponse, request: AnswerRequest, intent: Intent
+        self,
+        response: QueryResponse,
+        request: AnswerRequest,
+        emit: Callable[[PipelineEvent], None],
     ) -> QueryResponse:
-        """Optionally rewrite answer prose from verified evidence only."""
-        if self._explainer is None or intent not in GENERATION_INTENTS:
+        """Optionally rewrite answer prose from verified evidence only.
+
+        **Every intent is eligible.** There is no gate here, unlike `_fuse`,
+        and the asymmetry is deliberate. Semantic retrieval changes *which*
+        evidence an answer rests on, so letting it reach a resolved intent
+        would let a similarity score influence a deterministic result.
+        Generation changes only the prose above evidence that is already
+        settled: claims and citations pass through untouched whatever the
+        intent, so generating over an exact lookup costs latency, never
+        accuracy.
+
+        Tokens are emitted as they arrive. The event stage is the one the
+        stream vocabulary already publishes, so a client that renders partial
+        text needs no change.
+        """
+        if self._explainer is None:
             return response
-        return self._explainer.explain(response, question=request.question)
+        return self._explainer.explain(
+            response,
+            question=request.question,
+            on_token=lambda chunk: emit(
+                PipelineEvent("generation.delta", {"text": chunk})
+            ),
+        )
 
     def _retrieve(
         self, request: AnswerRequest, intent: Intent, target: str
@@ -250,6 +295,28 @@ class AnswerPipeline:
                     repository_id=request.repository_id,
                     query=target,
                     request_id=request.request_id,
+                )
+            )
+
+        if intent is Intent.GREETING:
+            return self._search.response_without_evidence(
+                SearchRequest(
+                    repository_id=request.repository_id,
+                    query=target,
+                    request_id=request.request_id,
+                    limit=1,
+                ),
+                summary=GREETING_SUMMARY,
+                timing_ms={"conversation": 0.0},
+            )
+
+        if intent is Intent.PROJECT_OVERVIEW:
+            return self._search.search_text(
+                SearchRequest(
+                    repository_id=request.repository_id,
+                    query=target,
+                    request_id=request.request_id,
+                    limit=PROJECT_OVERVIEW_SEARCH_RESULTS,
                 )
             )
 
@@ -281,9 +348,24 @@ class AnswerPipeline:
         return handler(graph_request)
 
 
+def _project_overview_response(response: QueryResponse) -> QueryResponse:
+    return response.model_copy(
+        update={
+            "warnings": [
+                warning
+                for warning in response.warnings
+                if warning != "LEXICAL_QUERY_RELAXED"
+            ],
+            "limitations": [PROJECT_OVERVIEW_LIMITATION],
+        }
+    )
+
+
 __all__ = [
     "DEFAULT_GRAPH_DEPTH",
-    "GENERATION_INTENTS",
+    "GREETING_SUMMARY",
+    "PROJECT_OVERVIEW_LIMITATION",
+    "PROJECT_OVERVIEW_SEARCH_RESULTS",
     "SEMANTIC_INTENTS",
     "AnswerExplainer",
     "AnswerPipeline",

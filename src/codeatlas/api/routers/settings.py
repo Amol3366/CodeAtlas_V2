@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from codeatlas.api.routers.repositories import Services
 from codeatlas.application.embedding_migrations import EmbeddingMigrationView
-from codeatlas.domain.semantic import EmbeddingProviderKind
+from codeatlas.domain.semantic import AnswerProviderKind, EmbeddingProviderKind
 
 router = APIRouter(tags=["settings"])
 
@@ -47,6 +47,12 @@ class SettingsResponse(StrictModel):
     # transmit would eventually disagree with the server.
     transmits_off_machine: bool
     updated_at: str
+    # The second provider decision. Reported separately from the embedding one
+    # because the two are independent: a repository may retrieve locally and
+    # answer remotely, or the reverse.
+    answer_provider: str
+    answer_model: str | None
+    answer_timeout_seconds: int | None
 
 
 class UpdateSettingsBody(StrictModel):
@@ -60,6 +66,9 @@ class UpdateSettingsBody(StrictModel):
     embedding_provider: EmbeddingProviderKind | None = None
     monthly_token_budget: int | None = Field(default=None, ge=0)
     per_run_token_budget: int | None = Field(default=None, ge=0)
+    answer_provider: AnswerProviderKind | None = None
+    answer_model: str | None = Field(default=None, min_length=1, max_length=200)
+    answer_timeout_seconds: int | None = Field(default=None, ge=1, le=3600)
 
 
 class ModelResponse(StrictModel):
@@ -71,8 +80,25 @@ class ModelResponse(StrictModel):
     requires: str | None
 
 
+class AnswerModelResponse(StrictModel):
+    """One answer provider a user could choose, and what choosing it means.
+
+    Deliberately not merged into `ModelResponse`: an answer model has no
+    dimensions, and a field that is always null teaches a client the wrong
+    shape.
+    """
+
+    provider: str
+    model_id: str | None
+    available: bool
+    transmits_off_machine: bool
+    requires: str | None
+
+
 class ModelsResponse(StrictModel):
     models: list[ModelResponse]
+    # Additive, so a client written before answer generation keeps working.
+    answer_models: list[AnswerModelResponse] = Field(default_factory=list)
 
 
 class ProviderTestResponse(StrictModel):
@@ -139,6 +165,9 @@ def update_settings(
             clear_per_run=(
                 "per_run_token_budget" in sent and body.per_run_token_budget is None
             ),
+            answer_provider=body.answer_provider,
+            answer_model=body.answer_model,
+            answer_timeout_seconds=body.answer_timeout_seconds,
         )
     )
 
@@ -161,7 +190,17 @@ def list_models(services: Services) -> ModelsResponse:
                 requires=model.requires,
             )
             for model in services.settings.models()
-        ]
+        ],
+        answer_models=[
+            AnswerModelResponse(
+                provider=model.provider.value,
+                model_id=model.model_id,
+                available=model.available,
+                transmits_off_machine=model.transmits_off_machine,
+                requires=model.requires,
+            )
+            for model in services.settings.answer_models()
+        ],
     )
 
 
@@ -229,6 +268,9 @@ def _settings_response(settings: object) -> SettingsResponse:
         per_run_token_budget=settings.per_run_token_budget,  # type: ignore[attr-defined]
         transmits_off_machine=settings.transmits_off_machine,  # type: ignore[attr-defined]
         updated_at=settings.updated_at.isoformat(),  # type: ignore[attr-defined]
+        answer_provider=settings.answer_provider.value,  # type: ignore[attr-defined]
+        answer_model=settings.answer_model,  # type: ignore[attr-defined]
+        answer_timeout_seconds=settings.answer_timeout_seconds,  # type: ignore[attr-defined]
     )
 
 

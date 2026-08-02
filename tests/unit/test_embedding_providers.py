@@ -123,3 +123,111 @@ def test_a_disabled_provider_is_not_retryable() -> None:
         provider.embed_documents(["x"])
 
     assert raised.value.retryable is False
+
+
+class TestConfiguredModels:
+    """Model identity comes from configuration; a wrong width is refused."""
+
+    def test_the_default_model_needs_no_dimensions(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from codeatlas.semantic.providers import (
+            OPENAI_DIMENSIONS,
+            OPENAI_MODEL_ID,
+            resolve_openai_embedding_model,
+        )
+        from codeatlas.settings.env_file import (
+            OPENAI_DIMENSIONS_VARIABLE,
+            OPENAI_MODEL_VARIABLE,
+        )
+
+        monkeypatch.delenv(OPENAI_MODEL_VARIABLE, raising=False)
+        monkeypatch.delenv(OPENAI_DIMENSIONS_VARIABLE, raising=False)
+
+        assert resolve_openai_embedding_model() == (OPENAI_MODEL_ID, OPENAI_DIMENSIONS)
+
+    def test_a_custom_model_with_its_width_is_accepted(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from codeatlas.semantic.providers import resolve_openai_embedding_model
+        from codeatlas.settings.env_file import (
+            OPENAI_DIMENSIONS_VARIABLE,
+            OPENAI_MODEL_VARIABLE,
+        )
+
+        monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "text-embedding-3-large")
+        monkeypatch.setenv(OPENAI_DIMENSIONS_VARIABLE, "3072")
+
+        assert resolve_openai_embedding_model() == ("text-embedding-3-large", 3072)
+
+    def test_a_custom_model_without_its_width_is_refused(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # The whole point. 3072-wide vectors in a namespace labelled 1536 is a
+        # corrupted similarity space that reports nothing and is found months
+        # later as poor results.
+        from codeatlas.semantic.providers import resolve_openai_embedding_model
+        from codeatlas.settings.env_file import (
+            OPENAI_DIMENSIONS_VARIABLE,
+            OPENAI_MODEL_VARIABLE,
+        )
+
+        monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "text-embedding-3-large")
+        monkeypatch.delenv(OPENAI_DIMENSIONS_VARIABLE, raising=False)
+
+        with pytest.raises(ProviderUnavailableError) as raised:
+            resolve_openai_embedding_model()
+
+        # The message must name the variable to set, not merely complain.
+        assert OPENAI_DIMENSIONS_VARIABLE in str(raised.value)
+
+    def test_a_width_disagreeing_with_the_default_model_is_refused(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # CodeAtlas does not send OpenAI's `dimensions` request parameter, so a
+        # width that disagrees with the default model would be a label, not a
+        # request — the same corruption by another route.
+        from codeatlas.semantic.providers import resolve_openai_embedding_model
+        from codeatlas.settings.env_file import (
+            OPENAI_DIMENSIONS_VARIABLE,
+            OPENAI_MODEL_VARIABLE,
+        )
+
+        monkeypatch.delenv(OPENAI_MODEL_VARIABLE, raising=False)
+        monkeypatch.setenv(OPENAI_DIMENSIONS_VARIABLE, "512")
+
+        with pytest.raises(ProviderUnavailableError):
+            resolve_openai_embedding_model()
+
+    def test_the_provider_reports_the_configured_identity(self) -> None:
+        from codeatlas.semantic.providers import OpenAIEmbeddingProvider
+
+        class FakeClient:
+            embeddings = None
+
+        provider = OpenAIEmbeddingProvider(
+            client=FakeClient(), model_id="text-embedding-3-large", dimensions=3072
+        )
+
+        assert provider.model_id == "text-embedding-3-large"
+        assert provider.dimensions == 3072
+
+    def test_the_local_model_comes_from_configuration(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from codeatlas.semantic.providers import (
+            LOCAL_MODEL_ID,
+            resolve_local_embedding_model,
+        )
+        from codeatlas.settings.env_file import LOCAL_MODEL_VARIABLE
+
+        monkeypatch.delenv(LOCAL_MODEL_VARIABLE, raising=False)
+        assert resolve_local_embedding_model() == LOCAL_MODEL_ID
+
+        monkeypatch.setenv(LOCAL_MODEL_VARIABLE, "BAAI/bge-small-en-v1.5")
+        assert resolve_local_embedding_model() == "BAAI/bge-small-en-v1.5"

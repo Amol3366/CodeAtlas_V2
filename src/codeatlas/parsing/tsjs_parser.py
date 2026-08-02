@@ -20,6 +20,8 @@ see it.
 from __future__ import annotations
 
 import hashlib
+from collections import defaultdict
+from dataclasses import replace
 from typing import Final
 
 from tree_sitter import Language, Node, Parser
@@ -61,7 +63,7 @@ _DECLARATION_KINDS: Final[dict[str, SymbolKind]] = {
     "property_signature": SymbolKind.PROPERTY,
 }
 
-# Node types that introduce a new naming scope for their members.
+# Node types that introduce a language-level naming scope for their members.
 _CONTAINER_TYPES: Final[frozenset[str]] = frozenset(
     {
         "class_declaration",
@@ -250,14 +252,70 @@ def _collect(
                         visibility=_visibility(node, name),
                     )
                 )
-                if node.type in _CONTAINER_TYPES:
-                    child_prefix = f"{qualified_name}."
+                # TypeScript declarations can contain other declarations in
+                # type positions: `type A = { id: string }`, function parameter
+                # object types, and nested property signatures. Those children
+                # need the nearest named declaration in their identity, or two
+                # unrelated `{ id: ... }` annotations in one file collide.
+                child_prefix = f"{qualified_name}."
 
         for child in reversed(node.children):
             stack.append((child, child_prefix))
 
+    symbols = _disambiguate_repeated_symbols(request, symbols)
     symbols.sort(key=lambda symbol: (symbol.start_byte, symbol.qualified_name))
     return tuple(symbols)
+
+
+def _disambiguate_repeated_symbols(
+    request: ParseRequest, symbols: list[SymbolRecord]
+) -> list[SymbolRecord]:
+    """Make repeated anonymous type members addressable without collisions.
+
+    Union types can legitimately contain several anonymous object members with
+    the same property name, for example `type Status = { kind: "a" } |
+    { kind: "b" }`. Their nearest named declaration is the same, so the normal
+    qualified name is the same. Position is the only stable local identity such
+    anonymous members have, and the suffix is applied only to repeated names.
+    """
+    groups: dict[tuple[SymbolKind, str], list[SymbolRecord]] = defaultdict(list)
+    for symbol in symbols:
+        groups[(symbol.kind, symbol.qualified_name)].append(symbol)
+
+    repeated = {
+        key: value for key, value in groups.items() if len(value) > 1
+    }
+    if not repeated:
+        return symbols
+
+    replacements: dict[int, SymbolRecord] = {}
+    for items in repeated.values():
+        line_counts: dict[int, int] = defaultdict(int)
+        for symbol in items:
+            line_counts[symbol.start_line] += 1
+        for symbol in items:
+            suffix = (
+                f"#L{symbol.start_line}"
+                if line_counts[symbol.start_line] == 1
+                else f"#L{symbol.start_line}B{symbol.start_byte}"
+            )
+            qualified_name = f"{symbol.qualified_name}{suffix}"
+            logical_id = symbol_id(
+                request.repository_id,
+                request.relative_path,
+                qualified_name,
+                symbol.kind.value,
+            )
+            replacements[id(symbol)] = replace(
+                symbol,
+                symbol_id=logical_id,
+                symbol_version_id=symbol_version_id(
+                    logical_id, symbol.content_hash, PARSER_BUNDLE_VERSION
+                ),
+                qualified_name=qualified_name,
+            )
+
+    return [replacements.get(id(symbol), symbol) for symbol in symbols]
 
 
 def _kind_for(node: Node) -> SymbolKind | None:

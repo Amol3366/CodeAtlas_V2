@@ -1,8 +1,10 @@
+
 # CodeAtlas
 
 CodeAtlas is a local-first repository-intelligence and change-assurance layer.
-The implementation follows the authoritative requirements in `CLAUDE.md` and
-the shared execution state in `docs/plans/PLAN.md`.
+The implementation follows the authoritative coding-agent contract exposed as
+`AGENTS.md` / `CLAUDE.md` and the shared execution state in
+`docs/plans/PLAN.md`.
 
 ## What works today (Phases 0–6 complete; Phase 7 in progress)
 
@@ -133,6 +135,7 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/release-validation.md` — what to run before a release, and what each step proves
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
 - `docs/operations/semantic-search.md` — semantic providers, coverage, migrations, and admission state
+- `docs/operations/answer-generation.md` — optional written explanations, the models, and every failure message
 - `docs/adr/README.md` — the eight accepted architecture decisions
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers
 - `docs/evaluation/phase-6-baseline-environment.md` — packaged performance and fixed release defects

@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from sqlite3 import Connection
 
+from codeatlas.application.answer_generation import RepositoryAnswerExplainer
 from codeatlas.application.change_analysis import ChangeAnalysisService
 from codeatlas.application.conversation_service import ConversationService
 from codeatlas.application.embedding_migrations import EmbeddingMigrationService
@@ -206,6 +207,14 @@ def build_services(
         search=search_store,
         evidence=evidence,
     )
+    if explainer is None:
+        # Built unconditionally, unlike `fusion`. It constructs no provider
+        # until a question arrives, and a repository whose policy says `none`
+        # gets `NoAnswerProvider` — so there is nothing optional here that
+        # could be missing, and no import of a package that may not be
+        # installed.
+        explainer = RepositoryAnswerExplainer(connection)
+
     if fusion is None and vectors is not None:
         fusion = SemanticFusionService(
             repositories=repositories,

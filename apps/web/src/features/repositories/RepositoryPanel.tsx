@@ -33,7 +33,11 @@ export function ErrorNotice({ error }: { readonly error: unknown }) {
   );
 }
 
-export function AddRepositoryForm() {
+export function AddRepositoryForm({
+  onAdded,
+}: {
+  readonly onAdded?: (repositoryId: string) => void;
+}) {
   const [path, setPath] = useState("");
   const add = useAddRepository();
 
@@ -42,7 +46,14 @@ export function AddRepositoryForm() {
       className="mt-[var(--space-4)]"
       onSubmit={(submitted) => {
         submitted.preventDefault();
-        if (path.trim() !== "") add.mutate(path.trim());
+        if (path.trim() !== "") {
+          add.mutate(path.trim(), {
+            onSuccess: (repository) => {
+              setPath("");
+              onAdded?.(repository.repository_id);
+            },
+          });
+        }
       }}
     >
       <label htmlFor="repository-path" className="block text-sm font-medium">
@@ -193,7 +204,7 @@ export function RepositoryPanel({
         <h1 className="text-2xl font-semibold tracking-tight">
           Add your first repository
         </h1>
-        <AddRepositoryForm />
+        <AddRepositoryForm onAdded={(repositoryId) => onSelect?.(repositoryId)} />
       </div>
     );
   }
@@ -224,7 +235,12 @@ export function RepositoryPanel({
           <DiagnosticsPanel repositoryId={active} />
         </>
       ) : null}
-      <AddRepositoryForm />
+      <AddRepositoryForm
+        onAdded={(repositoryId) => {
+          setSelected(repositoryId);
+          onSelect?.(repositoryId);
+        }}
+      />
     </div>
   );
 }

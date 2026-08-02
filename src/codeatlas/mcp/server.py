@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.mcp.tools import TOOL_SCHEMA_VERSION, ToolRegistry, build_registry
 from codeatlas.semantic.vector_store import LazyVectorStore
+from codeatlas.settings.env_file import load_env_file
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.upgrade import upgrade_database
 
@@ -143,4 +144,7 @@ def run_stdio(database: Path | None = None) -> None:  # pragma: no cover
 
 def main() -> None:  # pragma: no cover
     """Console-script entry point."""
+    # Same reason as the CLI and the API: before anything reads the
+    # environment, so a configured provider is visible to the tools.
+    load_env_file()
     run_stdio()

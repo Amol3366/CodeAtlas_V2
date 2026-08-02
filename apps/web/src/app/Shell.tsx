@@ -39,21 +39,36 @@ export function Shell() {
             data-open={sidebarOpen ? "true" : "false"}
             className="hidden border-r border-border bg-surface-raised data-[open=true]:absolute data-[open=true]:inset-y-0 data-[open=true]:left-0 data-[open=true]:z-10 data-[open=true]:block data-[open=true]:w-[280px] md:block"
           >
-            <div className="flex items-center justify-between p-[var(--space-3)]">
-              <span className="text-sm font-semibold tracking-tight">
-                CodeAtlas
-              </span>
-              <div className="flex items-center gap-[var(--space-2)]">
+            <div className="p-[var(--space-3)]">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold tracking-tight">
+                  CodeAtlas
+                </span>
+                <ThemeToggle />
+              </div>
+              <div className="mt-[var(--space-2)] flex items-center gap-[var(--space-1)]">
                 {/* `NavLink` rather than `Link`: it sets aria-current="page" on
                     the active route, the same way the conversation list marks
                     the active thread. */}
+                <NavLink
+                  to="/"
+                  end
+                  className="rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-xs text-text-muted hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-medium"
+                >
+                  Chat
+                </NavLink>
+                <NavLink
+                  to="/repositories"
+                  className="rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-xs text-text-muted hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-medium"
+                >
+                  Repositories
+                </NavLink>
                 <NavLink
                   to="/settings"
                   className="rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-xs text-text-muted hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-medium"
                 >
                   Settings
                 </NavLink>
-                <ThemeToggle />
               </div>
             </div>
             <Sidebar repositoryId={repositoryId} />

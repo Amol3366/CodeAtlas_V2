@@ -23,3 +23,14 @@ dist/
 # Agent worktrees and local session state. Holds a full checkout with
 # node_modules, so an unguarded `git add -A` would otherwise sweep it in.
 .claude/
+
+# Provider credentials and model selection. The example is committed; anything
+# holding a real value is not. The negation must follow the patterns it
+# re-includes — .gitignore takes the last match.
+.env
+.env.*
+*.env
+!.env.example
+
+# Dev-server logs written by scripts/run_dev.ps1.
+.run/

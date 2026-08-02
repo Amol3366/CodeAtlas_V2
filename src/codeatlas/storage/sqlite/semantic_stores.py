@@ -19,6 +19,7 @@ from datetime import datetime
 
 from codeatlas.domain.ids import validate_namespace_id
 from codeatlas.domain.semantic import (
+    AnswerProviderKind,
     EmbeddingMigration,
     EmbeddingMigrationStatus,
     EmbeddingNamespace,
@@ -379,55 +380,53 @@ class ProviderPolicyStore:
                 per_run_token_budget=None,
                 updated_at=_EPOCH,
             )
-        return ProviderPolicy(
-            repository_id=row["repository_id"],
-            embedding_provider=EmbeddingProviderKind(row["embedding_provider"]),
-            monthly_token_budget=row["monthly_token_budget"],
-            per_run_token_budget=row["per_run_token_budget"],
-            updated_at=from_utc_text(row["updated_at"]),
-        )
+        return _policy_of(row)
 
     def set(self, policy: ProviderPolicy) -> None:
         self._connection.execute(
             "INSERT INTO repository_provider_policy ("
             " repository_id, embedding_provider, monthly_token_budget,"
-            " per_run_token_budget, updated_at"
-            ") VALUES (?, ?, ?, ?, ?)"
+            " per_run_token_budget, updated_at, answer_provider, answer_model,"
+            " answer_timeout_seconds"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
             " ON CONFLICT (repository_id) DO UPDATE SET"
             " embedding_provider = excluded.embedding_provider,"
             " monthly_token_budget = excluded.monthly_token_budget,"
             " per_run_token_budget = excluded.per_run_token_budget,"
-            " updated_at = excluded.updated_at",
+            " updated_at = excluded.updated_at,"
+            " answer_provider = excluded.answer_provider,"
+            " answer_model = excluded.answer_model,"
+            " answer_timeout_seconds = excluded.answer_timeout_seconds",
             (
                 policy.repository_id,
                 policy.embedding_provider.value,
                 policy.monthly_token_budget,
                 policy.per_run_token_budget,
                 to_utc_text(policy.updated_at),
+                policy.answer_provider.value,
+                policy.answer_model,
+                policy.answer_timeout_seconds,
             ),
         )
 
     def list_opted_in(self) -> tuple[ProviderPolicy, ...]:
-        """Every repository with a provider other than ``none``.
+        """Every repository that has opted into any provider.
 
         Exists so that "what is currently able to transmit?" is one query with
         one answer, rather than something a support conversation reconstructs.
+
+        Both decisions are checked. A repository answering through OpenAI
+        transmits evidence excerpts even when its embedding provider is
+        ``none``, and a query that missed it would under-report exactly the
+        thing it exists to report.
         """
         rows = self._connection.execute(
             "SELECT * FROM repository_provider_policy"
-            " WHERE embedding_provider <> ? ORDER BY repository_id",
-            (EmbeddingProviderKind.NONE.value,),
+            " WHERE embedding_provider <> ? OR answer_provider <> ?"
+            " ORDER BY repository_id",
+            (EmbeddingProviderKind.NONE.value, AnswerProviderKind.NONE.value),
         ).fetchall()
-        return tuple(
-            ProviderPolicy(
-                repository_id=row["repository_id"],
-                embedding_provider=EmbeddingProviderKind(row["embedding_provider"]),
-                monthly_token_budget=row["monthly_token_budget"],
-                per_run_token_budget=row["per_run_token_budget"],
-                updated_at=from_utc_text(row["updated_at"]),
-            )
-            for row in rows
-        )
+        return tuple(_policy_of(row) for row in rows)
 
 
 class ProviderUsageStore:
@@ -472,6 +471,25 @@ class ProviderUsageStore:
 
 
 _EPOCH = datetime.fromisoformat("1970-01-01T00:00:00+00:00")
+
+
+def _policy_of(row: sqlite3.Row) -> ProviderPolicy:
+    """Map one policy row.
+
+    Shared by `get` and `list_opted_in` rather than written twice: the two
+    drifted apart once already, and a read path that silently omits a field is
+    the kind of bug that only shows up as a setting mysteriously resetting.
+    """
+    return ProviderPolicy(
+        repository_id=row["repository_id"],
+        embedding_provider=EmbeddingProviderKind(row["embedding_provider"]),
+        monthly_token_budget=row["monthly_token_budget"],
+        per_run_token_budget=row["per_run_token_budget"],
+        updated_at=from_utc_text(row["updated_at"]),
+        answer_provider=AnswerProviderKind(row["answer_provider"]),
+        answer_model=row["answer_model"],
+        answer_timeout_seconds=row["answer_timeout_seconds"],
+    )
 
 
 def _namespace_from_row(row: sqlite3.Row) -> EmbeddingNamespace:

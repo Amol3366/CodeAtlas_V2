@@ -97,6 +97,65 @@
         "title": "Answer",
         "type": "object"
       },
+      "AnswerModelResponse": {
+        "additionalProperties": false,
+        "description": "One answer provider a user could choose, and what choosing it means.\n\nDeliberately not merged into `ModelResponse`: an answer model has no\ndimensions, and a field that is always null teaches a client the wrong\nshape.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "requires": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires"
+          },
+          "transmits_off_machine": {
+            "title": "Transmits Off Machine",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "model_id",
+          "available",
+          "transmits_off_machine",
+          "requires"
+        ],
+        "title": "AnswerModelResponse",
+        "type": "object"
+      },
+      "AnswerProviderKind": {
+        "description": "Which model, if any, writes a repository's answer prose.\n\n``NONE`` is the default everywhere, and it is what a database written\nbefore answer generation existed upgrades to. ``OLLAMA`` runs on this\nmachine and transmits nothing. Only ``OPENAI`` sends evidence excerpts off\nthe machine, which is why it can never be reached by default or by\nomission.\n\nDeliberately not merged with `EmbeddingProviderKind`: they share two member\nnames and nothing else. Retrieval and answering have different costs,\ndifferent failure modes, and different providers \u2014 Ollama serves answers\nbut is not an embedding backend here \u2014 so one enum would have members that\nare invalid for half its uses.",
+        "enum": [
+          "none",
+          "ollama",
+          "openai"
+        ],
+        "title": "AnswerProviderKind",
+        "type": "string"
+      },
       "ChangeAnalysisKind": {
         "description": "Which form of diff an analysis compares.",
         "enum": [
@@ -1912,6 +1971,13 @@
       "ModelsResponse": {
         "additionalProperties": false,
         "properties": {
+          "answer_models": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerModelResponse"
+            },
+            "title": "Answer Models",
+            "type": "array"
+          },
           "models": {
             "items": {
               "$ref": "#/components/schemas/ModelResponse"
@@ -2394,6 +2460,32 @@
       "SettingsResponse": {
         "additionalProperties": false,
         "properties": {
+          "answer_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Model"
+          },
+          "answer_provider": {
+            "title": "Answer Provider",
+            "type": "string"
+          },
+          "answer_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Timeout Seconds"
+          },
           "embedding_provider": {
             "title": "Embedding Provider",
             "type": "string"
@@ -2439,7 +2531,10 @@
           "monthly_token_budget",
           "per_run_token_budget",
           "transmits_off_machine",
-          "updated_at"
+          "updated_at",
+          "answer_provider",
+          "answer_model",
+          "answer_timeout_seconds"
         ],
         "title": "SettingsResponse",
         "type": "object"
@@ -2749,6 +2844,42 @@
         "additionalProperties": false,
         "description": "A partial change. An unmentioned field is left alone.\n\n``monthly_token_budget: null`` means *clear it*, which is a different\nrequest from not mentioning it \u2014 so the handler inspects\n``model_fields_set`` rather than reading the value.",
         "properties": {
+          "answer_model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Model"
+          },
+          "answer_provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerProviderKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answer_timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Timeout Seconds"
+          },
           "embedding_provider": {
             "anyOf": [
               {

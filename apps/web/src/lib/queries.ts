@@ -120,12 +120,24 @@ export interface RepositorySettings {
   readonly per_run_token_budget: number | null;
   readonly transmits_off_machine: boolean;
   readonly updated_at: string;
+  readonly answer_provider: string;
+  readonly answer_model: string | null;
+  readonly answer_timeout_seconds: number | null;
 }
 
 export interface EmbeddingModel {
   readonly provider: string;
   readonly model_id: string | null;
   readonly dimensions: number | null;
+  readonly available: boolean;
+  readonly transmits_off_machine: boolean;
+  readonly requires: string | null;
+}
+
+/** An answer provider. No `dimensions`: an answer model has none. */
+export interface AnswerModel {
+  readonly provider: string;
+  readonly model_id: string | null;
   readonly available: boolean;
   readonly transmits_off_machine: boolean;
   readonly requires: string | null;
@@ -157,6 +169,9 @@ export interface SettingsUpdate {
   readonly embedding_provider?: string;
   readonly monthly_token_budget?: number | null;
   readonly per_run_token_budget?: number | null;
+  readonly answer_provider?: string;
+  readonly answer_model?: string | null;
+  readonly answer_timeout_seconds?: number | null;
 }
 
 export function useSettings(repositoryId: string | null) {
@@ -175,7 +190,13 @@ export function useModels() {
     queryKey: ["models"] as const,
     // The list is a property of the installation, not of a repository, so it
     // is fetched once rather than per selected repository.
-    queryFn: () => api.get<{ models: EmbeddingModel[] }>("/v1/models"),
+    queryFn: () =>
+      api.get<{
+        models: EmbeddingModel[];
+        // Optional so a response from a backend older than answer generation
+        // still parses rather than crashing the settings page.
+        answer_models?: AnswerModel[];
+      }>("/v1/models"),
   });
 }
 

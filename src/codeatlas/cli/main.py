@@ -54,6 +54,7 @@ from codeatlas.domain.semantic import EmbeddingProviderKind
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.semantic.vector_store import LazyVectorStore
+from codeatlas.settings.env_file import load_env_file
 from codeatlas.storage.sqlite.backup import create_backup, restore
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.upgrade import (
@@ -1214,6 +1215,10 @@ def _print_report(report: ChangeAnalysisReport, report_format: str) -> None:
 
 def main() -> None:
     """Console-script entry point."""
+    # Deliberately here and not in `app()`. Tests invoke the Typer app directly
+    # and must not pick up a developer's real `.env`; the console script is the
+    # thing a user runs.
+    load_env_file()
     try:
         app()
     except sqlite3.Error:

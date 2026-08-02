@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -56,6 +57,21 @@ class AnswerProvider(Protocol):
 
     def generate(self, prompt: EvidenceGroundedPrompt) -> GeneratedAnswer | None: ...
 
+    def generate_stream(self, prompt: EvidenceGroundedPrompt) -> Iterator[str]:
+        """Yield answer text as it is produced.
+
+        Kept separate from `generate` rather than replacing it. `generate`
+        returns a structured answer that can be checked before anything is
+        shown; a stream cannot be checked until it ends. The caller streams for
+        display and validates the assembled text, which is why the contract
+        already calls streamed text provisional and the persisted response
+        authoritative.
+
+        A caller with nobody to stream to — the CLI, a contract test — uses
+        `generate` and pays for one call instead of a connection held open.
+        """
+        ...
+
 
 class NoAnswerProvider:
     """The safe default: no model call and no answer rewrite."""
@@ -65,6 +81,14 @@ class NoAnswerProvider:
 
     def generate(self, prompt: EvidenceGroundedPrompt) -> GeneratedAnswer | None:
         return None
+
+    def generate_stream(self, prompt: EvidenceGroundedPrompt) -> Iterator[str]:
+        return iter(())
+
+
+def collect_stream(chunks: Iterable[str]) -> str:
+    """Join streamed chunks into the text that will be validated."""
+    return "".join(chunks)
 
 
 def build_evidence_prompt(
@@ -108,5 +132,6 @@ __all__ = [
     "NoAnswerProvider",
     "PromptEvidence",
     "build_evidence_prompt",
+    "collect_stream",
 ]
 

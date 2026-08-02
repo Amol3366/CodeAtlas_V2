@@ -30,7 +30,11 @@ from datetime import UTC, datetime
 from typing import Final
 
 from codeatlas.domain.errors import InvalidRequestError, RepositoryNotFoundError
-from codeatlas.domain.semantic import EmbeddingProviderKind, ProviderPolicy
+from codeatlas.domain.semantic import (
+    AnswerProviderKind,
+    EmbeddingProviderKind,
+    ProviderPolicy,
+)
 from codeatlas.storage.sqlite.semantic_stores import ProviderPolicyStore
 from codeatlas.storage.sqlite.stores import RepositoryStore
 
@@ -48,10 +52,17 @@ class RepositorySettings:
     monthly_token_budget: int | None
     per_run_token_budget: int | None
     updated_at: datetime
+    answer_provider: AnswerProviderKind = AnswerProviderKind.NONE
+    answer_model: str | None = None
+    answer_timeout_seconds: int | None = None
 
     @property
     def transmits_off_machine(self) -> bool:
-        return self.embedding_provider.transmits_off_machine
+        """True when either decision transmits. See `ProviderPolicy`."""
+        return (
+            self.embedding_provider.transmits_off_machine
+            or self.answer_provider.transmits_off_machine
+        )
 
 
 @dataclass(frozen=True)
@@ -71,6 +82,21 @@ class ModelDescriptor:
     # variable to set. A settings page can then explain an unavailable option
     # instead of hiding it, which is the difference between a product that
     # looks broken and one that tells you what to do.
+    requires: str | None
+
+
+@dataclass(frozen=True)
+class AnswerModelDescriptor:
+    """One answer provider a user could choose, and what choosing it means.
+
+    No `dimensions`: an answer model has none, and carrying a field that is
+    always null would teach a client the wrong shape.
+    """
+
+    provider: AnswerProviderKind
+    model_id: str | None
+    available: bool
+    transmits_off_machine: bool
     requires: str | None
 
 
@@ -116,6 +142,9 @@ class SettingsService:
         per_run_token_budget: int | None = None,
         clear_monthly: bool = False,
         clear_per_run: bool = False,
+        answer_provider: AnswerProviderKind | None = None,
+        answer_model: str | None = None,
+        answer_timeout_seconds: int | None = None,
     ) -> RepositorySettings:
         """Apply a partial change, refusing anything that would leave it unsafe.
 
@@ -146,7 +175,36 @@ class SettingsService:
                     details={"field": f"{label}_token_budget"},
                 )
 
-        if provider.transmits_off_machine and monthly is None:
+        answering = (
+            current.answer_provider if answer_provider is None else answer_provider
+        )
+        answer_model_value = (
+            current.answer_model if answer_model is None else answer_model
+        )
+        answer_timeout = (
+            current.answer_timeout_seconds
+            if answer_timeout_seconds is None
+            else answer_timeout_seconds
+        )
+
+        if answer_timeout is not None and answer_timeout <= 0:
+            # Zero would fail every generation instantly, which is
+            # indistinguishable from the feature being broken.
+            raise InvalidRequestError(
+                "The answer timeout must be a positive number of seconds.",
+                details={"field": "answer_timeout_seconds"},
+            )
+
+        # Either decision reaching a metered account requires the budget. The
+        # answer provider is checked by the same rule and for the same reason:
+        # an unbounded metered account is how a local tool produces a
+        # surprising bill, and it does not matter which call made it.
+        transmitting: EmbeddingProviderKind | AnswerProviderKind | None = None
+        if provider.transmits_off_machine:
+            transmitting = provider
+        elif answering.transmits_off_machine:
+            transmitting = answering
+        if transmitting is not None and monthly is None:
             # Checked against the *resolved* state rather than the request, so
             # removing the budget later is refused exactly like never setting
             # one. Both routes reach the same unbounded account.
@@ -154,7 +212,7 @@ class SettingsService:
                 "A provider that sends content off the machine requires a"
                 " monthly token budget.",
                 details={
-                    "provider": provider.value,
+                    "provider": transmitting.value,
                     "field": "monthly_token_budget",
                 },
             )
@@ -165,6 +223,9 @@ class SettingsService:
             monthly_token_budget=monthly,
             per_run_token_budget=per_run,
             updated_at=self._now(),
+            answer_provider=answering,
+            answer_model=answer_model_value,
+            answer_timeout_seconds=answer_timeout,
         )
         self._policies.set(policy)
         return _from_policy(policy)
@@ -176,16 +237,30 @@ class SettingsService:
         an option cannot explain why it is missing, and "install the extra" is
         the whole answer for most users who go looking.
         """
+        from codeatlas.domain.errors import CodeAtlasError
         from codeatlas.semantic.providers import (
             LOCAL_MODEL_DIMENSIONS,
             LOCAL_MODEL_ID,
             OPENAI_API_KEY_VARIABLE,
-            OPENAI_DIMENSIONS,
-            OPENAI_MODEL_ID,
             describe_available_providers,
+            resolve_local_embedding_model,
+            resolve_openai_embedding_model,
         )
 
         available = describe_available_providers()
+        local_model = resolve_local_embedding_model()
+        openai_model: str | None
+        openai_dimensions: int | None
+        try:
+            openai_model, openai_dimensions = resolve_openai_embedding_model()
+            openai_requires: str | None = None
+        except CodeAtlasError as error:
+            # A misconfigured custom model is reported the same way a missing
+            # extra is: the option stays visible and explains itself, rather
+            # than disappearing or crashing the settings page.
+            openai_model, openai_dimensions = None, None
+            openai_requires = error.message
+
         return (
             ModelDescriptor(
                 provider=EmbeddingProviderKind.NONE,
@@ -197,8 +272,12 @@ class SettingsService:
             ),
             ModelDescriptor(
                 provider=EmbeddingProviderKind.LOCAL,
-                model_id=LOCAL_MODEL_ID,
-                dimensions=LOCAL_MODEL_DIMENSIONS,
+                model_id=local_model,
+                # Known only for the pinned model. Loading a custom one to
+                # measure it is exactly the cost this function avoids.
+                dimensions=(
+                    LOCAL_MODEL_DIMENSIONS if local_model == LOCAL_MODEL_ID else None
+                ),
                 available=available[EmbeddingProviderKind.LOCAL],
                 transmits_off_machine=False,
                 requires=(
@@ -209,14 +288,76 @@ class SettingsService:
             ),
             ModelDescriptor(
                 provider=EmbeddingProviderKind.OPENAI,
-                model_id=OPENAI_MODEL_ID,
-                dimensions=OPENAI_DIMENSIONS,
-                available=available[EmbeddingProviderKind.OPENAI],
+                model_id=openai_model,
+                dimensions=openai_dimensions,
+                available=(
+                    available[EmbeddingProviderKind.OPENAI]
+                    and openai_requires is None
+                ),
+                transmits_off_machine=True,
+                requires=(
+                    openai_requires
+                    if openai_requires is not None
+                    else (
+                        None
+                        if available[EmbeddingProviderKind.OPENAI]
+                        else f"extra:semantic-openai and {OPENAI_API_KEY_VARIABLE}"
+                    )
+                ),
+            ),
+        )
+
+    def answer_models(self) -> tuple[AnswerModelDescriptor, ...]:
+        """Every answer provider, including ones that cannot run here.
+
+        Same rule as `models`: an option that is hidden cannot explain itself.
+        Ollama is reported available without connecting to it — see
+        `describe_available_answer_providers` for why a settings page must not
+        wait on a network probe.
+        """
+        from codeatlas.generation.factory import (
+            OPENAI_API_KEY_VARIABLE,
+            describe_available_answer_providers,
+        )
+        from codeatlas.generation.ollama_provider import (
+            DEFAULT_MODEL_ID as OLLAMA_DEFAULT,
+        )
+        from codeatlas.generation.openai_provider import (
+            DEFAULT_MODEL_ID as OPENAI_DEFAULT,
+        )
+        from codeatlas.settings.env_file import (
+            configured_ollama_answer_model,
+            configured_openai_answer_model,
+        )
+
+        available = describe_available_answer_providers()
+        return (
+            AnswerModelDescriptor(
+                provider=AnswerProviderKind.NONE,
+                model_id=None,
+                available=True,
+                transmits_off_machine=False,
+                requires=None,
+            ),
+            AnswerModelDescriptor(
+                provider=AnswerProviderKind.OLLAMA,
+                model_id=configured_ollama_answer_model() or OLLAMA_DEFAULT,
+                available=available[AnswerProviderKind.OLLAMA],
+                transmits_off_machine=False,
+                # Stated even though the option is always selectable: Ollama is
+                # a separate install, and "requires Ollama" is the whole answer
+                # for a user whose first question reports it unreachable.
+                requires="Ollama running locally",
+            ),
+            AnswerModelDescriptor(
+                provider=AnswerProviderKind.OPENAI,
+                model_id=configured_openai_answer_model() or OPENAI_DEFAULT,
+                available=available[AnswerProviderKind.OPENAI],
                 transmits_off_machine=True,
                 requires=(
                     None
-                    if available[EmbeddingProviderKind.OPENAI]
-                    else f"extra:semantic-openai and {OPENAI_API_KEY_VARIABLE}"
+                    if available[AnswerProviderKind.OPENAI]
+                    else OPENAI_API_KEY_VARIABLE
                 ),
             ),
         )
@@ -288,6 +429,9 @@ def _from_policy(policy: ProviderPolicy) -> RepositorySettings:
         monthly_token_budget=policy.monthly_token_budget,
         per_run_token_budget=policy.per_run_token_budget,
         updated_at=policy.updated_at,
+        answer_provider=policy.answer_provider,
+        answer_model=policy.answer_model,
+        answer_timeout_seconds=policy.answer_timeout_seconds,
     )
 
 

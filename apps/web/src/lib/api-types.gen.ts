@@ -745,6 +745,44 @@ export interface components {
             summary: string;
         };
         /**
+         * AnswerModelResponse
+         * @description One answer provider a user could choose, and what choosing it means.
+         *
+         *     Deliberately not merged into `ModelResponse`: an answer model has no
+         *     dimensions, and a field that is always null teaches a client the wrong
+         *     shape.
+         */
+        AnswerModelResponse: {
+            /** Available */
+            available: boolean;
+            /** Model Id */
+            model_id: string | null;
+            /** Provider */
+            provider: string;
+            /** Requires */
+            requires: string | null;
+            /** Transmits Off Machine */
+            transmits_off_machine: boolean;
+        };
+        /**
+         * AnswerProviderKind
+         * @description Which model, if any, writes a repository's answer prose.
+         *
+         *     ``NONE`` is the default everywhere, and it is what a database written
+         *     before answer generation existed upgrades to. ``OLLAMA`` runs on this
+         *     machine and transmits nothing. Only ``OPENAI`` sends evidence excerpts off
+         *     the machine, which is why it can never be reached by default or by
+         *     omission.
+         *
+         *     Deliberately not merged with `EmbeddingProviderKind`: they share two member
+         *     names and nothing else. Retrieval and answering have different costs,
+         *     different failure modes, and different providers — Ollama serves answers
+         *     but is not an embedding backend here — so one enum would have members that
+         *     are invalid for half its uses.
+         * @enum {string}
+         */
+        AnswerProviderKind: "none" | "ollama" | "openai";
+        /**
          * ChangeAnalysisKind
          * @description Which form of diff an analysis compares.
          * @enum {string}
@@ -1398,6 +1436,8 @@ export interface components {
         };
         /** ModelsResponse */
         ModelsResponse: {
+            /** Answer Models */
+            answer_models?: components["schemas"]["AnswerModelResponse"][];
             /** Models */
             models: components["schemas"]["ModelResponse"][];
         };
@@ -1570,6 +1610,12 @@ export interface components {
         };
         /** SettingsResponse */
         SettingsResponse: {
+            /** Answer Model */
+            answer_model: string | null;
+            /** Answer Provider */
+            answer_provider: string;
+            /** Answer Timeout Seconds */
+            answer_timeout_seconds: number | null;
             /** Embedding Provider */
             embedding_provider: string;
             /** Monthly Token Budget */
@@ -1695,6 +1741,11 @@ export interface components {
          *     ``model_fields_set`` rather than reading the value.
          */
         UpdateSettingsBody: {
+            /** Answer Model */
+            answer_model?: string | null;
+            answer_provider?: components["schemas"]["AnswerProviderKind"] | null;
+            /** Answer Timeout Seconds */
+            answer_timeout_seconds?: number | null;
             embedding_provider?: components["schemas"]["EmbeddingProviderKind"] | null;
             /** Monthly Token Budget */
             monthly_token_budget?: number | null;

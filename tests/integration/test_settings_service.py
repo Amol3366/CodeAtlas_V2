@@ -237,3 +237,40 @@ def test_the_model_list_names_the_variable_a_user_must_set(
 
     assert requires is not None
     assert "OPENAI_API_KEY" in requires
+
+
+def test_models_report_the_configured_local_model(
+    connection: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codeatlas.settings.env_file import LOCAL_MODEL_VARIABLE
+
+    monkeypatch.setenv(LOCAL_MODEL_VARIABLE, "BAAI/bge-small-en-v1.5")
+
+    models = SettingsService(connection).models()
+    local = next(m for m in models if m.provider is EmbeddingProviderKind.LOCAL)
+
+    assert local.model_id == "BAAI/bge-small-en-v1.5"
+    # Unknown until the model loads, and loading it to render a form is what
+    # this function exists to avoid.
+    assert local.dimensions is None
+
+
+def test_models_explain_a_custom_openai_model_missing_its_width(
+    connection: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codeatlas.settings.env_file import (
+        OPENAI_DIMENSIONS_VARIABLE,
+        OPENAI_MODEL_VARIABLE,
+    )
+
+    monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "text-embedding-3-large")
+    monkeypatch.delenv(OPENAI_DIMENSIONS_VARIABLE, raising=False)
+
+    models = SettingsService(connection).models()
+    openai = next(m for m in models if m.provider is EmbeddingProviderKind.OPENAI)
+
+    assert openai.available is False
+    assert openai.requires is not None
+    assert OPENAI_DIMENSIONS_VARIABLE in openai.requires
