@@ -114,12 +114,33 @@ user who has not installed it, and would declare the feature admitted without
 the measurement the threat model requires. `embedding_provider` already
 defaults to `none` for the same reason; this follows it.
 
-**An honest limit on the primary model.** `llama3.2:3b` is small. Its 128K
-context easily holds a 25-item evidence set, but at three billion parameters it
-produces clear, simple summaries rather than deep cross-file reasoning. That
-suits the motivating question — "what is this project" — and is weaker for
-subtle architectural questions. Offering both providers is the answer to this,
-not pretending the gap is absent.
+**An honest limit on the primary model, and the provision that answers it.**
+`llama3.2:3b` is small. Its 128K context easily holds a 25-item evidence set,
+but at three billion parameters it produces clear, simple summaries rather than
+deep cross-file reasoning. That suits the motivating question — "what is this
+project" — and is weaker for subtle architectural questions.
+
+The answer is not to pretend the gap is absent, but to make trading up a
+one-field change. **The model name is an editable field in the settings page**,
+pre-filled with `llama3.2:3b`, accepting any model the chosen provider can run:
+a larger local model such as an 8B or 14B build, or an OpenAI model. Nobody has
+to edit a file to reason harder; `.env` sets the default, the settings field
+overrides it per repository.
+
+Practical guidance belongs next to that field rather than in documentation
+nobody opens: bigger models need proportionally more RAM and answer more slowly,
+and the model tag must be one the local Ollama install has actually pulled.
+A wrong tag surfaces as `GENERATION_MODEL_MISSING` — "there is no model
+working" — which is why that cause is distinguished from "can't connect".
+
+**Swapping answer models is free, and this is worth stating because the
+embedding side is the opposite.** Changing an embedding model invalidates the
+vector index and requires a shadow namespace, a backfill, and an atomic cutover
+(ADR-0010, ADR-0011). An answer model stores nothing: it reads verified evidence
+and writes prose. Changing it affects the next answer and nothing else — no
+migration, no re-index, no rollback window. Users can therefore experiment
+freely, and the design must not accidentally invent ceremony the data does not
+require.
 
 The scope decision carries a cost the user accepted knowingly: a slow local
 model adds latency to lookups that were previously instant. Recorded under
@@ -223,6 +244,7 @@ credentials and model identity but never consent:
 | `CODEATLAS_OLLAMA_ANSWER_MODEL` | `llama3.2:3b` |
 | `CODEATLAS_OLLAMA_BASE_URL` | `http://127.0.0.1:11434` |
 | `CODEATLAS_OPENAI_ANSWER_MODEL` | `gpt-4o-mini` |
+| `CODEATLAS_ANSWER_TIMEOUT_SECONDS` | generous enough for a local heavy model |
 
 These select *which* model runs. They cannot enable generation for a repository
 whose stored setting is `none` — the same boundary `build_embedding_provider`
@@ -264,6 +286,16 @@ Telling these apart requires inspecting provider responses rather than catching
 a blanket `Exception`: Ollama returns 404 with a distinguishing body for a
 missing model; OpenAI returns 401 for a bad key and 429 with `insufficient_quota`
 for exhausted billing.
+
+**The timeout must be configurable, or it defeats the heavy-model provision.**
+A 3B model answers in seconds; a 14B model on CPU can take minutes. A timeout
+tuned to the default would turn "use a bigger model for deeper reasoning" into
+`GENERATION_TIMED_OUT` on every question — the feature would appear broken
+precisely when used as intended. The timeout is therefore a setting with a
+default generous enough for a local heavy model, and streaming makes a long wait
+tolerable because text appears as it is produced rather than after everything
+finishes. `AGENTS.md` Section 10.3 requires a bound on every request; this
+satisfies it with a bound the user can raise, not by removing it.
 
 ## Testing
 
