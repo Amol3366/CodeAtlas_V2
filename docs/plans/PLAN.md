@@ -1,13 +1,14 @@
+
 # CodeAtlas Shared Execution Plan
 
 Status: active
 Plan contract version: 1.0
-Policy authority: `CLAUDE.md`
+Policy authority: `AGENTS.md` / `CLAUDE.md`
 Blueprint: `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`
 
 ## Rules for Every Coding Agent
 
-1. Read `CLAUDE.md`, this file, and the active phase plan before acting.
+1. Read `AGENTS.md` / `CLAUDE.md`, this file, and the active phase plan before acting.
 2. Inspect the workspace, available Git state, and the latest handoff.
 3. Work only on the single task marked `ready`, `in_progress`, or `verifying`.
 4. Do not start a task until every declared dependency is `complete`.
@@ -34,47 +35,47 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 ## Phase Index
 
-| Phase                                            | Plan                                                                      | Status                                                  | Gate authority |
-| ------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------- | -------------- |
-| 0 — Product contract and evaluation             | [phase plan](phases/phase-00-product-contract-evaluation.md)               | `complete`                                            | User           |
-| 1 — Repository truth vertical slice             | [phase plan](phases/phase-01-repository-truth-vertical-slice.md)           | `complete`                                            | User           |
-| 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete`                                            | User           |
-| 3 — Polyglot graph and delivery contracts       | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md)     | `complete`                                            | User           |
-| 4 — Change assurance                            | [phase plan](phases/phase-04-change-assurance.md)                          | `complete`                                            | User           |
-| 5 — Persistent web application                  | [phase plan](phases/phase-05-persistent-web-application.md)                | `complete`                                            | User           |
-| 6 — Continuous freshness and hardening          | [phase plan](phases/phase-06-freshness-and-hardening.md)                   | `complete` (gate approved by the user 2026-07-29)     | User           |
-| 7 — Measured semantic uplift                    | [phase plan](phases/phase-07-measured-semantic-uplift.md)                  | `complete` (gate approved by the user 2026-07-31)   | User           |
+| Phase                                            | Plan                                                                      | Status                                              | Gate authority |
+| ------------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------- | -------------- |
+| 0 — Product contract and evaluation             | [phase plan](phases/phase-00-product-contract-evaluation.md)               | `complete`                                        | User           |
+| 1 — Repository truth vertical slice             | [phase plan](phases/phase-01-repository-truth-vertical-slice.md)           | `complete`                                        | User           |
+| 2 — Snapshots, stable chunks, lexical retrieval | [phase plan](phases/phase-02-snapshots-stable-chunks-lexical-retrieval.md) | `complete`                                        | User           |
+| 3 — Polyglot graph and delivery contracts       | [phase plan](phases/phase-03-polyglot-graph-and-delivery-contracts.md)     | `complete`                                        | User           |
+| 4 — Change assurance                            | [phase plan](phases/phase-04-change-assurance.md)                          | `complete`                                        | User           |
+| 5 — Persistent web application                  | [phase plan](phases/phase-05-persistent-web-application.md)                | `complete`                                        | User           |
+| 6 — Continuous freshness and hardening          | [phase plan](phases/phase-06-freshness-and-hardening.md)                   | `complete` (gate approved by the user 2026-07-29) | User           |
+| 7 — Measured semantic uplift                    | [phase plan](phases/phase-07-measured-semantic-uplift.md)                  | `complete` (gate approved by the user 2026-07-31) | User           |
 
 ## Active Work
 
-| Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active phase    | none — Phases 0–7 are all `complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                      |
-| Active task     | none — Phase 7 approved; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Task status     | `complete` — Phase 7 gate approved by the user 2026-07-31                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Agent           | Claude Code `claude-opus-5` (recovered P7-12 in place from Codex GPT-5, per rule 9) |
-| Started UTC     | 2026-07-30T18:51:46Z                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Git state       | Branch `main` at `5ea8ab8`. P7-05 through P7-12 are now committed; the working tree carries only this task's packaged provider-surface tests, the live policy-pointer updates, and this status edit. |
-| Policy filename | The policy file has been both `CLAUDE.md` and `AGENTS.md`, and has now been renamed back: it is **`CLAUDE.md`** again as of 2026-07-31. Citations to either name mean that one file — 113 of them across 57 files. Only the *live* pointers were updated (this file's header and rule 1, and the README); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a 113-reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision. Post-gate review findings (2026-07-31) are fixed; see the top handoff entry                                                                                                                                                                                                                                                                                                                                                                         |
+| Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Active phase    | none — Phases 0–7 are all`complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Active task     | none — Phase 7 approved; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Task status     | `complete` — Phase 7 gate approved by the user 2026-07-31                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Agent           | Claude Code`claude-opus-5` (recovered P7-12 in place from Codex GPT-5, per rule 9)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Started UTC     | 2026-07-30T18:51:46Z                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Git state       | Branch`main` at `5ea8ab8`. P7-05 through P7-12 are now committed; the working tree carries only this task's packaged provider-surface tests, the live policy-pointer updates, and this status edit.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Policy filename | The authoritative coding-agent contract is exposed as **`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
+| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision. Post-gate review findings (2026-07-31) are fixed; see the top handoff entry                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### Phase 7 Task Board
 
-| Task     | Deliverable                                                                          | Dependencies                      | Status          |
-| -------- | ------------------------------------------------------------------------------------ | --------------------------------- | --------------- |
-| P7-SETUP | ADR-0009, optional deps,`check_phase7.ps1` skeleton, comparison baseline           | Phase 6                           | `complete`    |
-| P7-01    | Semantic domain, migration`0010`, stores                                           | P7-SETUP                          | `complete`    |
-| P7-02    | `EmbeddingProvider` interface, NoOp + local provider, content-hash cache           | P7-01                             | `complete`    |
-| P7-03    | `VectorStore` interface, LanceDB adapter, base/delta namespaces                    | P7-01                             | `complete`    |
-| P7-04    | Index-time embedding pipeline, coverage tracking, crash-safe jobs                    | P7-02, P7-03                      | `complete`    |
-| P7-05    | Semantic retrieval channel, candidate-only fusion, fallback matrix                   | P7-04                             | `complete`    |
-| P7-06    | Uplift evaluation vs deterministic baseline,`baseline-phase-7`, admission decision | P7-05                             | `complete`    |
-| P7-07    | Privacy governance + OpenAI provider: opt-in, redaction, budgets, telemetry          | P7-02, P7-05                      | `complete`    |
-| P7-08    | Settings surface (Section 12.5): REST, CLI, web settings page                        | P7-07                             | `complete`    |
-| P7-09    | Shadow embedding migration, cutover/rollback, migration endpoints                    | P7-03, P7-04                      | `complete`    |
-| P7-10    | Optional bounded reranking, uplift A/B, admission decision                           | P7-06                             | `complete`    |
-| P7-11    | Optional evidence-grounded explanation, steps 14–15, admission decision             | P7-06, P7-07                      | `complete`    |
-| P7-12    | Perf/packaging/security validation, docs, phase gate                                 | P7-06, P7-08, P7-09, P7-10, P7-11 | `complete`    |
+| Task     | Deliverable                                                                          | Dependencies                      | Status       |
+| -------- | ------------------------------------------------------------------------------------ | --------------------------------- | ------------ |
+| P7-SETUP | ADR-0009, optional deps,`check_phase7.ps1` skeleton, comparison baseline           | Phase 6                           | `complete` |
+| P7-01    | Semantic domain, migration`0010`, stores                                           | P7-SETUP                          | `complete` |
+| P7-02    | `EmbeddingProvider` interface, NoOp + local provider, content-hash cache           | P7-01                             | `complete` |
+| P7-03    | `VectorStore` interface, LanceDB adapter, base/delta namespaces                    | P7-01                             | `complete` |
+| P7-04    | Index-time embedding pipeline, coverage tracking, crash-safe jobs                    | P7-02, P7-03                      | `complete` |
+| P7-05    | Semantic retrieval channel, candidate-only fusion, fallback matrix                   | P7-04                             | `complete` |
+| P7-06    | Uplift evaluation vs deterministic baseline,`baseline-phase-7`, admission decision | P7-05                             | `complete` |
+| P7-07    | Privacy governance + OpenAI provider: opt-in, redaction, budgets, telemetry          | P7-02, P7-05                      | `complete` |
+| P7-08    | Settings surface (Section 12.5): REST, CLI, web settings page                        | P7-07                             | `complete` |
+| P7-09    | Shadow embedding migration, cutover/rollback, migration endpoints                    | P7-03, P7-04                      | `complete` |
+| P7-10    | Optional bounded reranking, uplift A/B, admission decision                           | P7-06                             | `complete` |
+| P7-11    | Optional evidence-grounded explanation, steps 14–15, admission decision             | P7-06, P7-07                      | `complete` |
+| P7-12    | Perf/packaging/security validation, docs, phase gate                                 | P7-06, P7-08, P7-09, P7-10, P7-11 | `complete` |
 
 Detail, gate conditions, and the four user decisions behind the scope live in
 the [Phase 7 plan](phases/phase-07-measured-semantic-uplift.md).
@@ -207,6 +208,31 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-01T12:58:48Z — `AGENTS.md` / `CLAUDE.md` agent entries restored
+
+- Agent: Codex GPT-5.
+- Transition: none. Phases 0-7 stay `complete`; this is post-gate policy-file
+  discovery cleanup on the user's request.
+
+#### Outcome and compatibility
+
+The authoritative coding-agent contract is exposed as `AGENTS.md` /
+`CLAUDE.md`. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` remains
+in the working tree as the Claude entry point for the same contract and directs
+agents to the maintained `AGENTS.md` body before planning or changing code.
+
+The README and this file's live header/rule now name both entry files.
+Historical ADRs, old phase plans, baselines, source comments, and handoff
+entries were not rewritten; citations to `CLAUDE.md` and `AGENTS.md` refer to
+the same policy lineage.
+
+- Files changed: `AGENTS.md`, `CLAUDE.md`, `README.md`,
+  `docs/plans/PLAN.md`.
+- Verification: `git diff --check` exited 0. Git reported the existing
+  `README.md` CRLF normalization warning. No test suite was run because this is
+  documentation-only.
+- Next: await user instruction.
+
 ### 2026-08-01T12:10:10Z — `.env` configuration for provider credentials and models
 
 - Agent: Claude Code `claude-opus-5`, branch `env-provider-configuration` off
@@ -280,12 +306,12 @@ repository's hand-rolled YAML scanner and stdlib-`tomllib`-only precedent.
 
 #### Verification
 
-| Command | Exit | Result |
-| --- | --- | --- |
-| `uv run pytest` | 0 | 1724 passed |
-| `uv run ruff check .` | 0 | clean |
-| `uv run mypy --no-incremental src tests scripts apps` | 0 | 293 files, clean |
-| `scripts/check_phase7.ps1 -SkipSync` | **0** | 1724 Python tests, 113 web tests, 14 e2e passed / 4 skipped, lint and types clean |
+| Command                                                 | Exit        | Result                                                                            |
+| ------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `uv run pytest`                                       | 0           | 1724 passed                                                                       |
+| `uv run ruff check .`                                 | 0           | clean                                                                             |
+| `uv run mypy --no-incremental src tests scripts apps` | 0           | 293 files, clean                                                                  |
+| `scripts/check_phase7.ps1 -SkipSync`                  | **0** | 1724 Python tests, 113 web tests, 14 e2e passed / 4 skipped, lint and types clean |
 
 The gate failed once on types before passing: the new test files lacked the
 annotations this repository requires on `tests/`, which `mypy src` alone does
@@ -348,12 +374,12 @@ renderer.** The pre-authorized response was to skip that test on Chromium, as
 four conversation-route tests already are. That would have been wrong, and
 eight single-variable probes showed why:
 
-| Navigation | Settings render | Chromium |
-| --- | --- | --- |
-| full load | provider `none` | pass |
-| client-side | provider `none` | pass |
-| full load | transmitting | pass |
-| client-side | transmitting | **renderer death** |
+| Navigation  | Settings render  | Chromium                 |
+| ----------- | ---------------- | ------------------------ |
+| full load   | provider`none` | pass                     |
+| client-side | provider`none` | pass                     |
+| full load   | transmitting     | pass                     |
+| client-side | transmitting     | **renderer death** |
 
 Repository identity and repository switching were both exonerated: moving the
 transmitting policy onto the *default* repository, with no switch anywhere,
@@ -393,14 +419,14 @@ is a stored row and no provider is ever constructed.
 
 #### Verification
 
-| Command | Exit | Result |
-| --- | --- | --- |
-| `pnpm exec vitest run src/routes/SettingsRoute.test.tsx` | 0 | 5 passed |
-| `pnpm test` (apps/web) | 0 | 113 passed, 10 files |
-| `pnpm lint` / `pnpm typecheck` | 0 / 0 | clean |
-| `pnpm exec vite build` | 0 | built |
-| `pnpm exec playwright test` | 0 | 14 passed, 4 skipped (pre-existing Chromium conversation-route skips) |
-| `scripts/check_phase7.ps1 -SkipSync` | **0** | 1682 Python tests, 113 web tests, 14 e2e passed / 4 skipped, lint and types clean |
+| Command                                                    | Exit        | Result                                                                            |
+| ---------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `pnpm exec vitest run src/routes/SettingsRoute.test.tsx` | 0           | 5 passed                                                                          |
+| `pnpm test` (apps/web)                                   | 0           | 113 passed, 10 files                                                              |
+| `pnpm lint` / `pnpm typecheck`                         | 0 / 0       | clean                                                                             |
+| `pnpm exec vite build`                                   | 0           | built                                                                             |
+| `pnpm exec playwright test`                              | 0           | 14 passed, 4 skipped (pre-existing Chromium conversation-route skips)             |
+| `scripts/check_phase7.ps1 -SkipSync`                     | **0** | 1682 Python tests, 113 web tests, 14 e2e passed / 4 skipped, lint and types clean |
 
 The three pre-existing browser suites were also run against the seeded third
 repository before it was reverted, to prove the new fixture had not changed any
@@ -513,7 +539,6 @@ Recorded because a gate approved on incomplete evidence should say so.
 - `check_phase7.ps1 -Semantic -Package -Perf` was not re-run. The semantic
   extras are absent from this environment and the perf measurement is the
   previous agent's 2026-07-30 artifact.
-
 - Next: **await user instruction.** The Phase 7 gate remains approved; nothing
   here reopens it. If a release is cut from this state, the packaged artifact
   should be rebuilt and `check_phase7.ps1 -Semantic -Package -Perf` re-run,
@@ -534,11 +559,11 @@ twelve conditions met. Recording it any other way would misrepresent what the
 user agreed to, and the Phase 4 and Phase 6 gates set the precedent for
 carrying a known miss into an approval rather than quietly resolving it.
 
-| | Conditions |
-| --- | --- |
-| Met | 1, 2, 3, 4, 5, 6, 8, 11, 12 — and 2 was proven in a genuinely extras-free environment, not assumed |
-| Satisfied as recorded declines | 9 (reranking) and 10 (explanation) — both built as seams, measured, shown to improve nothing, and **not shipped** |
-| **Missed** | **7 — primary evidence Recall@10 0.6667 against the Section 19.3 >= 0.90 target** |
+|                                | Conditions                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Met                            | 1, 2, 3, 4, 5, 6, 8, 11, 12 — and 2 was proven in a genuinely extras-free environment, not assumed                     |
+| Satisfied as recorded declines | 9 (reranking) and 10 (explanation) — both built as seams, measured, shown to improve nothing, and**not shipped** |
+| **Missed**               | **7 — primary evidence Recall@10 0.6667 against the Section 19.3 >= 0.90 target**                                |
 
 On the miss: the semantic layer's uplift is real and positive on every recall
 metric (0.6000 -> 0.6667 recall, 0.9286 -> 1.0000 abstention correctness,
@@ -645,12 +670,12 @@ semantic baseline and both A/B artifacts.
 the difference is worth stating rather than leaving as an oddity a later reader
 has to re-derive:
 
-| | Tests |
-| --- | ---: |
-| Collected with the extras installed, before this task | 1696 |
-| less `tests/semantic/*`, which `tests/conftest.py` sets `collect_ignore_glob` for when the extras are absent | −25 |
-| plus this task's packaged provider-surface tests | +4 |
-| **Collected and passing without the extras** | **1675** |
+|                                                                                                                   |          Tests |
+| ----------------------------------------------------------------------------------------------------------------- | -------------: |
+| Collected with the extras installed, before this task                                                             |           1696 |
+| less`tests/semantic/*`, which `tests/conftest.py` sets `collect_ignore_glob` for when the extras are absent |           −25 |
+| plus this task's packaged provider-surface tests                                                                  |             +4 |
+| **Collected and passing without the extras**                                                                | **1675** |
 
 Nothing is silently uncollected. The 25 semantic tests are deliberately
 excluded without their dependencies and are run by the gate's `-Semantic` step
@@ -768,20 +793,20 @@ count.
 
 #### Phase 7 completion gate — condition by condition
 
-| # | Condition | Result |
-| --- | --- | --- |
-| 1 | Product/privacy/architecture approval recorded | **met** — 2026-07-29 handoff |
-| 2 | Provider-neutral interface, `NoEmbeddingProvider` default, deterministic path needs no provider | **met** — three `test_embedding_providers.py` assertions run only when the extras are absent |
-| 3 | Content-hash cache; one-symbol edit embeds only changed hashes | **met** — P7-02/P7-04 incremental-embedding tests over the Phase 2 fixtures |
-| 4 | LanceDB base/delta, SQLite membership authoritative, stale vectors excluded | **met** — P7-03 stale-vector filtering tests |
-| 5 | Deterministic fallback; provider-disabled run scores identically to baseline | **met** — `test_a_disabled_repository_gets_back_the_identical_response` plus the failure/timeout/budget matrix |
-| 6 | Privacy governance: opt-in, redaction, budgets, telemetry without content | **met** — 35+ tests in `tests/security/`, now also proven **on the artifact** (item 2 above) |
-| 7 | Semantic uplift vs the deterministic baseline, against the >= 0.90 Recall@10 target | **MISSED on the absolute target; the uplift itself is real.** 0.6000 -> 0.6667 (+0.0667). Abstention correctness 0.9286 -> 1.0000, exact symbol resolution 0.2143 -> 0.2857, unsupported-claim rate 0.0000 both sides. Evidence volume rose 132 -> 212, so exact/containing evidence *rates* fell. The target is missed with and without the layer |
-| 8 | Shadow migration: backfill, dual-write, atomic cutover, retained rollback | **met** — migration `0011`, the three `/v1/models/embedding-migrations` endpoints, cutover/rollback tests |
-| 9 | Bounded reranking, admitted only on uplift | **satisfied as a decline** — only `NoReranker` exists; zero delta on every metric; recorded in `rerank-phase-7.{json,md}` |
-| 10 | Evidence-grounded explanation, admitted only on uplift, 100% citation validity | **satisfied as a decline** — only `NoAnswerProvider`; zero delta; generated-citation validity 1.0000; recorded in `explanation-phase-7.{json,md}` |
-| 11 | Evidence/snapshot contracts preserved, `contract_version` stays `"1.1"`, leakage 0 | **met** — no contract bump; `SCHEMA_VERSION` 11 additive |
-| 12 | Section 19.3 targets hold with embeddings enabled; artifact size and cold start re-measured | **met, with the size recorded honestly** — refresh p95 **0.975 s** (<= 2 s), preflight p95 **2.298 s** (<= 10 s), coverage 1.0, cold start 1.064 s, exe 81.7 MB, onedir tree **1.05 GB** |
+| #  | Condition                                                                                        | Result                                                                                                                                                                                                                                                                                                                                                     |
+| -- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | Product/privacy/architecture approval recorded                                                   | **met** — 2026-07-29 handoff                                                                                                                                                                                                                                                                                                                        |
+| 2  | Provider-neutral interface,`NoEmbeddingProvider` default, deterministic path needs no provider | **met** — three `test_embedding_providers.py` assertions run only when the extras are absent                                                                                                                                                                                                                                                      |
+| 3  | Content-hash cache; one-symbol edit embeds only changed hashes                                   | **met** — P7-02/P7-04 incremental-embedding tests over the Phase 2 fixtures                                                                                                                                                                                                                                                                         |
+| 4  | LanceDB base/delta, SQLite membership authoritative, stale vectors excluded                      | **met** — P7-03 stale-vector filtering tests                                                                                                                                                                                                                                                                                                        |
+| 5  | Deterministic fallback; provider-disabled run scores identically to baseline                     | **met** — `test_a_disabled_repository_gets_back_the_identical_response` plus the failure/timeout/budget matrix                                                                                                                                                                                                                                    |
+| 6  | Privacy governance: opt-in, redaction, budgets, telemetry without content                        | **met** — 35+ tests in `tests/security/`, now also proven **on the artifact** (item 2 above)                                                                                                                                                                                                                                                |
+| 7  | Semantic uplift vs the deterministic baseline, against the >= 0.90 Recall@10 target              | **MISSED on the absolute target; the uplift itself is real.** 0.6000 -> 0.6667 (+0.0667). Abstention correctness 0.9286 -> 1.0000, exact symbol resolution 0.2143 -> 0.2857, unsupported-claim rate 0.0000 both sides. Evidence volume rose 132 -> 212, so exact/containing evidence *rates* fell. The target is missed with and without the layer |
+| 8  | Shadow migration: backfill, dual-write, atomic cutover, retained rollback                        | **met** — migration `0011`, the three `/v1/models/embedding-migrations` endpoints, cutover/rollback tests                                                                                                                                                                                                                                       |
+| 9  | Bounded reranking, admitted only on uplift                                                       | **satisfied as a decline** — only `NoReranker` exists; zero delta on every metric; recorded in `rerank-phase-7.{json,md}`                                                                                                                                                                                                                       |
+| 10 | Evidence-grounded explanation, admitted only on uplift, 100% citation validity                   | **satisfied as a decline** — only `NoAnswerProvider`; zero delta; generated-citation validity 1.0000; recorded in `explanation-phase-7.{json,md}`                                                                                                                                                                                               |
+| 11 | Evidence/snapshot contracts preserved,`contract_version` stays `"1.1"`, leakage 0            | **met** — no contract bump; `SCHEMA_VERSION` 11 additive                                                                                                                                                                                                                                                                                          |
+| 12 | Section 19.3 targets hold with embeddings enabled; artifact size and cold start re-measured      | **met, with the size recorded honestly** — refresh p95 **0.975 s** (<= 2 s), preflight p95 **2.298 s** (<= 10 s), coverage 1.0, cold start 1.064 s, exe 81.7 MB, onedir tree **1.05 GB**                                                                                                                                          |
 
 Ten conditions met, two admitted as recorded declines, **one missed**: the
 Section 19.3 Recall@10 target. The miss is not a regression — no earlier phase
@@ -818,7 +843,6 @@ the unfixed baseline would credit it with the bug fix's work.
 - No Playwright coverage for the settings flow.
 - The three Phase 6 qualifications stand unchanged: Chromium conversation-route
   skips, no pid-reuse detection in recovery, unsigned executable.
-
 - Next: record the `check_phase7.ps1 -SkipE2E` result. If it exits 0, move
   P7-12 to `complete` and Phase 7 to `awaiting_user_approval` with the table
   above as the gate summary. **The Phase 7 gate is the user's decision, and
@@ -902,16 +926,10 @@ the unfixed baseline would credit it with the bug fix's work.
 - Verification in this environment:
   tests were written first and failed with
   `ModuleNotFoundError: No module named 'codeatlas.semantic.reranking'`;
-  after implementation, `uv run pytest -q tests/unit/test_reranking.py
-  tests/integration/test_semantic_reranking.py
-  tests/evaluation/test_rerank_admission.py` — exit 0, 9 passed; targeted Ruff
+  after implementation, `uv run pytest -q tests/unit/test_reranking.py tests/integration/test_semantic_reranking.py tests/evaluation/test_rerank_admission.py` — exit 0, 9 passed; targeted Ruff
   — exit 0; `uv run mypy --no-incremental src/codeatlas scripts` — exit 0,
   no issues in 137 source files; broader semantic/migration/settings suite
-  including reranking — exit 0, 108 passed; `uv run python
-  scripts/run_phase7_rerank_ab.py --semantic-baseline
-  docs/evaluation/baseline-phase-7.json --json-output
-  docs/evaluation/rerank-phase-7.json --markdown-output
-  docs/evaluation/rerank-phase-7.md --check` — exit 0.
+  including reranking — exit 0, 108 passed; `uv run python scripts/run_phase7_rerank_ab.py --semantic-baseline docs/evaluation/baseline-phase-7.json --json-output docs/evaluation/rerank-phase-7.json --markdown-output docs/evaluation/rerank-phase-7.md --check` — exit 0.
 - Environment limitation: `sentence_transformers` is not installed here, so the
   P7-10 artifact uses the tracked P7-06 semantic baseline as its admitted
   comparison source and evaluates the implemented identity reranker against it.
