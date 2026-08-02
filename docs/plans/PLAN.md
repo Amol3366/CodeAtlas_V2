@@ -1,4 +1,3 @@
-
 # CodeAtlas Shared Execution Plan
 
 Status: active
@@ -48,16 +47,16 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 ## Active Work
 
-| Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Active phase    | none — Phases 0–7 are all`complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Active task     | none — Phase 7 approved; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Task status     | `complete` — Phase 7 gate approved by the user 2026-07-31                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Agent           | Claude Code`claude-opus-5` (recovered P7-12 in place from Codex GPT-5, per rule 9)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Started UTC     | 2026-07-30T18:51:46Z                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Git state       | Branch`main` at `5ea8ab8`. P7-05 through P7-12 are now committed; the working tree carries only this task's packaged provider-surface tests, the live policy-pointer updates, and this status edit.                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Policy filename | The authoritative coding-agent contract is exposed as **`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision. Post-gate review findings (2026-07-31) are fixed; see the top handoff entry                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Active phase    | none — Phases 0–7 are all`complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Active task     | none — post-gate answer generation delivered 2026-08-02; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Task status     | `complete` — Phase 7 gate approved by the user 2026-07-31. Post-gate work since then is recorded in the handoff log, not as reopened tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Started UTC     | 2026-08-02T13:53:34Z (latest entry; earlier post-gate work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Git state       | Branch`env-provider-configuration` at `32f1f75`, 28 commits ahead of `main` at `bb1580f` and **unmerged**. The working tree carries this status edit and an unrelated formatter reflow of this file's tables.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
+| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision. Post-gate review findings (2026-07-31) are fixed; see the top handoff entry                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### Phase 7 Task Board
 
@@ -207,6 +206,145 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-02T13:53:34Z — Evidence-grounded answer generation
+
+- Agent: Claude Code `claude-opus-5`, branch `env-provider-configuration` at
+  `32f1f75`, 28 commits ahead of `main` at `bb1580f`.
+- Transition: none. Phase 7 stays `complete`; this is post-gate work on the
+  user's request, not a reopened task. **Phase 7's `declined` status for
+  generated explanations is deliberately unchanged** — see "Admission status"
+  below.
+- Spec: `docs/superpowers/specs/2026-08-02-evidence-grounded-answer-generation-design.md`.
+  Plan: `docs/superpowers/plans/2026-08-02-evidence-grounded-answer-generation.md`.
+  Decision record: ADR-0012.
+
+#### Why
+
+The user asked why "Give me a full explanation about Prelegal project" returned
+twenty-five lines of `FILE lines N-M contain text matching '<the question>'`
+rather than an answer. Three causes, none of them a defect:
+
+1. `NoAnswerProvider` was the only `AnswerProvider` implementation and returns
+   `None`;
+2. `build_services` accepted an `explainer` and no adapter ever passed one, so
+   the seam was unreachable regardless;
+3. answers came from `conversations/templates.py`, whose docstring says so.
+
+Phase 7 recorded generation as `declined by A/B measurement`. True, and easy to
+misread: the A/B compared `NoAnswerProvider` — which returns nothing, and so
+improves nothing — against the deterministic baseline. It was never measured
+against a real model.
+
+#### Outcome and user-visible behavior
+
+An opted-in repository answers with model-written prose over verified evidence.
+The model writes `answer.summary` only; `answer.claims` and `evidence` pass
+through untouched with their original derivation and confidence, so a traced
+call graph is never relabelled as model output. Generation runs on every intent
+*because* of that boundary; `SEMANTIC_INTENTS` still gates retrieval, which is
+the asymmetry that matters.
+
+Defaults are unchanged for every existing installation: `answer_provider`
+defaults to `none`, and a repository that opts into nothing produces exactly the
+answer it produced before.
+
+Four user decisions shaped the scope: all three providers selectable in
+settings, generation on every intent, prose-on-top with facts untouched, and
+situation-specific failure causes. `llama3.2:3b` on Ollama is primary — the only
+default consistent with source code not leaving the workstation.
+
+#### Files
+
+- Created: `src/codeatlas/generation/{failures,prompts,ollama_provider,openai_provider,factory}.py`,
+  `src/codeatlas/application/answer_generation.py`,
+  `src/codeatlas/storage/sqlite/migrations/0013_answer_provider.sql`,
+  `docs/adr/0012-governed-answer-provider-policy.md`,
+  `docs/operations/answer-generation.md`, and five test modules.
+- Changed: `generation/{providers,explanations}.py`,
+  `conversations/{pipeline,templates}.py`,
+  `application/{container,settings,conversation_service}.py`,
+  `storage/sqlite/{semantic_stores,migrations}.py`, `domain/semantic.py`,
+  `settings/env_file.py`, `api/routers/settings.py`, `.env.example`,
+  `docs/security/threat-model.md`, `apps/web/src/features/settings/SemanticSettings.tsx`,
+  `apps/web/src/lib/queries.ts`, and the generated `api-types.gen.ts`.
+
+#### Contracts and migrations
+
+- `contract_version` stays **`1.1`**. Settings and `/v1/models` gained additive
+  fields; `answer_models` is optional so an older client keeps working.
+- Migration `0013` adds three defaulted-or-nullable columns to
+  `repository_provider_policy`. `SCHEMA_VERSION` **12 → 13**.
+- Web API types regenerated from the OpenAPI document, not hand-edited.
+
+#### Verification
+
+All run with `CODEATLAS_ENV_FILE=/nonexistent`, because a real `OPENAI_API_KEY`
+in `.env` otherwise changes what `POST /v1/models/test` returns.
+
+- `uv run pytest -q` — exit 0, **1805 passed**.
+- `uv run ruff check src tests scripts` — exit 0.
+- `uv run mypy --no-incremental src tests scripts` — exit 0, 301 files.
+- `pnpm --dir apps/web test` — **123 passed**; `lint`, `typecheck`, `build` — exit 0.
+- End to end against **Ollama 0.32.5 with `llama3.2:3b`** on a real indexed
+  repository, through the running HTTP server: provider off leaves the answer
+  unchanged; provider on returns multi-paragraph prose with 25 claims still
+  carrying `high_confidence_heuristic` and 25 evidence items intact; 511
+  `generation.delta` SSE events; persisted answer 8,573 characters, status
+  `complete`, citations beneath the prose. Model missing reports
+  `GENERATION_MODEL_MISSING` and provider unreachable reports
+  `GENERATION_PROVIDER_UNREACHABLE`, both returning the verified answer.
+
+#### Three defects found by verification, not by design
+
+- **`_STREAM_STAGES` had no `answer.completed` entry.** Predicted in the plan.
+  `conversation_service` publishes with `_STREAM_STAGES[event.stage]`, so an
+  unmapped stage raises `KeyError` and fails the whole run rather than dropping
+  one event. Mapped, with a test asserting every emitted stage has an entry.
+- **Every conversation answer carried a spurious `GENERATED_CLAIM_INVALID`.**
+  Not predicted. Caught by `test_conversation_query_parity`, which compares a
+  conversation answer against the identical `/v1/query` answer: "the provider
+  declined" had been conflated with "the provider returned something invalid".
+  `NoAnswerProvider` now returns before a prompt is built.
+- **Generated prose rendered as one run-on line of literal backslashes.** Not
+  predicted, and only visible against a real model. `_prose` escapes every
+  Markdown character and folds newlines, which is correct for a template
+  summary interpolating repository values and wrong for prose the model
+  composed. The two paths now render differently, with a test pinning that
+  template summaries stay escaped.
+
+#### Admission status, limitations, and carried items
+
+`docs/security/threat-model.md` required "a governed answer-provider policy
+**and** measured uplift before admission". This work delivers the policy
+(ADR-0012) and not the measurement, and resolves that by **not admitting the
+feature**: the default stays `none`, Phase 7's `declined` status is unchanged,
+and the threat-model row moves from "not shipped" to "available, opt-in, uplift
+unmeasured". A user switching it on is exercising an opt-in, not clearing a
+gate.
+
+Limitations recorded rather than discovered later:
+
+- **Generation does not improve retrieval.** Primary evidence Recall@10 remains
+  0.6667 against the ≥ 0.90 target, so wrongly retrieved evidence is now
+  described fluently rather than listed. This is why citations stay beneath
+  every generated paragraph.
+- Generating on every intent adds model latency to lookups that were instant.
+  Reversible by restoring the intent gate.
+- The Phase 7 explanation A/B is not re-run here.
+
+The five Phase 7 carried items are untouched by this work.
+
+#### Also committed on this branch
+
+Four commits of the user's in-flight work, committed first so it kept its own
+identity rather than being swept into this feature: the TypeScript type-member
+collision fix (`e4b0f79`, parser bundle 1.2.0 → 1.2.1), conversational greeting
+and project-overview intents (`72c4cfa`, retrieval policy 5.0 → 5.2), chat-first
+web routing (`dc72ffa`), and a `.gitignore` entry for dev-server logs.
+
+- Next: await user instruction. The branch is unmerged; `docs/plans/PLAN.md`
+  also carries an unrelated formatter reflow in the working tree.
 
 ### 2026-08-01T12:58:48Z — `AGENTS.md` / `CLAUDE.md` agent entries restored
 
