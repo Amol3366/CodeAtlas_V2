@@ -227,3 +227,104 @@ def test_testing_reports_a_code_not_a_provider_message(
 
     assert body["ok"] is False
     assert body["detail_code"] == "PROVIDER_UNAVAILABLE"
+
+
+# --- answer generation ---------------------------------------------------
+
+
+def test_settings_report_the_answer_provider(
+    client: TestClient, repository_id: str
+) -> None:
+    body = client.get("/v1/settings", params={"repository_id": repository_id}).json()
+
+    assert body["answer_provider"] == "none"
+    assert body["answer_model"] is None
+    assert body["answer_timeout_seconds"] is None
+
+
+def test_the_answer_provider_can_be_switched_on(
+    client: TestClient, repository_id: str
+) -> None:
+    response = client.patch(
+        "/v1/settings",
+        params={"repository_id": repository_id},
+        json={"answer_provider": "ollama", "answer_model": "llama3.2:3b"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["answer_provider"] == "ollama"
+    assert response.json()["answer_model"] == "llama3.2:3b"
+
+
+def test_switching_to_a_transmitting_answer_provider_needs_a_budget(
+    client: TestClient, repository_id: str
+) -> None:
+    """The same rule the embedding provider already obeys, for the same reason."""
+    response = client.patch(
+        "/v1/settings",
+        params={"repository_id": repository_id},
+        json={"answer_provider": "openai"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+
+
+def test_a_transmitting_answer_provider_is_allowed_with_a_budget(
+    client: TestClient, repository_id: str
+) -> None:
+    response = client.patch(
+        "/v1/settings",
+        params={"repository_id": repository_id},
+        json={"answer_provider": "openai", "monthly_token_budget": 50_000},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["transmits_off_machine"] is True
+
+
+def test_changing_the_budget_leaves_the_answer_provider_alone(
+    client: TestClient, repository_id: str
+) -> None:
+    client.patch(
+        "/v1/settings",
+        params={"repository_id": repository_id},
+        json={"answer_provider": "ollama"},
+    )
+
+    client.patch(
+        "/v1/settings",
+        params={"repository_id": repository_id},
+        json={"per_run_token_budget": 1000},
+    )
+
+    body = client.get("/v1/settings", params={"repository_id": repository_id}).json()
+    assert body["answer_provider"] == "ollama"
+
+
+def test_the_models_endpoint_lists_answer_providers(client: TestClient) -> None:
+    body = client.get("/v1/models").json()
+
+    providers = {model["provider"] for model in body["answer_models"]}
+    assert providers == {"none", "ollama", "openai"}
+
+
+def test_the_local_answer_provider_is_marked_as_not_transmitting(
+    client: TestClient,
+) -> None:
+    body = client.get("/v1/models").json()
+
+    ollama = next(
+        model for model in body["answer_models"] if model["provider"] == "ollama"
+    )
+    assert ollama["transmits_off_machine"] is False
+    assert ollama["model_id"] == "llama3.2:3b"
+
+
+def test_no_answer_setting_ever_returns_a_credential(
+    client: TestClient, repository_id: str
+) -> None:
+    body = client.get("/v1/settings", params={"repository_id": repository_id}).json()
+
+    assert "api_key" not in str(body).lower()
+    assert "sk-" not in str(body)

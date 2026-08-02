@@ -86,6 +86,21 @@ class ModelDescriptor:
 
 
 @dataclass(frozen=True)
+class AnswerModelDescriptor:
+    """One answer provider a user could choose, and what choosing it means.
+
+    No `dimensions`: an answer model has none, and carrying a field that is
+    always null would teach a client the wrong shape.
+    """
+
+    provider: AnswerProviderKind
+    model_id: str | None
+    available: bool
+    transmits_off_machine: bool
+    requires: str | None
+
+
+@dataclass(frozen=True)
 class ProviderTestResult:
     """Whether the configured provider actually answers.
 
@@ -288,6 +303,61 @@ class SettingsService:
                         if available[EmbeddingProviderKind.OPENAI]
                         else f"extra:semantic-openai and {OPENAI_API_KEY_VARIABLE}"
                     )
+                ),
+            ),
+        )
+
+    def answer_models(self) -> tuple[AnswerModelDescriptor, ...]:
+        """Every answer provider, including ones that cannot run here.
+
+        Same rule as `models`: an option that is hidden cannot explain itself.
+        Ollama is reported available without connecting to it — see
+        `describe_available_answer_providers` for why a settings page must not
+        wait on a network probe.
+        """
+        from codeatlas.generation.factory import (
+            OPENAI_API_KEY_VARIABLE,
+            describe_available_answer_providers,
+        )
+        from codeatlas.generation.ollama_provider import (
+            DEFAULT_MODEL_ID as OLLAMA_DEFAULT,
+        )
+        from codeatlas.generation.openai_provider import (
+            DEFAULT_MODEL_ID as OPENAI_DEFAULT,
+        )
+        from codeatlas.settings.env_file import (
+            configured_ollama_answer_model,
+            configured_openai_answer_model,
+        )
+
+        available = describe_available_answer_providers()
+        return (
+            AnswerModelDescriptor(
+                provider=AnswerProviderKind.NONE,
+                model_id=None,
+                available=True,
+                transmits_off_machine=False,
+                requires=None,
+            ),
+            AnswerModelDescriptor(
+                provider=AnswerProviderKind.OLLAMA,
+                model_id=configured_ollama_answer_model() or OLLAMA_DEFAULT,
+                available=available[AnswerProviderKind.OLLAMA],
+                transmits_off_machine=False,
+                # Stated even though the option is always selectable: Ollama is
+                # a separate install, and "requires Ollama" is the whole answer
+                # for a user whose first question reports it unreachable.
+                requires="Ollama running locally",
+            ),
+            AnswerModelDescriptor(
+                provider=AnswerProviderKind.OPENAI,
+                model_id=configured_openai_answer_model() or OPENAI_DEFAULT,
+                available=available[AnswerProviderKind.OPENAI],
+                transmits_off_machine=True,
+                requires=(
+                    None
+                    if available[AnswerProviderKind.OPENAI]
+                    else OPENAI_API_KEY_VARIABLE
                 ),
             ),
         )

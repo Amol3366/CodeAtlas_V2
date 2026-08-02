@@ -35,6 +35,12 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
 };
 
+const ANSWER_PROVIDER_LABELS: Record<string, string> = {
+  none: "No answer generation",
+  ollama: "Ollama (local, recommended)",
+  openai: "OpenAI",
+};
+
 export function SemanticSettings({ repositoryId }: Props) {
   const settings = useSettings(repositoryId);
   const models = useModels();
@@ -44,6 +50,8 @@ export function SemanticSettings({ repositoryId }: Props) {
 
   const [provider, setProvider] = useState<string>("none");
   const [monthlyBudget, setMonthlyBudget] = useState<string>("");
+  const [answerProvider, setAnswerProvider] = useState<string>("none");
+  const [answerModel, setAnswerModel] = useState<string>("");
 
   // Reconcile from the server whenever it answers. The form is a draft of the
   // server's state, not a second copy of it (Section 14.5).
@@ -55,11 +63,21 @@ export function SemanticSettings({ repositoryId }: Props) {
           ? ""
           : String(settings.data.monthly_token_budget),
       );
+      setAnswerProvider(settings.data.answer_provider);
+      setAnswerModel(settings.data.answer_model ?? "");
     }
   }, [settings.data]);
 
   const chosen = models.data?.models.find((item) => item.provider === provider);
-  const transmits = chosen?.transmits_off_machine ?? false;
+  const chosenAnswer = models.data?.answer_models?.find(
+    (item) => item.provider === answerProvider,
+  );
+  // Either decision reaching a metered account requires the budget, so the
+  // field appears for either. Asking the server first would surface the
+  // requirement as an error rather than as a field.
+  const transmits =
+    (chosen?.transmits_off_machine ?? false) ||
+    (chosenAnswer?.transmits_off_machine ?? false);
 
   if (settings.isLoading || models.isLoading) {
     return <p role="status">Loading settings…</p>;
@@ -75,9 +93,14 @@ export function SemanticSettings({ repositoryId }: Props) {
   function save(event: React.FormEvent) {
     event.preventDefault();
     const parsed = monthlyBudget.trim() === "" ? null : Number(monthlyBudget);
+    const trimmedModel = answerModel.trim();
     update.mutate({
       embedding_provider: provider,
       monthly_token_budget: parsed,
+      answer_provider: answerProvider,
+      // Empty means "use the configured default", which the server stores as
+      // null. Sending "" would pin the repository to a nameless model.
+      answer_model: trimmedModel === "" ? null : trimmedModel,
     });
   }
 
@@ -117,6 +140,62 @@ export function SemanticSettings({ repositoryId }: Props) {
             </label>
           ))}
         </fieldset>
+
+        <fieldset>
+          <legend>Answer provider</legend>
+          <p>
+            CodeAtlas always finds and cites the evidence itself. An answer
+            provider adds a written explanation on top of it; the citations and
+            their confidence never change.
+          </p>
+          {models.data?.answer_models?.map((model) => (
+            <label
+              key={model.provider}
+              htmlFor={`answer-provider-${model.provider}`}
+            >
+              <input
+                id={`answer-provider-${model.provider}`}
+                type="radio"
+                name="answer-provider"
+                value={model.provider}
+                checked={answerProvider === model.provider}
+                onChange={() => setAnswerProvider(model.provider)}
+              />
+              <span>
+                {ANSWER_PROVIDER_LABELS[model.provider] ?? model.provider}
+              </span>
+              {/* Words, not colour — the same rule the embedding options obey. */}
+              <span>
+                {model.transmits_off_machine
+                  ? "⚠ Sends repository content off this machine"
+                  : "Stays on this machine"}
+              </span>
+              {model.requires !== null ? (
+                <span>Requires {model.requires}</span>
+              ) : null}
+            </label>
+          ))}
+        </fieldset>
+
+        {answerProvider !== "none" ? (
+          <div>
+            <label htmlFor="answer-model">Answer model</label>
+            <input
+              id="answer-model"
+              type="text"
+              value={answerModel}
+              placeholder={chosenAnswer?.model_id ?? ""}
+              onChange={(event) => setAnswerModel(event.target.value)}
+              aria-describedby="answer-model-help"
+            />
+            <p id="answer-model-help">
+              Leave blank to use {chosenAnswer?.model_id ?? "the default"}. A
+              larger model reasons better across files, needs more memory, and
+              answers more slowly. A local model must already be installed —
+              for example <code>ollama pull llama3.1:8b</code>.
+            </p>
+          </div>
+        ) : null}
 
         {transmits ? (
           <div>

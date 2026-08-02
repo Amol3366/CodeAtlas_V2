@@ -33,6 +33,7 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 | [0009](0009-measured-semantic-uplift.md) | Optional semantic layer admitted: provider-neutral embeddings, LanceDB base/delta with SQLite membership authoritative, per-repository privacy governance, shadow migration, measurement-admitted rerank/explanation | 7 |
 | [0010](0010-repository-scoped-embedding-namespaces.md) | Which similarity space answers is a per-repository pointer, not a global active flag; migration `0012` drops the one-active index and backfills existing databases | 7 (post-gate) |
 | [0011](0011-configurable-embedding-models.md) | Embedding model identity is configurable through `.env`; namespace derivation keeps it safe, and a custom OpenAI model must declare its width | 7 (post-gate) |
+| [0012](0012-governed-answer-provider-policy.md) | Answer generation writes prose over untouched claims and evidence; local `llama3.2:3b` is primary, the default is off, and the feature ships available rather than admitted | 7 (post-gate) |
 
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.

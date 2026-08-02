@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
@@ -42,6 +42,29 @@ const MODELS = {
       requires: "extra:semantic-openai and OPENAI_API_KEY",
     },
   ],
+  answer_models: [
+    {
+      provider: "none",
+      model_id: null,
+      available: true,
+      transmits_off_machine: false,
+      requires: null,
+    },
+    {
+      provider: "ollama",
+      model_id: "llama3.2:3b",
+      available: true,
+      transmits_off_machine: false,
+      requires: "Ollama running locally",
+    },
+    {
+      provider: "openai",
+      model_id: "gpt-4o-mini",
+      available: false,
+      transmits_off_machine: true,
+      requires: "OPENAI_API_KEY",
+    },
+  ],
 };
 
 function stubBackend(overrides: Record<string, unknown> = {}) {
@@ -55,6 +78,9 @@ function stubBackend(overrides: Record<string, unknown> = {}) {
         per_run_token_budget: null,
         transmits_off_machine: false,
         updated_at: "2026-07-30T12:00:00Z",
+        answer_provider: "none",
+        answer_model: null,
+        answer_timeout_seconds: null,
       },
     },
     "/v1/repositories/repo_1/semantic-status": {
@@ -97,8 +123,9 @@ describe("SemanticSettings", () => {
     renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
 
     expect(
-      await screen.findByText(/sends repository content off this machine/i),
-    ).toBeInTheDocument();
+      (await screen.findAllByText(/sends repository content off this machine/i))
+        .length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getAllByText(/stays on this machine/i).length,
     ).toBeGreaterThan(0);
@@ -113,7 +140,12 @@ describe("SemanticSettings", () => {
     expect(
       await screen.findByText(/requires extra:semantic-openai/i),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/openai/i)).toBeDisabled();
+    // Scoped to the embedding group. Both fieldsets legitimately offer an
+    // OpenAI option, and an unscoped label query matches whichever comes
+    // first — which is how a passing test starts asserting the wrong control.
+    const embedding = screen
+      .getByRole("group", { name: /embedding provider/i });
+    expect(within(embedding).getByLabelText(/openai/i)).toBeDisabled();
   });
 
   it("reveals the budget field only for a transmitting provider", async () => {
@@ -211,6 +243,99 @@ describe("SemanticSettings", () => {
       <SemanticSettings repositoryId="repo_1" />,
     );
     await screen.findByText(/semantic search is optional/i);
+
+    const results = await axe(container);
+    expect(results.violations).toEqual([]);
+  });
+});
+
+/**
+ * Answer generation is the second provider decision on this page.
+ *
+ * The tests mirror the embedding ones because the disclosure rules are the
+ * same: state the transmit consequence in words, explain an option's
+ * requirement rather than hiding it, and reveal the budget a transmitting
+ * choice cannot be saved without.
+ */
+describe("answer provider", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("defaults to no answer generation", async () => {
+    stubBackend();
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    expect(
+      await screen.findByRole("radio", { name: /no answer generation/i }),
+    ).toBeChecked();
+  });
+
+  it("states in words that the local option stays on this machine", async () => {
+    stubBackend();
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    const ollama = await screen.findByRole("radio", { name: /ollama/i });
+    expect(ollama.closest("label")).toHaveTextContent(/stays on this machine/i);
+  });
+
+  it("says what an option needs rather than hiding it", async () => {
+    stubBackend();
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    const ollama = await screen.findByRole("radio", { name: /ollama/i });
+    expect(ollama.closest("label")).toHaveTextContent(/requires ollama/i);
+  });
+
+  it("hides the model field until generation is switched on", async () => {
+    stubBackend();
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    await screen.findByRole("radio", { name: /no answer generation/i });
+    expect(screen.queryByLabelText(/answer model/i)).not.toBeInTheDocument();
+  });
+
+  it("lets the model be changed so a heavier one can be chosen", async () => {
+    stubBackend();
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    await userEvent.click(await screen.findByRole("radio", { name: /ollama/i }));
+
+    const field = screen.getByLabelText(/answer model/i);
+    expect(field).toHaveAttribute("placeholder", "llama3.2:3b");
+
+    await userEvent.type(field, "llama3.1:8b");
+    expect(field).toHaveValue("llama3.1:8b");
+  });
+
+  it("sends the chosen answer provider when saved", async () => {
+    const fetchMock = stubBackend();
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    await userEvent.click(await screen.findByRole("radio", { name: /ollama/i }));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      const patch = fetchMock.mock.calls.find(
+        ([, init]) => (init as RequestInit | undefined)?.method === "PATCH",
+      );
+      expect(patch).toBeDefined();
+      const body = JSON.parse(String((patch?.[1] as RequestInit).body)) as Record<
+        string,
+        unknown
+      >;
+      expect(body["answer_provider"]).toBe("ollama");
+      // Blank means "use the configured default", stored as null. Sending ""
+      // would pin the repository to a nameless model.
+      expect(body["answer_model"]).toBeNull();
+    });
+  });
+
+  it("has no accessibility violations with generation enabled", async () => {
+    stubBackend();
+    const { container } = renderWithProviders(
+      <SemanticSettings repositoryId="repo_1" />,
+    );
+
+    await userEvent.click(await screen.findByRole("radio", { name: /ollama/i }));
 
     const results = await axe(container);
     expect(results.violations).toEqual([]);
