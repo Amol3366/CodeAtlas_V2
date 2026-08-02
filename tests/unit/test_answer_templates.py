@@ -258,3 +258,64 @@ def test_an_excerpt_is_never_interpolated_into_the_message() -> None:
     assert "<script>" not in rendered
     assert "**bold**" not in rendered
     assert "# Heading" not in rendered
+
+
+# --- generated prose -----------------------------------------------------
+
+
+def test_a_generated_summary_keeps_its_markdown_structure() -> None:
+    """The readable structure is the point of generating prose at all.
+
+    Escaping it the way a template summary is escaped turned a formatted
+    explanation into one run-on line of literal backslashes, which reads worse
+    than the deterministic list it replaced.
+    """
+    rendered = render_answer(
+        _response(
+            summary="**Backend**\n\n* FastAPI serves the API.\n* Next.js renders."
+        ),
+        intent=Intent.TEXT,
+        generated=True,
+    )
+
+    assert "**Backend**" in rendered
+    assert r"\*\*" not in rendered
+    assert "* FastAPI serves the API." in rendered
+
+
+def test_a_template_summary_is_still_escaped() -> None:
+    """Unchanged for everything CodeAtlas writes itself.
+
+    A template summary interpolates repository values, and a file genuinely
+    named `**evil**.py` must not render as bold.
+    """
+    rendered = render_answer(
+        _response(summary="Found **evil**.py in the tree."),
+        intent=Intent.TEXT,
+    )
+
+    assert r"\*\*evil\*\*" in rendered
+
+
+def test_control_characters_are_stripped_from_generated_prose() -> None:
+    rendered = render_answer(
+        _response(summary="Clean\x07text\x00here"),
+        intent=Intent.TEXT,
+        generated=True,
+    )
+
+    assert "\x07" not in rendered
+    assert "\x00" not in rendered
+    assert "Cleantexthere" in rendered
+
+
+def test_generated_prose_still_carries_its_citations() -> None:
+    """Prose replaces the summary. The claims below it are untouched."""
+    rendered = render_answer(
+        _response(summary="A clear explanation."),
+        intent=Intent.TEXT,
+        generated=True,
+    )
+
+    assert "A clear explanation." in rendered
+    assert "[1]" in rendered

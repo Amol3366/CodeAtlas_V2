@@ -28,6 +28,7 @@ from codeatlas.application.lookup import ExactSymbolLookupService, SymbolLookupR
 from codeatlas.contracts import QueryResponse
 from codeatlas.conversations.intent import Intent, classify
 from codeatlas.conversations.templates import render_answer
+from codeatlas.generation.explanations import ANSWER_GENERATION_TIMING_KEY
 from codeatlas.retrieval.graph import TraversalLimits
 from codeatlas.retrieval.lexical import (
     MAX_SEARCH_RESULTS,
@@ -211,7 +212,15 @@ class AnswerPipeline:
         response = self._explain(response, request, emit)
 
         token.raise_if_cancelled()
-        markdown = render_answer(response, intent=classification.intent)
+        # The timing key appears only when a generated summary was accepted, so
+        # it is the one honest signal that a model wrote this prose. A provider
+        # that failed, declined, or was cited-invalid leaves it absent and the
+        # deterministic summary renders exactly as it always did.
+        markdown = render_answer(
+            response,
+            intent=classification.intent,
+            generated=ANSWER_GENERATION_TIMING_KEY in response.timing_ms,
+        )
         emit(PipelineEvent("answer.completed", {"length": len(markdown)}))
 
         return AnswerResult(

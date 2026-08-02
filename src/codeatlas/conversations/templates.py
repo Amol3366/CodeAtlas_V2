@@ -44,14 +44,31 @@ _CHANNEL_NAMES: Final[dict[Intent, str]] = {
 PROJECT_OVERVIEW_EVIDENCE_LIMIT: Final[int] = 10
 
 
-def render_answer(response: QueryResponse, *, intent: Intent) -> str:
-    """Render one verified response as the assistant's Markdown message."""
+def render_answer(
+    response: QueryResponse, *, intent: Intent, generated: bool = False
+) -> str:
+    """Render one verified response as the assistant's Markdown message.
+
+    ``generated`` says a model wrote the summary. It changes only how the
+    summary is neutralized — see `_model_prose` — and nothing else. Claims,
+    citations, warnings, and limitations render identically either way, because
+    generation never produced them.
+    """
+    summary = (
+        _model_prose(response.answer.summary)
+        if generated
+        else _prose(response.answer.summary)
+    )
+
     if intent is Intent.GREETING:
-        return _bounded(f"{_prose(response.answer.summary)}\n")
-    if intent is Intent.PROJECT_OVERVIEW and response.evidence:
+        return _bounded(f"{summary}\n")
+    if intent is Intent.PROJECT_OVERVIEW and response.evidence and not generated:
+        # The deterministic overview is a template built from evidence. A
+        # generated summary has already answered the same question in prose, so
+        # replacing it with the template would discard what the model wrote.
         return _render_project_overview(response)
 
-    lines: list[str] = [_prose(response.answer.summary), ""]
+    lines: list[str] = [summary, ""]
 
     citations = {
         item.evidence_id: ordinal
@@ -375,6 +392,36 @@ def _prose(value: str) -> str:
     for character in ("\\", "`", "*", "_", "[", "]", "<", ">"):
         text = text.replace(character, f"\\{character}")
     return text
+
+
+def _model_prose(value: str) -> str:
+    """Neutralize a model-written summary without destroying its formatting.
+
+    `_prose` escapes every Markdown character and folds newlines into spaces,
+    which is right for a template: those summaries *interpolate* repository
+    values, and a file genuinely named `**evil**.py` must not render as bold.
+
+    A generated summary is different in kind. The whole string is prose the
+    model composed, and its paragraphs, lists, and emphasis are the readable
+    structure the feature exists to produce. Escaping them turns the answer
+    into one run-on line of literal backslashes — worse to read than the plain
+    text it replaced.
+
+    What is still removed: control characters, which have no place in prose and
+    can corrupt a terminal. What is *not* removed is Markdown structure, and
+    the safety of that rests on two things that are true rather than hoped for.
+    The browser renders this through a strict allowlist sanitizer that never
+    parses raw HTML and permits no executable link protocol, so `<script>`
+    arrives as literal text. And the evidence the model saw was redacted before
+    it was sent, so the prose is derived from content that had its secrets
+    removed.
+
+    A model can still be induced to emit misleading *prose* by a hostile
+    repository. That is a limitation of generation itself, which is why the
+    claims and citations below the summary are never model-written and remain
+    the authoritative part of the answer.
+    """
+    return _CONTROL.sub("", value).replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _bounded(text: str) -> str:

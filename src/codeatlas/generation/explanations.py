@@ -42,6 +42,12 @@ ANSWER_GENERATION_FAILED_WARNING = "ANSWER_GENERATION_FAILED"
 GENERATED_CLAIM_INVALID_WARNING = "GENERATED_CLAIM_INVALID"
 MODEL_GENERATED_CONFIDENCE = 0.6
 
+# Written into `timing_ms` when, and only when, a generated summary was
+# accepted. It doubles as the signal that a model wrote the prose, which
+# rendering needs in order to leave that prose's formatting intact. Named here
+# so the producer and the consumer cannot drift apart.
+ANSWER_GENERATION_TIMING_KEY = "answer_generation"
+
 # Evidence IDs are `ev_<digest>` (`domain.ids.evidence_id`). Anchoring on that
 # prefix is what lets prose keep ordinary brackets — a template cites as `[1]`,
 # and prose legitimately contains `[2]` — while still catching a fabricated
@@ -108,7 +114,10 @@ class EvidenceGroundedExplanationService:
         return response.model_copy(
             update={
                 "answer": answer,
-                "timing_ms": {**response.timing_ms, "answer_generation": elapsed},
+                "timing_ms": {
+                    **response.timing_ms,
+                    ANSWER_GENERATION_TIMING_KEY: elapsed,
+                },
             }
         )
 
@@ -178,6 +187,7 @@ def _with_warning(response: QueryResponse, warning: str) -> QueryResponse:
 
 __all__ = [
     "ANSWER_GENERATION_FAILED_WARNING",
+    "ANSWER_GENERATION_TIMING_KEY",
     "GENERATED_CLAIM_INVALID_WARNING",
     "MODEL_GENERATED_CONFIDENCE",
     "EvidenceGroundedExplanationService",
