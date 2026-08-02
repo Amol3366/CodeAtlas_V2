@@ -31,3 +31,6 @@ dist/
 .env.*
 *.env
 !.env.example
+
+# Dev-server logs written by scripts/run_dev.ps1.
+.run/
