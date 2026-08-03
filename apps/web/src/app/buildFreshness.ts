@@ -14,6 +14,12 @@ const RELOAD_GUARD_MILLISECONDS = 10_000;
  * a document reload happens. This hook turns that manual reload into an
  * automatic one after a route change, using the shell's hashed asset list as
  * the build identity.
+ *
+ * **This is the only client-side mechanism for it.** The Settings link once
+ * carried `reloadDocument` as a second line of defence, which cost a full page
+ * load on every visit and never addressed the cause — the real defect was the
+ * stale loop guard below. Do not add a per-link workaround back; if a tab is
+ * serving an old bundle, fix it here, where it is tested.
  */
 export function useReloadOnNewBuild() {
   const location = useLocation();
