@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import sqlite3
+import threading
 import uuid
 import webbrowser
 from collections.abc import Iterator
@@ -37,6 +39,10 @@ from codeatlas.api.app import create_app
 from codeatlas.api.web import web_assets_path
 from codeatlas.application.change_analysis import ChangeAnalysisRequest
 from codeatlas.application.container import ApplicationServices, build_services
+from codeatlas.application.ephemeral_bootstrap import (
+    index_repositories,
+    register_repositories,
+)
 from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
@@ -54,7 +60,12 @@ from codeatlas.domain.semantic import EmbeddingProviderKind
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import SearchRequest
 from codeatlas.semantic.vector_store import LazyVectorStore
-from codeatlas.settings.env_file import load_env_file
+from codeatlas.settings.env_file import configured_ephemeral_repositories, load_env_file
+from codeatlas.storage.session import (
+    create_session_directory,
+    remove_session_directory,
+    sweep_stale_sessions,
+)
 from codeatlas.storage.sqlite.backup import create_backup, restore
 from codeatlas.storage.sqlite.connection import connect, default_database_path
 from codeatlas.storage.sqlite.upgrade import (
@@ -708,6 +719,73 @@ def repo_remove(
     )
 
 
+_EPHEMERAL_VARIABLE = "CODEATLAS_EPHEMERAL"
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+
+
+def _ephemeral_requested(*, flag: bool) -> bool:
+    """Whether this run should use a throwaway session database."""
+    if flag:
+        return True
+    raw = os.environ.get(_EPHEMERAL_VARIABLE)
+    return raw is not None and raw.strip().lower() in _TRUE_VALUES
+
+
+def _resolve_serve_database(
+    *, database: Path | None, ephemeral: bool
+) -> tuple[Path, Path | None]:
+    """Return the database to serve, and the session directory to clean up.
+
+    An explicit `--database` outranks `--ephemeral`. Naming a database is a
+    deliberate instruction, and quietly serving a throwaway one instead would
+    discard the user's choice without saying so.
+    """
+    if database is not None:
+        return database, None
+    if not ephemeral:
+        return default_database_path(), None
+
+    session = create_session_directory()
+    return session / "codeatlas.db", session
+
+
+def _bootstrap_ephemeral_session(database_path: Path) -> None:
+    """Register the configured repositories, then index them in the background.
+
+    Registration is reported now because a bad path is worth seeing before the
+    browser opens. Indexing is not waited on: the server binds immediately and
+    the existing status surfaces report real progress, rather than the terminal
+    sitting silent through a first full index.
+    """
+    paths = configured_ephemeral_repositories()
+    if not paths:
+        return
+
+    with connect(database_path) as connection:
+        outcome = register_repositories(
+            build_services(
+                connection,
+                vectors=LazyVectorStore(database_path.parent / "vectors"),
+            ),
+            paths,
+        )
+
+    for failure in outcome.failures:
+        typer.echo(f"{failure.code}: {failure.path} — {failure.message}", err=True)
+
+    if not outcome.registered:
+        return
+
+    typer.echo(f"Indexing {len(outcome.registered)} repository(s) in the background.")
+    worker = threading.Thread(
+        target=index_repositories,
+        args=(database_path, outcome.registered),
+        name="ephemeral-bootstrap-index",
+        daemon=True,
+    )
+    worker.start()
+
+
 @app.command("serve")
 def serve(
     web: Annotated[
@@ -720,6 +798,13 @@ def serve(
     port: Annotated[int, typer.Option("--port", help="Port to listen on.")] = 8000,
     open_browser: Annotated[
         bool, typer.Option("--open", help="Open a browser once the server starts.")
+    ] = False,
+    ephemeral: Annotated[
+        bool,
+        typer.Option(
+            "--ephemeral",
+            help="Start from empty storage and discard it when the server stops.",
+        ),
     ] = False,
     database: DatabaseOption = None,
 ) -> None:
@@ -755,15 +840,30 @@ def serve(
             )
             raise typer.Exit(EXIT_INVALID_INPUT)
 
-    resolved = database or default_database_path()
+    use_ephemeral = _ephemeral_requested(flag=ephemeral)
+    if use_ephemeral:
+        # Before creating this run's directory, so a crashed predecessor's
+        # vectors are reclaimed rather than accumulating one tree per crash.
+        sweep_stale_sessions()
+
+    resolved, session_directory = _resolve_serve_database(
+        database=database, ephemeral=use_ephemeral
+    )
+
     # Upgrade before listening: a first run must not answer requests against an
     # unmigrated database, and a database from a newer build must stop the
     # server here rather than fail one request at a time.
     try:
         upgrade_database(resolved)
     except CodeAtlasError as error:
+        if session_directory is not None:
+            remove_session_directory(session_directory)
         _fail(error)
         return
+
+    if session_directory is not None:
+        typer.echo("Ephemeral session: storage is empty and will be discarded.")
+        _bootstrap_ephemeral_session(resolved)
 
     application = create_app(resolved, web_assets=assets)
     url = f"http://{host}:{port}"
@@ -777,18 +877,23 @@ def serve(
         with contextlib.suppress(OSError):
             webbrowser.open(url)
 
-    # `access_log=False` for two reasons that happen to agree.
-    #
-    # It is what `CLAUDE.md` Section 17 asks for: the access log records a
-    # request path per request, and this product writes no logs by default.
-    #
-    # It is also a deadlock this server had. uvicorn writes that line
-    # synchronously **on the event-loop thread**. A server launched by a
-    # shortcut, a wrapper script, or a test harness usually gets a pipe for
-    # stdout that nobody reads; a pipe holds a few kilobytes, and the write
-    # that fills it blocks forever. Not one request — every request, with the
-    # process alive and nothing in the log to say why (found in P6-08).
-    uvicorn.run(application, host=host, port=port, access_log=False)
+    try:
+        # `access_log=False` for two reasons that happen to agree.
+        #
+        # It is what `CLAUDE.md` Section 17 asks for: the access log records a
+        # request path per request, and this product writes no logs by default.
+        #
+        # It is also a deadlock this server had. uvicorn writes that line
+        # synchronously **on the event-loop thread**. A server launched by a
+        # shortcut, a wrapper script, or a test harness usually gets a pipe for
+        # stdout that nobody reads; a pipe holds a few kilobytes, and the write
+        # that fills it blocks forever. Not one request — every request, with
+        # the process alive and nothing in the log to say why (found in P6-08).
+        uvicorn.run(application, host=host, port=port, access_log=False)
+    finally:
+        # Ctrl-C reaches here too, which is the ordinary way this mode ends.
+        if session_directory is not None:
+            remove_session_directory(session_directory)
 
 
 @app.command("backup")
