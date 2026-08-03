@@ -112,13 +112,29 @@ Invoke-Checked "Phase 7 rerank A/B artifact" @(
     "--markdown-output", "docs/evaluation/rerank-phase-7.md",
     "--check"
 )
-Invoke-Checked "Phase 7 explanation A/B artifact" @(
-    "run", "python", "scripts/run_phase7_explanation_ab.py",
-    "--semantic-baseline", "docs/evaluation/baseline-phase-7.json",
-    "--json-output", "docs/evaluation/explanation-phase-7.json",
-    "--markdown-output", "docs/evaluation/explanation-phase-7.md",
-    "--check"
-)
+# The explanation A/B is deliberately NOT a gate step.
+#
+# It was one until `2d7e511` rewrote it to be a real measurement: it now answers
+# the evaluation corpus twice through the same services, differing only in
+# whether an Ollama provider is attached. That needs a live `llama3.2:3b`, and
+# `--check` does not avoid it — the script measures first and compares
+# afterwards, so every invocation needs the model.
+#
+# Running it here would make an optional provider a hard requirement of the
+# quality gate, which Section 4.3 forbids: no deterministic capability may
+# depend on a provider being present. The artifact stays a recorded manual
+# measurement, named with the model that produced it, exactly as ADR-0012
+# describes.
+#
+# To refresh it, with Ollama running:
+#
+#   uv run python scripts/run_phase7_explanation_ab.py `
+#       --dataset tests/evaluation/cases `
+#       --json-output docs/evaluation/explanation-phase-7.json `
+#       --markdown-output docs/evaluation/explanation-phase-7.md
+#
+# The rewrite left this call site passing the old `--semantic-baseline`, so the
+# gate threw here on every run from `2d7e511` until this was removed.
 
 if ($SkipWeb) {
     Write-Output "Phase 7 backend verification completed (web skipped)."

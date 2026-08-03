@@ -87,12 +87,17 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 ## Known Issues
 
-- **`scripts/check_phase7.ps1` is broken on `main`** (found 2026-08-04, not yet
-  fixed). Commit `2d7e511` made `run_phase7_explanation_ab.py` require
-  `--dataset`, but line 117 of the gate still passes `--semantic-baseline`, so
-  the gate throws at "Phase 7 explanation A/B artifact". Every step before it
-  passes, and the web steps pass when run directly. Pre-dates the
-  `ephemeral-session-mode` branch; left unfixed as unrelated scope.
+- **The explanation A/B is no longer a gate step** (fixed 2026-08-04). It threw
+  on every run since `2d7e511` because the gate passed `--semantic-baseline` to
+  a script rewritten to take `--dataset`. Removed rather than re-pointed: the
+  rewrite measures a live `llama3.2:3b`, and `--check` measures first and
+  compares afterwards, so any invocation needs Ollama running. Making the gate
+  depend on an optional provider is exactly what §4.3 forbids. Refreshing the
+  artifact is now a documented manual command at the call site.
+- `test_a_genuinely_killed_process_is_recovered_and_can_reindex` flakes under
+  full-suite load on Windows with `sqlite3.OperationalError: disk I/O error` —
+  a genuinely killed process can leave its SQLite handle briefly held. Passed
+  4/4 in isolation and on the next full run. Not investigated further.
 
 Carried into gate approvals as declared work rather than dropped:
 

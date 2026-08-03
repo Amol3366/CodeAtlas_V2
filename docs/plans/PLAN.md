@@ -260,8 +260,7 @@ pending one user observation rather than a fourth guess.
 
 - `contract_version` stays `1.1`. No REST change, no database migration.
 - **`AGENTS.md` §8.2 amended** to scope "history survives backend restart" to
-  default mode. **This edits the release-blocking contract and is pending the
-  user's explicit approval.**
+  default mode. **The user approved this amendment on 2026-08-04.**
 - Default-mode behavior unchanged; no existing test was modified.
 
 #### Verification
@@ -277,18 +276,46 @@ pending one user observation rather than a fourth guess.
 - `pnpm exec tsc --noEmit` — exit 0; `pnpm exec eslint . --max-warnings 0` — exit 0;
   `pnpm exec vitest run` — exit 0, 132 passed.
 - `uv run codeatlas serve --help` — `--ephemeral` present.
-- `powershell -File scripts/check_phase7.ps1 -SkipSync -SkipE2E` — **FAILED, for
-  a pre-existing reason unrelated to this work.** See limitations.
+- `powershell -File scripts/check_phase7.ps1 -SkipSync -SkipE2E` — **exit 0**
+  after the gate repair below: 1847 passed, lint clean, 312 files typed, dataset
+  valid, Phase 0/3/4 baselines and the rerank A/B pinned, web lint/types/build
+  clean, 132 web tests passed.
+
+#### Gate repair (2026-08-04, on the user's instruction)
+
+The gate threw at "Phase 7 explanation A/B artifact" on every run since
+`2d7e511`, which rewrote `run_phase7_explanation_ab.py` to take `--dataset`
+while `check_phase7.ps1:115` still passed `--semantic-baseline`.
+
+**The step was removed rather than re-pointed.** The rewritten script measures a
+live `llama3.2:3b` through Ollama, and `--check` does not avoid that — it
+measures first and compares afterwards. Re-pointing the flag would have made an
+optional provider a hard requirement of the quality gate, which §4.3 forbids and
+which the rewrite's own commit message rules out ("it needs a live model that is
+optional by design"). The artifact stays a recorded manual measurement; the
+refresh command is documented at the call site.
+
+Two further pre-existing gaps surfaced behind it, both from the uncommitted
+2026-08-04 work and neither from this branch:
+
+- `apps/web/src/lib/api-types.gen.ts` was stale — `POST /v1/models/ollama/pull`
+  was added without regenerating it. Regenerated (78 added lines, all that
+  endpoint). Left **uncommitted**, because it pairs with the uncommitted router
+  change that produced it; committing it here would put generated types for an
+  endpoint on a branch whose source does not contain it.
+- `tests/end_to_end/test_crash_recovery.py::test_a_genuinely_killed_process_is_recovered_and_can_reindex`
+  failed once with `sqlite3.OperationalError: disk I/O error` under full-suite
+  load, then passed 4/4 in isolation and on the next full run. Recorded as a
+  Windows flake — a genuinely killed process can leave its SQLite handle briefly
+  held. Not investigated further; not caused by this branch, which touches
+  neither crash recovery nor connection handling.
 
 #### Limitations
 
-- **The Phase 7 gate script is broken on `main`.** Commit `2d7e511` made
-  `scripts/run_phase7_explanation_ab.py` require `--dataset`; the gate at
-  `scripts/check_phase7.ps1:117` still passes `--semantic-baseline`, so it
-  throws at "Phase 7 explanation A/B artifact". `scripts/` is untouched by this
-  branch and unmodified in the working tree, so the breakage pre-dates it. Every
-  gate step before that point passed, and the web steps pass when run directly.
-  Left unfixed as unrelated scope — it is the user's call.
+- The explanation A/B artifact is no longer verified by the gate. Refreshing it
+  requires a live Ollama model and is now a documented manual step.
+- `apps/web/src/lib/api-types.gen.ts` is regenerated but uncommitted; it belongs
+  with the uncommitted Ollama-pull router change.
 - Every ephemeral run pays a full index; there is no incremental reuse, which is
   inherent to the request.
 - A crashed ephemeral run leaves its directory until the next ephemeral start.
