@@ -9,10 +9,12 @@ import pytest
 
 from codeatlas.settings.env_file import (
     ENV_FILE_VARIABLE,
+    EPHEMERAL_REPOSITORIES_VARIABLE,
     LOCAL_MODEL_VARIABLE,
     OPENAI_DIMENSIONS_VARIABLE,
     OPENAI_MODEL_VARIABLE,
     codeatlas_root,
+    configured_ephemeral_repositories,
     configured_local_model,
     configured_openai_dimensions,
     configured_openai_model,
@@ -285,3 +287,33 @@ class TestEntryPoints:
         create_app(tmp_path / "codeatlas.db", watch=False)
 
         assert os.environ["EXAMPLE_APP_KEY"] == "loaded"
+
+
+def test_ephemeral_repositories_default_to_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(EPHEMERAL_REPOSITORIES_VARIABLE, raising=False)
+    assert configured_ephemeral_repositories() == ()
+
+
+def test_ephemeral_repositories_split_on_semicolons(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(EPHEMERAL_REPOSITORIES_VARIABLE, r"C:\one;C:\two")
+    assert configured_ephemeral_repositories() == (r"C:\one", r"C:\two")
+
+
+def test_ephemeral_repositories_drop_blanks_and_trim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A trailing separator is the most common hand-edit, and must not become an
+    # empty path that fails registration with a confusing message.
+    monkeypatch.setenv(EPHEMERAL_REPOSITORIES_VARIABLE, r"  C:\one ;; C:\two ;  ")
+    assert configured_ephemeral_repositories() == (r"C:\one", r"C:\two")
+
+
+def test_ephemeral_repositories_preserve_order_and_drop_duplicates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(EPHEMERAL_REPOSITORIES_VARIABLE, r"C:\one;C:\two;C:\one")
+    assert configured_ephemeral_repositories() == (r"C:\one", r"C:\two")

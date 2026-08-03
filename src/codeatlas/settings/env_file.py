@@ -36,6 +36,11 @@ OPENAI_MODEL_VARIABLE = "CODEATLAS_OPENAI_EMBEDDING_MODEL"
 OPENAI_DIMENSIONS_VARIABLE = "CODEATLAS_OPENAI_EMBEDDING_DIMENSIONS"
 LOCAL_MODEL_VARIABLE = "CODEATLAS_LOCAL_EMBEDDING_MODEL"
 
+# Which repositories an ephemeral session registers and indexes at startup.
+# Semicolon-separated absolute paths. This names *what to open*, never whether a
+# repository may transmit — that stays in SQLite, per repository.
+EPHEMERAL_REPOSITORIES_VARIABLE = "CODEATLAS_EPHEMERAL_REPOSITORIES"
+
 # Answer generation. These name *which* model writes the prose; whether a
 # repository generates at all is stored per repository in SQLite, and no
 # variable here can change that.
@@ -145,6 +150,27 @@ def configured_openai_model() -> str | None:
 def configured_local_model() -> str | None:
     """The configured local embedding model, or ``None`` for the default."""
     return _text(LOCAL_MODEL_VARIABLE)
+
+
+def configured_ephemeral_repositories() -> tuple[str, ...]:
+    """Paths an ephemeral session should register at startup, in order.
+
+    Semicolons separate entries because a Windows path contains a colon and may
+    contain spaces, which rules out both of the other obvious separators.
+    Blanks are dropped and duplicates removed: a trailing separator is the most
+    common hand-edit, and registering the same root twice fails the second time
+    with an error that reads like a defect rather than a typo.
+    """
+    raw = _text(EPHEMERAL_REPOSITORIES_VARIABLE)
+    if raw is None:
+        return ()
+
+    ordered: list[str] = []
+    for entry in raw.split(";"):
+        candidate = entry.strip()
+        if candidate and candidate not in ordered:
+            ordered.append(candidate)
+    return tuple(ordered)
 
 
 def configured_openai_dimensions() -> int | None:
