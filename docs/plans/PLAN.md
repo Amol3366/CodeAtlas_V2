@@ -49,14 +49,14 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active phase    | none — Phases 0–7 are all`complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Active task     | none — post-gate answer generation delivered 2026-08-02; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Task status     | `complete` — Phase 7 gate approved by the user 2026-07-31. Post-gate work since then is recorded in the handoff log, not as reopened tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Started UTC     | 2026-08-02T13:53:34Z (latest entry; earlier post-gate work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Git state       | Branch`env-provider-configuration` at `32f1f75`, 28 commits ahead of `main` at `bb1580f` and **unmerged**. The working tree carries this status edit and an unrelated formatter reflow of this file's tables.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Active phase    | none - Phases 0-7 are all `complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Active task     | none - post-gate UX/provider polish and documentation refresh recorded 2026-08-04; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Task status     | `complete` - Phase 7 stays approved. The 2026-08-04 work is post-gate usability/provider polish and documentation, not a reopened phase task                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Agent           | Codex GPT-5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Started UTC     | 2026-08-03T20:17:35Z (latest documentation refresh; earlier post-gate work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Git state       | Branch `main` at `2d7e511`. The working tree carries post-gate Settings, warning-message, provider, cache/navigation, and documentation updates; changes are uncommitted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none — the Section 20 development order is finished. A new phase requires an explicit user decision. Post-gate review findings (2026-07-31) are fixed; see the top handoff entry                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision. The remaining Settings old-view browser observation is recorded, and the user asked to leave it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### Phase 7 Task Board
 
@@ -206,6 +206,184 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-04T22:05:00Z — Ephemeral session mode (ADR-0013)
+
+- Agent: Claude Code `claude-opus-5`, branch `ephemeral-session-mode` at
+  `af5ec06`, four commits ahead of `main` at `2d7e511`.
+- Transition: none. Phases 0–7 stay `complete`; this is post-gate work from a
+  user request, not a reopened phase task.
+
+#### Outcome
+
+The user asked that every run start with fresh indexing, embeddings, and
+storage, while history keeps working within a run. That inverts `AGENTS.md`
+§8.2 (history survives a backend restart, a Phase 5 gate condition) and §9
+(incremental, idempotent indexing), so it was built as an **opt-in mode with the
+default unchanged** rather than as a behavior change.
+
+- `codeatlas serve --ephemeral`, or `CODEATLAS_EPHEMERAL=1`, serves from
+  `%LOCALAPPDATA%/CodeAtlas/sessions/<pid>-<utc timestamp>/`.
+- One path is injected; the vector directory follows from the existing
+  `<database>.parent / "vectors"` derivation, so embeddings are fresh with no
+  new plumbing. The real database is never opened.
+- An explicit `--db` outranks `--ephemeral`.
+- `CODEATLAS_EPHEMERAL_REPOSITORIES` (semicolon-separated, project `.env` only)
+  is registered synchronously before bind, then indexed on one sequential
+  background thread so the server binds immediately.
+- A sweeper removes session directories whose owning pid is dead or which exceed
+  24 hours, inheriting crash recovery's documented pid-reuse limitation.
+
+The second reported issue — the stale Settings view — was **deliberately not
+fixed**. The built bundle was verified to contain the current UI and the shell
+is served `no-store`, so the staleness is browser-side; three prior workarounds
+for this symptom already exist and all failed. It is specified as a diagnosis
+pending one user observation rather than a fourth guess.
+
+#### Files
+
+- New: `src/codeatlas/storage/session.py`,
+  `src/codeatlas/application/ephemeral_bootstrap.py`,
+  `docs/adr/0013-ephemeral-session-mode.md`,
+  `docs/operations/ephemeral-sessions.md`,
+  `tests/unit/test_ephemeral_session.py`,
+  `tests/integration/test_ephemeral_bootstrap.py`,
+  `tests/integration/test_ephemeral_serve.py`,
+  `tests/end_to_end/test_ephemeral_session_isolation.py`.
+- Modified: `src/codeatlas/cli/main.py`, `src/codeatlas/settings/env_file.py`,
+  `AGENTS.md` §8.2, `docs/adr/README.md`, `.env.example`, `README.md`,
+  `documentation/memory.md`, this plan.
+- Design and plan: `docs/superpowers/specs/2026-08-04-ephemeral-session-and-stale-shell-design.md`,
+  `docs/superpowers/plans/2026-08-04-ephemeral-session-mode.md`.
+
+#### Contracts and compatibility
+
+- `contract_version` stays `1.1`. No REST change, no database migration.
+- **`AGENTS.md` §8.2 amended** to scope "history survives backend restart" to
+  default mode. **This edits the release-blocking contract and is pending the
+  user's explicit approval.**
+- Default-mode behavior unchanged; no existing test was modified.
+
+#### Verification
+
+- `uv run pytest tests -q` — exit 0, **1845 passed** in 232 s.
+- `uv run pytest tests/unit/test_ephemeral_session.py -q` — exit 0, 9 passed.
+- `uv run pytest tests/unit/test_env_file.py -q` — exit 0, 28 passed.
+- `uv run pytest tests/integration/test_ephemeral_bootstrap.py -q` — exit 0, 4 passed.
+- `uv run pytest tests/integration/test_ephemeral_serve.py -q` — exit 0, 6 passed.
+- `uv run pytest tests/end_to_end/test_ephemeral_session_isolation.py -q` — exit 0, 2 passed.
+- `uv run ruff check src tests` — exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` — exit 0, 312 files.
+- `pnpm exec tsc --noEmit` — exit 0; `pnpm exec eslint . --max-warnings 0` — exit 0;
+  `pnpm exec vitest run` — exit 0, 132 passed.
+- `uv run codeatlas serve --help` — `--ephemeral` present.
+- `powershell -File scripts/check_phase7.ps1 -SkipSync -SkipE2E` — **FAILED, for
+  a pre-existing reason unrelated to this work.** See limitations.
+
+#### Limitations
+
+- **The Phase 7 gate script is broken on `main`.** Commit `2d7e511` made
+  `scripts/run_phase7_explanation_ab.py` require `--dataset`; the gate at
+  `scripts/check_phase7.ps1:117` still passes `--semantic-baseline`, so it
+  throws at "Phase 7 explanation A/B artifact". `scripts/` is untouched by this
+  branch and unmodified in the working tree, so the breakage pre-dates it. Every
+  gate step before that point passed, and the web steps pass when run directly.
+  Left unfixed as unrelated scope — it is the user's call.
+- Every ephemeral run pays a full index; there is no incremental reuse, which is
+  inherent to the request.
+- A crashed ephemeral run leaves its directory until the next ephemeral start.
+- The stale Settings view is unresolved by design; see Outcome.
+
+#### Next
+
+User to approve or amend the `AGENTS.md` §8.2 wording, decide whether the broken
+gate script should be fixed, and — for the Settings issue — report whether a
+freshly opened tab at `/settings` shows the current UI.
+
+### 2026-08-03T20:17:35Z - Post-gate UX/provider polish and documentation refresh
+
+- Agent: Codex GPT-5, branch `main` at `2d7e511`.
+- Transition: none. Phases 0-7 stay `complete`; this is post-gate work from
+  the user's requests, not a reopened phase task.
+
+#### Outcome
+
+The user asked for warning text to be understandable, Settings to look
+professional, embedding dimensions to follow the selected model, Ollama models
+to be downloadable from Settings, and then asked to leave the remaining
+Settings old-view browser observation and update Markdown progress.
+
+Delivered behavior:
+
+- Known warning codes such as `EVIDENCE_EXCERPT_TRUNCATED` and
+  `LEXICAL_QUERY_RELAXED` still remain machine-readable, but the web answer view
+  renders plain-language notes. Lexical search is documented as word/text
+  matching against the active snapshot, not proof of behavior.
+- Settings was redesigned around summary panels, provider cards, status badges,
+  connection/coverage panels, and separate save/test/download actions.
+- Known OpenAI embedding dimensions now resolve automatically from selected
+  model ids; unknown OpenAI-compatible model ids still require explicit
+  dimensions. Local embedding model dimensions are detected when the model
+  loads.
+- Settings can call `POST /v1/models/ollama/pull` to download the typed Ollama
+  answer model. Pulling a model is separate from saving repository provider
+  settings.
+- The packaged/source `serve --web` application shell now sends non-cacheable
+  headers. The React shell checks for a fresh build signature, Settings queries
+  refetch on mount, and the Settings sidebar link performs document navigation.
+- The user still observed the older Settings view until manual reload. The
+  exact command path was probed successfully, so this remains recorded as a
+  browser/environment observation. The user then asked to leave it and update
+  docs.
+
+#### Files
+
+- Backend: `src/codeatlas/conversations/{intent,templates}.py`,
+  `src/codeatlas/semantic/providers.py`,
+  `src/codeatlas/generation/ollama_provider.py`,
+  `src/codeatlas/application/settings.py`,
+  `src/codeatlas/api/routers/settings.py`, and `src/codeatlas/api/web.py`.
+- Web: `apps/web/src/features/conversations/Thread.tsx`,
+  `apps/web/src/features/settings/SemanticSettings.tsx`,
+  `apps/web/src/routes/SettingsRoute.tsx`,
+  `apps/web/src/lib/queries.ts`, `apps/web/src/app/Shell.tsx`,
+  `apps/web/src/app/buildFreshness.ts`, and related tests.
+- Docs: `README.md`, `documentation/{PRD,architecture,design,rules,phases,memory}.md`,
+  `docs/operations/{answer-generation,chunking-and-search,packaging-and-install,release-validation,semantic-search,web-application}.md`,
+  and this plan.
+
+#### Contracts and compatibility
+
+- `contract_version` stays `1.1`.
+- Additive REST endpoint: `POST /v1/models/ollama/pull`.
+- No database migration in this round.
+- Provider disablement/failure still degrades to deterministic answers.
+- Existing warning codes remain available for machines; only presentation was
+  made friendlier.
+
+#### Verification
+
+- `uv run pytest tests/integration/test_serve_web.py -q` - exit 0,
+  15 passed, 1 warning.
+- `npm.cmd run test -- Shell.test.tsx buildFreshness.test.ts SemanticSettings.test.tsx SettingsRoute.test.tsx`
+  - exit 0, 33 passed.
+- `npm.cmd run build` - exit 0.
+- `npm.cmd run lint` - exit 0.
+- `npm.cmd run test` - exit 0, 132 passed with existing React
+  Router/jsdom canvas/act warnings.
+- `uv run ruff check src tests` - exit 0.
+- `uv run mypy --no-incremental src tests scripts apps` - exit 0.
+- `git diff --check` - exit 0.
+- `uv run codeatlas serve --web --open` - exact command path probed on
+  2026-08-04: `/v1/repositories` returned 200, `/` and `/settings` served the
+  application shell with `Cache-Control: no-store, max-age=0, must-revalidate`,
+  the served bundle contained the new Settings UI, and a Playwright probe
+  reported `playwright_settings_document_navigation=ok`.
+
+#### Next
+
+Await user instruction. Do not continue debugging the remaining Settings
+old-view browser observation unless the user asks to resume that investigation.
 
 ### 2026-08-02T13:53:34Z — Evidence-grounded answer generation
 

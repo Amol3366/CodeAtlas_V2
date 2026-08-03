@@ -345,7 +345,9 @@ Chat history is first-class persistent application data:
 
 Required behavior:
 
-- history survives browser restart and backend restart;
+- history survives browser restart and backend restart **in default mode**; the
+  opt-in ephemeral session mode (ADR-0013) discards its storage on exit by
+  definition, never opens the real database, and is never the default;
 - conversation ordering uses backend timestamps and stable pagination;
 - creating a user message and queued run is transactional;
 - completed assistant text and its evidence links are committed atomically;

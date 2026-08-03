@@ -6,7 +6,7 @@ The implementation follows the authoritative coding-agent contract exposed as
 `AGENTS.md` / `CLAUDE.md` and the shared execution state in
 `docs/plans/PLAN.md`.
 
-## What works today (Phases 0–6 complete; Phase 7 in progress)
+## What works today (Phases 0-7 complete; post-gate polish in progress)
 
 Register a local repository, index Python/TypeScript/JavaScript into a
 validated snapshot with a cross-file relation graph, search it, traverse it,
@@ -88,9 +88,29 @@ Phase 7 adds optional semantic retrieval. The default provider is still `none`;
 deterministic behavior does not need an embedding model. Repositories can opt
 into local embeddings or governed OpenAI embeddings through the settings
 surface, semantic coverage is reported per active snapshot, and shadow
-embedding migrations support cutover/rollback. Reranking and generated
-explanations have seams and validation but are recorded as declined until a real
-provider shows measured uplift (`docs/operations/semantic-search.md`).
+embedding migrations support cutover/rollback (`docs/operations/semantic-search.md`).
+
+Post-gate provider work is now present behind explicit repository settings:
+known OpenAI embedding model dimensions are resolved automatically, local
+embedding dimensions are reported as auto-detected when the model loads, and
+Settings can ask Ollama to download the typed answer model through
+`POST /v1/models/ollama/pull`. Optional Ollama/OpenAI answer generation still
+does not change citations, line numbers, claims, derivation, or confidence
+(`docs/operations/answer-generation.md`).
+
+The Settings web surface has also been polished: provider cards, summary
+panels, connection and coverage panels, clear warnings/limitations, and
+non-cacheable packaged app shell responses for `uv run codeatlas serve --web
+--open`. The exact command path was probed successfully on 2026-08-04, although
+one browser session still showed the old Settings view until reload; that
+environment-specific observation is recorded in `docs/plans/PLAN.md`.
+
+`codeatlas serve --ephemeral` starts from empty storage and discards it when the
+server stops, so indexing, embeddings, and conversations are all fresh each run
+while history behaves normally within the run. It never opens the real database,
+an explicit `--db` outranks it, and `CODEATLAS_EPHEMERAL_REPOSITORIES` names the
+repositories to register and index at startup (ADR-0013,
+`docs/operations/ephemeral-sessions.md`).
 
 Phase 7 packaged semantic-local performance has been measured on the onedir
 artifact: refresh p95 0.975 s, preflight p95 2.298 s, semantic coverage 1.0,
