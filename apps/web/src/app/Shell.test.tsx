@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
@@ -21,10 +21,19 @@ const repository = {
   created_at: "2026-07-27T12:00:00Z",
 };
 
-function stubBackend() {
+const secondRepository = {
+  repository_id: "repo_2",
+  display_name: "second",
+  created_at: "2026-07-27T12:01:00Z",
+};
+
+function stubBackend(repositories = [repository]) {
   return stubFetch({
-    "/v1/repositories": { body: [repository] },
+    "/v1/repositories": { body: repositories },
     "/v1/conversations?repository_id=repo_1": {
+      body: { items: [], next_cursor: null },
+    },
+    "/v1/conversations?repository_id=repo_2": {
       body: { items: [], next_cursor: null },
     },
     "/v1/repositories/repo_1/status": {
@@ -57,11 +66,12 @@ function stubBackend() {
 }
 
 afterEach(() => {
+  window.localStorage.removeItem("codeatlas.activeRepositoryId");
   vi.unstubAllGlobals();
 });
 
 describe("Shell", () => {
-  it("exposes the three regions as landmarks", async () => {
+  it("exposes the navigation and main regions as landmarks", async () => {
     stubBackend();
 
     renderWithProviders(
@@ -74,9 +84,24 @@ describe("Shell", () => {
       await screen.findByRole("navigation", { name: "Conversations" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
+  });
+
+  it("reserves no evidence panel before a citation is chosen", async () => {
+    // The rail used to hold a 380px column open from load. Nothing is selected,
+    // so there is nothing to show, and the conversation gets the width.
+    stubBackend();
+
+    renderWithProviders(
+      <ThemeProvider>
+        <Shell />
+      </ThemeProvider>,
+    );
+
+    await screen.findByRole("navigation", { name: "Conversations" });
+
     expect(
-      screen.getByRole("complementary", { name: "Evidence" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("complementary", { name: "Evidence" }),
+    ).not.toBeInTheDocument();
   });
 
   it("has no detectable accessibility violations", async () => {
@@ -136,6 +161,30 @@ describe("Shell", () => {
       "href",
       "/settings",
     );
+  });
+
+  it("uses the stored active repository after a document reload", async () => {
+    window.localStorage.setItem("codeatlas.activeRepositoryId", "repo_2");
+    const fetchMock = stubBackend([repository, secondRepository]);
+
+    renderWithProviders(
+      <ThemeProvider>
+        <Shell />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).endsWith("/v1/conversations?repository_id=repo_2"),
+        ),
+      ).toBe(true);
+    });
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).endsWith("/v1/conversations?repository_id=repo_1"),
+      ),
+    ).toBe(false);
   });
 
   it("lets the theme be chosen explicitly rather than only following the system", async () => {
