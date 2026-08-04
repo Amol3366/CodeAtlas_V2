@@ -265,7 +265,7 @@ def test_models_explain_a_custom_openai_model_missing_its_width(
         OPENAI_MODEL_VARIABLE,
     )
 
-    monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "text-embedding-3-large")
+    monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "new-embedding-model")
     monkeypatch.delenv(OPENAI_DIMENSIONS_VARIABLE, raising=False)
 
     models = SettingsService(connection).models()
@@ -274,3 +274,52 @@ def test_models_explain_a_custom_openai_model_missing_its_width(
     assert openai.available is False
     assert openai.requires is not None
     assert OPENAI_DIMENSIONS_VARIABLE in openai.requires
+
+
+# --- the embedding model is a per-repository decision ---------------------
+
+
+def test_an_embedding_model_round_trips_through_the_policy_store(
+    connection: sqlite3.Connection,
+) -> None:
+    """A stored model id survives the write/read cycle.
+
+    Null means "use the configured default", the convention `answer_model`
+    established, so absence must stay distinguishable from a stored value.
+    """
+    from codeatlas.domain.semantic import ProviderPolicy
+    from codeatlas.storage.sqlite.semantic_stores import ProviderPolicyStore
+
+    store = ProviderPolicyStore(connection)
+    store.set(
+        ProviderPolicy(
+            repository_id="repo_1",
+            embedding_provider=EmbeddingProviderKind.LOCAL,
+            monthly_token_budget=None,
+            per_run_token_budget=None,
+            updated_at=_NOW,
+            embedding_model="BAAI/bge-small-en-v1.5",
+        )
+    )
+
+    assert store.get("repo_1").embedding_model == "BAAI/bge-small-en-v1.5"
+
+
+def test_an_unset_embedding_model_reads_back_as_none(
+    connection: sqlite3.Connection,
+) -> None:
+    from codeatlas.domain.semantic import ProviderPolicy
+    from codeatlas.storage.sqlite.semantic_stores import ProviderPolicyStore
+
+    store = ProviderPolicyStore(connection)
+    store.set(
+        ProviderPolicy(
+            repository_id="repo_1",
+            embedding_provider=EmbeddingProviderKind.LOCAL,
+            monthly_token_budget=None,
+            per_run_token_budget=None,
+            updated_at=_NOW,
+        )
+    )
+
+    assert store.get("repo_1").embedding_model is None
