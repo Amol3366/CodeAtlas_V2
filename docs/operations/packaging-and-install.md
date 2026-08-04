@@ -118,6 +118,15 @@ Two routing rules make that safe:
 If the web application was never built, `serve --web` **refuses and says so**
 rather than starting an API-only server behind an empty page.
 
+The app shell is intentionally not cacheable. `index.html` is the pointer to the
+current hashed Vite assets, so it is served with
+`Cache-Control: no-store, max-age=0, must-revalidate`; hashed files under
+`/assets` can remain ordinary static assets. On 2026-08-04 the exact source
+command `uv run codeatlas serve --web --open` was checked against the running
+server: `/v1/repositories` returned 200, `/settings` returned the non-cacheable
+shell, the served bundle contained the new Settings UI, and a browser probe
+confirmed the Settings sidebar link performs a document navigation.
+
 ## What is verified, and what is not
 
 `tests/end_to_end/test_packaged_build.py` runs against the real binary: it

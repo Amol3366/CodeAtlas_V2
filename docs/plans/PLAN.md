@@ -207,6 +207,107 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-04T23:50:00Z — Per-repository embedding model (ADR-0014)
+
+- Agent: Claude Code `claude-opus-5`, branch `per-repository-embedding-model`,
+  ten commits ahead of `main` at `56c1431`.
+- Transition: none. Phases 0–7 stay `complete`; this is post-gate work from a
+  user request, not a reopened phase task.
+
+#### Outcome
+
+The user reported that the OpenAI embedding model was effectively selectable
+while no open-source model was. Investigation found two distinct causes, both
+by design and neither a defect:
+
+1. The **local provider radio was disabled** because the `semantic-local` extra
+   was not installed (`/v1/models` reported `available: false`,
+   `requires: extra:semantic-local`).
+2. **There was no embedding model field at all.** The page offered three
+   provider radios; model identity was a machine-wide `.env` value rendered as
+   read-only text, while answer generation already had a model input.
+
+Delivered, per the user's approved design:
+
+- Migration `0014` adds a nullable `embedding_model` to
+  `repository_provider_policy`, following the `answer_model` convention. Null
+  means "use the configured default", so existing databases upgrade to exactly
+  their current behaviour. `SCHEMA_VERSION` 13 → 14.
+- Resolution precedence is policy → `.env` → pinned default, threaded through
+  `build_embedding_provider` — the one choke point every caller reaches,
+  including the migration backfill via `ProviderFactory`. **The migration
+  service itself needed no change**, which the design had expected to modify;
+  resolving the model in two places would let them disagree about which is
+  current.
+- `POST /v1/models/embedding/validate` loads a candidate model and reports its
+  **measured** width. Save is gated on a successful check.
+- CLI parity: `codeatlas settings <id> --embedding-model <model>`.
+- Settings shows the field for the local provider, and offers **Re-embed with
+  the new model** when the saved model disagrees with the namespace serving
+  search, driving the existing P7-09 shadow migration.
+
+OpenAI embedding model identity stays in `.env`, unchanged and out of scope: an
+unknown OpenAI id also needs a declared width that cannot be measured for free.
+
+#### Files
+
+- New: `src/codeatlas/storage/sqlite/migrations/0014_embedding_model.sql`,
+  `docs/adr/0014-per-repository-embedding-model.md`,
+  `docs/superpowers/specs/2026-08-04-per-repository-embedding-model-design.md`,
+  `docs/superpowers/plans/2026-08-04-per-repository-embedding-model.md`.
+- Modified: `src/codeatlas/domain/semantic.py`,
+  `src/codeatlas/storage/sqlite/{semantic_stores,migrations}.py`,
+  `src/codeatlas/semantic/providers.py`,
+  `src/codeatlas/application/settings.py`,
+  `src/codeatlas/api/routers/settings.py`, `src/codeatlas/cli/main.py`,
+  `apps/web/src/lib/queries.ts`,
+  `apps/web/src/features/settings/SemanticSettings.tsx`,
+  `apps/web/{openapi.json,src/lib/api-types.gen.ts}` (regenerated, not
+  hand-edited), the matching tests, `.env.example`, `docs/adr/README.md`,
+  `docs/operations/semantic-search.md`, `documentation/architecture.md`,
+  `documentation/memory.md`, and this plan.
+
+#### Contracts and compatibility
+
+- `contract_version` stays `1.1`. Additive throughout: one nullable column, one
+  optional request field, one new endpoint.
+- Migration `0014`; `SCHEMA_VERSION` 14. An older build now refuses a database
+  written by this one, which is the intended protection.
+- Default behaviour unchanged. A repository that never chooses a model resolves
+  exactly as before.
+
+#### Verification
+
+- `powershell -File scripts/check_phase7.ps1 -SkipSync -SkipE2E` — **exit 0**:
+  1887 passed, 3 skipped, Ruff clean, MyPy clean across 313 files, 146 web
+  tests, web lint/types/build clean.
+- `uv run pytest tests -q --ignore=tests/end_to_end` — 1850 passed, 3 skipped.
+- Validation success path confirmed against a real model:
+  `EmbeddingModelValidation(model_id='sentence-transformers/all-MiniLM-L6-v2',
+  ok=True, dimensions=384, detail_code=None, latency_ms=22983)`.
+- `uv sync --extra semantic-local` installed sentence-transformers 5.6.1 and
+  torch 2.13.0 in this environment.
+
+#### Limitations
+
+- **The three skips in `tests/unit/test_embedding_providers.py` are new to this
+  environment, not to this branch.** They are by-design guards asserting
+  behaviour *without* the `semantic-local` extra, and installing the extra is
+  what skips them. A gate environment without the extra still runs them.
+- The validate endpoint's first call for an uncached model downloads weights and
+  took ~23 s locally; a large model will take minutes. No progress is streamed.
+- Validation is a client-side gate. The API accepts any syntactically valid id,
+  because it cannot verify a caller checked first; a bad id fails at first embed,
+  as a misconfigured `.env` model already does.
+- End-to-end suites were skipped (`-SkipE2E`). No Playwright coverage was added
+  for the new field.
+- OpenAI embedding models remain `.env`-only.
+
+#### Next
+
+User to review. If the branch is wanted on `main`, it needs a merge decision;
+Playwright coverage for the new Settings field is the obvious follow-up.
+
 ### 2026-08-04T22:05:00Z — Ephemeral session mode (ADR-0013)
 
 - Agent: Claude Code `claude-opus-5`, branch `ephemeral-session-mode` at

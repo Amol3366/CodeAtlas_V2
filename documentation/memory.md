@@ -33,6 +33,14 @@ development order is finished. A new phase requires an explicit user decision.
 
 - [x] Ephemeral session mode (ADR-0013), 2026-08-04: `serve --ephemeral` starts
       from empty storage and discards it on exit. Default unchanged.
+- [x] `README.md` "Running the project" section (2026-08-04): install, serve,
+      CLI, dev loop, packaged build, quality gate, and a troubleshooting table —
+      each command explained rather than just listed. Documentation only; no
+      code, contract, or migration change.
+
+- [x] Per-repository embedding model (ADR-0014), 2026-08-04: the local provider
+      takes a model id per repository, chosen in Settings and measured before
+      save. Migration `0014`, `SCHEMA_VERSION` 14. OpenAI stays `.env`-only.
 
 ## In Progress
 
@@ -81,6 +89,17 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   OpenAI embedding widths are resolved automatically; unknown OpenAI models
   still require an explicit dimension. Local model widths are detected when the
   model loads.
+- **An embedding model is measured, never declared.** A candidate local model is
+  loaded once and asked for its width, because the namespace is labelled with
+  that number and a wrong label never raises — it just returns worse results for
+  as long as the index lives. The check is a client-side gate: the API cannot
+  verify a caller ran it, and a flag the client sets would be enforcement in
+  name only.
+- **`build_embedding_provider` is the one place a model is resolved.** The
+  migration backfill reaches it through `ProviderFactory`, so ADR-0014 needed no
+  change to `EmbeddingMigrationService`. Two resolution sites could disagree
+  about which model is current, and a namespace whose label disagrees with its
+  contents fails silently.
 - **Ollama model download is separate from saving settings.** Settings can call
   `POST /v1/models/ollama/pull`, but a failed or slow pull must not silently
   change a repository's provider configuration.

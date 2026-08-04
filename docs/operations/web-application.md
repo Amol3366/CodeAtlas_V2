@@ -1,6 +1,6 @@
-# Web Application (Phase 5)
+# Web Application
 
-Status: current as of Phase 5
+Status: current as of 2026-08-04
 Audience: developers running or extending `apps/web`
 
 ## Running it
@@ -18,6 +18,17 @@ and pnpm are prerequisites.
 The gate is `scripts/check_phase5.ps1` — backend first, then generated types,
 then web lint, types, tests, and build.
 
+For the production-style local app, use the same command users run:
+
+```powershell
+uv run codeatlas serve --web --open
+```
+
+That serves the built `apps/web/dist` bundle from FastAPI on
+`http://127.0.0.1:8000`. The application shell is returned with
+`Cache-Control: no-store, max-age=0, must-revalidate` so a rebuilt local bundle
+does not keep pointing a browser tab at stale asset hashes.
+
 ## What it does
 
 - **Repository onboarding** — add a local repository, watch real index status,
@@ -33,11 +44,14 @@ then web lint, types, tests, and build.
 - **Change preflight** — runs a working-tree analysis and renders the persisted
   report, findings grouped by severity, warnings and limitations visible.
 - **Settings** — `/settings`, reached from the sidebar header. Chooses the
-  embedding provider for **one** repository: the active one, which the page
-  names rather than implies, because this is the only screen that can cause
-  repository content to leave the machine. With no repository selected it links
-  back to the home page, where that choice is made; the repository selector is
-  not duplicated onto this route.
+  embedding and answer providers for **one** repository: the active one, which
+  the page names rather than implies, because this is the only screen that can
+  cause repository content to leave the machine. The current surface uses
+  provider cards, summary panels, explicit transmission badges, connection and
+  coverage panels, fresh settings/model refetch on mount, and an Ollama
+  **Download model** action for the typed answer model. With no repository
+  selected it links back to the home page, where that choice is made; the
+  repository selector is not duplicated onto this route.
 
 ## Architecture
 
@@ -71,8 +85,10 @@ then web lint, types, tests, and build.
 
 ## What the web application does not do
 
-- **No LLM.** Every assistant message is a deterministic answer or an explicit
-  abstention. Generation is Phase 7, behind its own gate.
+- **No LLM authority.** Every factual claim still comes from deterministic or
+  validated retrieval. Optional answer generation may write prose above the
+  verified result, but it cannot change citations, line numbers, claims,
+  derivation, or confidence.
 - ~~**Answering is synchronous.**~~ **Closed by P6-STREAM (ADR-0008).**
   `POST /v1/conversations/{id}/messages` now returns `202` with a queued run and
   answers on a worker. The thread opens the run's stream, renders
@@ -90,4 +106,11 @@ then web lint, types, tests, and build.
   the first page only.
 - **No "purge now" control** for soft-deleted conversations; retention is
   Phase 6.
-- **`codeatlas serve --web` is not built.** Development runs two servers.
+- ~~**`codeatlas serve --web` is not built.**~~ **Closed by Phase 6.** The
+  packaged/source `serve --web` path serves the built web app and `/v1` from
+  one loopback origin. On 2026-08-04 the exact
+  `uv run codeatlas serve --web --open` path was probed: `/settings` returned
+  the current shell, cache headers were `no-store`, and the served bundle
+  contained the new Settings UI. A user browser session still showed the older
+  Settings view until reload; that observation is recorded as environment
+  specific in `docs/plans/PLAN.md`.

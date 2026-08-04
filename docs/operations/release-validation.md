@@ -34,6 +34,15 @@ codeatlas serve --web --open
 powershell -ExecutionPolicy Bypass -File scripts/install_windows.ps1 -Uninstall
 ```
 
+The exact source command `uv run codeatlas serve --web --open` was also probed
+on 2026-08-04 after the Settings polish. The running server returned 200 from
+`/v1/repositories`, served `/` and `/settings` with
+`Cache-Control: no-store, max-age=0, must-revalidate`, loaded a bundle that
+contained the new Settings UI, and a browser probe confirmed the Settings
+sidebar link performs document navigation. One user browser session still showed
+the older Settings view until manual reload, so that observation remains
+recorded separately from the release check.
+
 ## What each step proves
 
 | Step | Proves | Would otherwise hide |

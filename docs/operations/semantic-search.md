@@ -30,6 +30,47 @@ The settings and model APIs never return credentials. Provider telemetry records
 provider, operation, request count, token estimate, latency, outcome, and time;
 it has no columns for source text, prompts, evidence, answers, paths, or secrets.
 
+## Choosing a local embedding model in Settings
+
+A repository using the **local** provider chooses its own model, so one
+repository can use a heavier model than another (ADR-0014).
+
+Select "Local model" in Settings and an **Embedding model** field appears. Type
+any sentence-transformers id — `BAAI/bge-small-en-v1.5`, `thenlper/gte-small`,
+anything the library can load — then press **Check model**. Save stays disabled
+until that exact id has been checked.
+
+**Why the check is mandatory.** The vector namespace is labelled with the
+model's width. A wrong width never raises an error; it silently returns worse
+results for as long as the index lives. So CodeAtlas loads the model and
+measures the width rather than trusting a typed number. The first check of a
+model downloads its weights, which can take minutes.
+
+The check is a client-side gate. `POST /v1/models/embedding/validate` accepts
+any syntactically valid id, because the API cannot verify a caller checked
+first, and a flag the client sets would be enforcement in name only. An id that
+cannot load fails at first embed with a provider error — the same behaviour as a
+misconfigured `.env` model.
+
+Leaving the field blank means "use the configured default", and needs no check.
+Precedence is **repository setting → `.env` → pinned default**. The CLI takes
+the same setting on the same terms:
+
+```powershell
+uv run codeatlas settings <repository_id> --provider local --embedding-model BAAI/bge-small-en-v1.5
+```
+
+**Changing the model needs a re-embed.** Vectors from two models cannot share a
+similarity space, so a saved model that disagrees with the namespace currently
+serving search is not yet in effect. Settings offers **Re-embed with the new
+model**, which drives the shadow migration described under *Model migrations*
+below: the old namespace keeps answering until the backfill completes, and the
+cutover is reversible.
+
+OpenAI embedding model identity is **not** configurable per repository. It stays
+in `.env`, because an unknown OpenAI model also needs a declared width that
+cannot be measured without a billable call.
+
 ## Configuring credentials and models (`.env`)
 
 Copy `.env.example` to `.env` in the CodeAtlas project folder and edit it.
@@ -62,6 +103,13 @@ labelled with it, and CodeAtlas will not guess: set
 the variable. `text-embedding-3-small` is 1536; `text-embedding-3-large` is
 3072. The local provider needs no such setting — it reads the width from the
 model it loaded.
+
+Current behavior as of 2026-08-04: known OpenAI embedding model dimensions are
+resolved automatically. `text-embedding-3-small` is 1536,
+`text-embedding-3-large` is 3072, and `text-embedding-ada-002` is 1536. An
+unknown OpenAI embedding model still must declare
+`CODEATLAS_OPENAI_EMBEDDING_DIMENSIONS`. Local embedding dimensions are detected
+from the model when it loads.
 
 **Changing a model changes the namespace**, which is what makes it safe
 (ADR-0011). Existing vectors are not reinterpreted; the new model starts an
@@ -143,9 +191,15 @@ P7-10 and P7-11 built the bounded seams and recorded admission decisions:
   performs no provider call and produces no generated answer. Fake-provider
   tests cover evidence-only prompts and rejection of invalid generated claims.
 
-Concrete Ollama/OpenAI answer providers are not shipped. Adding them requires
-the same repository-level opt-in, redaction, budgets, timeouts, telemetry, and
-measured uplift before admission.
+Post-gate Ollama and OpenAI answer providers now exist behind repository-level
+opt-in, redaction, budgets, timeouts, telemetry, and deterministic fallback.
+Their presence does not change the Phase 7 admission record until a measured
+uplift run admits them.
+
+Settings can ask Ollama to download the typed answer model through
+`POST /v1/models/ollama/pull`. That operation is separate from saving settings:
+pulling a model can be slow and large, and a download failure must not silently
+change which provider a repository uses.
 
 ## Packaged semantic validation
 

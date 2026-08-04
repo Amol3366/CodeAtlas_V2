@@ -23,14 +23,16 @@ something a model said. It does not.
 ## Turning it on
 
 1. Install Ollama from <https://ollama.com/download>.
-2. Pull the default model:
+2. Pull the default model, or let Settings request the same download after you
+   select Ollama:
 
    ```powershell
    ollama pull llama3.2:3b
    ```
 
 3. Open Settings, choose **Ollama (local, recommended)** under *Answer
-   provider*, and save.
+   provider*, use **Download model** if the model is not installed yet, and
+   save.
 
 Nothing leaves your machine. Ollama runs locally and CodeAtlas talks to it on
 loopback.
@@ -46,7 +48,8 @@ redaction is a safety net, not a guarantee about your source.
 clearly rather than reasoning deeply across many files. For subtler questions,
 a larger model is a one-field change.
 
-Pull it, then type its tag into **Answer model** in Settings:
+Pull it, or type its tag into **Answer model** in Settings and use
+**Download model**:
 
 ```powershell
 ollama pull llama3.1:8b
@@ -55,6 +58,10 @@ ollama pull llama3.1:8b
 Bigger models need proportionally more memory and answer more slowly. The tag
 must be one Ollama has actually pulled — a tag it does not have reports "there
 is no model working", not a silent fallback.
+
+The web button calls `POST /v1/models/ollama/pull` with the typed model id. It
+does not save repository settings by itself; a slow or failed model download
+must not silently switch a repository's answer provider.
 
 Swapping answer models is free. Unlike an embedding model, an answer model
 stores nothing: changing it affects the next answer and nothing else. No
@@ -142,3 +149,4 @@ Against Ollama 0.32.5 with `llama3.2:3b`, on a real indexed repository:
 | Persisted answer | 8,573 characters, status `complete`, citations intact |
 | Model missing | `GENERATION_MODEL_MISSING`, verified answer returned |
 | Provider unreachable | `GENERATION_PROVIDER_UNREACHABLE`, verified answer returned |
+| Ollama model download | `POST /v1/models/ollama/pull` returns stable detail codes and does not change repository settings |
