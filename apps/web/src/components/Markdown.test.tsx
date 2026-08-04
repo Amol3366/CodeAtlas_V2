@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Markdown } from "./Markdown";
 
@@ -91,5 +91,60 @@ describe("Markdown", () => {
     );
 
     expect(container.querySelector("iframe")).toBeNull();
+  });
+});
+
+/**
+ * Citation markers are the interaction, not decoration.
+ *
+ * The answer body states a fact and ends it with `[1]`. That marker is where a
+ * reader's attention already is, so it is what must be clickable — which means
+ * turning text into an element without ever letting repository text become
+ * markup.
+ */
+describe("Markdown citations", () => {
+  it("replaces a marker with the rendered citation", () => {
+    render(
+      <Markdown renderCitation={(ordinal) => <button>cite {ordinal}</button>}>
+        {"A fact about the code. [1]"}
+      </Markdown>,
+    );
+
+    expect(screen.getByRole("button", { name: "cite 1" })).toBeInTheDocument();
+    expect(screen.queryByText(/\[1\]/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the marker as text when the renderer declines it", () => {
+    render(<Markdown renderCitation={() => null}>{"A fact. [7]"}</Markdown>);
+
+    expect(screen.getByText(/\[7\]/)).toBeInTheDocument();
+  });
+
+  it("renders every marker in one paragraph", () => {
+    render(
+      <Markdown renderCitation={(ordinal) => <button>cite {ordinal}</button>}>
+        {"A fact. [1][2]"}
+      </Markdown>,
+    );
+
+    expect(screen.getByRole("button", { name: "cite 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cite 2" })).toBeInTheDocument();
+  });
+
+  it("leaves a marker inside code untouched", () => {
+    const renderCitation = vi.fn(() => <button>cite</button>);
+    render(
+      <Markdown renderCitation={renderCitation}>
+        {"Use `array[1]` carefully."}
+      </Markdown>,
+    );
+
+    expect(renderCitation).not.toHaveBeenCalled();
+  });
+
+  it("renders normally without the prop", () => {
+    render(<Markdown>{"Plain text. [1]"}</Markdown>);
+
+    expect(screen.getByText(/\[1\]/)).toBeInTheDocument();
   });
 });
