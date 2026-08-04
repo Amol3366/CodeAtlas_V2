@@ -502,6 +502,88 @@ describe("answer provider", () => {
       });
     });
 
+    it("offers re-embedding when the saved model differs from the active one", async () => {
+      stubBackend({
+        "/v1/settings?repository_id=repo_1": {
+          body: {
+            repository_id: "repo_1",
+            embedding_provider: "local",
+            monthly_token_budget: null,
+            per_run_token_budget: null,
+            transmits_off_machine: false,
+            updated_at: "2026-07-30T12:00:00Z",
+            answer_provider: "none",
+            answer_model: null,
+            answer_timeout_seconds: null,
+            embedding_model: "BAAI/bge-small-en-v1.5",
+          },
+        },
+        "/v1/repositories/repo_1/semantic-status": {
+          body: {
+            repository_id: "repo_1",
+            provider: "local",
+            enabled: true,
+            snapshot_id: "snap_1",
+            coverage: 1,
+            total_count: 10,
+            embedded_count: 10,
+            pending_count: 0,
+            failed_count: 0,
+            namespace_id: "ns_1",
+            model_id: "sentence-transformers/all-MiniLM-L6-v2",
+            is_complete: true,
+          },
+        },
+      });
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      expect(
+        await screen.findByRole("button", { name: /re-embed/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("does not offer re-embedding when the active model already matches", async () => {
+      stubBackend({
+        "/v1/settings?repository_id=repo_1": {
+          body: {
+            repository_id: "repo_1",
+            embedding_provider: "local",
+            monthly_token_budget: null,
+            per_run_token_budget: null,
+            transmits_off_machine: false,
+            updated_at: "2026-07-30T12:00:00Z",
+            answer_provider: "none",
+            answer_model: null,
+            answer_timeout_seconds: null,
+            embedding_model: "sentence-transformers/all-MiniLM-L6-v2",
+          },
+        },
+        "/v1/repositories/repo_1/semantic-status": {
+          body: {
+            repository_id: "repo_1",
+            provider: "local",
+            enabled: true,
+            snapshot_id: "snap_1",
+            coverage: 1,
+            total_count: 10,
+            embedded_count: 10,
+            pending_count: 0,
+            failed_count: 0,
+            namespace_id: "ns_1",
+            model_id: "sentence-transformers/all-MiniLM-L6-v2",
+            is_complete: true,
+          },
+        },
+      });
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      await screen.findByLabelText(/embedding model/i);
+
+      expect(
+        screen.queryByRole("button", { name: /re-embed/i }),
+      ).not.toBeInTheDocument();
+    });
+
     it("keeps saving blocked when the check fails", async () => {
       stubBackend({
         "/v1/models/embedding/validate": {

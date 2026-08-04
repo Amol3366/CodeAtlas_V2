@@ -273,6 +273,30 @@ export function useValidateEmbeddingModel() {
   });
 }
 
+/** A shadow embedding migration. Only the fields this UI acts on. */
+export interface EmbeddingMigration {
+  readonly migration_id: string;
+  readonly repository_id: string;
+  readonly status: string;
+  readonly source_namespace_id: string;
+  readonly target_namespace_id: string;
+}
+
+export function useStartEmbeddingMigration(repositoryId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<EmbeddingMigration>("/v1/models/embedding-migrations", {
+        repository_id: repositoryId,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({
+        queryKey: ["semantic-status", repositoryId],
+      });
+    },
+  });
+}
+
 export function usePullOllamaModel() {
   return useMutation({
     mutationFn: (modelId: string) =>

@@ -17,6 +17,7 @@ import {
   usePullOllamaModel,
   useValidateEmbeddingModel,
   useSemanticStatus,
+  useStartEmbeddingMigration,
   useSettings,
   useTestProvider,
   useUpdateSettings,
@@ -48,6 +49,7 @@ export function SemanticSettings({ repositoryId }: Props) {
   const test = useTestProvider(repositoryId);
   const pullOllama = usePullOllamaModel();
   const validateModel = useValidateEmbeddingModel();
+  const startMigration = useStartEmbeddingMigration(repositoryId);
 
   const [provider, setProvider] = useState<string>("none");
   const [monthlyBudget, setMonthlyBudget] = useState<string>("");
@@ -116,6 +118,17 @@ export function SemanticSettings({ repositoryId }: Props) {
     provider !== "local" ||
     trimmedEmbeddingModel === "" ||
     trimmedEmbeddingModel === validatedModel;
+  // Vectors from two models cannot share a similarity space, so a saved model
+  // that disagrees with the namespace currently serving search is not yet in
+  // effect. Offering the migration is how that is made visible rather than
+  // silently half-applied.
+  const activeNamespaceModel = status.data?.model_id ?? null;
+  const savedEmbeddingModel = settings.data?.embedding_model ?? null;
+  const needsReembedding =
+    provider === "local" &&
+    savedEmbeddingModel !== null &&
+    activeNamespaceModel !== null &&
+    savedEmbeddingModel !== activeNamespaceModel;
   const selectedOllamaModel =
     answerModel.trim() || chosenAnswer?.model_id?.trim() || "";
 
@@ -314,6 +327,45 @@ export function SemanticSettings({ repositoryId }: Props) {
                         validateModel.data.detail_code ?? "unknown"
                       }.`}
                 </p>
+              ) : null}
+              {needsReembedding ? (
+                <div className="mt-[var(--space-3)] border-t border-border pt-[var(--space-3)]">
+                  <button
+                    type="button"
+                    onClick={() => startMigration.mutate()}
+                    disabled={startMigration.isPending}
+                    className="w-full rounded-[var(--radius-md)] border border-border px-[var(--space-3)] py-[var(--space-2)] text-sm font-medium disabled:opacity-50"
+                  >
+                    {startMigration.isPending
+                      ? "Re-embedding..."
+                      : "Re-embed with the new model"}
+                  </button>
+                  <p className="mt-[var(--space-2)] text-xs leading-5 text-text-muted">
+                    Search keeps using{" "}
+                    <code>{activeNamespaceModel}</code> until the new vectors
+                    are complete. Vectors from two models cannot share one
+                    similarity space, so the new model starts an empty
+                    namespace.
+                  </p>
+                  {startMigration.isError ? (
+                    <p
+                      role="alert"
+                      className="mt-[var(--space-2)] text-sm text-danger"
+                    >
+                      {(startMigration.error as Error).message}
+                    </p>
+                  ) : null}
+                  {startMigration.data ? (
+                    <p
+                      role="status"
+                      className="mt-[var(--space-2)] text-sm text-fresh"
+                    >
+                      Re-embedding {startMigration.data.status
+                        .toLowerCase()
+                        .replace(/_/g, " ")}.
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
               {trimmedEmbeddingModel !== "" && !embeddingModelReady ? (
                 <p className="mt-[var(--space-2)] text-xs leading-5 text-text-muted">
