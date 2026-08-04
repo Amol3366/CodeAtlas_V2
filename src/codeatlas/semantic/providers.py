@@ -149,16 +149,26 @@ OPENAI_MODEL_ID = "text-embedding-3-small"
 OPENAI_DIMENSIONS = 1536
 OPENAI_TIMEOUT_SECONDS = 30.0
 OPENAI_API_KEY_VARIABLE = "OPENAI_API_KEY"
+_KNOWN_OPENAI_EMBEDDING_DIMENSIONS: dict[str, int] = {
+    OPENAI_MODEL_ID: OPENAI_DIMENSIONS,
+    "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536,
+}
 
 
-def resolve_local_embedding_model() -> str:
+def resolve_local_embedding_model(policy_model: str | None = None) -> str:
     """Which sentence-transformers model the local provider loads.
+
+    Precedence is policy, then ``.env``, then the pinned default. The
+    repository's own choice wins because the provider decision is per
+    repository (Section 4.4), and a machine-wide value cannot express "this
+    repository uses a bigger model".
 
     Safe to configure freely: the provider reads the true width from the model
     it loaded, and the namespace is derived from that. A different model simply
     means a different namespace.
     """
-    return configured_local_model() or LOCAL_MODEL_ID
+    return policy_model or configured_local_model() or LOCAL_MODEL_ID
 
 
 def resolve_openai_embedding_model() -> tuple[str, int]:
@@ -173,23 +183,25 @@ def resolve_openai_embedding_model() -> tuple[str, int]:
     """
     model = configured_openai_model()
     width = configured_openai_dimensions()
+    resolved_model = model or OPENAI_MODEL_ID
+    known_width = _KNOWN_OPENAI_EMBEDDING_DIMENSIONS.get(resolved_model)
 
-    if model is None or model == OPENAI_MODEL_ID:
-        if width is not None and width != OPENAI_DIMENSIONS:
+    if known_width is not None:
+        if width is not None and width != known_width:
             raise ProviderUnavailableError(
                 f"{OPENAI_DIMENSIONS_VARIABLE} is {width}, but "
-                f"{OPENAI_MODEL_ID} returns {OPENAI_DIMENSIONS}. CodeAtlas does "
+                f"{resolved_model} returns {known_width}. CodeAtlas does "
                 "not request shortened embeddings, so the two must agree.",
                 details={
                     "provider": EmbeddingProviderKind.OPENAI.value,
                     "variable": OPENAI_DIMENSIONS_VARIABLE,
                 },
             )
-        return OPENAI_MODEL_ID, OPENAI_DIMENSIONS
+        return resolved_model, known_width
 
     if width is None:
         raise ProviderUnavailableError(
-            f"{OPENAI_MODEL_VARIABLE} is set to '{model}', so "
+            f"{OPENAI_MODEL_VARIABLE} is set to '{resolved_model}', so "
             f"{OPENAI_DIMENSIONS_VARIABLE} must also be set — CodeAtlas labels "
             "its vector index with that width and will not guess it. "
             "text-embedding-3-large is 3072.",
@@ -198,7 +210,7 @@ def resolve_openai_embedding_model() -> tuple[str, int]:
                 "variable": OPENAI_DIMENSIONS_VARIABLE,
             },
         )
-    return model, width
+    return resolved_model, width
 
 
 class OpenAIEmbeddingProvider:
@@ -344,7 +356,14 @@ def build_embedding_provider(policy: ProviderPolicy) -> EmbeddingProvider:
     if kind is EmbeddingProviderKind.NONE:
         return NoEmbeddingProvider()
     if kind is EmbeddingProviderKind.LOCAL:
-        return _cached_local_provider(resolve_local_embedding_model())
+        # The policy value passes through the one choke point every caller
+        # reaches, including the migration backfill via `ProviderFactory`. Two
+        # paths that resolved the model separately could disagree about which
+        # one is current, and a namespace whose label disagrees with its
+        # contents never raises — it just returns worse results.
+        return _cached_local_provider(
+            resolve_local_embedding_model(policy.embedding_model)
+        )
 
     # OPENAI is deliberately unreachable from here, and stays that way. This
     # function has no database connection, so it cannot read a budget or record
