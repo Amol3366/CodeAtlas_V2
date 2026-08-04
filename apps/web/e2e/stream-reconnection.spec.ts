@@ -246,7 +246,8 @@ test("the thread reaches its answer through the stream, with no reload", async (
   browserName,
 }) => {
   skipChromiumRendererCrash(browserName);
-  await page.goto("/");
+  // The repository selector lives on `/repositories`; the app opens in chat.
+  await page.goto("/repositories");
   await page
     .getByLabel("Repository", { exact: true })
     .selectOption(seeded.repository_id);
@@ -269,7 +270,8 @@ test("the thread reaches its answer through the stream, with no reload", async (
 
 test("citations survive a reload", async ({ page, seeded, browserName }) => {
   skipChromiumRendererCrash(browserName);
-  await page.goto("/");
+  // The repository selector lives on `/repositories`; the app opens in chat.
+  await page.goto("/repositories");
   await page
     .getByLabel("Repository", { exact: true })
     .selectOption(seeded.repository_id);

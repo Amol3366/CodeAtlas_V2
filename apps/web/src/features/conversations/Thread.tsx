@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Markdown } from "../../components/Markdown";
 import { Skeleton } from "../../components/Skeleton";
@@ -136,34 +136,6 @@ function AssistantTurn({
     );
   }
 
-  const byOrdinal = new Map(evidence.map((item) => [item.citation_ordinal, item]));
-
-  function renderCitation(ordinal: number) {
-    const item = byOrdinal.get(ordinal);
-    // An ordinal with no evidence stays literal text. Not defensive padding:
-    // answers stored before this change carry their own numbering, and a
-    // button that opens nothing is worse than the marker it replaced.
-    if (item === undefined) return null;
-    // The label carries what the removed evidence list used to show. Derivation
-    // in particular has to stay reachable — it is how a claim was established,
-    // and it must not collapse into a bare number.
-    const label =
-      `Evidence ${ordinal}: ${item.file_path} ` +
-      `lines ${item.start_line}-${item.end_line}, ${item.derivation}`;
-    return (
-      <button
-        key={`${item.evidence_id}-${ordinal}`}
-        type="button"
-        onClick={() => onCite?.(item, message.message_id)}
-        aria-label={label}
-        title={label}
-        className="mx-[2px] rounded-[var(--radius-sm)] border border-border px-[var(--space-1)] align-baseline text-xs text-accent"
-      >
-        [{ordinal}]
-      </button>
-    );
-  }
-
   return (
     <div>
       {stale ? (
@@ -188,9 +160,71 @@ function AssistantTurn({
           ))}
         </ul>
       ) : null}
-      <Markdown renderCitation={renderCitation}>{visible}</Markdown>
+      <AnswerBody
+        content={visible}
+        evidence={evidence}
+        messageId={message.message_id}
+        onCite={onCite}
+      />
     </div>
   );
+}
+
+/**
+ * The answer text, with each `[n]` marker rendered as the citation it names.
+ *
+ * Its own component so the memoization can live above any early return: the
+ * identity of `renderCitation` decides whether Markdown rebuilds its component
+ * map, and a rebuilt map remounts the paragraph — replacing the button's DOM
+ * node and detaching the reference the evidence panel restores focus to.
+ */
+function AnswerBody({
+  content,
+  evidence,
+  messageId,
+  onCite,
+}: {
+  readonly content: string;
+  readonly evidence: readonly MessageEvidence[];
+  readonly messageId: string;
+  readonly onCite?:
+    | ((evidence: MessageEvidence, messageId: string) => void)
+    | undefined;
+}) {
+  const byOrdinal = useMemo(
+    () => new Map(evidence.map((item) => [item.citation_ordinal, item])),
+    [evidence],
+  );
+
+  const renderCitation = useCallback(
+    (ordinal: number) => {
+      const item = byOrdinal.get(ordinal);
+      // An ordinal with no evidence stays literal text. Not defensive padding:
+      // answers stored before this change carry their own numbering, and a
+      // button that opens nothing is worse than the marker it replaced.
+      if (item === undefined) return null;
+      // The label carries what the removed evidence list used to show.
+      // Derivation in particular has to stay reachable — it is how a claim was
+      // established, and it must not collapse into a bare number.
+      const label =
+        `Evidence ${ordinal}: ${item.file_path} ` +
+        `lines ${item.start_line}-${item.end_line}, ${item.derivation}`;
+      return (
+        <button
+          type="button"
+          onClick={() => onCite?.(item, messageId)}
+          aria-label={label}
+          title={label}
+          className="mx-[2px] rounded-[var(--radius-sm)] border border-border px-[var(--space-1)] align-baseline text-xs text-accent"
+        >
+          [{ordinal}]
+        </button>
+      );
+    },
+    [byOrdinal, messageId, onCite],
+  );
+
+  return <Markdown renderCitation={renderCitation}>{content}</Markdown>;
 }
 
 export function Thread({

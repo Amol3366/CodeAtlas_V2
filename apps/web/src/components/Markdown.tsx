@@ -1,5 +1,6 @@
-import { Children, type ReactNode } from "react";
+import { Children, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Options as SanitizeSchema } from "rehype-sanitize";
 
@@ -103,8 +104,32 @@ export function Markdown({
   className,
   renderCitation,
 }: MarkdownProps) {
-  const wrap = (nodes: ReactNode): ReactNode =>
-    renderCitation === undefined ? nodes : withCitations(nodes, renderCitation);
+  // Memoized because the identity of these functions is the component *type*
+  // React reconciles against. Rebuilding the object every render makes every
+  // paragraph a new type, which remounts the subtree and replaces its DOM
+  // nodes — detaching anything holding a reference to one, including the
+  // evidence panel's focus-return.
+  const components: Components = useMemo(() => {
+    const wrap = (nodes: ReactNode): ReactNode =>
+      renderCitation === undefined ? nodes : withCitations(nodes, renderCitation);
+    return {
+      p: ({ children: content }) => <p>{wrap(content)}</p>,
+      li: ({ children: content }) => <li>{wrap(content)}</li>,
+      td: ({ children: content }) => <td>{wrap(content)}</td>,
+      th: ({ children: content }) => <th>{wrap(content)}</th>,
+      a: ({ href, children: linkChildren, ...rest }) => (
+        <a
+          {...rest}
+          href={href}
+          // An external link must not hand the opener a window handle.
+          rel="noopener noreferrer nofollow"
+          target="_blank"
+        >
+          {linkChildren}
+        </a>
+      ),
+    };
+  }, [renderCitation]);
   return (
     <div
       className={className}
@@ -117,23 +142,7 @@ export function Markdown({
         // `rehype-raw` is deliberately absent: without it, raw HTML in the
         // source is already inert text rather than markup.
         rehypePlugins={[[rehypeSanitize, schema]]}
-        components={{
-          p: ({ children: content }) => <p>{wrap(content)}</p>,
-          li: ({ children: content }) => <li>{wrap(content)}</li>,
-          td: ({ children: content }) => <td>{wrap(content)}</td>,
-          th: ({ children: content }) => <th>{wrap(content)}</th>,
-          a: ({ href, children: linkChildren, ...rest }) => (
-            <a
-              {...rest}
-              href={href}
-              // An external link must not hand the opener a window handle.
-              rel="noopener noreferrer nofollow"
-              target="_blank"
-            >
-              {linkChildren}
-            </a>
-          ),
-        }}
+        components={components}
       >
         {children}
       </ReactMarkdown>

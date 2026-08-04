@@ -147,4 +147,33 @@ describe("Markdown citations", () => {
 
     expect(screen.getByText(/\[1\]/)).toBeInTheDocument();
   });
+
+  it("keeps the same citation element across a re-render", () => {
+    // Focus lives on a DOM node. If a re-render replaces the node, anything
+    // holding a reference to it — the evidence panel's focus-return, for
+    // instance — is left pointing at a detached element, and the user lands on
+    // the document body instead of the citation they opened.
+    // A stable renderer, as the real caller provides: identity churn there is
+    // itself a remount trigger, and this test is about what Markdown does with
+    // props that have not changed.
+    const renderCitation = (ordinal: number) => <button>cite {ordinal}</button>;
+
+    function Harness({ tick }: { readonly tick: number }) {
+      return (
+        <div data-tick={tick}>
+          <Markdown renderCitation={renderCitation}>{"A fact. [1]"}</Markdown>
+        </div>
+      );
+    }
+
+    const { rerender } = render(<Harness tick={1} />);
+    const before = screen.getByRole("button", { name: "cite 1" });
+    before.focus();
+
+    rerender(<Harness tick={2} />);
+
+    const after = screen.getByRole("button", { name: "cite 1" });
+    expect(after).toBe(before);
+    expect(after).toHaveFocus();
+  });
 });

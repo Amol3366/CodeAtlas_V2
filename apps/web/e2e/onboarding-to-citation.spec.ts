@@ -18,7 +18,10 @@ test("a repository can be added, indexed, questioned, and cited", async ({
   browserName,
 }) => {
   skipChromiumRendererCrash(browserName);
-  await page.goto("/");
+  // Registration and indexing live on `/repositories`. The app opens in chat
+  // instead (dc72ffa), so this workflow starts where the controls are rather
+  // than on the landing route.
+  await page.goto("/repositories");
 
   // --- Onboard ------------------------------------------------------------
   await page
