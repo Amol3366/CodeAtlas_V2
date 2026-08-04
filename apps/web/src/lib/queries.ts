@@ -123,6 +123,8 @@ export interface RepositorySettings {
   readonly answer_provider: string;
   readonly answer_model: string | null;
   readonly answer_timeout_seconds: number | null;
+  /** Null means "use the configured default for the chosen provider". */
+  readonly embedding_model: string | null;
 }
 
 export interface EmbeddingModel {
@@ -165,6 +167,14 @@ export interface ProviderTest {
   readonly latency_ms: number;
 }
 
+export interface OllamaModelPull {
+  readonly provider: "ollama";
+  readonly model_id: string;
+  readonly ok: boolean;
+  readonly detail_code: string | null;
+  readonly latency_ms: number;
+}
+
 export interface SettingsUpdate {
   readonly embedding_provider?: string;
   readonly monthly_token_budget?: number | null;
@@ -172,6 +182,7 @@ export interface SettingsUpdate {
   readonly answer_provider?: string;
   readonly answer_model?: string | null;
   readonly answer_timeout_seconds?: number | null;
+  readonly embedding_model?: string | null;
 }
 
 export function useSettings(repositoryId: string | null) {
@@ -182,6 +193,7 @@ export function useSettings(repositoryId: string | null) {
         `/v1/settings?repository_id=${encodeURIComponent(repositoryId!)}`,
       ),
     enabled: repositoryId !== null,
+    refetchOnMount: "always",
   });
 }
 
@@ -197,6 +209,7 @@ export function useModels() {
         // still parses rather than crashing the settings page.
         answer_models?: AnswerModel[];
       }>("/v1/models"),
+    refetchOnMount: "always",
   });
 }
 
@@ -208,6 +221,7 @@ export function useSemanticStatus(repositoryId: string | null) {
         `/v1/repositories/${encodeURIComponent(repositoryId!)}/semantic-status`,
       ),
     enabled: repositoryId !== null,
+    refetchOnMount: "always",
   });
 }
 
@@ -236,5 +250,34 @@ export function useTestProvider(repositoryId: string) {
       api.post<ProviderTest>(
         `/v1/models/test?repository_id=${encodeURIComponent(repositoryId)}`,
       ),
+  });
+}
+
+/** The measured result of loading a candidate local embedding model. */
+export interface EmbeddingModelValidation {
+  readonly provider: "local";
+  readonly model_id: string;
+  readonly ok: boolean;
+  /** Measured by loading the model. Null when it could not be loaded. */
+  readonly dimensions: number | null;
+  readonly detail_code: string | null;
+  readonly latency_ms: number;
+}
+
+export function useValidateEmbeddingModel() {
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      api.post<EmbeddingModelValidation>("/v1/models/embedding/validate", {
+        model_id: modelId,
+      }),
+  });
+}
+
+export function usePullOllamaModel() {
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      api.post<OllamaModelPull>("/v1/models/ollama/pull", {
+        model_id: modelId,
+      }),
   });
 }
