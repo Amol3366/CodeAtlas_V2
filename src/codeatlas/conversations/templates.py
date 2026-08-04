@@ -215,8 +215,13 @@ def _render_project_overview(response: QueryResponse) -> str:
                 if item.symbol and _is_display_symbol(item.symbol)
                 else ""
             )
+            # Leads with the same `[n]` marker the claims use, so the web
+            # client turns it into a citation button through one mechanism
+            # rather than two. A bullet rather than an ordered list: the
+            # ordinal is the citation, and letting Markdown number the item
+            # separately would put two different numbers on one line.
             lines.append(
-                f"{ordinal}. `{_code(location)}`{symbol} "
+                f"- [{ordinal}] `{_code(location)}`{symbol} "
                 f"({item.derivation.value}, confidence {item.confidence:.2f})"
             )
         lines.append("")

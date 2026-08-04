@@ -357,3 +357,16 @@ def test_claims_keep_their_citation_markers() -> None:
     rendered = render_answer(_response(), intent=Intent.EXACT_SYMBOL)
 
     assert "[1]" in rendered
+
+
+def test_key_evidence_entries_carry_a_citation_marker() -> None:
+    """The overview keeps its curated shortlist, but it is not inert text.
+
+    Each entry leads with the same `[n]` marker the claims use, so the web
+    client renders it as a button through one mechanism rather than two.
+    """
+    rendered = render_answer(_response(), intent=Intent.PROJECT_OVERVIEW)
+
+    key_evidence = rendered.split("**Key Evidence**")[1]
+
+    assert "[1]" in key_evidence.splitlines()[1]
