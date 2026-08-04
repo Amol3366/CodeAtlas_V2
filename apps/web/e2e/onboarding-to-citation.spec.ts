@@ -56,8 +56,11 @@ test("a repository can be added, indexed, questioned, and cited", async ({
   await expect(assistant).toContainText("src/payments/service.py");
 
   // --- Cite ---------------------------------------------------------------
+  // The citation is now inline, at the end of the claim it supports. Its
+  // accessible name carries the path, line range, and derivation that the
+  // removed evidence list used to show.
   const citation = page.getByRole("button", {
-    name: /^\[1\] src\/payments\/service\.py:/,
+    name: /^Evidence 1: src\/payments\/service\.py/,
   });
   await expect(citation).toBeVisible();
   await citation.click();

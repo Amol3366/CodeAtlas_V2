@@ -279,8 +279,9 @@ test("citations survive a reload", async ({ page, seeded, browserName }) => {
     .fill("PaymentService.capture");
   await page.getByRole("button", { name: "Send" }).click();
 
+  // Inline since the citation moved to the end of the claim it supports.
   const citation = page.getByRole("button", {
-    name: /^\[1\] src\/payments\/service\.py:/,
+    name: /^Evidence 1: src\/payments\/service\.py/,
   });
   await expect(citation).toBeVisible({ timeout: 30_000 });
 
