@@ -476,7 +476,7 @@ class SettingsService:
         started = time.monotonic()
         try:
             provider = LocalSentenceTransformerProvider(model_id=cleaned)
-        except Exception as error:  # noqa: BLE001 - reduced to a code below
+        except Exception as error:
             # Any failure is a failed check, not a failed request: a missing
             # extra, an unknown model id, and a network outage are all "this
             # model cannot be used here", which is what the caller asked.
