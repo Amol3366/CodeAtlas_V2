@@ -27,7 +27,7 @@ import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from codeatlas.domain.errors import InvalidRequestError, RepositoryNotFoundError
 from codeatlas.domain.semantic import (
@@ -42,6 +42,9 @@ from codeatlas.storage.sqlite.stores import RepositoryStore
 # express clearing a budget, and every unmentioned field would silently reset.
 _UNSET: Final = object()
 
+if TYPE_CHECKING:
+    from codeatlas.generation.ollama_provider import OllamaPullResult
+
 
 @dataclass(frozen=True)
 class RepositorySettings:
@@ -55,6 +58,7 @@ class RepositorySettings:
     answer_provider: AnswerProviderKind = AnswerProviderKind.NONE
     answer_model: str | None = None
     answer_timeout_seconds: int | None = None
+    embedding_model: str | None = None
 
     @property
     def transmits_off_machine(self) -> bool:
@@ -145,6 +149,8 @@ class SettingsService:
         answer_provider: AnswerProviderKind | None = None,
         answer_model: str | None = None,
         answer_timeout_seconds: int | None = None,
+        embedding_model: str | None = None,
+        clear_embedding_model: bool = False,
     ) -> RepositorySettings:
         """Apply a partial change, refusing anything that would leave it unsafe.
 
@@ -195,6 +201,38 @@ class SettingsService:
                 details={"field": "answer_timeout_seconds"},
             )
 
+        model = _resolve(
+            current.embedding_model, embedding_model, clear_embedding_model
+        )
+        if model is not None:
+            model = model.strip()
+            if not model:
+                raise InvalidRequestError(
+                    "An embedding model id cannot be blank. Omit it to use the"
+                    " configured default.",
+                    details={"field": "embedding_model"},
+                )
+            if len(model) > 200:
+                raise InvalidRequestError(
+                    "An embedding model id is limited to 200 characters.",
+                    details={"field": "embedding_model"},
+                )
+            if provider is not EmbeddingProviderKind.LOCAL:
+                # Checked against the *resolved* provider rather than the
+                # request, so switching away from `local` while a model is
+                # stored is caught exactly like setting one under the wrong
+                # provider. A stored value that cannot take effect would look
+                # accepted while changing nothing.
+                raise InvalidRequestError(
+                    "Only the local embedding provider takes a model id."
+                    " OpenAI model identity is configured in .env, because an"
+                    " unknown OpenAI model also needs a declared vector width.",
+                    details={
+                        "provider": provider.value,
+                        "field": "embedding_model",
+                    },
+                )
+
         # Either decision reaching a metered account requires the budget. The
         # answer provider is checked by the same rule and for the same reason:
         # an unbounded metered account is how a local tool produces a
@@ -226,6 +264,7 @@ class SettingsService:
             answer_provider=answering,
             answer_model=answer_model_value,
             answer_timeout_seconds=answer_timeout,
+            embedding_model=model,
         )
         self._policies.set(policy)
         return _from_policy(policy)
@@ -362,6 +401,35 @@ class SettingsService:
             ),
         )
 
+    def pull_ollama_answer_model(self, model_id: str) -> OllamaPullResult:
+        """Download the user-selected local answer model through Ollama.
+
+        The repository setting is not changed here. A pull is an explicit
+        model-management action, and saving remains a cheap SQLite write.
+        """
+        cleaned = model_id.strip()
+        if not cleaned:
+            raise InvalidRequestError(
+                "An Ollama model name is required.",
+                details={"field": "model_id"},
+            )
+        if len(cleaned) > 200:
+            raise InvalidRequestError(
+                "An Ollama model name is limited to 200 characters.",
+                details={"field": "model_id"},
+            )
+
+        from codeatlas.generation.ollama_provider import (
+            DEFAULT_BASE_URL,
+            pull_ollama_model,
+        )
+        from codeatlas.settings.env_file import configured_ollama_base_url
+
+        return pull_ollama_model(
+            cleaned,
+            base_url=configured_ollama_base_url() or DEFAULT_BASE_URL,
+        )
+
     def test_provider(self, repository_id: str) -> ProviderTestResult:
         """Ask the configured provider to embed one short string.
 
@@ -416,7 +484,13 @@ class SettingsService:
             raise RepositoryNotFoundError("The repository is not registered.")
 
 
-def _resolve(current: int | None, requested: int | None, clear: bool) -> int | None:
+def _resolve[T](current: T | None, requested: T | None, clear: bool) -> T | None:
+    """The three-way answer to "unchanged, set, or cleared?".
+
+    Generic over the value type rather than duplicated per field: budgets and
+    the embedding model ask exactly the same question, and a second copy is a
+    second place for the "absent means unchanged" rule to drift.
+    """
     if clear:
         return None
     return current if requested is None else requested
@@ -432,6 +506,7 @@ def _from_policy(policy: ProviderPolicy) -> RepositorySettings:
         answer_provider=policy.answer_provider,
         answer_model=policy.answer_model,
         answer_timeout_seconds=policy.answer_timeout_seconds,
+        embedding_model=policy.embedding_model,
     )
 
 

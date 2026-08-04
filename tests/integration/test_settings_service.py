@@ -323,3 +323,74 @@ def test_an_unset_embedding_model_reads_back_as_none(
     )
 
     assert store.get("repo_1").embedding_model is None
+
+
+def test_a_local_repository_can_choose_its_embedding_model(
+    connection: sqlite3.Connection,
+) -> None:
+    result = _service(connection).update(
+        "repo_1",
+        embedding_provider=EmbeddingProviderKind.LOCAL,
+        embedding_model="BAAI/bge-small-en-v1.5",
+    )
+
+    assert result.embedding_model == "BAAI/bge-small-en-v1.5"
+
+
+def test_an_unmentioned_embedding_model_is_left_alone(
+    connection: sqlite3.Connection,
+) -> None:
+    """A partial update must not reset a field it never named."""
+    service = _service(connection)
+    service.update(
+        "repo_1",
+        embedding_provider=EmbeddingProviderKind.LOCAL,
+        embedding_model="BAAI/bge-small-en-v1.5",
+    )
+
+    result = service.update("repo_1", per_run_token_budget=100)
+
+    assert result.embedding_model == "BAAI/bge-small-en-v1.5"
+
+
+def test_the_embedding_model_can_be_cleared_back_to_the_default(
+    connection: sqlite3.Connection,
+) -> None:
+    service = _service(connection)
+    service.update(
+        "repo_1",
+        embedding_provider=EmbeddingProviderKind.LOCAL,
+        embedding_model="BAAI/bge-small-en-v1.5",
+    )
+
+    result = service.update("repo_1", clear_embedding_model=True)
+
+    assert result.embedding_model is None
+
+
+def test_a_model_is_refused_for_a_provider_that_cannot_use_one(
+    connection: sqlite3.Connection,
+) -> None:
+    """Only the local provider takes a model id today.
+
+    Storing one under `none` or `openai` would leave a value that looks
+    effective and is not: the setting would appear to have been accepted while
+    changing nothing.
+    """
+    with pytest.raises(InvalidRequestError):
+        _service(connection).update(
+            "repo_1",
+            embedding_provider=EmbeddingProviderKind.NONE,
+            embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+
+def test_a_blank_embedding_model_is_refused(
+    connection: sqlite3.Connection,
+) -> None:
+    with pytest.raises(InvalidRequestError):
+        _service(connection).update(
+            "repo_1",
+            embedding_provider=EmbeddingProviderKind.LOCAL,
+            embedding_model="   ",
+        )
