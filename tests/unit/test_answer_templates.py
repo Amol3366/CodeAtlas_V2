@@ -103,8 +103,14 @@ def test_every_claim_is_rendered_with_its_citation() -> None:
 
 def test_a_file_path_renders_inside_a_code_span() -> None:
     """Repository text is data. A path outside a code span could be read as
-    Markdown structure, and a link target is one character away from that."""
-    rendered = render_answer(_response(), intent=Intent.EXACT_SYMBOL)
+    Markdown structure, and a link target is one character away from that.
+
+    Asserted against the project overview, which is where the template still
+    renders evidence locations itself. The exact-symbol answer no longer lists
+    them: its citations are rendered as buttons by the web client, and the path
+    travels on the button rather than in the prose.
+    """
+    rendered = render_answer(_response(), intent=Intent.PROJECT_OVERVIEW)
 
     assert "`src/payments/service.py:7-8`" in rendered
 
@@ -120,7 +126,7 @@ def test_a_hostile_symbol_name_cannot_break_out_of_its_code_span() -> None:
     hostile = "capture` **bold** [x](http://evil) `"
     rendered = render_answer(
         _response(evidence=[_evidence(symbol=hostile)]),
-        intent=Intent.EXACT_SYMBOL,
+        intent=Intent.PROJECT_OVERVIEW,
     )
 
     line = next(item for item in rendered.splitlines() if "**bold**" in item)
@@ -151,6 +157,20 @@ def test_warnings_and_limitations_are_shown_not_hidden() -> None:
 
     assert "GRAPH_TRUNCATED_DEPTH" in rendered
     assert "Traversal stopped at depth 3." in rendered
+
+
+def test_known_warning_codes_render_as_reader_facing_notes() -> None:
+    rendered = render_answer(
+        _response(
+            warnings=["EVIDENCE_EXCERPT_TRUNCATED", "LEXICAL_QUERY_RELAXED"],
+        ),
+        intent=Intent.TEXT,
+    )
+
+    assert "Some cited excerpts were shortened" in rendered
+    assert "CodeAtlas broadened the search terms" in rendered
+    assert "EVIDENCE_EXCERPT_TRUNCATED" not in rendered
+    assert "LEXICAL_QUERY_RELAXED" not in rendered
 
 
 def test_an_abstention_names_what_was_tried() -> None:
@@ -318,4 +338,22 @@ def test_generated_prose_still_carries_its_citations() -> None:
     )
 
     assert "A clear explanation." in rendered
+    assert "[1]" in rendered
+
+
+def test_the_answer_does_not_repeat_its_evidence_as_a_list() -> None:
+    """The citation markers are the evidence surface now.
+
+    The list duplicated what every claim already carried, in a less useful
+    form, and it sat between the answer and the controls that act on it.
+    """
+    rendered = render_answer(_response(), intent=Intent.EXACT_SYMBOL)
+
+    assert "**Evidence**" not in rendered
+
+
+def test_claims_keep_their_citation_markers() -> None:
+    """Removing the list must not remove the citations themselves."""
+    rendered = render_answer(_response(), intent=Intent.EXACT_SYMBOL)
+
     assert "[1]" in rendered
