@@ -1347,6 +1347,13 @@ def settings_command(
         int | None,
         typer.Option("--per-run-budget", help="Per-run token budget."),
     ] = None,
+    embedding_model: Annotated[
+        str | None,
+        typer.Option(
+            "--embedding-model",
+            help="Local embedding model id, for example BAAI/bge-small-en-v1.5.",
+        ),
+    ] = None,
     database: DatabaseOption = None,
     as_json: JsonOption = False,
 ) -> None:
@@ -1370,7 +1377,10 @@ def settings_command(
             raise typer.Exit(EXIT_INVALID_INPUT) from None
 
     changing = (
-        kind is not None or monthly_budget is not None or per_run_budget is not None
+        kind is not None
+        or monthly_budget is not None
+        or per_run_budget is not None
+        or embedding_model is not None
     )
     try:
         with _services(database) as services:
@@ -1380,6 +1390,7 @@ def settings_command(
                     embedding_provider=kind,
                     monthly_token_budget=monthly_budget,
                     per_run_token_budget=per_run_budget,
+                    embedding_model=embedding_model,
                 )
                 if changing
                 else services.settings.get(repository_id)
@@ -1395,6 +1406,7 @@ def settings_command(
         "per_run_token_budget": result.per_run_token_budget,
         "transmits_off_machine": result.transmits_off_machine,
         "updated_at": result.updated_at.isoformat(),
+        "embedding_model": result.embedding_model,
     }
     transmits = " (transmits off machine)" if result.transmits_off_machine else ""
     text = (
