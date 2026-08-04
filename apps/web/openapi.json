@@ -2078,6 +2078,64 @@
         "title": "ProviderTestResponse",
         "type": "object"
       },
+      "PullOllamaModelBody": {
+        "additionalProperties": false,
+        "properties": {
+          "model_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "PullOllamaModelBody",
+        "type": "object"
+      },
+      "PullOllamaModelResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detail_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail Code"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "const": "ollama",
+            "default": "ollama",
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "ok",
+          "detail_code",
+          "latency_ms"
+        ],
+        "title": "PullOllamaModelResponse",
+        "type": "object"
+      },
       "QueryBody": {
         "additionalProperties": false,
         "description": "A bounded query request.",
@@ -2486,6 +2544,17 @@
             ],
             "title": "Answer Timeout Seconds"
           },
+          "embedding_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Model"
+          },
           "embedding_provider": {
             "title": "Embedding Provider",
             "type": "string"
@@ -2534,7 +2603,8 @@
           "updated_at",
           "answer_provider",
           "answer_model",
-          "answer_timeout_seconds"
+          "answer_timeout_seconds",
+          "embedding_model"
         ],
         "title": "SettingsResponse",
         "type": "object"
@@ -2880,6 +2950,19 @@
             ],
             "title": "Answer Timeout Seconds"
           },
+          "embedding_model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Model"
+          },
           "embedding_provider": {
             "anyOf": [
               {
@@ -2916,6 +2999,76 @@
           }
         },
         "title": "UpdateSettingsBody",
+        "type": "object"
+      },
+      "ValidateEmbeddingModelBody": {
+        "additionalProperties": false,
+        "properties": {
+          "model_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id"
+        ],
+        "title": "ValidateEmbeddingModelBody",
+        "type": "object"
+      },
+      "ValidateEmbeddingModelResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detail_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail Code"
+          },
+          "dimensions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dimensions"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "const": "local",
+            "default": "local",
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "ok",
+          "dimensions",
+          "detail_code",
+          "latency_ms"
+        ],
+        "title": "ValidateEmbeddingModelResponse",
         "type": "object"
       },
       "ValidationError": {
@@ -4059,6 +4212,90 @@
           }
         },
         "summary": "Activate Embedding Migration",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/models/embedding/validate": {
+      "post": {
+        "description": "Load a candidate local embedding model and report its vector width.\n\nSeparate from saving because the first load downloads the model, which is\nlarge and slow. The request carries only a model name, never repository\ncontent.",
+        "operationId": "validate_embedding_model_v1_models_embedding_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateEmbeddingModelBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateEmbeddingModelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Embedding Model",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/models/ollama/pull": {
+      "post": {
+        "description": "Ask local Ollama to download the model the user selected.\n\nThis is separate from saving settings because model downloads can be large\nand slow. The request carries only a model name, never repository content.",
+        "operationId": "pull_ollama_model_v1_models_ollama_pull_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullOllamaModelBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullOllamaModelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pull Ollama Model",
         "tags": [
           "settings"
         ]

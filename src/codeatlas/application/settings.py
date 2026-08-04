@@ -119,6 +119,22 @@ class ProviderTestResult:
     latency_ms: int
 
 
+@dataclass(frozen=True)
+class EmbeddingModelValidation:
+    """Whether a candidate model loads, and how wide its vectors are.
+
+    ``dimensions`` is the measured width, not a declared one. It is the field
+    this whole check exists for: the namespace is labelled with that number,
+    and a wrong label never raises — it just returns worse results.
+    """
+
+    model_id: str
+    ok: bool
+    dimensions: int | None
+    detail_code: str | None
+    latency_ms: int
+
+
 class SettingsService:
     """Read and change one repository's provider policy."""
 
@@ -428,6 +444,55 @@ class SettingsService:
         return pull_ollama_model(
             cleaned,
             base_url=configured_ollama_base_url() or DEFAULT_BASE_URL,
+        )
+
+    def validate_embedding_model(self, model_id: str) -> EmbeddingModelValidation:
+        """Load a candidate local model and report its true vector width.
+
+        Not tied to a repository: this answers "could this model be used?",
+        which is a question about the machine. Saving stays a separate, cheap
+        SQLite write, exactly as it is for an Ollama pull.
+
+        The first load of an uncached model downloads its weights, so this can
+        take minutes. The request carries only a model name, never repository
+        content.
+        """
+        import time
+
+        cleaned = model_id.strip()
+        if not cleaned:
+            raise InvalidRequestError(
+                "An embedding model id is required.",
+                details={"field": "model_id"},
+            )
+        if len(cleaned) > 200:
+            raise InvalidRequestError(
+                "An embedding model id is limited to 200 characters.",
+                details={"field": "model_id"},
+            )
+
+        from codeatlas.semantic.providers import LocalSentenceTransformerProvider
+
+        started = time.monotonic()
+        try:
+            provider = LocalSentenceTransformerProvider(model_id=cleaned)
+        except Exception as error:  # noqa: BLE001 - reduced to a code below
+            # Any failure is a failed check, not a failed request: a missing
+            # extra, an unknown model id, and a network outage are all "this
+            # model cannot be used here", which is what the caller asked.
+            return EmbeddingModelValidation(
+                model_id=cleaned,
+                ok=False,
+                dimensions=None,
+                detail_code=_failure_code(error),
+                latency_ms=int((time.monotonic() - started) * 1000),
+            )
+        return EmbeddingModelValidation(
+            model_id=cleaned,
+            ok=True,
+            dimensions=provider.dimensions,
+            detail_code=None,
+            latency_ms=int((time.monotonic() - started) * 1000),
         )
 
     def test_provider(self, repository_id: str) -> ProviderTestResult:

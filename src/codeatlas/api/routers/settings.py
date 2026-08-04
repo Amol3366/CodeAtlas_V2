@@ -53,6 +53,8 @@ class SettingsResponse(StrictModel):
     answer_provider: str
     answer_model: str | None
     answer_timeout_seconds: int | None
+    # Null means "use the configured default for the chosen provider".
+    embedding_model: str | None
 
 
 class UpdateSettingsBody(StrictModel):
@@ -69,6 +71,7 @@ class UpdateSettingsBody(StrictModel):
     answer_provider: AnswerProviderKind | None = None
     answer_model: str | None = Field(default=None, min_length=1, max_length=200)
     answer_timeout_seconds: int | None = Field(default=None, ge=1, le=3600)
+    embedding_model: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class ModelResponse(StrictModel):
@@ -104,6 +107,33 @@ class ModelsResponse(StrictModel):
 class ProviderTestResponse(StrictModel):
     provider: str
     ok: bool
+    detail_code: str | None
+    latency_ms: int
+
+
+class PullOllamaModelBody(StrictModel):
+    model_id: str = Field(min_length=1, max_length=200)
+
+
+class PullOllamaModelResponse(StrictModel):
+    provider: Literal["ollama"] = "ollama"
+    model_id: str
+    ok: bool
+    detail_code: str | None
+    latency_ms: int
+
+
+class ValidateEmbeddingModelBody(StrictModel):
+    model_id: str = Field(min_length=1, max_length=200)
+
+
+class ValidateEmbeddingModelResponse(StrictModel):
+    provider: Literal["local"] = "local"
+    model_id: str
+    ok: bool
+    # Measured by loading the model, never declared. Null when it could not be
+    # loaded, which is a failed check rather than a failed request.
+    dimensions: int | None
     detail_code: str | None
     latency_ms: int
 
@@ -168,6 +198,10 @@ def update_settings(
             answer_provider=body.answer_provider,
             answer_model=body.answer_model,
             answer_timeout_seconds=body.answer_timeout_seconds,
+            embedding_model=body.embedding_model,
+            clear_embedding_model=(
+                "embedding_model" in sent and body.embedding_model is None
+            ),
         )
     )
 
@@ -224,6 +258,44 @@ def test_model(
     )
 
 
+@router.post("/v1/models/ollama/pull")
+def pull_ollama_model(
+    services: Services, body: PullOllamaModelBody
+) -> PullOllamaModelResponse:
+    """Ask local Ollama to download the model the user selected.
+
+    This is separate from saving settings because model downloads can be large
+    and slow. The request carries only a model name, never repository content.
+    """
+    result = services.settings.pull_ollama_answer_model(body.model_id)
+    return PullOllamaModelResponse(
+        model_id=result.model_id,
+        ok=result.ok,
+        detail_code=result.detail_code,
+        latency_ms=result.latency_ms,
+    )
+
+
+@router.post("/v1/models/embedding/validate")
+def validate_embedding_model(
+    services: Services, body: ValidateEmbeddingModelBody
+) -> ValidateEmbeddingModelResponse:
+    """Load a candidate local embedding model and report its vector width.
+
+    Separate from saving because the first load downloads the model, which is
+    large and slow. The request carries only a model name, never repository
+    content.
+    """
+    result = services.settings.validate_embedding_model(body.model_id)
+    return ValidateEmbeddingModelResponse(
+        model_id=result.model_id,
+        ok=result.ok,
+        dimensions=result.dimensions,
+        detail_code=result.detail_code,
+        latency_ms=result.latency_ms,
+    )
+
+
 @router.post("/v1/models/embedding-migrations")
 def start_embedding_migration(
     services: Services, body: CreateEmbeddingMigrationBody
@@ -271,6 +343,7 @@ def _settings_response(settings: object) -> SettingsResponse:
         answer_provider=settings.answer_provider.value,  # type: ignore[attr-defined]
         answer_model=settings.answer_model,  # type: ignore[attr-defined]
         answer_timeout_seconds=settings.answer_timeout_seconds,  # type: ignore[attr-defined]
+        embedding_model=settings.embedding_model,  # type: ignore[attr-defined]
     )
 
 

@@ -212,9 +212,10 @@ def test_testing_a_disabled_provider_reports_disabled(
 
 
 def test_testing_reports_a_code_not_a_provider_message(
-    client: TestClient, repository_id: str
+    client: TestClient, repository_id: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A provider's own message can quote the request that produced it."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     client.patch(
         "/v1/settings",
         params={"repository_id": repository_id},
@@ -321,6 +322,46 @@ def test_the_local_answer_provider_is_marked_as_not_transmitting(
     assert ollama["model_id"] == "llama3.2:3b"
 
 
+def test_ollama_model_pull_uses_the_supplied_model(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from codeatlas.generation.ollama_provider import OllamaPullResult
+
+    seen: dict[str, str] = {}
+
+    def fake_pull(model_id: str, *, base_url: str) -> OllamaPullResult:
+        seen["model_id"] = model_id
+        seen["base_url"] = base_url
+        return OllamaPullResult(
+            model_id=model_id,
+            ok=True,
+            detail_code=None,
+            latency_ms=12,
+        )
+
+    monkeypatch.setattr(
+        "codeatlas.generation.ollama_provider.pull_ollama_model",
+        fake_pull,
+    )
+
+    response = client.post(
+        "/v1/models/ollama/pull", json={"model_id": "llama3.1:8b"}
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["provider"] == "ollama"
+    assert body["ok"] is True
+    assert body["model_id"] == "llama3.1:8b"
+    assert seen["model_id"] == "llama3.1:8b"
+
+
+def test_ollama_model_pull_requires_a_model_name(client: TestClient) -> None:
+    response = client.post("/v1/models/ollama/pull", json={"model_id": ""})
+
+    assert response.status_code == 422
+
+
 def test_no_answer_setting_ever_returns_a_credential(
     client: TestClient, repository_id: str
 ) -> None:
@@ -328,3 +369,56 @@ def test_no_answer_setting_ever_returns_a_credential(
 
     assert "api_key" not in str(body).lower()
     assert "sk-" not in str(body)
+
+
+# --- validating an embedding model ---------------------------------------
+
+
+def test_validating_a_model_reports_its_measured_dimensions(
+    client: TestClient,
+) -> None:
+    """The width is measured, never guessed.
+
+    The namespace is keyed on (model_id, dimensions, normalization_version). A
+    wrong width never raises; it just returns worse results indefinitely, so
+    the only safe way to admit an arbitrary model id is to load it and ask.
+    """
+    response = client.post(
+        "/v1/models/embedding/validate",
+        json={"model_id": "sentence-transformers/all-MiniLM-L6-v2"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["model_id"] == "sentence-transformers/all-MiniLM-L6-v2"
+    if body["ok"]:
+        assert body["dimensions"] == 384
+    else:
+        # Without the semantic-local extra installed there is nothing to load,
+        # and a test that assumed otherwise would fail for an environmental
+        # reason rather than a code one.
+        assert body["dimensions"] is None
+        assert body["detail_code"] is not None
+
+
+def test_validating_an_unloadable_model_reports_a_code_not_a_message(
+    client: TestClient,
+) -> None:
+    """A provider message can quote what produced it. A code cannot."""
+    response = client.post(
+        "/v1/models/embedding/validate",
+        json={"model_id": "codeatlas/definitely-not-a-real-model"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is False
+    assert body["dimensions"] is None
+    assert body["detail_code"] is not None
+
+
+def test_validating_rejects_a_blank_model_id(client: TestClient) -> None:
+    response = client.post("/v1/models/embedding/validate", json={"model_id": "  "})
+
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"

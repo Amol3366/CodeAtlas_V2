@@ -342,6 +342,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/models/embedding/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Embedding Model
+         * @description Load a candidate local embedding model and report its vector width.
+         *
+         *     Separate from saving because the first load downloads the model, which is
+         *     large and slow. The request carries only a model name, never repository
+         *     content.
+         */
+        post: operations["validate_embedding_model_v1_models_embedding_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/ollama/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull Ollama Model
+         * @description Ask local Ollama to download the model the user selected.
+         *
+         *     This is separate from saving settings because model downloads can be large
+         *     and slow. The request carries only a model name, never repository content.
+         */
+        post: operations["pull_ollama_model_v1_models_ollama_pull_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/models/test": {
         parameters: {
             query?: never;
@@ -1475,6 +1522,28 @@ export interface components {
             /** Provider */
             provider: string;
         };
+        /** PullOllamaModelBody */
+        PullOllamaModelBody: {
+            /** Model Id */
+            model_id: string;
+        };
+        /** PullOllamaModelResponse */
+        PullOllamaModelResponse: {
+            /** Detail Code */
+            detail_code: string | null;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Model Id */
+            model_id: string;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Provider
+             * @default ollama
+             * @constant
+             */
+            provider: "ollama";
+        };
         /**
          * QueryBody
          * @description A bounded query request.
@@ -1616,6 +1685,8 @@ export interface components {
             answer_provider: string;
             /** Answer Timeout Seconds */
             answer_timeout_seconds: number | null;
+            /** Embedding Model */
+            embedding_model: string | null;
             /** Embedding Provider */
             embedding_provider: string;
             /** Monthly Token Budget */
@@ -1746,11 +1817,37 @@ export interface components {
             answer_provider?: components["schemas"]["AnswerProviderKind"] | null;
             /** Answer Timeout Seconds */
             answer_timeout_seconds?: number | null;
+            /** Embedding Model */
+            embedding_model?: string | null;
             embedding_provider?: components["schemas"]["EmbeddingProviderKind"] | null;
             /** Monthly Token Budget */
             monthly_token_budget?: number | null;
             /** Per Run Token Budget */
             per_run_token_budget?: number | null;
+        };
+        /** ValidateEmbeddingModelBody */
+        ValidateEmbeddingModelBody: {
+            /** Model Id */
+            model_id: string;
+        };
+        /** ValidateEmbeddingModelResponse */
+        ValidateEmbeddingModelResponse: {
+            /** Detail Code */
+            detail_code: string | null;
+            /** Dimensions */
+            dimensions: number | null;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Model Id */
+            model_id: string;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Provider
+             * @default local
+             * @constant
+             */
+            provider: "local";
         };
         /** ValidationError */
         ValidationError: {
@@ -2477,6 +2574,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmbeddingMigrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_embedding_model_v1_models_embedding_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidateEmbeddingModelBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidateEmbeddingModelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pull_ollama_model_v1_models_ollama_pull_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PullOllamaModelBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PullOllamaModelResponse"];
                 };
             };
             /** @description Validation Error */
