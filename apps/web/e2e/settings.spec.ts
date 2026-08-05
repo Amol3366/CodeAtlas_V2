@@ -204,8 +204,12 @@ test("a repository with no provider says so, and can be saved and tested", async
     await expect(openaiOption).toBeEnabled();
   } else {
     await expect(openaiOption).toBeDisabled();
-    // The requirement text comes from the server, which knows what is missing.
-    await expect(openaiCard.getByText(/unavailable - requires/i)).toBeVisible();
+    // The separator is an em dash in the component. Matched as a class rather
+    // than copied, so the assertion survives it becoming a hyphen and does not
+    // fail on a character nobody can see in a diff.
+    await expect(
+      openaiCard.getByText(/unavailable\s*[—-]\s*requires/i),
+    ).toBeVisible();
     await expect(
       openaiCard.getByText(openaiModel.requires ?? "", { exact: false }),
     ).toBeVisible();
@@ -287,15 +291,16 @@ test("a repository whose policy transmits shows the warning, the budget, and its
     // The coverage branch a disabled repository can never reach: real counts
     // for a repository that opted in and has embedded nothing.
     //
-    // The redesign renders this as a percentage above a progress bar rather
-    // than the sentence this once matched. The bar is the better anchor
-    // anyway: it carries the accessible name and the value, so it asserts what
-    // a screen-reader user is actually told.
-    const coverage = page.getByRole("progressbar", {
-      name: "Semantic coverage",
-    });
-    await expect(coverage).toBeVisible();
-    await expect(coverage).toHaveAttribute("aria-valuenow", "0");
+    // Asserted as the sentence `SemanticSettings` renders, because that is
+    // what it renders. A previous revision of this test waited on a
+    // `progressbar` with an accessible name and an `aria-valuenow` — no such
+    // element exists in the component, and the assertion had never been
+    // executed. A progress bar would be the better anchor for a screen-reader
+    // user and is worth building; until it is built, asserting it here only
+    // reports the test as broken.
+    await expect(
+      page.getByText(/% of this snapshot is embedded/i),
+    ).toBeVisible();
   } finally {
     // Restored even on failure. The database outlives this test, and leaving a
     // transmitting policy behind would change what every later test sees.

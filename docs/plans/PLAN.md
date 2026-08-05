@@ -207,6 +207,92 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-05T08:40:00Z — Phase 7 gate re-run green; two never-executed e2e assertions fixed
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Phases 0–7 stay `complete`. This records the verification
+  evidence the two entries below were missing.
+
+#### Outcome
+
+`check_phase7.ps1 -SkipSync` was run against the merged tree. **The first run
+failed**, exit 1, with three end-to-end failures — all in
+`apps/web/e2e/settings.spec.ts`, and both root causes introduced by commit
+`1d2080c`, whose assertions had never been executed before being written.
+
+Neither was a product defect:
+
+1. **A dash.** The test matched `/unavailable - requires/i` with a
+   hyphen-minus; `SemanticSettings.tsx:138` renders `Unavailable — requires`
+   with an em dash. The regex could never match. Now matched as a character
+   class, `/unavailable\s*[—-]\s*requires/i`, so it survives the separator
+   changing and cannot fail on a character that is invisible in a diff.
+2. **A progress bar that does not exist.** The test waited for
+   `getByRole("progressbar", { name: "Semantic coverage" })` and an
+   `aria-valuenow`. `SemanticSettings.tsx:262` renders coverage as a paragraph
+   — `{N}% of this snapshot is embedded (x of y)` — and the component contains
+   no `progressbar` and no `aria-valuenow` anywhere. The spec's own comment
+   claimed "the redesign renders this as a percentage above a progress bar",
+   which was never true: only `SettingsRoute.tsx` was ever redesigned. The
+   assertion now matches the sentence the component renders.
+
+The stricter `aria-valuenow: 0` intent was **not** reproduced as a `0%` text
+match. That value was never verified by a passing run, so asserting it would
+have been a guess.
+
+A progress bar carrying an accessible name and value would tell a screen-reader
+user more than a paragraph does, and `AGENTS.md` §14.4 asks for WCAG 2.2 AA. It
+is worth building. It was not built here, because changing the product to make
+a red test green is backwards; the reasoning is preserved in the test comment.
+
+#### Files
+
+- `apps/web/e2e/settings.spec.ts` — two assertions.
+- `docs/plans/PLAN.md` — this entry.
+
+#### Contracts and compatibility
+
+None. Test-only change.
+
+#### Verification
+
+`powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync`
+— **exit 0**, "Phase 7 verification completed".
+
+| Section | Result |
+| --- | --- |
+| Contract schema freshness | pass |
+| Python tests | **1870 passed**, 3 skipped, 160.83 s |
+| Lint (Ruff) | All checks passed |
+| Types (strict MyPy) | no issues in **313 source files** |
+| Dataset validation | pass |
+| Phase 0 / 3 / 4 baselines, Phase 7 rerank artifact | pass |
+| Web lint, web types | pass |
+| Web tests | **147 passed**, 12 files |
+| Web build | pass |
+| End-to-end suites | **13 passed, 5 skipped** |
+
+Before the fix the same suites reported 10 passed, 3 failed, 5 skipped. The
+targeted re-run of `settings.spec.ts` alone reported 3 passed, 1 skipped.
+
+The three Python skips are environment-conditional (`semantic-local` is
+installed). The five e2e skips are the documented Chromium renderer defect;
+Firefox proves those paths.
+
+#### Limitations
+
+- Three gate sections did **not** run: `-Semantic`, `-Package`, and `-Perf`
+  were not passed. Packaged performance and the semantic extras are therefore
+  unverified in this run, though the packaged build itself was rebuilt and
+  probed earlier today (entry below).
+- The Chromium skips remain a declared gap, unchanged since Phase 6.
+
+#### Next
+
+No assigned work. The open items are unchanged: build a coverage progress bar
+if the accessibility improvement is wanted, and consider making
+`build_package.ps1` refuse when `apps/web/dist` is newer than the release tree.
+
 ### 2026-08-05T07:25:00Z — Packaged bundle probe: the Settings report is closed
 
 - Agent: Claude Code `claude-opus-5`, branch `main` at `f34e28c`.
