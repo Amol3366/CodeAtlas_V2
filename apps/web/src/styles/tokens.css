@@ -120,3 +120,16 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* The evidence panel enters from the edge it is anchored to, so the motion
+   states where it came from rather than decorating the arrival. The
+   prefers-reduced-motion block above already collapses animation-duration to
+   0.01ms, so this inherits the preference without restating it. */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

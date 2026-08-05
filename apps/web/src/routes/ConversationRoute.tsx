@@ -1,6 +1,8 @@
+import { useCallback } from "react";
 import { useParams } from "react-router-dom";
 
 import { useActiveRepository, useCitation } from "../app/context";
+import type { MessageEvidence } from "../lib/conversations";
 import { Thread } from "../features/conversations/Thread";
 import { useRepositoryStatus } from "../lib/queries";
 
@@ -17,6 +19,15 @@ export function ConversationRoute() {
   const { setCitation } = useCitation();
   const status = useRepositoryStatus(repositoryId);
 
+  // Stable identity, deliberately. A fresh arrow here reaches the citation
+  // renderer, which decides whether Markdown rebuilds its component map; a
+  // rebuilt map remounts the answer and replaces the citation's DOM node,
+  // leaving the evidence panel restoring focus to a detached element.
+  const onCite = useCallback(
+    (evidence: MessageEvidence) => setCitation(evidence),
+    [setCitation],
+  );
+
   if (conversationId === undefined) return null;
 
   return (
@@ -24,7 +35,7 @@ export function ConversationRoute() {
       <Thread
         conversationId={conversationId}
         activeSnapshotId={status.data?.snapshot?.snapshot_id ?? null}
-        onCite={(evidence) => setCitation(evidence)}
+        onCite={onCite}
       />
     </div>
   );

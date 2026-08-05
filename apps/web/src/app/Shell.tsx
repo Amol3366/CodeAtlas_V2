@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { Sidebar } from "../features/conversations/Sidebar";
@@ -6,7 +6,10 @@ import { EvidenceDrawer } from "../features/evidence/EvidenceDrawer";
 import { ThemeToggle } from "../features/settings/ThemeToggle";
 import type { MessageEvidence } from "../lib/conversations";
 import { useRepositories } from "../lib/queries";
+import { useReloadOnNewBuild } from "./buildFreshness";
 import { ActiveRepositoryContext, CitationContext } from "./context";
+
+const ACTIVE_REPOSITORY_STORAGE_KEY = "codeatlas.activeRepositoryId";
 
 /**
  * The three-region desktop layout of `AGENTS.md` Section 14.1.
@@ -18,22 +21,50 @@ import { ActiveRepositoryContext, CitationContext } from "./context";
  * the visual structure rather than the DOM's accidents.
  */
 export function Shell() {
+  useReloadOnNewBuild();
+
   const repositories = useRepositories();
-  const [repositoryOverride, setRepositoryOverride] = useState<string | null>(
-    null,
-  );
+  const [repositoryOverride, setRepositoryOverrideState] = useState<
+    string | null
+  >(() => readStoredActiveRepository());
   const [citation, setCitation] = useState<MessageEvidence | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const repositoryId =
-    repositoryOverride ?? repositories.data?.[0]?.repository_id ?? null;
+    repositories.data === undefined
+      ? null
+      : repositoryOverride !== null &&
+          repositories.data.some(
+            (repository) => repository.repository_id === repositoryOverride,
+          )
+        ? repositoryOverride
+        : repositories.data[0]?.repository_id ?? null;
+
+  const setRepositoryId = useCallback((nextRepositoryId: string | null) => {
+    setRepositoryOverrideState(nextRepositoryId);
+    writeStoredActiveRepository(nextRepositoryId);
+  }, []);
+
+  useEffect(() => {
+    if (repositories.data === undefined || repositoryOverride === null) return;
+    if (
+      repositories.data.some(
+        (repository) => repository.repository_id === repositoryOverride,
+      )
+    ) {
+      return;
+    }
+
+    setRepositoryOverrideState(null);
+    writeStoredActiveRepository(null);
+  }, [repositories.data, repositoryOverride]);
 
   return (
     <ActiveRepositoryContext.Provider
-      value={{ repositoryId, setRepositoryId: setRepositoryOverride }}
+      value={{ repositoryId, setRepositoryId }}
     >
       <CitationContext.Provider value={{ citation, setCitation }}>
-        <div className="grid h-full grid-cols-1 md:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_380px]">
+        <div className="grid h-full grid-cols-1 md:grid-cols-[280px_1fr]">
           <nav
             aria-label="Conversations"
             data-open={sidebarOpen ? "true" : "false"}
@@ -87,22 +118,43 @@ export function Shell() {
             <Outlet />
           </main>
 
-          <aside
-            aria-label="Evidence"
-            className={
-              citation === null
-                ? "hidden xl:block xl:border-l xl:border-border xl:bg-surface-raised"
-                : "fixed inset-y-0 right-0 z-20 w-full max-w-[420px] xl:static xl:max-w-none"
-            }
-          >
-            <EvidenceDrawer
-              evidence={citation}
-              repositoryId={repositoryId}
-              onClose={() => setCitation(null)}
-            />
-          </aside>
+          {/* Rendered only while something is selected. A permanently reserved
+              rail spent 380px on an empty panel for the whole session, and the
+              conversation is what the width belongs to. */}
+          {citation !== null ? (
+            <aside
+              aria-label="Evidence"
+              className="fixed inset-y-0 right-0 z-20 w-full max-w-[420px] animate-[slide-in-right_var(--motion-base)_ease-out] overflow-y-auto border-l border-border bg-surface-raised shadow-md"
+            >
+              <EvidenceDrawer
+                evidence={citation}
+                repositoryId={repositoryId}
+                onClose={() => setCitation(null)}
+              />
+            </aside>
+          ) : null}
         </div>
       </CitationContext.Provider>
     </ActiveRepositoryContext.Provider>
   );
+}
+
+function readStoredActiveRepository(): string | null {
+  try {
+    return window.localStorage.getItem(ACTIVE_REPOSITORY_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredActiveRepository(repositoryId: string | null): void {
+  try {
+    if (repositoryId === null) {
+      window.localStorage.removeItem(ACTIVE_REPOSITORY_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(ACTIVE_REPOSITORY_STORAGE_KEY, repositoryId);
+  } catch {
+    // In-memory context still works if browser storage is blocked.
+  }
 }

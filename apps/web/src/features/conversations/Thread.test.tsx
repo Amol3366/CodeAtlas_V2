@@ -238,7 +238,7 @@ describe("Thread", () => {
             message({
               message_id: "msg_2",
               role: "assistant",
-              content: "ok",
+              content: "capture is defined. [1]",
               evidence: submission().evidence,
             }),
           ],
@@ -256,9 +256,7 @@ describe("Thread", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     expect(
-      await screen.findByRole("button", {
-        name: /src\/payments\/service\.py:7-8/,
-      }),
+      await screen.findByRole("button", { name: /^Evidence 1:/ }),
     ).toBeInTheDocument();
   });
 
@@ -273,7 +271,7 @@ describe("Thread", () => {
             message({
               message_id: "msg_2",
               role: "assistant",
-              content: "ok",
+              content: "capture is defined. [1]",
               evidence: submission().evidence,
             }),
           ],
@@ -289,11 +287,7 @@ describe("Thread", () => {
     renderWithProviders(<Thread conversationId="conv_1" onCite={onCite} />);
     await user.type(await screen.findByLabelText(/Ask about this repository/i), "capture");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    await user.click(
-      await screen.findByRole("button", {
-        name: /src\/payments\/service\.py:7-8/,
-      }),
-    );
+    await user.click(await screen.findByRole("button", { name: /^Evidence 1:/ }));
 
     expect(onCite).toHaveBeenCalledWith(
       expect.objectContaining({ evidence_id: "ev_1" }),
@@ -366,7 +360,8 @@ describe("a reopened thread", () => {
             message_id: "msg_2",
             role: "assistant",
             sequence_number: 2,
-            content: "capture is defined in `src/payments/service.py:7-8`.",
+            content:
+              "capture is defined in `src/payments/service.py:7-8`. [1]",
             snapshot_id: "snap_1",
             evidence: submission().evidence,
           }),
@@ -381,10 +376,92 @@ describe("a reopened thread", () => {
     // Nothing was submitted in this session: if the citation renders, it came
     // from storage, which is the whole point.
     expect(
-      await screen.findByRole("button", {
-        name: /src\/payments\/service\.py:7-8/,
-      }),
+      await screen.findByRole("button", { name: /^Evidence 1:/ }),
     ).toBeInTheDocument();
+  });
+
+  it("names a citation with its path, lines, and derivation", async () => {
+    // The plain-text evidence list used to carry these. Removing it must not
+    // remove the only place a reader can see how a claim was derived.
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              sequence_number: 2,
+              content: "capture is defined. [1]",
+              evidence: submission().evidence,
+            }),
+          ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+
+    const cite = await screen.findByRole("button", { name: /^Evidence 1:/ });
+
+    expect(cite).toHaveAccessibleName(/src\/payments\/service\.py/);
+    expect(cite).toHaveAccessibleName(/lines 7-8/);
+    expect(cite).toHaveAccessibleName(/deterministic/);
+  });
+
+  it("leaves a marker with no matching evidence as plain text", async () => {
+    // A button that opens nothing is worse than the marker it replaced, and
+    // an answer stored under a different numbering can produce exactly that.
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              sequence_number: 2,
+              content: "A claim citing nothing we hold. [4]",
+              evidence: submission().evidence,
+            }),
+          ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+
+    expect(await screen.findByText(/\[4\]/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Evidence 4:/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not list the citations again below the answer", async () => {
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              sequence_number: 2,
+              content: "capture is defined. [1]",
+              evidence: submission().evidence,
+            }),
+          ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+
+    await screen.findByRole("button", { name: /^Evidence 1:/ });
+
+    expect(
+      screen.queryByRole("button", { name: /^\[1\] src\/payments/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps an old answer labelled with its own snapshot", async () => {
@@ -461,6 +538,61 @@ describe("a reopened thread", () => {
     renderWithProviders(<Thread conversationId="conv_1" />);
 
     expect(await screen.findByText(/GRAPH_TRUNCATED_DEPTH/)).toBeInTheDocument();
+  });
+
+  it("explains known run warnings in the fallback warning list", async () => {
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              sequence_number: 2,
+              content: "A broad answer.",
+              snapshot_id: "snap_1",
+              warnings: ["LEXICAL_QUERY_RELAXED"],
+            }),
+          ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+
+    expect(
+      await screen.findByText(/broadened the search terms/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("LEXICAL_QUERY_RELAXED")).not.toBeInTheDocument();
+  });
+
+  it("does not duplicate warnings already rendered into the markdown answer", async () => {
+    stubFetch({
+      [messagesUrl]: {
+        body: {
+          items: [
+            message({
+              message_id: "msg_2",
+              role: "assistant",
+              sequence_number: 2,
+              content:
+                "A broad answer.\n\n**Warnings**\n- The exact text query matched nothing, so CodeAtlas broadened the search terms before returning evidence.\n",
+              snapshot_id: "snap_1",
+              warnings: ["LEXICAL_QUERY_RELAXED"],
+            }),
+          ],
+          next_cursor: null,
+        },
+      },
+    });
+
+    renderWithProviders(<Thread conversationId="conv_1" />);
+
+    expect(
+      await screen.findAllByText(/broadened the search terms/i),
+    ).toHaveLength(1);
+    expect(screen.queryByTestId("run-warnings")).not.toBeInTheDocument();
   });
 });
 

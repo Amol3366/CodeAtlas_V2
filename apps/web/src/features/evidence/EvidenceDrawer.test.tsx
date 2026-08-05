@@ -208,6 +208,43 @@ describe("EvidenceDrawer", () => {
     ).toHaveFocus();
   });
 
+  it("returns focus to the opener when it unmounts", async () => {
+    // The panel is unmounted on close rather than left mounted with no
+    // evidence, so the focus contract has to survive unmount — not just a
+    // prop change. A keyboard user who closes the panel must land back on the
+    // citation they opened, never on the document body.
+    stubFetch({ [EVIDENCE_URL]: { body: envelope() } });
+
+    function Harness({ open }: { readonly open: boolean }) {
+      return (
+        <>
+          <button type="button">Evidence 1</button>
+          {open ? (
+            <EvidenceDrawer
+              evidence={citation}
+              repositoryId={REPOSITORY_ID}
+              onClose={vi.fn()}
+            />
+          ) : null}
+        </>
+      );
+    }
+
+    const { rerender } = renderWithProviders(<Harness open={false} />);
+    const opener = screen.getByRole("button", { name: "Evidence 1" });
+    opener.focus();
+    expect(opener).toHaveFocus();
+
+    rerender(<Harness open />);
+    expect(
+      await screen.findByRole("button", { name: "Close evidence" }),
+    ).toHaveFocus();
+
+    rerender(<Harness open={false} />);
+
+    expect(opener).toHaveFocus();
+  });
+
   it("closes on Escape", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

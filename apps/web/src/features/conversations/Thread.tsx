@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Markdown } from "../../components/Markdown";
 import { Skeleton } from "../../components/Skeleton";
@@ -37,6 +37,21 @@ export interface ThreadProps {
 interface PendingTurn {
   readonly key: string;
   readonly content: string;
+}
+
+const warningMessages: Record<string, string> = {
+  EVIDENCE_EXCERPT_TRUNCATED:
+    "Some cited excerpts were shortened to fit display limits; citations still point to the full indexed file ranges.",
+  LEXICAL_QUERY_RELAXED:
+    "The exact text query matched nothing, so CodeAtlas broadened the search terms before returning evidence.",
+};
+
+function warningText(code: string) {
+  return warningMessages[code] ?? code;
+}
+
+function hasRenderedWarningSection(content: string) {
+  return /\*\*Warnings\*\*/.test(content);
 }
 
 function StatusLine({ status }: { readonly status: Message["status"] }) {
@@ -95,6 +110,8 @@ function AssistantTurn({
     activeSnapshotId !== undefined &&
     activeSnapshotId !== null &&
     snapshotId !== activeSnapshotId;
+  const showRunWarnings =
+    message.warnings.length > 0 && !hasRenderedWarningSection(visible);
 
   if (message.status === "failed" || message.status === "cancelled") {
     return (
@@ -131,37 +148,83 @@ function AssistantTurn({
         </p>
       ) : null}
       <StatusLine status={message.status} />
-      {message.warnings.length > 0 ? (
+      {showRunWarnings ? (
         <ul
           data-testid="run-warnings"
           className="mb-[var(--space-2)] space-y-[var(--space-1)]"
         >
           {message.warnings.map((warning) => (
-            <li key={warning} className="text-xs text-stale">
-              {warning}
+            <li key={warning} title={warning} className="text-xs text-stale">
+              {warningText(warning)}
             </li>
           ))}
         </ul>
       ) : null}
-      <Markdown>{visible}</Markdown>
-      {evidence.length > 0 ? (
-        <ul className="mt-[var(--space-3)] flex flex-wrap gap-[var(--space-2)]">
-          {evidence.map((item) => (
-            <li key={item.evidence_id}>
-              <button
-                type="button"
-                onClick={() => onCite?.(item, message.message_id)}
-                className="rounded-[var(--radius-sm)] border border-border px-[var(--space-2)] py-[var(--space-1)] text-xs"
-              >
-                [{item.citation_ordinal}] {item.file_path}:{item.start_line}-
-                {item.end_line}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <AnswerBody
+        content={visible}
+        evidence={evidence}
+        messageId={message.message_id}
+        onCite={onCite}
+      />
     </div>
   );
+}
+
+/**
+ * The answer text, with each `[n]` marker rendered as the citation it names.
+ *
+ * Its own component so the memoization can live above any early return: the
+ * identity of `renderCitation` decides whether Markdown rebuilds its component
+ * map, and a rebuilt map remounts the paragraph — replacing the button's DOM
+ * node and detaching the reference the evidence panel restores focus to.
+ */
+function AnswerBody({
+  content,
+  evidence,
+  messageId,
+  onCite,
+}: {
+  readonly content: string;
+  readonly evidence: readonly MessageEvidence[];
+  readonly messageId: string;
+  readonly onCite?:
+    | ((evidence: MessageEvidence, messageId: string) => void)
+    | undefined;
+}) {
+  const byOrdinal = useMemo(
+    () => new Map(evidence.map((item) => [item.citation_ordinal, item])),
+    [evidence],
+  );
+
+  const renderCitation = useCallback(
+    (ordinal: number) => {
+      const item = byOrdinal.get(ordinal);
+      // An ordinal with no evidence stays literal text. Not defensive padding:
+      // answers stored before this change carry their own numbering, and a
+      // button that opens nothing is worse than the marker it replaced.
+      if (item === undefined) return null;
+      // The label carries what the removed evidence list used to show.
+      // Derivation in particular has to stay reachable — it is how a claim was
+      // established, and it must not collapse into a bare number.
+      const label =
+        `Evidence ${ordinal}: ${item.file_path} ` +
+        `lines ${item.start_line}-${item.end_line}, ${item.derivation}`;
+      return (
+        <button
+          type="button"
+          onClick={() => onCite?.(item, messageId)}
+          aria-label={label}
+          title={label}
+          className="mx-[2px] rounded-[var(--radius-sm)] border border-border px-[var(--space-1)] align-baseline text-xs text-accent"
+        >
+          [{ordinal}]
+        </button>
+      );
+    },
+    [byOrdinal, messageId, onCite],
+  );
+
+  return <Markdown renderCitation={renderCitation}>{content}</Markdown>;
 }
 
 export function Thread({

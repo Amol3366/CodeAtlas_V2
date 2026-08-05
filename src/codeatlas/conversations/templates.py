@@ -43,6 +43,17 @@ _CHANNEL_NAMES: Final[dict[Intent, str]] = {
 }
 PROJECT_OVERVIEW_EVIDENCE_LIMIT: Final[int] = 10
 
+_WARNING_MESSAGES: Final[dict[str, str]] = {
+    "EVIDENCE_EXCERPT_TRUNCATED": (
+        "Some cited excerpts were shortened to fit display limits; the "
+        "citations still point to the full indexed file ranges."
+    ),
+    "LEXICAL_QUERY_RELAXED": (
+        "The exact text query matched nothing, so CodeAtlas broadened the "
+        "search terms before returning evidence."
+    ),
+}
+
 
 def render_answer(
     response: QueryResponse, *, intent: Intent, generated: bool = False
@@ -92,20 +103,19 @@ def render_answer(
         )
         lines.append("")
 
-    if response.evidence:
-        lines.append("**Evidence**")
-        for ordinal, item in enumerate(response.evidence, start=1):
-            location = f"{item.file_path}:{item.start_line}-{item.end_line}"
-            symbol = f" — `{_code(item.symbol)}`" if item.symbol else ""
-            lines.append(
-                f"{ordinal}. `{_code(location)}`{symbol} "
-                f"({item.derivation.value}, confidence {item.confidence:.2f})"
-            )
-        lines.append("")
+    # The evidence list used to be repeated here and is gone deliberately. The
+    # `[n]` markers on each claim above are rendered as buttons by the web
+    # client, so the list duplicated every citation in a less useful form and
+    # pushed the answer's controls below a wall of lines. Path, line range, and
+    # derivation now travel on the button itself.
+    #
+    # Answers persisted before this change keep their own text, including their
+    # list. A stored answer is the record of what CodeAtlas said and is never
+    # rewritten.
 
     if response.warnings:
         lines.append("**Warnings**")
-        lines.extend(f"- `{_code(item)}`" for item in response.warnings)
+        lines.extend(_warning_line(item) for item in response.warnings)
         lines.append("")
 
     if response.limitations:
@@ -205,15 +215,20 @@ def _render_project_overview(response: QueryResponse) -> str:
                 if item.symbol and _is_display_symbol(item.symbol)
                 else ""
             )
+            # Leads with the same `[n]` marker the claims use, so the web
+            # client turns it into a citation button through one mechanism
+            # rather than two. A bullet rather than an ordered list: the
+            # ordinal is the citation, and letting Markdown number the item
+            # separately would put two different numbers on one line.
             lines.append(
-                f"{ordinal}. `{_code(location)}`{symbol} "
+                f"- [{ordinal}] `{_code(location)}`{symbol} "
                 f"({item.derivation.value}, confidence {item.confidence:.2f})"
             )
         lines.append("")
 
     if response.warnings:
         lines.append("**Warnings**")
-        lines.extend(f"- `{_code(item)}`" for item in response.warnings)
+        lines.extend(_warning_line(item) for item in response.warnings)
         lines.append("")
 
     if response.limitations:
@@ -368,6 +383,13 @@ def _marks(items: Sequence[Evidence], citations: dict[str, int]) -> str:
         if item.evidence_id in citations
     ]
     return "".join(marks)
+
+
+def _warning_line(code: str) -> str:
+    message = _WARNING_MESSAGES.get(code)
+    if message is None:
+        return f"- `{_code(code)}`"
+    return f"- {_prose(message)}"
 
 
 def _code(value: str) -> str:

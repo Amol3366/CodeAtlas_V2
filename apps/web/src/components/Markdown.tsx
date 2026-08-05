@@ -1,4 +1,6 @@
+import { Children, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Options as SanitizeSchema } from "rehype-sanitize";
 
@@ -53,12 +55,81 @@ const schema: SanitizeSchema = {
   clobber: [],
 };
 
+const CITATION = /\[(\d+)\]/g;
+
+/**
+ * Replace `[n]` markers in text with whatever the caller renders for them.
+ *
+ * Walks rendered children rather than the raw Markdown source, so a marker
+ * inside a code span or fenced block is never touched: those arrive as
+ * elements, not as bare strings, and only strings are split. That distinction
+ * is what keeps quoted repository source — `array[1]` — from being rewritten.
+ */
+function withCitations(
+  children: ReactNode,
+  renderCitation: (ordinal: number) => ReactNode,
+): ReactNode {
+  return Children.map(children, (child) => {
+    if (typeof child !== "string") return child;
+
+    const parts: ReactNode[] = [];
+    let cursor = 0;
+    for (const match of child.matchAll(CITATION)) {
+      const start = match.index ?? 0;
+      const rendered = renderCitation(Number(match[1]));
+      if (rendered === null || rendered === undefined) continue;
+      if (start > cursor) parts.push(child.slice(cursor, start));
+      parts.push(rendered);
+      cursor = start + match[0].length;
+    }
+    if (parts.length === 0) return child;
+    if (cursor < child.length) parts.push(child.slice(cursor));
+    return parts;
+  });
+}
+
 export interface MarkdownProps {
   readonly children: string;
   readonly className?: string;
+  /**
+   * Render a `[n]` citation marker. Returning null keeps the literal text,
+   * which is what an ordinal with no matching evidence must do — a button that
+   * opens nothing is worse than the marker it replaced.
+   */
+  readonly renderCitation?: (ordinal: number) => ReactNode;
 }
 
-export function Markdown({ children, className }: MarkdownProps) {
+export function Markdown({
+  children,
+  className,
+  renderCitation,
+}: MarkdownProps) {
+  // Memoized because the identity of these functions is the component *type*
+  // React reconciles against. Rebuilding the object every render makes every
+  // paragraph a new type, which remounts the subtree and replaces its DOM
+  // nodes — detaching anything holding a reference to one, including the
+  // evidence panel's focus-return.
+  const components: Components = useMemo(() => {
+    const wrap = (nodes: ReactNode): ReactNode =>
+      renderCitation === undefined ? nodes : withCitations(nodes, renderCitation);
+    return {
+      p: ({ children: content }) => <p>{wrap(content)}</p>,
+      li: ({ children: content }) => <li>{wrap(content)}</li>,
+      td: ({ children: content }) => <td>{wrap(content)}</td>,
+      th: ({ children: content }) => <th>{wrap(content)}</th>,
+      a: ({ href, children: linkChildren, ...rest }) => (
+        <a
+          {...rest}
+          href={href}
+          // An external link must not hand the opener a window handle.
+          rel="noopener noreferrer nofollow"
+          target="_blank"
+        >
+          {linkChildren}
+        </a>
+      ),
+    };
+  }, [renderCitation]);
   return (
     <div
       className={className}
@@ -71,19 +142,7 @@ export function Markdown({ children, className }: MarkdownProps) {
         // `rehype-raw` is deliberately absent: without it, raw HTML in the
         // source is already inert text rather than markup.
         rehypePlugins={[[rehypeSanitize, schema]]}
-        components={{
-          a: ({ href, children: linkChildren, ...rest }) => (
-            <a
-              {...rest}
-              href={href}
-              // An external link must not hand the opener a window handle.
-              rel="noopener noreferrer nofollow"
-              target="_blank"
-            >
-              {linkChildren}
-            </a>
-          ),
-        }}
+        components={components}
       >
         {children}
       </ReactMarkdown>

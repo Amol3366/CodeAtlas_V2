@@ -27,9 +27,24 @@ then web lint, types, tests, and build.
   search, rename, archive, and delete. The URL identifies the active thread.
 - **Thread** — submit a question, see the answer, retry a failed or cancelled
   one. Assistant text renders only through the sanitizer.
-- **Evidence** — a citation opens a drawer showing path, symbol, line range,
-  derivation, confidence, and **the snapshot the answer used**, with the
-  excerpt as text.
+- **Evidence** — each claim ends with its citations as inline `[n]` buttons,
+  placed where the fact is rather than collected below the answer. A button's
+  accessible name and tooltip carry the path, the line range, and the
+  derivation, so how a claim was established stays readable without opening
+  anything. There is no separate evidence list under an answer; a project
+  overview still ends with a curated **Key Evidence** shortlist, whose entries
+  are citation buttons too.
+
+  Clicking one opens a panel showing path, symbol, line range, derivation,
+  confidence, and **the snapshot the answer used**, with the excerpt as text.
+  The panel exists only while a citation is selected — it enters from the
+  right, and closing it returns the width to the conversation. Escape closes
+  it, focus moves into it on open and back to the citation on close.
+
+  A marker with no matching evidence stays plain text. Answers persisted
+  before this change keep their original wording, including their own evidence
+  list: a stored answer is the record of what CodeAtlas said and is never
+  rewritten.
 - **Change preflight** — runs a working-tree analysis and renders the persisted
   report, findings grouped by severity, warnings and limitations visible.
 - **Settings** — `/settings`, reached from the sidebar header. Chooses the

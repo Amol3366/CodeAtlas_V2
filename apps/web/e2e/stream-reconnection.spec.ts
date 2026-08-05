@@ -246,7 +246,8 @@ test("the thread reaches its answer through the stream, with no reload", async (
   browserName,
 }) => {
   skipChromiumRendererCrash(browserName);
-  await page.goto("/");
+  // The repository selector lives on `/repositories`; the app opens in chat.
+  await page.goto("/repositories");
   await page
     .getByLabel("Repository", { exact: true })
     .selectOption(seeded.repository_id);
@@ -269,7 +270,8 @@ test("the thread reaches its answer through the stream, with no reload", async (
 
 test("citations survive a reload", async ({ page, seeded, browserName }) => {
   skipChromiumRendererCrash(browserName);
-  await page.goto("/");
+  // The repository selector lives on `/repositories`; the app opens in chat.
+  await page.goto("/repositories");
   await page
     .getByLabel("Repository", { exact: true })
     .selectOption(seeded.repository_id);
@@ -279,8 +281,9 @@ test("citations survive a reload", async ({ page, seeded, browserName }) => {
     .fill("PaymentService.capture");
   await page.getByRole("button", { name: "Send" }).click();
 
+  // Inline since the citation moved to the end of the claim it supports.
   const citation = page.getByRole("button", {
-    name: /^\[1\] src\/payments\/service\.py:/,
+    name: /^Evidence 1: src\/payments\/service\.py/,
   });
   await expect(citation).toBeVisible({ timeout: 30_000 });
 
