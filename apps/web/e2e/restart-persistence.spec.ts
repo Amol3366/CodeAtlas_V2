@@ -21,8 +21,13 @@ test("conversations and messages survive a backend restart", async ({
   await page.goto("/");
 
   await page.getByRole("button", { name: "New chat" }).click();
-  await expect(page).toHaveURL(/\/conversations\/conv_/);
-  const conversationUrl = page.url();
+  await page.waitForURL(/\/conversations\/conv_/);
+
+  // The composer is one element reused across threads, and Thread clears the
+  // draft whenever `conversationId` changes. Typing before the new thread has
+  // settled gets wiped, leaving Send disabled. An empty message list is the
+  // app's own signal that the new conversation is the one on screen.
+  await expect(page.getByTestId("message-user")).toHaveCount(0);
 
   // A distinctive title, so the assertion cannot pass on a default one.
   const question = "IdempotencyStore.claim";
@@ -33,6 +38,13 @@ test("conversations and messages survive a backend restart", async ({
   await expect(page.getByTestId("message-assistant")).toContainText(
     "src/payments/idempotency.py",
   );
+
+  // Captured here, not at creation. The database is worker-scoped, so `/`
+  // redirects into whatever conversation an earlier spec left behind, and the
+  // app performs more than one navigation while a new chat opens. Reading the
+  // URL only once the answer is on screen makes it the thread we actually
+  // used, rather than whichever one the URL happened to hold mid-flight.
+  const conversationUrl = page.url();
 
   // --- The restart --------------------------------------------------------
   await backend.stop();
