@@ -155,11 +155,14 @@ Carried into gate approvals as declared work rather than dropped:
   fix a real rebuild-while-tab-open problem — but they were never this problem.
 
 - **`pull_ollama_model` is not reachable.** The provider function exists and is
-  tested, but no REST route and no UI call it, so the
-  `POST /v1/models/ollama/pull` endpoint described in `README.md` (line ~97) and
-  previously claimed here **does not exist**. The Settings UI only prints the
-  `ollama pull …` command for the user to run in a terminal. Either wire it or
-  correct the README; do not cite it as delivered.
+  tested, but no REST route and no UI call it, so `POST /v1/models/ollama/pull`
+  **does not exist**. The Settings UI only prints the `ollama pull …` command
+  for the user to run in a terminal.
+
+  **The documentation was corrected 2026-08-05** — `README.md` no longer claims
+  the endpoint, and `docs/operations/answer-generation.md` was already accurate.
+  The dead function remains, deliberately: it is tested and is the building
+  block if the feature is wired later. Do not cite it as delivered.
 
 - **`renderWithProviders` accepts a `client` option nothing passes.** Harmless
   unused extension point in `apps/web/src/test/harness.tsx`.
@@ -168,9 +171,10 @@ Carried into gate approvals as declared work rather than dropped:
 
 No assigned work. Candidates, in the order they'd most likely be picked up:
 
-1. **Resolve the `POST /v1/models/ollama/pull` gap** — either wire the tested
-   `pull_ollama_model` to a route and the Settings UI, or correct `README.md`.
-   Documentation currently promises a feature that does not exist.
+1. **Decide whether to wire `pull_ollama_model`.** The documentation half of
+   this was settled 2026-08-05 (the README no longer promises the endpoint), so
+   what remains is a product call: add the route and the Settings button, or
+   delete the unused function. Not urgent either way.
 2. **Rebuild the package whenever the web app changes.** The four-day-old
    packaged bundle cost three misdiagnosed debugging rounds. Consider making
    `build_package.ps1` refuse when `apps/web/dist` is newer than the release

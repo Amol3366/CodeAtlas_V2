@@ -91,18 +91,27 @@ surface, semantic coverage is reported per active snapshot, and shadow
 embedding migrations support cutover/rollback (`docs/operations/semantic-search.md`).
 
 Post-gate provider work is now present behind explicit repository settings:
-known OpenAI embedding model dimensions are resolved automatically, local
-embedding dimensions are reported as auto-detected when the model loads, and
-Settings can ask Ollama to download the typed answer model through
-`POST /v1/models/ollama/pull`. Optional Ollama/OpenAI answer generation still
-does not change citations, line numbers, claims, derivation, or confidence
-(`docs/operations/answer-generation.md`).
+known OpenAI embedding model dimensions are resolved automatically, and local
+embedding dimensions are reported as auto-detected when the model loads.
+CodeAtlas does not download models for you — Settings names the answer model it
+expects and shows the `ollama pull` command, which you run yourself. Optional
+Ollama/OpenAI answer generation still does not change citations, line numbers,
+claims, derivation, or confidence (`docs/operations/answer-generation.md`).
 
-The Settings web surface has also been polished: provider cards, summary
-panels, connection and coverage panels, clear warnings/limitations, and
-non-cacheable packaged app shell responses for `uv run codeatlas serve --web --open`. The exact command path was probed successfully on 2026-08-04, although
-one browser session still showed the old Settings view until reload; that
-environment-specific observation is recorded in `docs/plans/PLAN.md`.
+The Settings web surface has also been polished: a page header naming the
+repository being configured, provider cards, summary panels, connection and
+coverage panels, and clear warnings/limitations. The application shell is served
+non-cacheable, because Vite asset names carry a content hash but `index.html` is
+the pointer to whichever hashes are current — a cached shell keeps a browser on
+the previous bundle after a rebuild.
+
+A report of Settings "reverting" to an older view was traced on 2026-08-05 and
+was **not** a caching problem. There are two built bundles, and the server picks
+between them by launch mode: a source checkout serves `apps/web/dist`, the
+packaged executable serves its own copy under `dist/codeatlas-win64/`. A package
+built before a UI change keeps serving the older interface until it is rebuilt.
+**Rebuild the package whenever the web application changes**
+(`scripts/build_package.ps1`).
 
 `codeatlas serve --ephemeral` starts from empty storage and discards it when the
 server stops, so indexing, embeddings, and conversations are all fresh each run
@@ -301,7 +310,7 @@ suites **inside** the gate; `-SkipE2E` opts out for a fast inner loop.
 | Port already in use                                         | `--port` on `serve`, `-ApiPort` on `run_dev.ps1`                          |
 | Script will not run                                         | Use the`-ExecutionPolicy Bypass -File` form                                     |
 | A repository will not reindex                               | `codeatlas doctor` names the blocking run and its pid                           |
-| Settings shows a stale view                                 | Reload the tab. Known browser-side observation, recorded in`docs/plans/PLAN.md` |
+| The UI looks older than the code                            | You are almost certainly running the packaged build. Rebuild it with`scripts/build_package.ps1`, or run from source |
 
 ## Windows development
 
