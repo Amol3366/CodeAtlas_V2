@@ -100,8 +100,7 @@ does not change citations, line numbers, claims, derivation, or confidence
 
 The Settings web surface has also been polished: provider cards, summary
 panels, connection and coverage panels, clear warnings/limitations, and
-non-cacheable packaged app shell responses for `uv run codeatlas serve --web
---open`. The exact command path was probed successfully on 2026-08-04, although
+non-cacheable packaged app shell responses for `uv run codeatlas serve --web --open`. The exact command path was probed successfully on 2026-08-04, although
 one browser session still showed the old Settings view until reload; that
 environment-specific observation is recorded in `docs/plans/PLAN.md`.
 
@@ -123,6 +122,186 @@ missed with and without it — read
 `docs/evaluation/phase-7-baseline-environment.md` before quoting either figure.
 That completes Phases 0–7; `docs/plans/PLAN.md` is the live phase and task
 status.
+
+## Running the project
+
+Everything below is PowerShell on Windows. Each command is explained, because
+several of them exist for a reason that is not obvious from the name.
+
+### Step 0 — Install, once
+
+Prerequisites: Windows 11, PowerShell 7 or Windows PowerShell 5.1, `uv`,
+Node.js 20+ with pnpm (`corepack enable pnpm`), and Git on `PATH`. Git is not
+optional — change preflight shells out to it through an argument-array
+subprocess.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
+```
+
+Installs the locked Python environment and the `apps/web` dependencies. It syncs
+**frozen**, so you get exactly the versions in `uv.lock` and `pnpm-lock.yaml`
+rather than whatever resolves today. The `-ExecutionPolicy Bypass -File` form is
+required; a plain `./script.ps1` is blocked by the default execution policy.
+
+Optional extras — skip both unless you actually want semantic recall.
+Deterministic behaviour never needs them:
+
+```powershell
+uv sync --extra semantic-local      # local embeddings via sentence-transformers; ~1 GB of torch, nothing leaves the machine
+uv sync --extra semantic-openai     # OpenAI embeddings; transmits, and needs OPENAI_API_KEY
+```
+
+Configuration lives in `.env` **in this project folder**, copied from
+`.env.example`. It is deliberately not read from the directory you run the
+command in: a repository you index must never be able to configure the tool
+indexing it. Every setting in it is optional, and putting an API key there
+enables nothing on its own — a provider is granted permission per repository, in
+Settings.
+
+### Step 1 — Start the app
+
+```powershell
+uv run codeatlas serve --web --open
+```
+
+The normal way to run CodeAtlas, and exactly what a packaged build does. One
+loopback server on `http://127.0.0.1:8000` serves both the built web app and the
+`/v1` API, so the browser sees a single origin — which is what lets the API stay
+loopback-bound with no CORS relaxation. Breaking the flags apart:
+
+- `--web` also serves `apps/web/dist`. If that build is missing the command
+  refuses with `INVALID_REQUEST` and tells you to run
+  `pnpm --dir apps/web build`, rather than handing you a blank page.
+- `--open` launches a browser. Without it the URL is only printed — starting a
+  server should not steal focus, and must not try to on a headless machine.
+- `--host` accepts loopback addresses only. Anything else exits with
+  `INVALID_REQUEST`, because binding wider needs authentication and a CORS
+  review that this product has not had.
+- `--port 8000` is the default; change it if the port is taken.
+
+Two variants worth knowing:
+
+```powershell
+uv run codeatlas serve                    # API only, no web assets
+uv run codeatlas serve --web --ephemeral  # fresh empty storage, discarded when the server stops
+```
+
+`--ephemeral` (ADR-0013) gives you a clean index, clean embeddings, and clean
+conversations every run, while history still behaves normally *within* the run.
+It never opens the real database, an explicit `--db` outranks it, and
+`CODEATLAS_EPHEMERAL_REPOSITORIES` names repositories to register and index at
+startup. Every ephemeral run pays a full index — there is no reuse, which is
+inherent to asking for freshness.
+
+### Step 2 — Use it from the CLI
+
+Same application services as the web app, so results are identical.
+
+```powershell
+uv run codeatlas repo add C:\path\to\repository --json
+```
+
+Registers a repository. It only records the path and Git state; it does not read
+the code yet. `--json` prints the machine-readable envelope, including the
+`repository_id` every later command needs.
+
+```powershell
+uv run codeatlas index <repository_id>
+```
+
+Scans, parses, extracts symbols and relations, chunks, and builds the search
+index — then validates all of it and activates the snapshot in a single atomic
+transaction. An interrupted index leaves the previous active snapshot usable.
+Repository code is never imported, built, or executed.
+
+```powershell
+uv run codeatlas symbol <repository_id> PaymentService.capture
+uv run codeatlas search text <repository_id> "idempotency key"
+uv run codeatlas graph callers <repository_id> PaymentService.capture
+```
+
+Exact symbol lookup, lexical (FTS5) text search, and bounded graph traversal.
+All three are deterministic and need no model. Each answer names the snapshot it
+came from, and abstains rather than guessing when nothing matches.
+
+```powershell
+uv run codeatlas impact <repository_id>
+uv run codeatlas impact <repository_id> --commits HEAD~1..HEAD --format sarif
+```
+
+Change preflight — the point of the product. With no arguments it compares your
+working tree against `HEAD`; `--commits` takes a range instead. Output is JSON
+by default, with `--format markdown` for humans and `--format sarif` for
+scanners. Base-side evidence is labelled historical.
+
+```powershell
+uv run codeatlas repo watch <repository_id>
+uv run codeatlas doctor
+uv run codeatlas backup / restore
+```
+
+`repo watch` keeps the index current without an explicit `index`, debounced, and
+disableable per repository — filesystem events name candidates, never truth, so
+a reconciling scan and the content hashes always decide. `doctor` reports what
+was interrupted, what is blocking a reindex, and what was never indexed, telling
+those apart because the remedies differ. `backup` copies the database safely
+while the server runs; `restore` validates integrity and schema version *before*
+replacing anything, and keeps what it replaced.
+
+### Step 3 — Frontend dev loop (only when editing `apps/web`)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run_dev.ps1
+```
+
+Starts uvicorn on 8000 and the Vite dev server in front of it, with `/v1`
+proxied so the browser still talks to one origin. Two processes because they
+are genuinely two servers. The script stops the API when you exit Vite, so no
+stray process holds the port. `-ApiOnly` runs the backend alone; `-ApiPort`
+moves it.
+
+If you change a REST endpoint, regenerate the frontend types — never hand-edit
+them:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/generate_web_types.ps1
+```
+
+### Step 4 — Run the packaged build
+
+```powershell
+dist\codeatlas-win64\codeatlas.exe serve --web --open
+```
+
+Unzip and run; no install, no elevation. Rebuild it with
+`scripts/build_package.ps1`. The executable is **unsigned**, so SmartScreen
+warns on first run — a declared, accepted gap that needs a purchased
+certificate.
+
+### Step 5 — Verify before calling anything done
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync
+powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync -SkipE2E
+```
+
+The quality gate: contract schema, Python tests, Ruff, strict MyPy, the
+evaluation corpus, the tracked Phase 0/3/4 baselines, and the web app's lint,
+types, component tests, and build. `-SkipSync` reuses the installed environment
+instead of re-syncing. Unlike earlier phase scripts this one runs the Playwright
+suites **inside** the gate; `-SkipE2E` opts out for a fast inner loop.
+
+### If something does not work
+
+| Symptom                                                     | Cause and fix                                                                     |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `INVALID_REQUEST: the web application has not been built` | `pnpm --dir apps/web build`, or use the packaged release                        |
+| `--host must be a loopback address`                       | Loopback only, by design. Use`127.0.0.1`                                        |
+| Port already in use                                         | `--port` on `serve`, `-ApiPort` on `run_dev.ps1`                          |
+| Script will not run                                         | Use the`-ExecutionPolicy Bypass -File` form                                     |
+| A repository will not reindex                               | `codeatlas doctor` names the blocking run and its pid                           |
+| Settings shows a stale view                                 | Reload the tab. Known browser-side observation, recorded in`docs/plans/PLAN.md` |
 
 ## Windows development
 
