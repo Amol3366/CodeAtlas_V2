@@ -154,15 +154,15 @@ Carried into gate approvals as declared work rather than dropped:
   layer. The `no-store` shell headers are still correct and worth keeping — they
   fix a real rebuild-while-tab-open problem — but they were never this problem.
 
-- **`pull_ollama_model` is not reachable.** The provider function exists and is
-  tested, but no REST route and no UI call it, so `POST /v1/models/ollama/pull`
-  **does not exist**. The Settings UI only prints the `ollama pull …` command
-  for the user to run in a terminal.
+- ~~**`pull_ollama_model` is not reachable.**~~ **Closed 2026-08-05 by deleting
+  it.** The function had no route and no caller, so
+  `POST /v1/models/ollama/pull` never existed. `README.md` was corrected first,
+  then the dead code and its two tests were removed rather than left as an
+  unreferenced building block. CodeAtlas does not download models: the Settings
+  UI prints the `ollama pull …` command for the user to run in a terminal, which
+  is what `docs/operations/answer-generation.md` has always said.
 
-  **The documentation was corrected 2026-08-05** — `README.md` no longer claims
-  the endpoint, and `docs/operations/answer-generation.md` was already accurate.
-  The dead function remains, deliberately: it is tested and is the building
-  block if the feature is wired later. Do not cite it as delivered.
+  If the feature is ever wanted, `git show 3c631ce` has the implementation.
 
 - **`renderWithProviders` accepts a `client` option nothing passes.** Harmless
   unused extension point in `apps/web/src/test/harness.tsx`.
@@ -171,17 +171,13 @@ Carried into gate approvals as declared work rather than dropped:
 
 No assigned work. Candidates, in the order they'd most likely be picked up:
 
-1. **Decide whether to wire `pull_ollama_model`.** The documentation half of
-   this was settled 2026-08-05 (the README no longer promises the endpoint), so
-   what remains is a product call: add the route and the Settings button, or
-   delete the unused function. Not urgent either way.
-2. **Rebuild the package whenever the web app changes.** The four-day-old
+1. **Rebuild the package whenever the web app changes.** The four-day-old
    packaged bundle cost three misdiagnosed debugging rounds. Consider making
    `build_package.ps1` refuse when `apps/web/dist` is newer than the release
    tree, so the mismatch reports itself instead of surfacing as a phantom UI
    regression.
-3. Close the untested `POST /v1/models/test` success branch by installing an
+2. Close the untested `POST /v1/models/test` success branch by installing an
    optional extra in a gate environment.
-4. Investigate Recall@10 — the stopword finding suggests lexical quality, not
+3. Investigate Recall@10 — the stopword finding suggests lexical quality, not
    embedding quality, is where the remaining headroom is.
-5. Decide on code signing (a purchasing decision, not an engineering one).
+4. Decide on code signing (a purchasing decision, not an engineering one).

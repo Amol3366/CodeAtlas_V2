@@ -14,9 +14,7 @@ failed" has to guess which one they have.
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Iterator
-from dataclasses import dataclass
 
 import httpx
 
@@ -39,17 +37,6 @@ DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 # Low, because this explains supplied evidence rather than inventing anything.
 # Variance in an answer about fixed facts reads as unreliability.
 _TEMPERATURE = 0.2
-PULL_TIMEOUT_SECONDS = 600.0
-
-
-@dataclass(frozen=True)
-class OllamaPullResult:
-    """Outcome of asking local Ollama to pull one model."""
-
-    model_id: str
-    ok: bool
-    detail_code: str | None
-    latency_ms: int
 
 
 class OllamaAnswerProvider:
@@ -114,55 +101,6 @@ class OllamaAnswerProvider:
             raise ProviderUnreachable(f"Ollama answered {response.status_code}.")
 
 
-def pull_ollama_model(
-    model_id: str,
-    *,
-    base_url: str = DEFAULT_BASE_URL,
-    timeout_seconds: float = PULL_TIMEOUT_SECONDS,
-    client: httpx.Client | None = None,
-) -> OllamaPullResult:
-    """Download one Ollama model through the local Ollama API.
-
-    This sends only the model name the user typed, never repository content.
-    It is deliberately separate from saving settings: pulling a model can be a
-    multi-gigabyte network operation, so it must be an explicit action.
-    """
-    model = model_id.strip()
-    started = time.perf_counter()
-    owns_client = client is None
-    resolved = client or httpx.Client(timeout=timeout_seconds)
-    try:
-        response = resolved.post(
-            f"{base_url.rstrip('/')}/api/pull",
-            json={"model": model, "stream": False},
-            timeout=timeout_seconds,
-        )
-    except httpx.TimeoutException:
-        return _pull_result(model, False, "OLLAMA_PULL_TIMED_OUT", started)
-    except httpx.RequestError:
-        return _pull_result(model, False, "OLLAMA_UNREACHABLE", started)
-    finally:
-        if owns_client:
-            resolved.close()
-
-    if response.status_code == 404:
-        return _pull_result(model, False, "OLLAMA_MODEL_NOT_FOUND", started)
-    if response.status_code >= 400:
-        return _pull_result(model, False, "OLLAMA_PULL_FAILED", started)
-    return _pull_result(model, True, None, started)
-
-
-def _pull_result(
-    model_id: str, ok: bool, detail_code: str | None, started: float
-) -> OllamaPullResult:
-    return OllamaPullResult(
-        model_id=model_id,
-        ok=ok,
-        detail_code=detail_code,
-        latency_ms=int((time.perf_counter() - started) * 1000),
-    )
-
-
 def _chunk_of(line: str) -> str:
     """Read one NDJSON line, ignoring anything unparseable.
 
@@ -179,11 +117,4 @@ def _chunk_of(line: str) -> str:
     return value if isinstance(value, str) else ""
 
 
-__all__ = [
-    "DEFAULT_BASE_URL",
-    "DEFAULT_MODEL_ID",
-    "PULL_TIMEOUT_SECONDS",
-    "OllamaAnswerProvider",
-    "OllamaPullResult",
-    "pull_ollama_model",
-]
+__all__ = ["DEFAULT_BASE_URL", "DEFAULT_MODEL_ID", "OllamaAnswerProvider"]
