@@ -25,8 +25,8 @@ from codeatlas.domain.errors import QueryTooLongError
 def test_the_policy_version_is_recorded() -> None:
     """A run stores this; changing the rules without changing the version
     would make old runs claim to have used rules they never saw."""
-    assert RETRIEVAL_POLICY_VERSION == "5.2"
-    assert classify("PaymentService.capture").policy_version == "5.2"
+    assert RETRIEVAL_POLICY_VERSION == "5.3"
+    assert classify("PaymentService.capture").policy_version == "5.3"
 
 
 @pytest.mark.parametrize("text", ["Hi", "hello!", "hey there", "good morning"])
@@ -41,7 +41,12 @@ def test_greetings_do_not_route_to_repository_search(text: str) -> None:
     [
         "tell me about prelegal project",
         "what is this repository?",
+        "what is this repository about?",
+        "what does this project do?",
         "summarize the codebase",
+        "describe the repo",
+        "explain this project",
+        "give me a full explanation about Prelegal project",
         "give me an overview of the project",
     ],
 )
