@@ -207,6 +207,78 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-05T18:10:00Z — A selected provider stayed invisible when unavailable
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Post-gate follow-up to the entry below.
+
+#### Outcome
+
+Verifying the packaged build found a defect in the styling committed in
+`a93c273`, hours old.
+
+`optionCardClass` returned the disabled treatment for any unavailable option
+and discarded the selected treatment with it. A repository stored as
+`embedding_provider: "openai"`, `transmits_off_machine: true`, on a machine
+without the OpenAI extra or an API key, therefore rendered with **no embedding
+provider selected at all**.
+
+That is the one way this screen must not fail. Its purpose, stated in its own
+header comment and required by `AGENTS.md` §14.4, is to make "content leaves
+this machine" impossible to miss. Drawing a transmitting policy as "nothing is
+selected", because of a missing key, hides a privacy-relevant setting behind an
+environment problem.
+
+A selected-but-unavailable card now keeps its accent border and ring while
+staying muted, non-choosable, and stating what it requires.
+
+It was never a regression — before `a93c273` nothing was styled, so no selection
+was visible either — but it became wrong the moment selection started being
+expressed visually.
+
+#### Files
+
+- `apps/web/src/features/settings/SemanticSettings.tsx`
+- `docs/plans/PLAN.md` — this entry.
+
+#### Verification
+
+`check_phase7.ps1 -SkipSync` — 17 sections, "Phase 7 verification completed":
+**1849 Python passed**, Ruff clean, strict MyPy clean over 313 source files,
+**147 web tests**, **13 end-to-end passed**. 15 `SemanticSettings` component
+tests including `vitest-axe` pass unchanged.
+
+Confirmed by rendering `/settings` from the **packaged** server against the
+repository that exposed it: the OpenAI card is ringed and muted simultaneously.
+Computed style on a provider card is `display: flex`, `1px` border, `8px`
+radius, `12px` padding and gap — applied, not merely present in the bundle.
+
+The zip was verified by reading it: 6219 entries, 883 MB uncompressed,
+`codeatlas.exe` present, and the packaged web assets are the current build.
+
+#### Three cautions for whoever runs this next
+
+- **The Python suite collected 1849 tests, not the 1874 of the previous run.**
+  `uv run` re-syncs the environment to the locked default dependencies, so it
+  removes anything installed by `uv sync --extra semantic-local`. `torch`,
+  `sentence_transformers`, and `lancedb` were confirmed absent afterwards. This
+  is what the gate's `-Semantic` flag is for; it is not a defect, but gate
+  coverage is **not constant between runs**, and a bare pass count should not be
+  compared across them without checking the collected total.
+- **A background `powershell -File <relative path>` invocation reported exit 0
+  having never run the script.** The path did not resolve, the error went to
+  the output, and the exit code was still 0. A passing gate writes 17 `==>`
+  sections and a completion line; anything less is not a pass whatever the exit
+  code says. A separate run reported `-1` while genuinely passing.
+- **Port 8123 belongs to the e2e suite** (`apps/web/e2e/support/backend.ts:26`).
+  A server parked there makes the settings suite fail against the wrong
+  database, which looks exactly like a product regression.
+
+#### Next
+
+No assigned work. The coverage progress bar remains the open accessibility
+improvement.
+
 ### 2026-08-05T15:30:00Z — The Settings body was never styled; `SemanticSettings` redesigned
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

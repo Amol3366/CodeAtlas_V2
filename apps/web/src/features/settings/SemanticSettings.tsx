@@ -53,7 +53,15 @@ function optionCardClass(selected: boolean, disabled: boolean): string {
   if (disabled) {
     // Shown rather than hidden — a missing option reads as a broken product —
     // but clearly not choosable.
-    return `${base} cursor-not-allowed border-border bg-surface-sunken opacity-70`;
+    const unavailable = `${base} cursor-not-allowed bg-surface-sunken opacity-70`;
+    // Still marked when it is the stored choice. A repository can be
+    // configured for a provider this machine cannot currently run — an absent
+    // API key is enough — and drawing that as "nothing is selected" would hide
+    // a policy that transmits behind an environment problem. This screen exists
+    // to make that consequence impossible to miss.
+    return selected
+      ? `${unavailable} border-accent ring-1 ring-accent`
+      : `${unavailable} border-border`;
   }
   return selected
     ? `${base} cursor-pointer border-accent bg-surface-raised ring-1 ring-accent`
