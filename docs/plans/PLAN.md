@@ -207,6 +207,101 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-05T15:30:00Z — The Settings body was never styled; `SemanticSettings` redesigned
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Phases 0–7 stay `complete`.
+
+#### Outcome
+
+The user reported, twice, that the Settings view had not changed. The first
+investigation blamed a packaged build four days older than the redesign, which
+**was** real and is fixed — but it was not what they were looking at.
+
+Rendering `/settings` in a real browser against the running server settled it.
+The page header was the new design. The body was raw, unstyled markup: the
+provider options ran together as one line of text, `DisabledStays on this
+machineLocal modelStays on this machine OpenAI⚠ Sends…`, with no cards, edges,
+or spacing.
+
+`SemanticSettings.tsx` contained **zero `className` attributes**;
+`SettingsRoute.tsx` had fourteen. The "Settings visual redesign" recorded as
+delivered on 2026-08-04 only ever touched the page header. The provider cards,
+summary panels, and connection/coverage panels that `README.md` described were
+never built. **Nothing regressed — that component had never been styled at
+all**, which is why rebuilding the package changed nothing the user could see.
+
+`SemanticSettings` now renders as three panels, with each provider option a
+selectable card: the chosen one carries an accent border and ring, an
+unavailable one is muted and states what it requires, and the budget field
+appears in its own bordered block because it is a consequence of the choice
+above rather than another row.
+
+Every string, `id`, `htmlFor`, `role`, `fieldset`, and `legend` is unchanged.
+The semantics were already correct — Section 14.4's "never colour alone" is
+still carried by words and an icon, not by the new colour — so the styling had
+to sit on top of them without moving them.
+
+#### Files
+
+- `apps/web/src/features/settings/SemanticSettings.tsx`
+- `docs/plans/PLAN.md` — this entry.
+
+#### Contracts and compatibility
+
+None. Presentation only. No contract, migration, REST, or dependency change.
+
+#### Verification
+
+`powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync`
+— every section passed and the script printed "Phase 7 verification completed".
+
+| Section | Result |
+| --- | --- |
+| Python tests | **1871 passed**, 3 skipped, 267 s |
+| Lint (Ruff) | All checks passed |
+| Types (strict MyPy) | no issues in 313 source files |
+| Dataset, Phase 0/3/4 baselines, rerank artifact | pass |
+| Web lint, types, build | pass |
+| Web tests | **147 passed**, 12 files |
+| End-to-end suites | **13 passed**, 5 skipped |
+
+The harness reported exit `-1` because the detached process was lost, not
+because a step failed; the script's own completion line is the evidence, and
+every section above was confirmed individually.
+
+Also confirmed by rendering: the restyled page was screenshotted through
+Playwright before and after, which is how the unstyled body was found in the
+first place.
+
+#### Two things worth recording
+
+- **The staleness guard added earlier today caught its first real case.** The
+  gate run before this one failed on
+  `test_the_packaged_web_assets_match_the_source_build`, because restyling the
+  UI left the package behind. It named the remedy in one line. That is the
+  failure that started this whole thread, reported in seconds instead of days.
+- **A port collision, not a regression.** An intermediate e2e failure was
+  caused by an inspection server parked on port 8123 — which
+  `apps/web/e2e/support/backend.ts:26` uses for the suite's own API, so the
+  tests were talking to the real database instead of their seeded fixture.
+  Nothing to fix in the product; worth knowing before debugging a future one.
+
+#### Limitations
+
+- `-Semantic`, `-Package`, and `-Perf` did not run; they need explicit flags.
+- The packaged tree was rebuilt and carries this UI, but its zip was
+  interrupted and removed rather than left truncated. `serve --web` reads the
+  unpacked tree, so the artifact is usable; regenerate the zip before
+  distributing it.
+- The screenshots were taken by Playwright, not by a person. The page is proven
+  to render, not proven to be liked.
+
+#### Next
+
+No assigned work. A coverage progress bar remains the open accessibility
+improvement, described in `apps/web/e2e/settings.spec.ts`.
+
 ### 2026-08-05T08:40:00Z — Phase 7 gate re-run green; two never-executed e2e assertions fixed
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.
