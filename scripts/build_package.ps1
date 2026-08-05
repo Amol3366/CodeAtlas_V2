@@ -47,6 +47,49 @@ if (-not (Test-Path (Join-Path $assets "index.html"))) {
     throw "apps/web/dist/index.html is missing. Build the web application first."
 }
 
+# --- Staleness guard -------------------------------------------------------
+#
+# `-SkipWebBuild` reuses whatever is in `apps/web/dist`, which is what the
+# quality gate wants: it has just built the web application itself, and
+# rebuilding costs seconds for no gain. The hazard is the same switch used
+# against an old `dist` — the package then ships an interface the source tree
+# no longer has, and nothing says so.
+#
+# That is not hypothetical. On 2026-08-05 a package built four days before a
+# Settings redesign served the pre-redesign page, and the mismatch was invisible
+# from outside: a stale package and a stale browser cache look identical, so
+# three rounds of debugging went after the cache. Running the source checkout to
+# check kept confirming the *other* bundle, because the server picks its assets
+# by launch mode.
+#
+# Compared against the newest web source rather than a fixed age, so the check
+# stays true whenever it runs. `node_modules` is excluded: it moves on install
+# and says nothing about the UI.
+if ($SkipWebBuild) {
+    $builtAt = (Get-Item (Join-Path $assets "index.html")).LastWriteTimeUtc
+
+    $sourcePaths = @("src", "index.html", "package.json", "vite.config.ts", "tsconfig.json") |
+        ForEach-Object { Join-Path $web $_ } |
+        Where-Object { Test-Path $_ }
+
+    $newest = Get-ChildItem -Path $sourcePaths -Recurse -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+
+    if ($newest -and $newest.LastWriteTimeUtc -gt $builtAt) {
+        $relative = $newest.FullName.Substring($root.Length).TrimStart('\', '/')
+        throw @"
+apps/web/dist is older than the web application source, so -SkipWebBuild would
+package an interface that no longer exists.
+
+  newest source : $relative ($($newest.LastWriteTimeUtc.ToString('u')))
+  apps/web/dist : $($builtAt.ToString('u'))
+
+Run without -SkipWebBuild, or build it yourself with `pnpm --dir apps/web build`.
+"@
+    }
+}
+
 # --- The executable -------------------------------------------------------
 
 Write-Output "==> Building the executable"
@@ -104,6 +147,42 @@ if (-not (Test-Path $executable)) {
 if ($LASTEXITCODE -ne 0) {
     throw "The packaged executable failed to run (exit code $LASTEXITCODE)."
 }
+
+# What shipped must be what was built. The guard above stops a stale `dist`
+# reaching PyInstaller; this stops PyInstaller carrying something else — a
+# `--add-data` pointed at the wrong place, or a partial copy. Checked in both
+# known locations because onedir builds nest data under `_internal` in current
+# PyInstaller and placed it beside the executable in older ones.
+$bundledWeb = @(
+    (Join-Path $release "_internal/web"),
+    (Join-Path $release "web")
+) | Where-Object { Test-Path (Join-Path $_ "index.html") } | Select-Object -First 1
+
+if (-not $bundledWeb) {
+    throw "The packaged build carries no web assets. `serve --web` would refuse."
+}
+
+function Get-TreeDigest([string]$directory) {
+    Get-ChildItem -Path $directory -Recurse -File |
+        Sort-Object { $_.FullName.Substring($directory.Length) } |
+        ForEach-Object {
+            $name = $_.FullName.Substring($directory.Length).TrimStart('\', '/').Replace('\', '/')
+            "$name=$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+        }
+}
+
+$bundledDigest = (Get-TreeDigest $bundledWeb) -join "`n"
+$sourceDigest = (Get-TreeDigest $assets) -join "`n"
+
+if ($bundledDigest -ne $sourceDigest) {
+    throw @"
+The packaged web assets differ from apps/web/dist. The build would ship a
+different interface from the one just built, which is the failure this check
+exists to prevent. Inspect $bundledWeb against $assets.
+"@
+}
+
+Write-Output "    web assets match apps/web/dist"
 
 if (-not $SkipZip) {
     Write-Output "==> Zipping"

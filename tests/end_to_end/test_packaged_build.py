@@ -12,6 +12,7 @@ Chromium gap is.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -170,6 +171,59 @@ def test_the_packaged_build_serves_the_web_application(tmp_path: Path) -> None:
     finally:
         server.terminate()
         server.wait(timeout=30)
+
+
+@packaged
+def test_the_packaged_web_assets_match_the_source_build() -> None:
+    """The packaged UI is the UI that was built, not an older one.
+
+    On 2026-08-05 a package four days older than the web application served an
+    interface that no longer existed in the source tree. It cost three rounds
+    of debugging aimed at browser caching, because a stale package is
+    indistinguishable from a stale cache from the outside — the server picks
+    its assets by launch mode, so probing a source checkout kept confirming a
+    bundle the user was never being served.
+
+    Filenames alone would nearly catch it, since Vite hashes on content, but
+    the bytes are compared too: a build that reused a name must not slip
+    through the one check that would have caught this.
+    """
+    source = _REPOSITORY_ROOT / "apps" / "web" / "dist"
+    if not (source / "index.html").is_file():
+        pytest.skip("apps/web/dist is absent, so there is nothing to compare against")
+
+    bundled = _packaged_web_directory()
+    assert bundled is not None, "the packaged build carries no web directory"
+
+    assert _digests(bundled) == _digests(source), (
+        "the packaged web assets differ from apps/web/dist."
+        " Rebuild with scripts/build_package.ps1."
+    )
+
+
+def _packaged_web_directory() -> Path | None:
+    """Where PyInstaller put the bundled web assets.
+
+    Checked in both known places rather than hard-coded: onedir builds nest
+    data under `_internal` in current PyInstaller and placed it beside the
+    executable in older ones. A toolchain upgrade should not turn this test
+    into a false failure.
+    """
+    root = _ARTIFACT.parent
+    for candidate in (root / "_internal" / "web", root / "web"):
+        if (candidate / "index.html").is_file():
+            return candidate
+    return None
+
+
+def _digests(directory: Path) -> dict[str, str]:
+    return {
+        path.relative_to(directory).as_posix(): hashlib.sha256(
+            path.read_bytes()
+        ).hexdigest()
+        for path in sorted(directory.rglob("*"))
+        if path.is_file()
+    }
 
 
 def _wait_until_listening(
