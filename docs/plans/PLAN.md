@@ -50,13 +50,13 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | none - Phases 0-7 are all `complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Active task     | none - post-gate UX/provider polish and documentation refresh recorded 2026-08-04; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Task status     | `complete` - Phase 7 stays approved. The 2026-08-04 work is post-gate usability/provider polish and documentation, not a reopened phase task                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Agent           | Codex GPT-5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Started UTC     | 2026-08-03T20:17:35Z (latest documentation refresh; earlier post-gate work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Git state       | Branch `main` at `2d7e511`. The working tree carries post-gate Settings, warning-message, provider, cache/navigation, and documentation updates; changes are uncommitted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Active task     | none - post-gate work committed and merged 2026-08-05, package rebuilt and probed. Awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Task status     | `complete` - Phase 7 stays approved. The 2026-08-04/05 work is post-gate usability/provider polish, the inline-citation answer view, and documentation, not a reopened phase task                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Agent           | Claude Code `claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Started UTC     | 2026-08-05T06:55:00Z (commit and merge of the previously uncommitted post-gate work; earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Git state       | Branch `main` at `f34e28c`, merging `settings-and-provider-polish` (`9f3b202`) and `inline-citations-and-evidence-panel` (`61f23e0`). Working tree clean apart from this plan and `documentation/memory.md`. The post-gate Settings/provider work is **no longer uncommitted** - it had been sitting in a working tree since 2026-08-04, on the branch of an unrelated feature                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision. The remaining Settings old-view browser observation is recorded, and the user asked to leave it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision. The Settings old-view report is **root-caused and closed**: it was a packaged build predating the redesign, not browser caching (2026-08-05 handoff)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### Phase 7 Task Board
 
@@ -206,6 +206,165 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-05T07:25:00Z — Packaged bundle probe: the Settings report is closed
+
+- Agent: Claude Code `claude-opus-5`, branch `main` at `f34e28c`.
+- Transition: none. Completes the outstanding item declared in the
+  2026-08-05T06:55:00Z entry below.
+
+#### Outcome
+
+`scripts/build_package.ps1` was run and completed. The probe that entry left
+outstanding has now been executed, and the user's original report is closed.
+
+#### Verification
+
+- `powershell -ExecutionPolicy Bypass -File scripts/build_package.ps1` —
+  "Build complete!" at 523 s, artifact verification and zipping ran after it.
+- Packaged assets now at `dist/codeatlas-win64/_internal/web/assets/`, dated
+  2026-08-05 12:50, replacing the 2026-07-31 tree.
+- **String probe against the packaged bundle: `"Repository settings"`
+  PRESENT, `"Choose a repository"` PRESENT.** Both were absent from the
+  2026-07-31 package. This is the evidence the previous entry required.
+- The packaged filenames — `index-C349r8-M.js`, `index-Bg7lMLTi.css` — are
+  **identical to `apps/web/dist`**. Vite hashes on content, so matching names
+  prove the package and the source build now carry the same bundle. That
+  equality is the durable check; it is what was false for four days.
+- Executable smoke test: `codeatlas.exe --version` loaded the interpreter and
+  rendered Typer's error UI (no such option), and `codeatlas.exe --help` lists
+  `index`, `status`, `diagnostics`, `serve`, `doctor`, and `impact`. The binary
+  runs and its commands are registered.
+
+#### Limitations
+
+- The probe is a string search of the bundle and a CLI smoke test. **The
+  packaged server was not started and no browser rendered the page**, so the
+  Settings view is proven present in the shipped asset, not proven to render.
+  Starting it would have bound a port the user may be using.
+- `dist/codeatlas-win64.zip` was still being written when these checks ran; the
+  unpacked tree, which is what `serve --web` reads, was complete.
+- Everything listed under "Limitations and open items" in the entry below still
+  stands — in particular the unreachable `POST /v1/models/ollama/pull`, and the
+  fact that no Playwright suite has been run against this work.
+
+#### Next
+
+Unchanged from the entry below: resolve the `pull_ollama_model` wiring or
+correct `README.md`, and consider making `build_package.ps1` refuse when
+`apps/web/dist` is newer than the release tree.
+
+### 2026-08-05T06:55:00Z — Post-gate work committed and merged; the stale Settings view root-caused
+
+- Agent: Claude Code `claude-opus-5`. Branches: `settings-and-provider-polish`
+  at `9f3b202` (new, seven commits off `main`),
+  `inline-citations-and-evidence-panel` at `61f23e0` (pre-existing, eight
+  commits). Both merged into `main`, now at `f34e28c`.
+- Transition: none. Phases 0–7 stay `complete`. This is post-gate work from a
+  user report, not a reopened phase task.
+
+#### Outcome
+
+The user reported the Settings page had reverted to the older view and asked
+why it had been changed. **Nothing had been changed, and nothing was lost.**
+
+`web_assets_path()` (`src/codeatlas/api/web.py`) resolves the built web
+application two different ways: a frozen build answers from `sys._MEIPASS/web`,
+a source checkout from `apps/web/dist`. The packaged tree under
+`dist/codeatlas-win64/` was built **2026-07-31**, four days before the Settings
+redesign, so launching the packaged executable served a bundle that had never
+contained the new view. `apps/web/dist` (2026-08-05) had it all along.
+
+This also explains why the three earlier workarounds for this symptom failed,
+and why the 2026-08-04 probe of `uv run codeatlas serve --web --open` "confirmed
+the fix" while the user still saw the old page: that command reads the *other*
+bundle. The symptom was never browser caching. The `no-store` shell headers
+introduced for it remain correct for a real rebuild-while-tab-open problem, but
+they were never this problem.
+
+Separately, the entire post-gate Settings and provider effort had been sitting
+**uncommitted in a working tree since 2026-08-04**, on the branch of an
+unrelated feature. One `git checkout` would have destroyed it. It is now
+committed in seven scoped commits and merged.
+
+#### Files
+
+- Committed on `settings-and-provider-polish` (previously uncommitted):
+  `apps/web/src/routes/SettingsRoute.tsx` (`bc3671d`),
+  `src/codeatlas/api/web.py` + `tests/integration/test_serve_web.py`
+  (`e5b9e72`), `src/codeatlas/conversations/intent.py` +
+  `tests/unit/test_intent_rules.py` (`884f41b`),
+  `src/codeatlas/generation/ollama_provider.py` +
+  `tests/unit/test_ollama_answer_provider.py` (`3c631ce`),
+  `apps/web/e2e/settings.spec.ts` (`1d2080c`),
+  `apps/web/e2e/restart-persistence.spec.ts` +
+  `apps/web/src/test/harness.tsx` (`8c1e033`),
+  `README.md` + `CLAUDE.md` (`9f3b202`).
+- Modified after the merges: `documentation/memory.md`, this plan.
+- A pre-merge patch of the uncommitted tree (907 lines) was captured to the
+  session scratchpad before any branch operation.
+
+#### Contracts and compatibility
+
+No contract change; `contract_version` stays `1.1`. No migration, no new
+dependency. `RETRIEVAL_POLICY_VERSION` goes **5.2 -> 5.3**, because the
+project-overview intent rule now matches "describe", "explain", "what does …
+do", and "give me a full explanation about". A run records the policy version it
+used, so broadening the rules without the bump would let old runs claim rules
+they never saw.
+
+#### Verification
+
+Run on the branch before committing:
+
+- `uv run pytest tests/unit/test_intent_rules.py tests/unit/test_ollama_answer_provider.py tests/integration/test_serve_web.py -q` — **63 passed**.
+- `pnpm --dir apps/web exec vitest run` — **133 passed**, 12 files.
+- `pnpm --dir apps/web exec tsc --noEmit` — exit 0.
+- `uv run ruff check src tests` — passed. `uv run mypy --no-incremental` on the
+  three changed modules — no issues.
+- `pnpm --dir apps/web exec eslint .` — exit 0.
+
+Run on `main` after both merges, because the two branches had been verified
+separately but never together:
+
+- `uv run pytest tests/unit tests/integration -q` — **1268 passed, 3 skipped**
+  in 135 s. The three skips are environment-conditional
+  (`semantic-local` is installed).
+- `pnpm --dir apps/web exec vitest run` — **147 passed**, 12 files.
+- `tsc --noEmit` exit 0; `eslint .` exit 0.
+- `pnpm --dir apps/web build` — succeeded, emitting `index-C349r8-M.js` and
+  `index-Bg7lMLTi.css`, hashes **identical** to the pre-merge build. That is the
+  expected result and a useful confirmation: the 2026-08-05 01:33 bundle had
+  already been built from a tree carrying both feature sets.
+- Bundle string probe: `"Repository settings"` and `"Choose a repository"`
+  **present** in `apps/web/dist`, **absent** from the 2026-07-31 packaged
+  assets — the evidence identifying the packaged build as the cause.
+
+#### Limitations and open items
+
+- **The package rebuild was still running when this entry was written**, so the
+  packaged bundle is **not yet verified** to contain the new Settings view. The
+  probe against `dist/codeatlas-win64/_internal/web/` is outstanding and will be
+  recorded in a follow-up entry. Do not treat the user's report as closed until
+  that probe is recorded.
+- **`pull_ollama_model` is unreachable.** It is implemented and tested, but no
+  REST route and no UI call it, so the `POST /v1/models/ollama/pull` endpoint
+  described in `README.md` (~line 97) **does not exist**. The Settings UI only
+  prints the `ollama pull …` command for the user to run themselves. It was
+  committed anyway to preserve the tested building block, and `3c631ce` says so.
+  Either wire it or correct the README.
+- `renderWithProviders` gained a `client` option that nothing passes.
+- No Playwright run was executed for this work. `settings.spec.ts` and
+  `restart-persistence.spec.ts` both changed, so the e2e suites are unverified
+  in this environment.
+
+#### Next
+
+Record the packaged-bundle probe. Then decide the `POST /v1/models/ollama/pull`
+gap — wire it or correct the documentation — and consider making
+`scripts/build_package.ps1` refuse when `apps/web/dist` is newer than the
+release tree, so this mismatch reports itself instead of resurfacing as a
+phantom UI regression.
 
 ### 2026-08-04T22:05:00Z — Ephemeral session mode (ADR-0013)
 
