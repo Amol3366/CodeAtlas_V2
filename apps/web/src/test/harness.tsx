@@ -15,6 +15,7 @@ export function renderWithProviders(
   {
     route = "/",
     path = "*",
+    client,
   }: {
     route?: string;
     /**
@@ -23,18 +24,21 @@ export function renderWithProviders(
      * nothing without one — the entry alone is not enough.
      */
     path?: string;
+    client?: QueryClient;
   } = {},
 ): RenderResult {
-  const client = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: 0 },
-      mutations: { retry: false },
-    },
-  });
+  const resolvedClient =
+    client ??
+    new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { retry: false },
+      },
+    });
 
   function Wrapper({ children }: { readonly children: ReactNode }) {
     return (
-      <QueryClientProvider client={client}>
+      <QueryClientProvider client={resolvedClient}>
         <MemoryRouter initialEntries={[route]}>
           <Routes>
             <Route path={path} element={children} />

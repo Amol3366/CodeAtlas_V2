@@ -24,7 +24,7 @@ from typing import Final
 
 from codeatlas.domain.errors import QueryTooLongError
 
-RETRIEVAL_POLICY_VERSION: Final[str] = "5.2"
+RETRIEVAL_POLICY_VERSION: Final[str] = "5.3"
 
 # Bounded input (`AGENTS.md` Section 10.3). Truncating instead would answer a
 # question the user did not ask.
@@ -141,8 +141,10 @@ _GREETING: Final[re.Pattern[str]] = re.compile(
     re.IGNORECASE,
 )
 _PROJECT_OVERVIEW: Final[re.Pattern[str]] = re.compile(
-    r"^(?:(?:tell|show)\s+me\s+about|summarize|give\s+me\s+(?:an\s+)?"
-    r"overview\s+of|what\s+is)\b.*\b(?:project|repo|repository|codebase)\b",
+    r"^(?:(?:tell|show)\s+me\s+about|summarize|describe|explain|"
+    r"give\s+me\s+(?:(?:an\s+)?overview\s+of|(?:a\s+)?(?:full\s+)?"
+    r"explanation\s+(?:about|of))|what\s+is|what\s+does)\b.*"
+    r"\b(?:project|repo|repository|codebase)\b",
     re.IGNORECASE,
 )
 

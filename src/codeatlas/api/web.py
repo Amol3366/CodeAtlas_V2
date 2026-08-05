@@ -29,6 +29,11 @@ from fastapi.staticfiles import StaticFiles
 # Everything under this prefix belongs to the API and is never answered with
 # the application shell.
 _API_PREFIX = "/v1"
+_SHELL_CACHE_HEADERS = {
+    "Cache-Control": "no-store, max-age=0, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 # Where the built assets sit inside a PyInstaller bundle, relative to the
 # unpacked data directory.
@@ -91,10 +96,10 @@ def mount_web_application(app: FastAPI, assets: Path) -> None:
             raise HTTPException(status_code=404)
 
         candidate = _file_within(assets, full_path)
-        if candidate is not None:
+        if candidate is not None and candidate != index:
             return FileResponse(candidate)
 
-        return FileResponse(index)
+        return _application_shell_response(index)
 
     _ = application_shell  # registered by decoration; named for the traceback
 
@@ -119,3 +124,14 @@ def _file_within(root: Path, relative: str) -> Path | None:
     if not candidate.is_relative_to(resolved_root):
         return None
     return candidate if candidate.is_file() else None
+
+
+def _application_shell_response(index: Path) -> FileResponse:
+    """Return the SPA shell without letting browsers keep an old bundle map.
+
+    Hashed Vite assets can be cached safely, but ``index.html`` is the pointer
+    to whichever hashes are current. If a local packaged server is rebuilt
+    while a browser tab is open, a cached shell keeps route navigation on the
+    old UI until the user manually reloads.
+    """
+    return FileResponse(index, headers=_SHELL_CACHE_HEADERS)

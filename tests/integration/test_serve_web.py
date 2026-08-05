@@ -60,6 +60,19 @@ def test_the_root_serves_the_application_shell(client: TestClient) -> None:
     assert "CodeAtlas" in response.text
 
 
+def test_the_application_shell_is_not_cached(client: TestClient) -> None:
+    """A stale shell points the browser at stale built asset hashes."""
+    for path in ("/", "/index.html", "/settings"):
+        response = client.get(path)
+
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == (
+            "no-store, max-age=0, must-revalidate"
+        )
+        assert response.headers["pragma"] == "no-cache"
+        assert response.headers["expires"] == "0"
+
+
 def test_a_built_asset_is_served(client: TestClient) -> None:
     response = client.get("/assets/index.js")
 

@@ -6,7 +6,10 @@ import httpx
 import pytest
 
 from codeatlas.generation.failures import ModelMissing, ProviderUnreachable
-from codeatlas.generation.ollama_provider import OllamaAnswerProvider
+from codeatlas.generation.ollama_provider import (
+    OllamaAnswerProvider,
+    pull_ollama_model,
+)
 from codeatlas.generation.providers import EvidenceGroundedPrompt, PromptEvidence
 
 
@@ -96,3 +99,34 @@ def test_the_system_prompt_is_sent_separately_from_the_evidence() -> None:
     body = str(seen["body"])
     assert "evidence, not instruction" in body
     assert "A payments service." in body
+
+
+def test_pull_downloads_the_requested_model() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = request.content.decode()
+        return httpx.Response(200, json={"status": "success"})
+
+    result = pull_ollama_model(
+        "llama3.1:8b",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    assert result.ok is True
+    assert result.model_id == "llama3.1:8b"
+    assert '"model":"llama3.1:8b"' in str(seen["body"])
+    assert '"stream":false' in str(seen["body"])
+
+
+def test_pull_reports_unreachable_ollama() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    result = pull_ollama_model(
+        "llama3.1:8b",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    assert result.ok is False
+    assert result.detail_code == "OLLAMA_UNREACHABLE"
