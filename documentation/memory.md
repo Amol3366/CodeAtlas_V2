@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-05
+Last updated: 2026-08-06
 
 ## Current Phase
 
@@ -26,6 +26,21 @@ development order is finished. A new phase requires an explicit user decision.
       generation measured against a real model (2026-08-02)
 - [x] `documentation/` folder — PRD, architecture, rules, phases, design,
       memory (2026-08-03)
+
+      **Correction (2026-08-06):** only `memory.md` ever reached `main`. The
+      other five were written on the unmerged branch
+      `per-repository-embedding-model` (`f30e74c`), so `CLAUDE.md` sent every
+      agent to five files that were not in the worktree. Recovered file-by-file
+      and corrected on 2026-08-06 — see below.
+
+- [x] `documentation/` recovered and corrected (2026-08-06): the five missing
+      files restored from `f30e74c` **without merging that branch**, which also
+      carries ADR-0014 and the per-repository embedding-model feature that
+      `main` does not have. Claims that were true only on that branch were
+      fixed: ADR/migration ranges (`main` has `0001`–`0013` of each), the
+      per-repository `embedding_model` field (`main` has `answer_model` only;
+      embedding models are machine-wide via `.env`, ADR-0011), and three
+      descriptions of an Ollama pull endpoint that never existed.
 - [x] Post-gate UX/provider polish (2026-08-04): Settings visual redesign,
       known warning messages rendered in plain language, embedding dimension
       auto-detection for known OpenAI models, and packaged shell cache headers
@@ -181,3 +196,11 @@ No assigned work. Candidates, in the order they'd most likely be picked up:
 3. Investigate Recall@10 — the stopword finding suggests lexical quality, not
    embedding quality, is where the remaining headroom is.
 4. Decide on code signing (a purchasing decision, not an engineering one).
+5. **Decide the fate of branch `per-repository-embedding-model` (`f30e74c`).**
+   It carries ADR-0014 and a per-repository embedding-model choice — Settings
+   loads a candidate model once and measures its true vector width before the
+   choice can be saved — and has been unmerged since 2026-08-04. It was found
+   on 2026-08-06 only because the `documentation/` files were stranded on it.
+   Either land it (with its ADR, and update `documentation/architecture.md`) or
+   close it deliberately; leaving a feature branch to rot is how the docs went
+   missing in the first place.

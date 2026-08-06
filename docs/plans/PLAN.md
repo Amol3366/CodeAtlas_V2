@@ -207,6 +207,105 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-06T00:00:00Z — The `documentation/` folder was never on `main`; recovered and corrected
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Documentation-only correction; no task status changed.
+
+#### Outcome
+
+`CLAUDE.md`'s "Before Any Task, Read" table pointed at five files that did not
+exist in the worktree: `documentation/PRD.md`, `architecture.md`, `rules.md`,
+`phases.md`, and `design.md`. Only `memory.md` was present, and it was the sole
+tracked file in that folder — while the 2026-08-03 memory entry claimed the
+folder had been completed. Every agent entering through `CLAUDE.md` was being
+sent to five missing files on its first instruction.
+
+They were not lost. They were written on branch
+`per-repository-embedding-model` (`f30e74c`, 2026-08-04) and that branch was
+never merged. `git log --all --diff-filter=A -- 'documentation/*'` found them;
+there is no deletion commit anywhere in the history.
+
+The five files were recovered individually with `git show f30e74c:<path>`
+rather than by merging the branch. That branch also carries ADR-0014 and the
+per-repository embedding-model feature, none of which is on `main`; merging it
+to recover documentation would have imported an unapproved feature and its ADR
+as a side effect of a docs fix.
+
+Because the files were authored against that branch, they described a product
+`main` does not have. Each was audited against the tree and corrected:
+
+- `architecture.md` — ADR range `0001..0014` → `0001..0013`; migration range
+  `0001`–`0014` → `0001`–`0013` (`main` has thirteen, verified against
+  `src/codeatlas/storage/sqlite/migrations/`); the `Repository` entry claimed a
+  per-repository `embedding_model` on `ProviderPolicy` (ADR-0014) — `main`'s
+  `ProviderPolicy` has `answer_model` but no embedding-model field, and
+  embedding models resolve machine-wide from `.env` per ADR-0011; and three
+  separate claims that Settings can pull an Ollama model through
+  `POST /v1/models/ollama/pull`.
+- `PRD.md` — the same pull-endpoint claim, and a "Current Status" paragraph
+  still describing the stale-Settings report as an unexplained live observation.
+- `phases.md` — the pull claim in Post-Gate Work; open item 8 (stale Settings)
+  replaced with the closure and its lesson; ephemeral session mode, inline
+  citations, the commit/merge, and the `pull_ollama_model` deletion added.
+- `design.md` — "download an Ollama model" removed from the Settings component
+  notes; inline citation markers, on-demand evidence-panel mounting, and the
+  selected-but-unavailable provider rule (`69023f3`) documented.
+- `rules.md` — no change. It is policy, not status, and nothing in it had drifted.
+
+That endpoint never existed on `main`. `pull_ollama_model` had no route and no
+caller and was deleted in `89ebc54` on 2026-08-05; the recovered docs predate
+that by a day and describe it as shipped.
+
+#### Files
+
+`documentation/PRD.md`, `documentation/architecture.md`,
+`documentation/design.md`, `documentation/phases.md`, `documentation/rules.md`
+(all recovered from `f30e74c`, four then corrected); `documentation/memory.md`;
+this file. `CLAUDE.md` was **not** edited — every path it names now resolves, so
+the table was correct and the worktree was the bug.
+
+#### Contracts/migrations
+
+None. No source, schema, contract, or test was touched.
+
+#### Verification
+
+- `git log --all --diff-filter=A -- 'documentation/*'` located the origin
+  commit; `git log --all --diff-filter=D` confirmed no deletion exists.
+- `git merge-base --is-ancestor f30e74c main` → false, confirming the branch is
+  unmerged and its contents are not otherwise on `main`.
+- Migration and ADR counts checked directly against `git ls-files`.
+- `ProviderPolicy` read at `src/codeatlas/domain/semantic.py:167` to confirm the
+  absence of an embedding-model field.
+- Every `docs/`, `src/`, `apps/`, `scripts/`, `tests/` path cited across the five
+  files was existence-checked; the only non-resolving string is `docs/adr/0001`,
+  which is one end of a written range, not a path.
+- `apps/web/src/styles/tokens.css` exists and its token values match the tables
+  in `design.md`.
+- **The Phase 7 gate was not run.** This change touches no executable code, and
+  `scripts/check_phase7.ps1` does not validate `documentation/`. No test result
+  is claimed.
+
+#### Limitations
+
+The recovered files were audited against `main` for claims that contradict the
+tree, not re-derived from scratch. Their descriptions of Phases 0–7, the
+derivation ladder, and the design tokens were spot-checked against `AGENTS.md`
+and `tokens.css` and agreed, but a line-by-line reverification of every
+historical figure in them was not performed — `AGENTS.md` and this file remain
+the authorities, and any disagreement is a bug in the summary.
+
+Branch `per-repository-embedding-model` is still unmerged and still carries
+ADR-0014 and the per-repository embedding-model feature. Nothing here decides
+whether that work should land; it is untouched and awaits a user decision.
+
+#### Next
+
+No assigned work. If ADR-0014 is wanted on `main`, that is a separate decision
+and a separate change — `documentation/architecture.md` describes `main` as it
+is today and would need updating alongside it.
+
 ### 2026-08-05T18:10:00Z — A selected provider stayed invisible when unavailable
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.
