@@ -212,9 +212,23 @@ def test_testing_a_disabled_provider_reports_disabled(
 
 
 def test_testing_reports_a_code_not_a_provider_message(
-    client: TestClient, repository_id: str
+    client: TestClient, repository_id: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A provider's own message can quote the request that produced it."""
+    """A provider's own message can quote the request that produced it.
+
+    The credential is removed rather than assumed absent. This assertion is
+    about the *shape* of a failure — a code, never the provider's own text —
+    so it must hold identically whether or not the `semantic-openai` extra is
+    installed and whether or not a key is configured on this machine.
+
+    Asserting the failure without forcing it is what this test did until
+    2026-08-06, and it silently tested the environment instead of the code: it
+    passed only because no provider was installed, then failed the moment one
+    was, and reaching the success branch it had never covered meant issuing a
+    real billable request to OpenAI from the test suite. A gate that depends on
+    an optional provider and a network is what Section 4.3 forbids.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     client.patch(
         "/v1/settings",
         params={"repository_id": repository_id},
@@ -227,6 +241,10 @@ def test_testing_reports_a_code_not_a_provider_message(
 
     assert body["ok"] is False
     assert body["detail_code"] == "PROVIDER_UNAVAILABLE"
+    # The invariant the name promises: no free-text provider message anywhere
+    # in the payload, because for a transmitting provider that text can quote
+    # the content that produced it.
+    assert "message" not in body
 
 
 # --- answer generation ---------------------------------------------------
