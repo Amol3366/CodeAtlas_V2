@@ -289,3 +289,52 @@ export function useStartEmbeddingMigration(repositoryId: string) {
   });
 }
 
+
+/**
+ * Provider credential state.
+ *
+ * Status only. The API has no field carrying the key, and neither has this:
+ * not even a masked one, because a suffix is still key material.
+ */
+export interface CredentialStatus {
+  readonly configured: boolean;
+  readonly source: "credential_store" | "env" | null;
+  readonly store_available: boolean;
+}
+
+export interface Credentials {
+  readonly openai: CredentialStatus;
+}
+
+export function useCredentials() {
+  return useQuery({
+    queryKey: ["credentials"] as const,
+    queryFn: () => api.get<Credentials>("/v1/credentials"),
+    refetchOnMount: "always",
+  });
+}
+
+export function useSetOpenAiKey() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (apiKey: string) =>
+      api.put<Credentials>("/v1/credentials/openai", { api_key: apiKey }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["credentials"] });
+      // Provider availability depends on the key, so the model list is stale
+      // the moment one is stored or removed.
+      void client.invalidateQueries({ queryKey: ["models"] });
+    },
+  });
+}
+
+export function useClearOpenAiKey() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<Credentials>("/v1/credentials/openai"),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["credentials"] });
+      void client.invalidateQueries({ queryKey: ["models"] });
+    },
+  });
+}

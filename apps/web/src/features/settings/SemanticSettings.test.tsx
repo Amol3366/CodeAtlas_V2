@@ -85,6 +85,15 @@ function stubBackend(overrides: Record<string, unknown> = {}) {
         embedding_model: null,
       },
     },
+    // The component asks for this on every render, so it belongs in the
+    // defaults rather than in each test's overrides: without it every existing
+    // test in this file fails with a NOT_STUBBED 500 that has nothing to do
+    // with what it was asserting.
+    "/v1/credentials": {
+      body: {
+        openai: { configured: false, source: null, store_available: true },
+      },
+    },
     "/v1/repositories/repo_1/semantic-status": {
       body: {
         repository_id: "repo_1",
@@ -208,7 +217,13 @@ describe("SemanticSettings", () => {
       screen.queryByLabelText(/monthly token budget/i),
     ).not.toBeInTheDocument();
 
-    await userEvent.click(await screen.findByLabelText(/openai/i));
+    // Scoped, and anchored. The page now also carries an "OpenAI API key"
+    // field, so an unscoped /openai/i matches two different controls.
+    await userEvent.click(
+      await within(
+        await screen.findByRole("group", { name: /embedding provider/i }),
+      ).findByLabelText(/openai/i),
+    );
 
     expect(
       await screen.findByLabelText(/monthly token budget/i),
@@ -268,7 +283,9 @@ describe("SemanticSettings", () => {
     });
     renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /save/i }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^save$/i }),
+    );
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
@@ -377,7 +394,7 @@ describe("answer provider", () => {
     renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
 
     await userEvent.click(await screen.findByRole("radio", { name: /ollama/i }));
-    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
       const patch = fetchMock.mock.calls.find(
@@ -593,5 +610,91 @@ describe("answer provider", () => {
 
     const results = await axe(container);
     expect(results.violations).toEqual([]);
+  });
+});
+
+describe("the OpenAI API key", () => {
+  it("never populates the key field from the server", async () => {
+    stubBackend({
+      "/v1/credentials": {
+        body: {
+          openai: {
+            configured: true,
+            source: "credential_store",
+            store_available: true,
+          },
+        },
+      },
+    });
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    const field = await screen.findByLabelText(/openai api key/i);
+    expect(field).toHaveAttribute("type", "password");
+    expect(field).toHaveValue("");
+  });
+
+  it("says where a configured key came from", async () => {
+    stubBackend({
+      "/v1/credentials": {
+        body: {
+          openai: { configured: true, source: "env", store_available: true },
+        },
+      },
+    });
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    await screen.findByText(/configured from \.env/i);
+  });
+
+  it("sends the typed key and clears the field afterwards", async () => {
+    const fetchMock = stubBackend({
+      "PUT /v1/credentials/openai": {
+        body: {
+          openai: {
+            configured: true,
+            source: "credential_store",
+            store_available: true,
+          },
+        },
+      },
+    });
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    await userEvent.type(
+      await screen.findByLabelText(/openai api key/i),
+      "sk-typed-by-user",
+    );
+    await userEvent.click(screen.getByRole("button", { name: /save key/i }));
+
+    const put = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).includes("/v1/credentials/openai") &&
+        (init as RequestInit | undefined)?.method === "PUT",
+    );
+    expect(put).toBeDefined();
+    const body = JSON.parse(String((put?.[1] as RequestInit).body)) as Record<
+      string,
+      unknown
+    >;
+    expect(body["api_key"]).toBe("sk-typed-by-user");
+
+    // Emptied once the key is stored: leaving it populated invites a second
+    // save and keeps the secret sitting in the DOM.
+    await waitFor(() =>
+      expect(screen.getByLabelText(/openai api key/i)).toHaveValue(""),
+    );
+  });
+
+  it("explains itself when the machine has no credential store", async () => {
+    stubBackend({
+      "/v1/credentials": {
+        body: {
+          openai: { configured: false, source: null, store_available: false },
+        },
+      },
+    });
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    await screen.findByText(/credential store is unavailable/i);
   });
 });
