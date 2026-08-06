@@ -50,11 +50,11 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | none - Phases 0-7 are all `complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Active task     | none - ADR-0014 (per-repository embedding model) and ADR-0015 (frontend credential entry) merged 2026-08-06; `main` pushed to `origin` 2026-08-06 after a history rewrite recorded in the log. Awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Active task     | none - CodeAtlas V2 working guide added 2026-08-07 as post-gate documentation; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Task status     | `complete` - Phase 7 stays approved. Everything since is post-gate work, not a reopened phase task. `SCHEMA_VERSION` is now **14** (migration `0014`); `contract_version` remains `1.1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Agent           | Claude Code `claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Started UTC     | 2026-08-07T00:00:00Z (documentation status pass; all earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Git state       | Branch `main`, clean, synced with `origin/main`. ADRs `0001`-`0015`, migrations `0001`-`0014`. The local branches `env-provider-configuration`, `ephemeral-session-mode`, `inline-citations-and-evidence-panel`, `per-repository-embedding-model`, and `settings-and-provider-polish` all have their content in `main` but point at **pre-rewrite commit objects**, so `git branch --merged` will not list them; `backup-before-rewrite` holds the pre-rewrite tip deliberately |
+| Started UTC     | 2026-08-06T20:30:00Z (CodeAtlas V2 working guide; all earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Git state       | Branch `main`; pre-existing local modification observed in `tests/contract/test_settings_api.py` before this documentation task. This task added `documentation/codeatlas-v2-working-guide.md` and updated `README.md`, `documentation/memory.md`, plus this handoff; no source, schema, contract, migration, or generated artifact was changed |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
 | Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision |
 
@@ -207,6 +207,83 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-07T02:00:00Z — The `/v1/models/test` success branch is covered
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Closes one of the five items carried from the Phase 7 gate.
+
+#### Outcome
+
+`POST /v1/models/test` now has both of its uncovered branches asserted:
+
+- `ok is True`, `detail_code is None`, `provider == "local"`, `latency_ms >= 0`
+- `PROVIDER_RETURNED_NO_VECTOR` when the provider answers with an empty vector
+
+**No source changed.** `git diff --stat -- src/` is empty; this was a coverage
+gap, not a defect.
+
+#### The blocker was never real
+
+The item was carried from the gate on the reasoning that reaching the success
+branch "needs an available provider, and no optional extra is installed". That
+was wrong, and it kept the branch uncovered for a week. It never needed a
+provider — it needed **something that returns a vector**.
+
+`_WorkingProvider` is nine lines. It is handed to the service by patching
+`ProviderFactory.build`, which is the seam chosen deliberately: the factory is
+the only supported way `test_provider` obtains a provider, so patching there
+cannot be bypassed by a change in how providers are constructed.
+
+The irony is worth recording. Once the extras *were* installed on 2026-08-06,
+the obvious version of this test — configure OpenAI, call the endpoint — would
+have issued **a real billable request on every run**, which is exactly the
+defect found that day in a neighbouring test. The reason to stub was never
+convenience; it is that the honest alternative was the bug.
+
+#### Tests that passed on the first run, and why that is a problem
+
+Both new tests passed immediately, because the behaviour already existed. A
+test written against working code proves nothing until it is shown to fail
+against broken code, so each was mutation-checked:
+
+| Mutation | Result |
+| --- | --- |
+| `if not vectors or not vectors[0]` → `if False` | `test_a_provider_that_returns_no_vector_is_not_ok` **fails** |
+| success branch `ok=True` → `ok=False` | `test_a_working_provider_is_reported_as_ok` **fails** |
+
+Each mutation failed exactly one test, the one that names that behaviour, and
+both pass again with the source restored — confirmed byte-identical by
+`git diff`.
+
+The second branch, `PROVIDER_RETURNED_NO_VECTOR`, was uncovered too and is
+included: a provider that answers with nothing has satisfied the call and
+produced nothing usable, and reporting that as success would tell a user their
+semantic setup is fine while every embedding it makes is empty.
+
+#### Files
+
+`tests/contract/test_settings_api.py` only, plus `documentation/memory.md` and
+`documentation/phases.md` to record the closure.
+
+#### Contracts/migrations
+
+None. `SCHEMA_VERSION` 14, `contract_version` `1.1`, both unchanged.
+
+#### Verification
+
+- `uv run ruff check src tests scripts apps` — clean.
+- `uv run mypy --no-incremental src tests scripts apps` — clean, 322 files.
+- `scripts/check_phase7.ps1 -SkipSync` — **exit 0**. (The log was truncated by
+  backgrounding, so no test count is quoted here; the exit status is the claim.)
+- Mutation results above.
+
+#### Next
+
+**Four** items now remain from the Phase 7 gate, not five: the unsigned
+executable, the Chromium skips, pid-reuse detection, and the 1.05 GB packaged
+semantic tree. `AGENTS.md` Section 20 still says five and is left alone — it
+records the state at the gate, and the living summaries carry the current count.
+
 ### 2026-08-07T00:00:00Z — Status pass: two claims in this log were wrong
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.
@@ -285,6 +362,53 @@ why they look unmerged.
 #### Next
 
 No assigned work. The five carried items from the Phase 7 gate remain five.
+
+### 2026-08-06T20:30:00Z - CodeAtlas V2 working guide added
+
+- Agent: Codex, branch `main`.
+- Transition: none. Post-gate documentation from a user request; Phases 0-7
+  stay `complete`.
+
+#### Outcome
+
+Added a single human-readable guide that explains what CodeAtlas V2 is, how it
+works, which scenarios its functions serve, how change preflight fits as the
+core workflow, how semantic/hybrid retrieval is bounded, and how the product
+differs from IDEs, code search, AI PR review, static analysis, semantic search,
+and generic codebase chat.
+
+#### Files
+
+- `documentation/codeatlas-v2-working-guide.md` - new orientation guide.
+- `README.md` - pointer to the guide from the documentation list.
+- `documentation/memory.md` - convenience log entry for the guide.
+- `docs/plans/PLAN.md` - this handoff and live status table update.
+
+#### Contracts/migrations
+
+None. No source code, generated artifacts, API contract, schema version,
+migration, or product behavior changed.
+
+#### Verification
+
+- `Get-Content documentation\codeatlas-v2-working-guide.md | Select-Object -First 80`
+  reviewed the opening structure and content.
+- Custom PowerShell character scan reported `count=0` non-ASCII characters in
+  the new guide.
+- `rg "TODO|FIXME|TBD|not yet planned|awaiting merge|Settings request" documentation\codeatlas-v2-working-guide.md`
+  found no placeholder or stale status markers.
+- `git diff --check -- README.md documentation/codeatlas-v2-working-guide.md documentation/memory.md docs/plans/PLAN.md`
+  exited 0.
+- Full executable tests were not run because this is documentation-only.
+
+#### Workspace notes
+
+`tests/contract/test_settings_api.py` was already modified before this work and
+was left untouched.
+
+#### Next
+
+Await user instruction.
 
 ### 2026-08-06T08:00:00Z — History rewritten to clear a scanner false positive
 

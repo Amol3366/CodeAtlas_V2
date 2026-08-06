@@ -238,14 +238,15 @@ Carried into approvals as declared work, with no later phase to absorb them:
    before the next start, that repository stays blocked from reindexing.
    `codeatlas doctor` names the run and its pid, so it is visible, not silent.
 4. **The packaged semantic tree is 1.05 GB.**
-5. **`POST /v1/models/test`'s success branch is untested.** Both tests that
-   reach it assert `ok is False`; nothing asserts `ok is True`.
+5. ~~**`POST /v1/models/test`'s success branch is untested.**~~ **Closed
+   2026-08-07.** Covered by a stubbed provider rather than a real one, so the
+   suite reaches `ok is True` without a network call or a billable request.
+   Both new tests were mutation-checked, since behaviour that already works
+   produces tests that pass on the first run whether or not they assert
+   anything useful.
 
-   *Updated 2026-08-07:* the original reason — no optional extra installed —
-   no longer holds, since both extras were installed on 2026-08-06. Work done
-   that day made the *failure* deterministic and was briefly recorded as
-   closing this item; it did not. The gap is unchanged, and now cheaper to
-   close than it has ever been.
+   The stated blocker — "needs an available provider" — was never the real
+   one. It needed something that returns a vector.
 6. **Recall@10 is 0.6667 against a ≥0.90 target** (Phase 7, condition 7).
 7. **Changed-symbol precision is 0.9375 against ≥0.95** (Phase 4, structural).
 

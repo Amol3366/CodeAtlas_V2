@@ -196,6 +196,98 @@ def test_no_credential_appears_in_any_response(
 # --- testing a provider --------------------------------------------------
 
 
+class _WorkingProvider:
+    """A provider that answers, without a model, a network, or a credential.
+
+    The success branch of `/v1/models/test` went untested from the Phase 7 gate
+    until 2026-08-07 because reaching it "needs an available provider". It does
+    not: it needs something that returns a vector. Waiting for a real provider
+    is what kept the branch uncovered for a week, and once one *was* installed
+    the honest version of that test would have issued a real billable request
+    on every run.
+    """
+
+    model_id = "fake"
+    dimensions = 3
+    normalization_version = "l2_v1"
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [[1.0, 0.0, 0.0] for _ in texts]
+
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_documents(texts)
+
+
+class _SilentProvider(_WorkingProvider):
+    """Answers, but with nothing in it."""
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [[] for _ in texts]
+
+
+def _use_provider(monkeypatch: pytest.MonkeyPatch, provider: object) -> None:
+    """Make `ProviderFactory.build` hand back `provider`.
+
+    Patched at the factory rather than at the transport because the factory is
+    the only supported way `test_provider` obtains anything, so this is the one
+    seam that cannot be bypassed by a change in how a provider is constructed.
+    """
+    monkeypatch.setattr(
+        "codeatlas.semantic.providers.ProviderFactory.build",
+        lambda self, policy: provider,
+    )
+
+
+def test_a_working_provider_is_reported_as_ok(
+    client: TestClient, repository_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The success branch: the provider answered, so the answer is yes."""
+    client.patch(
+        "/v1/settings",
+        params={"repository_id": repository_id},
+        json={"embedding_provider": "local"},
+    )
+    _use_provider(monkeypatch, _WorkingProvider())
+
+    response = client.post(
+        "/v1/models/test", params={"repository_id": repository_id}
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is True
+    # No code, because nothing went wrong. A success carrying a detail code
+    # would make "ok" and "detail_code" two ways of saying the same thing that
+    # could disagree.
+    assert body["detail_code"] is None
+    assert body["provider"] == "local"
+    assert body["latency_ms"] >= 0
+
+
+def test_a_provider_that_returns_no_vector_is_not_ok(
+    client: TestClient, repository_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Answering is not the same as working.
+
+    A provider that responds with an empty vector has satisfied the call and
+    produced nothing usable. Reporting that as success would tell a user their
+    semantic setup is fine while every embedding it makes is empty.
+    """
+    client.patch(
+        "/v1/settings",
+        params={"repository_id": repository_id},
+        json={"embedding_provider": "local"},
+    )
+    _use_provider(monkeypatch, _SilentProvider())
+
+    body = client.post(
+        "/v1/models/test", params={"repository_id": repository_id}
+    ).json()
+
+    assert body["ok"] is False
+    assert body["detail_code"] == "PROVIDER_RETURNED_NO_VECTOR"
+
+
 def test_testing_a_disabled_provider_reports_disabled(
     client: TestClient, repository_id: str
 ) -> None:

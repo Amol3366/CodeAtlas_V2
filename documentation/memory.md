@@ -89,6 +89,14 @@ development order is finished. A new phase requires an explicit user decision.
       machine-wide, precedence store → `.env`. No migration; `SCHEMA_VERSION`
       stays 14 and `contract_version` stays `1.1`. Gate green: 1926 passed.
 
+- [x] CodeAtlas V2 working guide (2026-08-07): added
+      `documentation/codeatlas-v2-working-guide.md` as a human-readable overview
+      of what CodeAtlas is, how it works, its main operating scenarios, change
+      preflight, semantic/hybrid retrieval boundaries, and how it differs from
+      IDEs, code search, AI PR review, static analysis, and generic codebase
+      chat. `README.md` now points to it from the docs list. Documentation
+      only; no product contract, schema, or code change.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -212,15 +220,21 @@ Carried into gate approvals as declared work rather than dropped:
   blocked from reindexing. `codeatlas doctor` makes it visible, not automatic.
 - Packaged semantic tree is 1.05 GB (torch), accepted at the Phase 7 activation
   gate.
-- **`POST /v1/models/test` success branch is still untested.** Both tests that
-  reach it assert `ok is False`; nothing asserts `ok is True`.
+- ~~**`POST /v1/models/test` success branch is untested.**~~ **Closed
+  2026-08-07**, for real this time — the claim on 2026-08-06 was premature and
+  is corrected in the handoff log.
 
-  **Correction (2026-08-07):** the 2026-08-06 work claimed to close this. It did
-  not. It made the *failure* deterministic — the test had been passing only
-  because no provider was installed, and it issued a real billable OpenAI
-  request the moment one was — which was worth doing, but is not the success
-  branch. Improving a nearby test is not the same as closing the gap it sits
-  next to.
+  Two tests were added and, because the behaviour already existed, both passed
+  immediately. That makes them worthless unless they would catch a regression,
+  so each was **mutation-checked**: dropping the empty-vector guard fails the
+  no-vector test, and flipping the success branch to `ok=False` fails the
+  success test. Both pass again with the source restored.
+
+  The item had been carried since the Phase 7 gate on the reasoning that it
+  "needs an available provider". It never did — it needed something that
+  returns a vector. Waiting for a real provider is what kept it open for a
+  week, and once one *was* installed, the naive version of the test would have
+  issued a real billable request on every run.
 - Primary evidence Recall@10 = 0.6667 vs a ≥0.90 target. Missed with *and*
   without the semantic layer, so not a regression. Never cite the uplift without
   `docs/evaluation/phase-7-baseline-environment.md`: the lexical stopword fix
