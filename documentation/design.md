@@ -146,6 +146,12 @@ decoration.
 
   Settings does **not** download models. Where a model must be fetched, the
   panel names it and shows the `ollama pull …` command to run in a terminal.
+- **Embedding model field** (local provider only) — free-text, because a
+  curated dropdown is not "any model you want". Save stays disabled until
+  **Check model** succeeds, since the vector index is labelled with the width
+  the model reports and a wrong label fails silently. The help text warns that
+  checking an uncached model downloads it and can take minutes, and a model
+  change offers re-embedding rather than half-applying itself.
 
 ## Layout
 

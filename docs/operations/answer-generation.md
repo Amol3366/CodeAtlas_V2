@@ -23,14 +23,15 @@ something a model said. It does not.
 ## Turning it on
 
 1. Install Ollama from <https://ollama.com/download>.
-2. Pull the default model:
+2. Pull the default model, or let Settings request the same download after you
+   select Ollama:
 
    ```powershell
    ollama pull llama3.2:3b
    ```
 
 3. Open Settings, choose **Ollama (local, recommended)** under *Answer
-   provider*, and save.
+   provider*, and save. The model must already be pulled — step 2 above.
 
 Nothing leaves your machine. Ollama runs locally and CodeAtlas talks to it on
 loopback.
@@ -55,6 +56,12 @@ ollama pull llama3.1:8b
 Bigger models need proportionally more memory and answer more slowly. The tag
 must be one Ollama has actually pulled — a tag it does not have reports "there
 is no model working", not a silent fallback.
+
+CodeAtlas does not run the pull for you. Settings names the model and shows the
+command; you run it in a terminal, where its progress and its failures are
+legible. A pull is a multi-gigabyte network operation, and putting it behind a
+button in a settings form makes a slow or failed download look like a failed
+save.
 
 Swapping answer models is free. Unlike an embedding model, an answer model
 stores nothing: changing it affects the next answer and nothing else. No

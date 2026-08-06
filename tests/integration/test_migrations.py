@@ -60,15 +60,15 @@ def test_expected_tables_exist(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_is_thirteen() -> None:
-    """Migration 0013 adds the per-repository answer-provider decision.
+def test_schema_version_is_fourteen() -> None:
+    """Migration 0014 adds the per-repository embedding-model decision.
 
     The pin is deliberate: a version bump is a contract change someone must
     review. It is also load-bearing. `SCHEMA_VERSION` is what tells an older
     build that a database came from a newer one, so a migration added without
     bumping it makes every install refuse the database it just wrote.
     """
-    assert SCHEMA_VERSION == 13
+    assert SCHEMA_VERSION == 14
 
 
 def test_repository_namespaces_replaces_the_global_active_index() -> None:

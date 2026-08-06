@@ -123,6 +123,8 @@ export interface RepositorySettings {
   readonly answer_provider: string;
   readonly answer_model: string | null;
   readonly answer_timeout_seconds: number | null;
+  /** Null means "use the configured default for the chosen provider". */
+  readonly embedding_model: string | null;
 }
 
 export interface EmbeddingModel {
@@ -172,6 +174,7 @@ export interface SettingsUpdate {
   readonly answer_provider?: string;
   readonly answer_model?: string | null;
   readonly answer_timeout_seconds?: number | null;
+  readonly embedding_model?: string | null;
 }
 
 export function useSettings(repositoryId: string | null) {
@@ -182,6 +185,7 @@ export function useSettings(repositoryId: string | null) {
         `/v1/settings?repository_id=${encodeURIComponent(repositoryId!)}`,
       ),
     enabled: repositoryId !== null,
+    refetchOnMount: "always",
   });
 }
 
@@ -197,6 +201,7 @@ export function useModels() {
         // still parses rather than crashing the settings page.
         answer_models?: AnswerModel[];
       }>("/v1/models"),
+    refetchOnMount: "always",
   });
 }
 
@@ -208,6 +213,7 @@ export function useSemanticStatus(repositoryId: string | null) {
         `/v1/repositories/${encodeURIComponent(repositoryId!)}/semantic-status`,
       ),
     enabled: repositoryId !== null,
+    refetchOnMount: "always",
   });
 }
 
@@ -238,3 +244,48 @@ export function useTestProvider(repositoryId: string) {
       ),
   });
 }
+
+/** The measured result of loading a candidate local embedding model. */
+export interface EmbeddingModelValidation {
+  readonly provider: "local";
+  readonly model_id: string;
+  readonly ok: boolean;
+  /** Measured by loading the model. Null when it could not be loaded. */
+  readonly dimensions: number | null;
+  readonly detail_code: string | null;
+  readonly latency_ms: number;
+}
+
+export function useValidateEmbeddingModel() {
+  return useMutation({
+    mutationFn: (modelId: string) =>
+      api.post<EmbeddingModelValidation>("/v1/models/embedding/validate", {
+        model_id: modelId,
+      }),
+  });
+}
+
+/** A shadow embedding migration. Only the fields this UI acts on. */
+export interface EmbeddingMigration {
+  readonly migration_id: string;
+  readonly repository_id: string;
+  readonly status: string;
+  readonly source_namespace_id: string;
+  readonly target_namespace_id: string;
+}
+
+export function useStartEmbeddingMigration(repositoryId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<EmbeddingMigration>("/v1/models/embedding-migrations", {
+        repository_id: repositoryId,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({
+        queryKey: ["semantic-status", repositoryId],
+      });
+    },
+  });
+}
+

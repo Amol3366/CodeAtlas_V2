@@ -69,6 +69,13 @@ lines, but the judgment that they answer the question was made by a ranking
 function — so the label says so. **An exact match is never displaced by a
 lexical one.**
 
+Current presentation behavior as of 2026-08-04: `LEXICAL_QUERY_RELAXED` means
+the query was reduced to searchable literal terms instead of treated as a
+structured code relation. It is a warning about retrieval strategy, not an
+answer failure. `EVIDENCE_EXCERPT_TRUNCATED` means a cited excerpt was shortened
+for display while the evidence id, file path, and line range remain the
+authoritative reference.
+
 ### Query safety
 
 User text never reaches FTS5 as syntax. It is NFC-normalized, case-folded, split

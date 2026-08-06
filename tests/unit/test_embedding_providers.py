@@ -162,7 +162,22 @@ class TestConfiguredModels:
 
         assert resolve_openai_embedding_model() == ("text-embedding-3-large", 3072)
 
-    def test_a_custom_model_without_its_width_is_refused(
+    def test_a_known_custom_model_does_not_need_a_manual_width(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from codeatlas.semantic.providers import resolve_openai_embedding_model
+        from codeatlas.settings.env_file import (
+            OPENAI_DIMENSIONS_VARIABLE,
+            OPENAI_MODEL_VARIABLE,
+        )
+
+        monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "text-embedding-3-large")
+        monkeypatch.delenv(OPENAI_DIMENSIONS_VARIABLE, raising=False)
+
+        assert resolve_openai_embedding_model() == ("text-embedding-3-large", 3072)
+
+    def test_an_unknown_custom_model_without_its_width_is_refused(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -175,7 +190,7 @@ class TestConfiguredModels:
             OPENAI_MODEL_VARIABLE,
         )
 
-        monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "text-embedding-3-large")
+        monkeypatch.setenv(OPENAI_MODEL_VARIABLE, "new-embedding-model")
         monkeypatch.delenv(OPENAI_DIMENSIONS_VARIABLE, raising=False)
 
         with pytest.raises(ProviderUnavailableError) as raised:
@@ -231,3 +246,41 @@ class TestConfiguredModels:
 
         monkeypatch.setenv(LOCAL_MODEL_VARIABLE, "BAAI/bge-small-en-v1.5")
         assert resolve_local_embedding_model() == "BAAI/bge-small-en-v1.5"
+
+
+# --- the repository's own model choice ------------------------------------
+
+
+def test_the_policy_model_outranks_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A repository's own choice wins over the machine-wide default.
+
+    The provider decision is per repository (Section 4.4), and a machine-wide
+    value cannot express "this repository uses a bigger model".
+    """
+    from codeatlas.semantic import providers
+
+    monkeypatch.setattr(providers, "configured_local_model", lambda: "env/model")
+
+    assert providers.resolve_local_embedding_model("repo/model") == "repo/model"
+
+
+def test_the_environment_is_used_when_the_policy_is_silent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codeatlas.semantic import providers
+
+    monkeypatch.setattr(providers, "configured_local_model", lambda: "env/model")
+
+    assert providers.resolve_local_embedding_model(None) == "env/model"
+
+
+def test_the_pinned_default_is_used_when_nothing_is_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codeatlas.semantic import providers
+
+    monkeypatch.setattr(providers, "configured_local_model", lambda: None)
+
+    assert providers.resolve_local_embedding_model(None) == providers.LOCAL_MODEL_ID

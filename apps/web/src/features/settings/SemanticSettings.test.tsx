@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -81,6 +82,7 @@ function stubBackend(overrides: Record<string, unknown> = {}) {
         answer_provider: "none",
         answer_model: null,
         answer_timeout_seconds: null,
+        embedding_model: null,
       },
     },
     "/v1/repositories/repo_1/semantic-status": {
@@ -108,6 +110,46 @@ afterEach(() => {
 });
 
 describe("SemanticSettings", () => {
+  it("waits for fresh settings data instead of rendering cached route data", async () => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { retry: false },
+      },
+    });
+    client.setQueryData(["settings", "repo_1"], {
+      repository_id: "repo_1",
+      embedding_provider: "none",
+      monthly_token_budget: null,
+      per_run_token_budget: null,
+      transmits_off_machine: false,
+      updated_at: "2026-07-30T12:00:00Z",
+      answer_provider: "none",
+      answer_model: null,
+      answer_timeout_seconds: null,
+      embedding_model: null,
+    });
+    client.setQueryData(["models"], {
+      models: MODELS.models,
+      answer_models: [],
+    });
+    stubBackend();
+
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />, {
+      client,
+    });
+
+    expect(
+      screen.getByRole("status", { name: /loading provider settings/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/no answer providers are available/i),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("radio", { name: /ollama/i }),
+    ).toBeInTheDocument();
+  });
+
   it("says semantic search is optional", async () => {
     stubBackend();
     renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
@@ -181,6 +223,30 @@ describe("SemanticSettings", () => {
 
     expect(
       await screen.findByText(/nothing to cover/i),
+    ).toBeInTheDocument();
+  });
+
+  it("explains custom embedding dimensions are auto-detected", async () => {
+    stubBackend({
+      "/v1/models": {
+        body: {
+          ...MODELS,
+          models: MODELS.models.map((model) =>
+            model.provider === "local"
+              ? {
+                  ...model,
+                  model_id: "BAAI/bge-small-en-v1.5",
+                  dimensions: null,
+                }
+              : model,
+          ),
+        },
+      },
+    });
+    renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+    expect(
+      await screen.findByText(/dimensions auto-detected/i),
     ).toBeInTheDocument();
   });
 
@@ -326,6 +392,194 @@ describe("answer provider", () => {
       // Blank means "use the configured default", stored as null. Sending ""
       // would pin the repository to a nameless model.
       expect(body["answer_model"]).toBeNull();
+    });
+  });
+
+
+  describe("choosing an embedding model", () => {
+    it("shows the model field only for the local provider", async () => {
+      stubBackend();
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      await userEvent.click(
+        await screen.findByRole("radio", { name: /local model/i }),
+      );
+
+      expect(screen.getByLabelText(/embedding model/i)).toBeInTheDocument();
+    });
+
+    it("hides the model field while no local provider is selected", async () => {
+      stubBackend();
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      await screen.findByRole("radio", { name: /local model/i });
+
+      expect(screen.queryByLabelText(/embedding model/i)).not.toBeInTheDocument();
+    });
+
+    it("blocks saving a typed model until it has been checked", async () => {
+      stubBackend();
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      await userEvent.click(
+        await screen.findByRole("radio", { name: /local model/i }),
+      );
+      await userEvent.type(
+        screen.getByLabelText(/embedding model/i),
+        "BAAI/bge-small-en-v1.5",
+      );
+
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    });
+
+    it("reports the measured dimensions after a successful check", async () => {
+      stubBackend({
+        "/v1/models/embedding/validate": {
+          body: {
+            provider: "local",
+            model_id: "BAAI/bge-small-en-v1.5",
+            ok: true,
+            dimensions: 384,
+            detail_code: null,
+            latency_ms: 120,
+          },
+        },
+      });
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      await userEvent.click(
+        await screen.findByRole("radio", { name: /local model/i }),
+      );
+      await userEvent.type(
+        screen.getByLabelText(/embedding model/i),
+        "BAAI/bge-small-en-v1.5",
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: /check model/i }),
+      );
+
+      // Scoped to the check result: the provider card also states the
+      // default model's width, so a bare /384 dimensions/ matches twice.
+      expect(
+        await screen.findByText(/loaded, 384 dimensions/i),
+      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
+      });
+    });
+
+    it("offers re-embedding when the saved model differs from the active one", async () => {
+      stubBackend({
+        "/v1/settings?repository_id=repo_1": {
+          body: {
+            repository_id: "repo_1",
+            embedding_provider: "local",
+            monthly_token_budget: null,
+            per_run_token_budget: null,
+            transmits_off_machine: false,
+            updated_at: "2026-07-30T12:00:00Z",
+            answer_provider: "none",
+            answer_model: null,
+            answer_timeout_seconds: null,
+            embedding_model: "BAAI/bge-small-en-v1.5",
+          },
+        },
+        "/v1/repositories/repo_1/semantic-status": {
+          body: {
+            repository_id: "repo_1",
+            provider: "local",
+            enabled: true,
+            snapshot_id: "snap_1",
+            coverage: 1,
+            total_count: 10,
+            embedded_count: 10,
+            pending_count: 0,
+            failed_count: 0,
+            namespace_id: "ns_1",
+            model_id: "sentence-transformers/all-MiniLM-L6-v2",
+            is_complete: true,
+          },
+        },
+      });
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      expect(
+        await screen.findByRole("button", { name: /re-embed/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("does not offer re-embedding when the active model already matches", async () => {
+      stubBackend({
+        "/v1/settings?repository_id=repo_1": {
+          body: {
+            repository_id: "repo_1",
+            embedding_provider: "local",
+            monthly_token_budget: null,
+            per_run_token_budget: null,
+            transmits_off_machine: false,
+            updated_at: "2026-07-30T12:00:00Z",
+            answer_provider: "none",
+            answer_model: null,
+            answer_timeout_seconds: null,
+            embedding_model: "sentence-transformers/all-MiniLM-L6-v2",
+          },
+        },
+        "/v1/repositories/repo_1/semantic-status": {
+          body: {
+            repository_id: "repo_1",
+            provider: "local",
+            enabled: true,
+            snapshot_id: "snap_1",
+            coverage: 1,
+            total_count: 10,
+            embedded_count: 10,
+            pending_count: 0,
+            failed_count: 0,
+            namespace_id: "ns_1",
+            model_id: "sentence-transformers/all-MiniLM-L6-v2",
+            is_complete: true,
+          },
+        },
+      });
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      await screen.findByLabelText(/embedding model/i);
+
+      expect(
+        screen.queryByRole("button", { name: /re-embed/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps saving blocked when the check fails", async () => {
+      stubBackend({
+        "/v1/models/embedding/validate": {
+          body: {
+            provider: "local",
+            model_id: "nope/not-a-model",
+            ok: false,
+            dimensions: null,
+            detail_code: "PROVIDER_UNAVAILABLE",
+            latency_ms: 30,
+          },
+        },
+      });
+      renderWithProviders(<SemanticSettings repositoryId="repo_1" />);
+
+      await userEvent.click(
+        await screen.findByRole("radio", { name: /local model/i }),
+      );
+      await userEvent.type(
+        screen.getByLabelText(/embedding model/i),
+        "nope/not-a-model",
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: /check model/i }),
+      );
+
+      expect(
+        await screen.findByText(/could not load nope\/not-a-model/i),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
     });
   });
 

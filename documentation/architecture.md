@@ -110,7 +110,7 @@ CodeAtlas_V2/
 │   ├── unit/ integration/ contract/ end_to_end/
 │   ├── security/ retrieval/ evaluation/ fixtures/
 ├── docs/
-│   ├── adr/                                # 0000-template + ADR-0001..0013
+│   ├── adr/                                # 0000-template + ADR-0001..0014
 │   ├── api/ · evaluation/ · operations/ · security/
 │   └── plans/PLAN.md                       # LIVE task status — the coordination file
 ├── documentation/                          # this folder: PRD, architecture, rules, phases, design, memory
@@ -132,7 +132,7 @@ CodeAtlas_V2/
 
 ## Data Model
 
-SQLite is the system of record. Migrations `0001`–`0013` are numbered and
+SQLite is the system of record. Migrations `0001`–`0014` are numbered and
 explicit; schema is never mutated at startup.
 
 **Repository truth**
@@ -140,9 +140,10 @@ explicit; schema is never mutated at startup.
 - `Repository` — id, canonical root, display path, Git metadata, settings,
   provider policy. `ProviderPolicy` carries the embedding and answer provider
   decisions separately — a repository may retrieve locally and answer remotely,
-  or the reverse — plus token budgets and an optional per-repository
-  `answer_model`. The *embedding* model is machine-wide configuration resolved
-  from `.env`, not a per-repository field (ADR-0011).
+  or the reverse — plus token budgets, an optional per-repository `answer_model`
+  (ADR-0012) and, for the local embedding provider, the repository's chosen
+  `embedding_model` (ADR-0014). OpenAI embedding model identity stays machine-wide
+  in `.env` (ADR-0011), because an unknown OpenAI id also needs a declared width.
 - `Snapshot` — id, repository, Git HEAD, working-tree fingerprint, lifecycle
   state, parser/chunker/index versions. **Exactly one is active per repository.**
 - `FileRecord` — stable logical id, snapshot membership, normalized relative
@@ -255,7 +256,8 @@ UTC timestamps, cursor pagination.
 - Intelligence: `POST /v1/query`, `/v1/query/stream`, evidence, files, symbols,
   symbol relations, search (files / symbols / text)
 - Change analysis: working-tree, commits, get, report
-- Settings and providers: settings, models, model test, embedding migrations
+- Settings and providers: settings, models, model test, embedding-model
+  validation, embedding migrations
 
 One error envelope everywhere:
 
@@ -292,24 +294,30 @@ Configuration is read from `.env` **in the project folder**, not the working
 directory: a repository you index must never be able to configure the tool
 indexing it.
 
-Embedding models are configured machine-wide in `.env` and reported per
-repository (ADR-0011). Known OpenAI embedding dimensions are resolved from the
-selected model id where the mapping is built in; unknown OpenAI-compatible ids
-still require explicit dimensions. Local sentence-transformer dimensions are
-detected when the model loads.
+A repository using the local provider chooses its own embedding model in
+Settings, and any sentence-transformers model is reachable. The candidate is
+loaded once and its *measured* vector width reported through
+`POST /v1/models/embedding/validate` before the choice can be saved (ADR-0014) —
+the namespace is labelled with that width, and a wrong label never raises, it
+just returns worse results for as long as the index lives.
+
+OpenAI embedding model identity stays in `.env` (ADR-0011). Known OpenAI widths
+are resolved from the selected model id where the mapping is built in; unknown
+OpenAI-compatible ids still require explicit dimensions, because asking OpenAI
+for the width costs a billable call per construction.
 
 **CodeAtlas never downloads a model for you.** Settings names the answer model
 it expects and displays the `ollama pull …` command for you to run in a
-terminal. There is no pull endpoint: `pull_ollama_model` was implemented in
-Phase 7 post-gate work, was never routed or called, and was deleted on
-2026-08-05 rather than left as unreachable code. `git show 3c631ce` has the
-implementation if the feature is ever wanted.
+terminal. There is no pull endpoint: `pull_ollama_model` was deleted on
+2026-08-05 rather than left as unreachable code, and that decision was preserved
+when ADR-0014 landed. `git show 3c631ce` has the implementation if it is ever
+wanted.
 
 ## Where to Read Next
 
 | Topic | File |
 | --- | --- |
 | Live task status | `docs/plans/PLAN.md` |
-| Decisions and their rationale | `docs/adr/0001`–`0013` |
+| Decisions and their rationale | `docs/adr/0001`–`0014` |
 | Chunking, search, graph, change analysis | `docs/operations/*.md` |
 | Measured numbers and their caveats | `docs/evaluation/*.md` |

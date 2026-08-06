@@ -34,13 +34,16 @@ development order is finished. A new phase requires an explicit user decision.
       and corrected on 2026-08-06 — see below.
 
 - [x] `documentation/` recovered and corrected (2026-08-06): the five missing
-      files restored from `f30e74c` **without merging that branch**, which also
-      carries ADR-0014 and the per-repository embedding-model feature that
-      `main` does not have. Claims that were true only on that branch were
-      fixed: ADR/migration ranges (`main` has `0001`–`0013` of each), the
-      per-repository `embedding_model` field (`main` has `answer_model` only;
-      embedding models are machine-wide via `.env`, ADR-0011), and three
-      descriptions of an Ollama pull endpoint that never existed.
+      files restored from `f30e74c` **without merging that branch**, and
+      corrected for what `main` actually had at that moment.
+
+      **Superseded hours later**, when the user asked for the embedding-model
+      feature and that same branch was merged deliberately. The ADR/migration
+      ranges corrected *down* to `0013` went back to `0014`, and the
+      per-repository `embedding_model` field became real. The correction about
+      the Ollama pull endpoint survived the merge and is now enforced in code —
+      see Decisions. Recovering the docs first was still right: it kept a docs
+      fix from silently importing a feature.
 - [x] Post-gate UX/provider polish (2026-08-04): Settings visual redesign,
       known warning messages rendered in plain language, embedding dimension
       auto-detection for known OpenAI models, and packaged shell cache headers
@@ -62,6 +65,24 @@ development order is finished. A new phase requires an explicit user decision.
 
 - [x] Ephemeral session mode (ADR-0013), 2026-08-04: `serve --ephemeral` starts
       from empty storage and discards it on exit. Default unchanged.
+- [x] `README.md` "Running the project" section (2026-08-04): install, serve,
+      CLI, dev loop, packaged build, quality gate, and a troubleshooting table —
+      each command explained rather than just listed. Documentation only; no
+      code, contract, or migration change.
+
+- [x] Per-repository embedding model (ADR-0014), 2026-08-04: the local provider
+      takes a model id per repository, chosen in Settings and measured before
+      save. Migration `0014`, `SCHEMA_VERSION` 14. OpenAI stays `.env`-only.
+
+- [x] Semantic extras installed and ADR-0014 merged (2026-08-06). The reported
+      "embedding option is not clickable, and OpenAI is missing" was **not a
+      defect**: both providers are gated on an optional Python extra, neither
+      was installed, so only "Disabled" was selectable and OpenAI rendered
+      greyed with its requirement. `uv sync --extra semantic-local --extra
+      semantic-openai` fixed it; `OPENAI_API_KEY` in `.env` had been correct all
+      along. ADR-0014 (per-repository embedding model) merged from the branch it
+      had been stranded on since 2026-08-04, **minus** the Ollama pull feature —
+      see Decisions. Gate green: 1886 passed.
 
 ## In Progress
 
@@ -112,11 +133,25 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   OpenAI embedding widths are resolved automatically; unknown OpenAI models
   still require an explicit dimension. Local model widths are detected when the
   model loads.
-- **Ollama model download is separate from saving settings.** A pull can be a
-  multi-gigabyte network operation, so a failed or slow one must not silently
-  change a repository's provider configuration. This is why `pull_ollama_model`
-  is a standalone function rather than part of the settings save path — but the
-  endpoint and UI that would call it **do not exist yet** (see Known Issues).
+- **An embedding model is measured, never declared.** A candidate local model is
+  loaded once and asked for its width, because the namespace is labelled with
+  that number and a wrong label never raises — it just returns worse results for
+  as long as the index lives. The check is a client-side gate: the API cannot
+  verify a caller ran it, and a flag the client sets would be enforcement in
+  name only.
+- **`build_embedding_provider` is the one place a model is resolved.** The
+  migration backfill reaches it through `ProviderFactory`, so ADR-0014 needed no
+  change to `EmbeddingMigrationService`. Two resolution sites could disagree
+  about which model is current, and a namespace whose label disagrees with its
+  contents fails silently.
+- **CodeAtlas does not download models.** Settings names the model and shows the
+  `ollama pull …` command; the user runs it. `pull_ollama_model` was deleted on
+  2026-08-05 as unreachable, and the ADR-0014 branch — written a day earlier —
+  carried a route and UI for it. Merging on 2026-08-06 would have resurrected
+  the feature silently, calling a function `main` no longer has, so **the pull
+  was dropped during the merge** and `main`'s newer decision preserved. A pull
+  is a multi-gigabyte network operation, and putting it behind a button in a
+  settings form makes a slow or failed download look like a failed save.
 
 ## Known Issues
 
@@ -184,6 +219,14 @@ Carried into gate approvals as declared work rather than dropped:
 
 ## Next Up
 
+0. **ADR-0015: frontend OpenAI API-key entry backed by Windows DPAPI.** Chosen
+   by the user on 2026-08-06 over `.env`-only and over plaintext SQLite. Needs
+   a secret-store adapter, a write-only endpoint, a GET that reports only
+   set/not-set (Section 12.5 forbids the value appearing in any GET, log,
+   export, or diagnostic bundle), redaction coverage, and a migration. Not
+   started.
+
+
 No assigned work. Candidates, in the order they'd most likely be picked up:
 
 1. **Rebuild the package whenever the web app changes.** The four-day-old
@@ -196,11 +239,8 @@ No assigned work. Candidates, in the order they'd most likely be picked up:
 3. Investigate Recall@10 — the stopword finding suggests lexical quality, not
    embedding quality, is where the remaining headroom is.
 4. Decide on code signing (a purchasing decision, not an engineering one).
-5. **Decide the fate of branch `per-repository-embedding-model` (`f30e74c`).**
-   It carries ADR-0014 and a per-repository embedding-model choice — Settings
-   loads a candidate model once and measures its true vector width before the
-   choice can be saved — and has been unmerged since 2026-08-04. It was found
-   on 2026-08-06 only because the `documentation/` files were stranded on it.
-   Either land it (with its ADR, and update `documentation/architecture.md`) or
-   close it deliberately; leaving a feature branch to rot is how the docs went
-   missing in the first place.
+5. ~~Decide the fate of branch `per-repository-embedding-model`.~~ **Done
+   2026-08-06 — merged.** The lesson stands: it sat unmerged for two days, took
+   the `documentation/` folder with it, and its merge silently resurrected a
+   feature `main` had deliberately deleted. A feature branch left to rot does
+   not stay still; it drifts against decisions made after it.

@@ -125,3 +125,57 @@ def test_the_human_output_names_what_transmits(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert "transmits" in result.output.lower()
+
+
+def test_the_cli_can_set_an_embedding_model(
+    tmp_path: Path, sample_repo: Path
+) -> None:
+    """CLI and REST must offer the same setting on the same terms.
+
+    Section 4.5: a setting reachable only from the browser would make the four
+    adapters disagree about what a repository can be configured to do.
+    """
+    database = _database(tmp_path)
+    repository_id = _register(database, sample_repo)
+
+    result = runner.invoke(
+        app,
+        [
+            "settings",
+            repository_id,
+            "--provider",
+            "local",
+            "--embedding-model",
+            "BAAI/bge-small-en-v1.5",
+            "--db",
+            str(database),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["embedding_model"] == "BAAI/bge-small-en-v1.5"
+
+
+def test_the_cli_refuses_a_model_for_a_provider_that_cannot_use_one(
+    tmp_path: Path, sample_repo: Path
+) -> None:
+    database = _database(tmp_path)
+    repository_id = _register(database, sample_repo)
+
+    result = runner.invoke(
+        app,
+        [
+            "settings",
+            repository_id,
+            "--provider",
+            "none",
+            "--embedding-model",
+            "BAAI/bge-small-en-v1.5",
+            "--db",
+            str(database),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "INVALID_REQUEST" in result.output

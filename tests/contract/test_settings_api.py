@@ -346,3 +346,56 @@ def test_no_answer_setting_ever_returns_a_credential(
 
     assert "api_key" not in str(body).lower()
     assert "sk-" not in str(body)
+
+
+# --- validating an embedding model ---------------------------------------
+
+
+def test_validating_a_model_reports_its_measured_dimensions(
+    client: TestClient,
+) -> None:
+    """The width is measured, never guessed.
+
+    The namespace is keyed on (model_id, dimensions, normalization_version). A
+    wrong width never raises; it just returns worse results indefinitely, so
+    the only safe way to admit an arbitrary model id is to load it and ask.
+    """
+    response = client.post(
+        "/v1/models/embedding/validate",
+        json={"model_id": "sentence-transformers/all-MiniLM-L6-v2"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["model_id"] == "sentence-transformers/all-MiniLM-L6-v2"
+    if body["ok"]:
+        assert body["dimensions"] == 384
+    else:
+        # Without the semantic-local extra installed there is nothing to load,
+        # and a test that assumed otherwise would fail for an environmental
+        # reason rather than a code one.
+        assert body["dimensions"] is None
+        assert body["detail_code"] is not None
+
+
+def test_validating_an_unloadable_model_reports_a_code_not_a_message(
+    client: TestClient,
+) -> None:
+    """A provider message can quote what produced it. A code cannot."""
+    response = client.post(
+        "/v1/models/embedding/validate",
+        json={"model_id": "codeatlas/definitely-not-a-real-model"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is False
+    assert body["dimensions"] is None
+    assert body["detail_code"] is not None
+
+
+def test_validating_rejects_a_blank_model_id(client: TestClient) -> None:
+    response = client.post("/v1/models/embedding/validate", json={"model_id": "  "})
+
+    assert response.status_code == 400, response.text
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"

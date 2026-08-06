@@ -1,25 +1,22 @@
 /**
- * Choosing an embedding provider for one repository.
+ * Provider settings for one repository.
  *
  * This is the only screen in CodeAtlas where a user can cause repository
- * content to leave their machine, so it is written to make that consequence
- * impossible to miss rather than to make the choice quick:
- *
- * - every option states whether it transmits, in words and with an icon, never
- *   by colour alone (`AGENTS.md` Section 14.4);
- * - a provider that cannot run here is shown with what it needs, not hidden —
- *   a missing option reads as a broken product;
- * - selecting a transmitting provider reveals the budget field it cannot be
- *   saved without, so the requirement is discovered before the error;
- * - the server refuses anything unsafe regardless, and its message is shown
- *   verbatim. This form is a convenience, never the control.
+ * content to leave their machine. The layout keeps that consequence visible in
+ * the same place as the decision: every provider option states its transmission
+ * boundary in words, unavailable options remain visible with their requirement,
+ * and any off-machine choice reveals the required budget before save.
  */
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
+import { Skeleton } from "../../components/Skeleton";
+import type { AnswerModel, EmbeddingModel } from "../../lib/queries";
 import {
   useModels,
+  useValidateEmbeddingModel,
   useSemanticStatus,
+  useStartEmbeddingMigration,
   useSettings,
   useTestProvider,
   useUpdateSettings,
@@ -29,44 +26,7 @@ interface Props {
   readonly repositoryId: string;
 }
 
-/**
- * Shared shells, so the three sections of this page read as one surface.
- *
- * Kept as constants rather than components: the markup below is deliberately
- * plain — `fieldset`, `legend`, `label`, `input` — because that is what carries
- * the accessibility contract, and wrapping each in a styled component hides
- * which element a screen reader actually meets.
- */
-const PANEL =
-  "rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-6)]";
-const FIELD =
-  "w-full rounded-[var(--radius-sm)] border border-border bg-surface-raised" +
-  " px-[var(--space-3)] py-[var(--space-2)] text-sm" +
-  " focus:outline-none focus:ring-2 focus:ring-accent";
-const HELP = "mt-[var(--space-2)] text-xs text-text-muted";
-
-/** One radio option, drawn as a card so the choice has a hit area and an edge. */
-function optionCardClass(selected: boolean, disabled: boolean): string {
-  const base =
-    "flex gap-[var(--space-3)] rounded-[var(--radius-md)] border" +
-    " p-[var(--space-3)] transition-colors";
-  if (disabled) {
-    // Shown rather than hidden — a missing option reads as a broken product —
-    // but clearly not choosable.
-    const unavailable = `${base} cursor-not-allowed bg-surface-sunken opacity-70`;
-    // Still marked when it is the stored choice. A repository can be
-    // configured for a provider this machine cannot currently run — an absent
-    // API key is enough — and drawing that as "nothing is selected" would hide
-    // a policy that transmits behind an environment problem. This screen exists
-    // to make that consequence impossible to miss.
-    return selected
-      ? `${unavailable} border-accent ring-1 ring-accent`
-      : `${unavailable} border-border`;
-  }
-  return selected
-    ? `${base} cursor-pointer border-accent bg-surface-raised ring-1 ring-accent`
-    : `${base} cursor-pointer border-border hover:bg-surface-raised`;
-}
+type ProviderModel = EmbeddingModel | AnswerModel;
 
 const PROVIDER_LABELS: Record<string, string> = {
   none: "Disabled",
@@ -86,14 +46,18 @@ export function SemanticSettings({ repositoryId }: Props) {
   const status = useSemanticStatus(repositoryId);
   const update = useUpdateSettings(repositoryId);
   const test = useTestProvider(repositoryId);
+  const validateModel = useValidateEmbeddingModel();
+  const startMigration = useStartEmbeddingMigration(repositoryId);
 
   const [provider, setProvider] = useState<string>("none");
   const [monthlyBudget, setMonthlyBudget] = useState<string>("");
   const [answerProvider, setAnswerProvider] = useState<string>("none");
   const [answerModel, setAnswerModel] = useState<string>("");
+  const [embeddingModel, setEmbeddingModel] = useState<string>("");
+  // The model id proven to load. Reset whenever the field changes, because a
+  // checked id and an edited one are not the same id.
+  const [validatedModel, setValidatedModel] = useState<string | null>(null);
 
-  // Reconcile from the server whenever it answers. The form is a draft of the
-  // server's state, not a second copy of it (Section 14.5).
   useEffect(() => {
     if (settings.data) {
       setProvider(settings.data.embedding_provider);
@@ -102,34 +66,69 @@ export function SemanticSettings({ repositoryId }: Props) {
           ? ""
           : String(settings.data.monthly_token_budget),
       );
-      setAnswerProvider(settings.data.answer_provider);
+      setAnswerProvider(settings.data.answer_provider ?? "none");
       setAnswerModel(settings.data.answer_model ?? "");
+      setEmbeddingModel(settings.data.embedding_model ?? "");
+      setValidatedModel(settings.data.embedding_model ?? null);
     }
   }, [settings.data]);
 
-  const chosen = models.data?.models.find((item) => item.provider === provider);
-  const chosenAnswer = models.data?.answer_models?.find(
-    (item) => item.provider === answerProvider,
-  );
-  // Either decision reaching a metered account requires the budget, so the
-  // field appears for either. Asking the server first would surface the
-  // requirement as an error rather than as a field.
-  const transmits =
-    (chosen?.transmits_off_machine ?? false) ||
-    (chosenAnswer?.transmits_off_machine ?? false);
-
-  if (settings.isLoading || models.isLoading) {
-    return <p role="status">Loading settings…</p>;
-  }
-  if (settings.isError || models.isError) {
+  if (
+    settings.isLoading ||
+    models.isLoading ||
+    !settings.isFetchedAfterMount ||
+    !models.isFetchedAfterMount
+  ) {
     return (
-      <p role="alert">
-        Settings could not be loaded. The backend may not be running.
-      </p>
+      <div className="grid gap-[var(--space-4)] lg:grid-cols-3">
+        <Skeleton className="h-28" label="Loading provider settings" />
+        <Skeleton className="h-28" label="Loading model settings" />
+        <Skeleton className="h-28" label="Loading privacy settings" />
+      </div>
     );
   }
 
-  function save(event: React.FormEvent) {
+  if (settings.isError || models.isError) {
+    return (
+      <div
+        role="alert"
+        className="rounded-[var(--radius-md)] border border-danger bg-surface p-[var(--space-4)] text-sm text-danger"
+      >
+        Settings could not be loaded. The backend may not be running.
+      </div>
+    );
+  }
+
+  const embeddingModels = models.data?.models ?? [];
+  const answerModels = models.data?.answer_models ?? [];
+  const chosen = embeddingModels.find((item) => item.provider === provider);
+  const chosenAnswer = answerModels.find(
+    (item) => item.provider === answerProvider,
+  );
+  const transmits =
+    (chosen?.transmits_off_machine ?? false) ||
+    (chosenAnswer?.transmits_off_machine ?? false);
+  const trimmedEmbeddingModel = embeddingModel.trim();
+  // A blank field means "use the configured default", which needs no check.
+  // Everything else must be proven to load before it can be saved: the vector
+  // index is labelled with the model's width, and a wrong label never raises.
+  const embeddingModelReady =
+    provider !== "local" ||
+    trimmedEmbeddingModel === "" ||
+    trimmedEmbeddingModel === validatedModel;
+  // Vectors from two models cannot share a similarity space, so a saved model
+  // that disagrees with the namespace currently serving search is not yet in
+  // effect. Offering the migration is how that is made visible rather than
+  // silently half-applied.
+  const activeNamespaceModel = status.data?.model_id ?? null;
+  const savedEmbeddingModel = settings.data?.embedding_model ?? null;
+  const needsReembedding =
+    provider === "local" &&
+    savedEmbeddingModel !== null &&
+    activeNamespaceModel !== null &&
+    savedEmbeddingModel !== activeNamespaceModel;
+
+  function save(event: FormEvent) {
     event.preventDefault();
     const parsed = monthlyBudget.trim() === "" ? null : Number(monthlyBudget);
     const trimmedModel = answerModel.trim();
@@ -137,131 +136,247 @@ export function SemanticSettings({ repositoryId }: Props) {
       embedding_provider: provider,
       monthly_token_budget: parsed,
       answer_provider: answerProvider,
-      // Empty means "use the configured default", which the server stores as
-      // null. Sending "" would pin the repository to a nameless model.
       answer_model: trimmedModel === "" ? null : trimmedModel,
+      embedding_model:
+        provider === "local" && trimmedEmbeddingModel !== ""
+          ? trimmedEmbeddingModel
+          : null,
     });
   }
 
   return (
     <section
       aria-labelledby="semantic-settings-heading"
-      className="flex flex-col gap-[var(--space-6)]"
+      className="space-y-[var(--space-8)]"
     >
-      <div className={PANEL}>
-        <h2
-          id="semantic-settings-heading"
-          className="text-lg font-semibold tracking-tight"
-        >
-          Semantic search
-        </h2>
-        <p className="mt-[var(--space-2)] max-w-[var(--measure)] text-sm text-text-muted">
-          Semantic search is optional. CodeAtlas answers with exact, lexical,
-          graph, and Git retrieval whether or not it is enabled.
-        </p>
+      <div className="flex flex-col gap-[var(--space-3)] md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2
+            id="semantic-settings-heading"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Semantic search
+          </h2>
+          <p className="mt-[var(--space-2)] max-w-3xl text-sm text-text-muted">
+            Semantic search is optional. CodeAtlas answers with exact, lexical,
+            graph, and Git retrieval whether or not it is enabled.
+          </p>
+        </div>
+        <StatusPill tone={transmits ? "warning" : "fresh"}>
+          {transmits
+            ? "Off-machine provider selected"
+            : "Local-only configuration"}
+        </StatusPill>
+      </div>
 
-        <form
-          onSubmit={save}
-          className="mt-[var(--space-6)] flex flex-col gap-[var(--space-6)]"
-        >
-          <fieldset className="border-0 p-0">
-            <legend className="text-sm font-semibold">
+      <div className="grid gap-[var(--space-3)] lg:grid-cols-3">
+        <SummaryPanel
+          label="Embeddings"
+          value={PROVIDER_LABELS[provider] ?? provider}
+          detail={chosen?.model_id ?? "No embedding model selected"}
+        />
+        <SummaryPanel
+          label="Answer writing"
+          value={ANSWER_PROVIDER_LABELS[answerProvider] ?? answerProvider}
+          detail={chosenAnswer?.model_id ?? "Template answers"}
+        />
+        <SummaryPanel
+          label="Repository content"
+          value={
+            transmits
+              ? "Sends repository content off this machine"
+              : "Stays on this machine"
+          }
+          detail={
+            transmits
+              ? "A monthly token budget is required."
+              : "No transmitting provider is selected."
+          }
+          tone={transmits ? "warning" : "fresh"}
+        />
+      </div>
+
+      <form
+        onSubmit={save}
+        className="grid gap-[var(--space-8)] xl:grid-cols-[minmax(0,1fr)_20rem]"
+      >
+        <div className="space-y-[var(--space-8)]">
+          <fieldset className="space-y-[var(--space-3)]">
+            <legend className="text-base font-semibold">
               Embedding provider
             </legend>
-            <div className="mt-[var(--space-3)] grid gap-[var(--space-2)] md:grid-cols-3">
-              {models.data?.models.map((model) => (
-                <label
+            <p className="text-sm text-text-muted">
+              Choose the retrieval layer used for semantic candidates.
+            </p>
+            <div className="grid gap-[var(--space-3)] md:grid-cols-3">
+              {embeddingModels.map((model) => (
+                <ProviderOption
                   key={model.provider}
-                  htmlFor={`provider-${model.provider}`}
-                  className={optionCardClass(
-                    provider === model.provider,
-                    !model.available,
-                  )}
-                >
-                  <input
-                    id={`provider-${model.provider}`}
-                    type="radio"
-                    name="embedding-provider"
-                    value={model.provider}
-                    checked={provider === model.provider}
-                    disabled={!model.available}
-                    onChange={() => setProvider(model.provider)}
-                    className="mt-[var(--space-1)] shrink-0 accent-[var(--color-accent)]"
-                  />
-                  <span className="flex flex-col gap-[var(--space-1)]">
-                    <span className="text-sm font-medium">
-                      {PROVIDER_LABELS[model.provider] ?? model.provider}
-                    </span>
-                    {/* Words, not colour. Section 14.4 forbids colour alone for a
-                        status this consequential. */}
-                    <span className="text-xs text-text-muted">
-                      {model.transmits_off_machine
-                        ? "⚠ Sends repository content off this machine"
-                        : "Stays on this machine"}
-                    </span>
-                    {!model.available && model.requires !== null ? (
-                      <span className="text-xs font-medium text-text-muted">
-                        Unavailable — requires {model.requires}
-                      </span>
-                    ) : null}
-                  </span>
-                </label>
+                  id={`provider-${model.provider}`}
+                  name="embedding-provider"
+                  label={PROVIDER_LABELS[model.provider] ?? model.provider}
+                  model={model}
+                  checked={provider === model.provider}
+                  detail={embeddingDetail(model)}
+                  onChoose={() => setProvider(model.provider)}
+                />
               ))}
             </div>
           </fieldset>
 
-          <fieldset className="border-0 p-0">
-            <legend className="text-sm font-semibold">Answer provider</legend>
-            <p className="mt-[var(--space-2)] max-w-[var(--measure)] text-sm text-text-muted">
-              CodeAtlas always finds and cites the evidence itself. An answer
-              provider adds a written explanation on top of it; the citations and
-              their confidence never change.
+          <fieldset className="space-y-[var(--space-3)]">
+            <legend className="text-base font-semibold">Answer provider</legend>
+            <p className="text-sm text-text-muted">
+              CodeAtlas finds and cites the evidence. An answer provider writes
+              a prose explanation above those unchanged citations.
             </p>
-            <div className="mt-[var(--space-3)] grid gap-[var(--space-2)] md:grid-cols-3">
-              {models.data?.answer_models?.map((model) => (
-                <label
-                  key={model.provider}
-                  htmlFor={`answer-provider-${model.provider}`}
-                  className={optionCardClass(
-                    answerProvider === model.provider,
-                    false,
-                  )}
-                >
-                  <input
+            {answerModels.length > 0 ? (
+              <div className="grid gap-[var(--space-3)] md:grid-cols-3">
+                {answerModels.map((model) => (
+                  <ProviderOption
+                    key={model.provider}
                     id={`answer-provider-${model.provider}`}
-                    type="radio"
                     name="answer-provider"
-                    value={model.provider}
+                    label={
+                      ANSWER_PROVIDER_LABELS[model.provider] ?? model.provider
+                    }
+                    model={model}
                     checked={answerProvider === model.provider}
-                    onChange={() => setAnswerProvider(model.provider)}
-                    className="mt-[var(--space-1)] shrink-0 accent-[var(--color-accent)]"
+                    detail={answerDetail(model)}
+                    onChoose={() => setAnswerProvider(model.provider)}
                   />
-                  <span className="flex flex-col gap-[var(--space-1)]">
-                    <span className="text-sm font-medium">
-                      {ANSWER_PROVIDER_LABELS[model.provider] ?? model.provider}
-                    </span>
-                    {/* Words, not colour — the same rule the embedding options obey. */}
-                    <span className="text-xs text-text-muted">
-                      {model.transmits_off_machine
-                        ? "⚠ Sends repository content off this machine"
-                        : "Stays on this machine"}
-                    </span>
-                    {model.requires !== null ? (
-                      <span className="text-xs font-medium text-text-muted">
-                        Requires {model.requires}
-                      </span>
-                    ) : null}
-                  </span>
-                </label>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-3)] text-sm text-text-muted">
+                No answer providers are available in this installation.
+              </p>
+            )}
           </fieldset>
+        </div>
+
+        <aside className="space-y-[var(--space-4)] self-start xl:sticky xl:top-[var(--space-8)]">
+          {provider === "local" ? (
+            <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">
+              <label
+                htmlFor="embedding-model"
+                className="block text-sm font-medium"
+              >
+                Embedding model
+              </label>
+              <input
+                id="embedding-model"
+                type="text"
+                value={embeddingModel}
+                placeholder={chosen?.model_id ?? ""}
+                onChange={(event) => {
+                  setEmbeddingModel(event.target.value);
+                  setValidatedModel(null);
+                  validateModel.reset();
+                }}
+                aria-describedby="embedding-model-help"
+                className="mt-[var(--space-2)] w-full rounded-[var(--radius-md)] border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] text-sm"
+              />
+              <p
+                id="embedding-model-help"
+                className="mt-[var(--space-2)] text-xs leading-5 text-text-muted"
+              >
+                Any sentence-transformers model, for example{" "}
+                <code>BAAI/bge-small-en-v1.5</code>. Leave blank to use{" "}
+                {chosen?.model_id ?? "the default"}. Checking a new model
+                downloads it, which can take several minutes.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  validateModel.mutate(trimmedEmbeddingModel, {
+                    onSuccess: (result) => {
+                      if (result.ok) setValidatedModel(result.model_id);
+                    },
+                  });
+                }}
+                disabled={
+                  validateModel.isPending || trimmedEmbeddingModel === ""
+                }
+                className="mt-[var(--space-3)] w-full rounded-[var(--radius-md)] border border-border px-[var(--space-3)] py-[var(--space-2)] text-sm font-medium disabled:opacity-50"
+              >
+                {validateModel.isPending ? "Checking..." : "Check model"}
+              </button>
+              {validateModel.isError ? (
+                <p
+                  role="alert"
+                  className="mt-[var(--space-2)] text-sm text-danger"
+                >
+                  {(validateModel.error as Error).message}
+                </p>
+              ) : null}
+              {validateModel.data ? (
+                <p
+                  role="status"
+                  className={`mt-[var(--space-2)] text-sm ${
+                    validateModel.data.ok ? "text-fresh" : "text-danger"
+                  }`}
+                >
+                  {validateModel.data.ok
+                    ? `${validateModel.data.model_id} loaded, ${validateModel.data.dimensions} dimensions.`
+                    : `Could not load ${validateModel.data.model_id}: ${
+                        validateModel.data.detail_code ?? "unknown"
+                      }.`}
+                </p>
+              ) : null}
+              {needsReembedding ? (
+                <div className="mt-[var(--space-3)] border-t border-border pt-[var(--space-3)]">
+                  <button
+                    type="button"
+                    onClick={() => startMigration.mutate()}
+                    disabled={startMigration.isPending}
+                    className="w-full rounded-[var(--radius-md)] border border-border px-[var(--space-3)] py-[var(--space-2)] text-sm font-medium disabled:opacity-50"
+                  >
+                    {startMigration.isPending
+                      ? "Re-embedding..."
+                      : "Re-embed with the new model"}
+                  </button>
+                  <p className="mt-[var(--space-2)] text-xs leading-5 text-text-muted">
+                    Search keeps using{" "}
+                    <code>{activeNamespaceModel}</code> until the new vectors
+                    are complete. Vectors from two models cannot share one
+                    similarity space, so the new model starts an empty
+                    namespace.
+                  </p>
+                  {startMigration.isError ? (
+                    <p
+                      role="alert"
+                      className="mt-[var(--space-2)] text-sm text-danger"
+                    >
+                      {(startMigration.error as Error).message}
+                    </p>
+                  ) : null}
+                  {startMigration.data ? (
+                    <p
+                      role="status"
+                      className="mt-[var(--space-2)] text-sm text-fresh"
+                    >
+                      Re-embedding {startMigration.data.status
+                        .toLowerCase()
+                        .replace(/_/g, " ")}.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {trimmedEmbeddingModel !== "" && !embeddingModelReady ? (
+                <p className="mt-[var(--space-2)] text-xs leading-5 text-text-muted">
+                  Check the model before saving. The vector index is labelled
+                  with its width, so CodeAtlas measures it rather than guessing.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
 
           {answerProvider !== "none" ? (
-            <div className="max-w-md">
+            <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">
               <label
                 htmlFor="answer-model"
-                className="text-sm font-semibold"
+                className="block text-sm font-medium"
               >
                 Answer model
               </label>
@@ -272,28 +387,41 @@ export function SemanticSettings({ repositoryId }: Props) {
                 placeholder={chosenAnswer?.model_id ?? ""}
                 onChange={(event) => setAnswerModel(event.target.value)}
                 aria-describedby="answer-model-help"
-                className={`mt-[var(--space-2)] ${FIELD}`}
+                className="mt-[var(--space-2)] w-full rounded-[var(--radius-md)] border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] text-sm"
               />
-              <p id="answer-model-help" className={HELP}>
-                Leave blank to use {chosenAnswer?.model_id ?? "the default"}. A
-                larger model reasons better across files, needs more memory, and
-                answers more slowly. A local model must already be installed —
-                for example{" "}
-                <code className="rounded-[var(--radius-sm)] bg-surface-sunken px-[var(--space-1)]">
-                  ollama pull llama3.1:8b
-                </code>
-                .
+              <p
+                id="answer-model-help"
+                className="mt-[var(--space-2)] text-xs leading-5 text-text-muted"
+              >
+                Leave blank to use {chosenAnswer?.model_id ?? "the default"}.
+                A local model must already be installed, for example{" "}
+                <code>ollama pull llama3.1:8b</code>.
               </p>
-            </div>
+              {/*
+                CodeAtlas names the model and shows the command; it does not
+                run it. A pull is a multi-gigabyte network operation, and
+                putting it behind a button in a settings form makes a slow or
+                failed download look like a failed save. The user runs this in
+                a terminal, where its progress and failures are legible.
+              */}
+              {answerProvider === "ollama" ? (
+                <p className="mt-[var(--space-3)] border-t border-border pt-[var(--space-3)] text-xs leading-5 text-text-muted">
+                  If it is not installed yet, run{" "}
+                  <code>
+                    ollama pull{" "}
+                    {answerModel.trim() || chosenAnswer?.model_id || "<model>"}
+                  </code>{" "}
+                  in a terminal first.
+                </p>
+              ) : null}
+            </section>
           ) : null}
 
           {transmits ? (
-            // Bordered, because this field appearing is a consequence of the
-            // choice above rather than another row in the form.
-            <div className="max-w-md rounded-[var(--radius-md)] border border-border bg-surface-raised p-[var(--space-4)]">
+            <section className="rounded-[var(--radius-md)] border border-stale bg-surface p-[var(--space-4)] shadow-sm">
               <label
                 htmlFor="monthly-budget"
-                className="text-sm font-semibold"
+                className="block text-sm font-medium"
               >
                 Monthly token budget (required)
               </label>
@@ -304,101 +432,329 @@ export function SemanticSettings({ repositoryId }: Props) {
                 value={monthlyBudget}
                 onChange={(event) => setMonthlyBudget(event.target.value)}
                 aria-describedby="monthly-budget-help"
-                className={`mt-[var(--space-2)] ${FIELD}`}
+                className="mt-[var(--space-2)] w-full rounded-[var(--radius-md)] border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] text-sm"
               />
-              <p id="monthly-budget-help" className={HELP}>
-                A provider that sends content off this machine cannot be enabled
-                without a spending bound.
+              <p
+                id="monthly-budget-help"
+                className="mt-[var(--space-2)] text-xs leading-5 text-text-muted"
+              >
+                A provider that sends content off this machine cannot be
+                enabled without a spending bound.
               </p>
-            </div>
+            </section>
           ) : null}
 
-          <div>
+          <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">
+            <h3 className="text-sm font-semibold">Save changes</h3>
             <button
               type="submit"
-              disabled={update.isPending}
-              className="rounded-[var(--radius-md)] bg-accent px-[var(--space-4)] py-[var(--space-2)] text-sm font-medium text-accent-contrast disabled:opacity-60"
+              disabled={update.isPending || !embeddingModelReady}
+              className="mt-[var(--space-3)] w-full rounded-[var(--radius-md)] bg-accent px-[var(--space-4)] py-[var(--space-2)] text-sm font-medium text-accent-contrast disabled:opacity-50"
             >
-              {update.isPending ? "Saving…" : "Save"}
+              {update.isPending ? "Saving..." : "Save"}
             </button>
-          </div>
-        </form>
+            {update.isError ? (
+              <p role="alert" className="mt-[var(--space-3)] text-sm text-danger">
+                {(update.error as Error).message}
+              </p>
+            ) : null}
+            {update.isSuccess ? (
+              <p role="status" className="mt-[var(--space-3)] text-sm text-fresh">
+                Settings saved.
+              </p>
+            ) : null}
+          </section>
+        </aside>
+      </form>
 
-        {update.isError ? (
-          <p
-            role="alert"
-            className="mt-[var(--space-4)] rounded-[var(--radius-sm)] border border-danger px-[var(--space-3)] py-[var(--space-2)] text-sm text-danger"
-          >
-            {(update.error as Error).message}
-          </p>
-        ) : null}
-        {update.isSuccess ? (
-          <p
-            role="status"
-            className="mt-[var(--space-4)] text-sm font-medium text-text"
-          >
-            Settings saved.
-          </p>
-        ) : null}
+      <div className="grid gap-[var(--space-4)] lg:grid-cols-2">
+        <ConnectionPanel
+          pending={test.isPending}
+          data={test.data}
+          onTest={() => test.mutate()}
+        />
+        <CoveragePanel repositoryId={repositoryId} status={status} />
       </div>
+    </section>
+  );
+}
 
-      <div className={PANEL}>
-        <h3 className="text-base font-semibold tracking-tight">Connection</h3>
+function ProviderOption({
+  id,
+  name,
+  label,
+  model,
+  checked,
+  detail,
+  onChoose,
+}: {
+  readonly id: string;
+  readonly name: string;
+  readonly label: string;
+  readonly model: ProviderModel;
+  readonly checked: boolean;
+  readonly detail: string;
+  readonly onChoose: () => void;
+}) {
+  const disabled = !model.available;
+  return (
+    <label htmlFor={id} className={optionClass(checked, disabled)}>
+      <input
+        id={id}
+        type="radio"
+        name={name}
+        value={model.provider}
+        checked={checked}
+        disabled={disabled}
+        onChange={onChoose}
+        className="mt-[2px] h-4 w-4 shrink-0 accent-accent"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-col gap-[var(--space-2)]">
+          <span className="font-medium leading-5">{label}</span>
+          <TransmissionBadge transmits={model.transmits_off_machine} />
+        </span>
+        <span className="mt-[var(--space-2)] block text-xs leading-5 text-text-muted">
+          {detail}
+        </span>
+        {model.requires !== null ? (
+          <span className="mt-[var(--space-2)] block text-xs leading-5 text-text-muted">
+            {disabled ? "Unavailable - requires " : "Requires "}
+            {model.requires}
+          </span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+function TransmissionBadge({ transmits }: { readonly transmits: boolean }) {
+  return (
+    <span
+      className={`inline-flex w-fit rounded-[var(--radius-sm)] border px-[var(--space-2)] py-[2px] text-xs font-medium ${
+        transmits
+          ? "border-stale text-stale"
+          : "border-border text-text-muted"
+      }`}
+    >
+      {transmits
+        ? "Sends repository content off this machine"
+        : "Stays on this machine"}
+    </span>
+  );
+}
+
+function StatusPill({
+  children,
+  tone = "neutral",
+}: {
+  readonly children: string;
+  readonly tone?: "fresh" | "neutral" | "warning";
+}) {
+  const toneClass =
+    tone === "fresh"
+      ? "border-fresh text-fresh"
+      : tone === "warning"
+        ? "border-stale text-stale"
+        : "border-border text-text-muted";
+  return (
+    <span
+      className={`inline-flex w-fit rounded-[var(--radius-sm)] border bg-surface px-[var(--space-2)] py-[var(--space-1)] text-xs font-medium ${toneClass}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SummaryPanel({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly detail: string;
+  readonly tone?: "fresh" | "neutral" | "warning";
+}) {
+  return (
+    <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">
+      <div className="flex items-center justify-between gap-[var(--space-3)]">
+        <h3 className="text-xs font-semibold uppercase text-text-muted">
+          {label}
+        </h3>
+        <StatusDot tone={tone} />
+      </div>
+      <p className="mt-[var(--space-2)] truncate text-sm font-medium">{value}</p>
+      <p className="mt-[var(--space-1)] truncate text-xs text-text-muted">
+        {detail}
+      </p>
+    </section>
+  );
+}
+
+function StatusDot({
+  tone,
+}: {
+  readonly tone: "fresh" | "neutral" | "warning";
+}) {
+  const color =
+    tone === "fresh"
+      ? "bg-fresh"
+      : tone === "warning"
+        ? "bg-stale"
+        : "bg-text-muted";
+  return <span aria-hidden="true" className={`h-2 w-2 rounded-full ${color}`} />;
+}
+
+function ConnectionPanel({
+  pending,
+  data,
+  onTest,
+}: {
+  readonly pending: boolean;
+  readonly data:
+    | {
+        readonly ok: boolean;
+        readonly detail_code: string | null;
+        readonly latency_ms: number;
+      }
+    | undefined;
+  readonly onTest: () => void;
+}) {
+  return (
+    <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">
+      <div className="flex items-start justify-between gap-[var(--space-4)]">
+        <div>
+          <h3 className="text-sm font-semibold">Connection</h3>
+          <p className="mt-[var(--space-1)] text-sm text-text-muted">
+            Check the selected provider path.
+          </p>
+        </div>
         <button
           type="button"
-          onClick={() => test.mutate()}
-          disabled={test.isPending}
-          className="mt-[var(--space-3)] rounded-[var(--radius-md)] border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] text-sm font-medium hover:bg-surface-raised disabled:opacity-60"
+          onClick={onTest}
+          disabled={pending}
+          className="shrink-0 rounded-[var(--radius-md)] border border-border px-[var(--space-3)] py-[var(--space-2)] text-sm font-medium disabled:opacity-50"
         >
-          {test.isPending ? "Testing…" : "Test provider"}
+          {pending ? "Testing..." : "Test provider"}
         </button>
-        {test.data ? (
-          <p role="status" className="mt-[var(--space-3)] text-sm">
-            {test.data.ok
-              ? `Provider responded in ${test.data.latency_ms} ms.`
-              : `Provider did not respond: ${test.data.detail_code ?? "unknown"}.`}
-          </p>
-        ) : null}
       </div>
+      {data ? (
+        <p
+          role="status"
+          className={`mt-[var(--space-3)] text-sm ${
+            data.ok ? "text-fresh" : "text-danger"
+          }`}
+        >
+          {data.ok
+            ? `Provider responded in ${data.latency_ms} ms.`
+            : `Provider did not respond: ${data.detail_code ?? "unknown"}.`}
+        </p>
+      ) : null}
+    </section>
+  );
+}
 
-      <div className={PANEL}>
-        <h3 className="mb-[var(--space-3)] text-base font-semibold tracking-tight">
-          Coverage
-        </h3>
-      {/*
-        Four states, not two. "No provider is enabled" is a claim about
-        privacy, so it may only be rendered when the server has actually said
-        so. Collapsing loading and error into it told a user that nothing was
-        being transmitted while the request that would have revealed otherwise
-        was still in flight.
-      */}
+function CoveragePanel({
+  repositoryId,
+  status,
+}: {
+  readonly repositoryId: string;
+  readonly status: ReturnType<typeof useSemanticStatus>;
+}) {
+  return (
+    <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">
+      <h3 className="text-sm font-semibold">Coverage</h3>
       {status.isPending ? (
-        <p role="status" className="text-sm text-text-muted">
-          Checking coverage…
+        <p role="status" className="mt-[var(--space-2)] text-sm text-text-muted">
+          Checking coverage...
         </p>
       ) : status.isError ? (
-        <p role="status" className="text-sm text-text-muted">
+        <p role="status" className="mt-[var(--space-2)] text-sm text-stale">
           Coverage could not be read, so this page cannot say whether a
           provider is enabled. Retry, or check{" "}
-          <code className="rounded-[var(--radius-sm)] bg-surface-sunken px-[var(--space-1)]">
-            codeatlas settings {repositoryId}
-          </code>
-          .
+          <code>codeatlas settings {repositoryId}</code>.
         </p>
       ) : status.data && status.data.coverage !== null ? (
-        <p className="text-sm">
-          {Math.round(status.data.coverage * 100)}% of this snapshot is
-          embedded ({status.data.embedded_count} of {status.data.total_count}
-          {status.data.failed_count ? `, ${status.data.failed_count} failed` : ""}
-          ).
-        </p>
+        <CoverageValue
+          coverage={status.data.coverage}
+          embeddedCount={status.data.embedded_count ?? 0}
+          totalCount={status.data.total_count ?? 0}
+          failedCount={status.data.failed_count ?? 0}
+        />
       ) : (
-        <p className="text-sm text-text-muted">
+        <p className="mt-[var(--space-2)] text-sm text-text-muted">
           No provider is enabled, so there is nothing to cover. This is not a
           degraded state.
         </p>
       )}
-      </div>
     </section>
   );
+}
+
+function CoverageValue({
+  coverage,
+  embeddedCount,
+  totalCount,
+  failedCount,
+}: {
+  readonly coverage: number;
+  readonly embeddedCount: number;
+  readonly totalCount: number;
+  readonly failedCount: number;
+}) {
+  const percent = Math.round(coverage * 100);
+  return (
+    <div className="mt-[var(--space-3)]">
+      <div className="flex items-baseline justify-between gap-[var(--space-3)]">
+        <p className="text-2xl font-semibold">{percent}%</p>
+        <p className="text-xs text-text-muted">
+          {embeddedCount} of {totalCount}
+          {failedCount ? `, ${failedCount} failed` : ""}
+        </p>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="Semantic coverage"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="mt-[var(--space-3)] h-2 overflow-hidden rounded-[var(--radius-sm)] bg-surface-sunken"
+      >
+        <div className="h-full bg-accent" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function embeddingDetail(model: EmbeddingModel) {
+  if (model.provider === "none") return "Deterministic retrieval only";
+  if (model.dimensions === null) {
+    return `${model.model_id ?? "Model not configured"}, dimensions auto-detected when the model loads`;
+  }
+  return `${model.model_id ?? "Model not configured"}, ${model.dimensions} dimensions`;
+}
+
+function answerDetail(model: AnswerModel) {
+  if (model.provider === "none") return "Template answers";
+  return model.model_id ?? "Model not configured";
+}
+
+function optionClass(checked: boolean, disabled: boolean) {
+  const state = disabled
+    ? // Still marked when it is the stored choice. A repository can be
+      // configured for a provider this machine cannot currently run — an
+      // absent API key or an uninstalled extra is enough — and drawing that as
+      // "nothing is selected" would hide a policy that transmits behind an
+      // environment problem. This screen exists to make that consequence
+      // impossible to miss, and a user who cannot see their own selection
+      // cannot correct it.
+      checked
+      ? "cursor-not-allowed opacity-60 border-accent ring-1 ring-accent"
+      : "cursor-not-allowed opacity-60 border-border"
+    : checked
+      ? "border-accent bg-surface-sunken shadow-sm"
+      : "border-border bg-surface hover:border-accent";
+  return `flex min-h-36 gap-[var(--space-3)] rounded-[var(--radius-md)] border p-[var(--space-4)] text-sm transition-colors ${state}`;
 }

@@ -189,6 +189,19 @@ reopened tasks:
   caller, so `POST /v1/models/ollama/pull` never existed. CodeAtlas does not
   download models; Settings prints the `ollama pull …` command for the user to
   run. `git show 3c631ce` retains the implementation.
+- Per-repository embedding model (ADR-0014), merged 2026-08-06: the local
+  provider takes any sentence-transformers model id per repository, chosen in
+  Settings. `POST /v1/models/embedding/validate` loads the candidate and
+  reports its **measured** width before Save is enabled, because the namespace
+  is labelled with that number and a wrong label never raises — it just returns
+  worse results for as long as the index lives. Migration `0014`,
+  `SCHEMA_VERSION` 13 → 14. OpenAI embedding identity stays `.env`-only.
+
+  The branch had been unmerged since 2026-08-04 and was found only because the
+  `documentation/` files were stranded on it. Merging it resurrected the Ollama
+  pull route it had built a day before `main` deleted the underlying function;
+  **that feature was dropped during the merge** rather than reversing `main`'s
+  newer decision. The embedding-model selection it existed for was kept.
 
 ## Still Open
 

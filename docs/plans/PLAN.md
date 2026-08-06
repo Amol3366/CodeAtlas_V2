@@ -207,6 +207,131 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-06T02:00:00Z — Semantic extras installed; ADR-0014 merged; the Ollama pull dropped
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Post-gate work from a user report; Phases 0–7 stay `complete`.
+
+#### The report
+
+"Why is the embedding option not able to click, and OpenAI also not available in
+embeddings" — plus a request that any open-source embedding model be usable and
+that the OpenAI key be enterable from the frontend.
+
+#### Root cause — not a defect
+
+`SemanticSettings` binds each radio to `disabled={!model.available}`, and
+`describe_available_providers()` (`src/codeatlas/semantic/providers.py:360`)
+gates `local` on `sentence_transformers` being importable and `openai` on both
+the `openai` package *and* `OPENAI_API_KEY`. Neither optional extra was
+installed, so both real providers reported `available=false` and only "Disabled"
+was selectable. OpenAI was never missing from the list — it renders greyed with
+its requirement, which reads as absent.
+
+`OPENAI_API_KEY` was already correctly set in `.env` and reaches `os.environ`
+via `load_env_file()` at `api/app.py:82`. The key was never the problem.
+
+Fixed by `uv sync --extra semantic-local --extra semantic-openai`. All three
+options now report `available=True`. **This is an environment change, not a code
+change** — and it does not reach the packaged executable, which carries its own
+bundled environment.
+
+#### A test that was measuring the environment
+
+Installing an extra made `test_testing_reports_a_code_not_a_provider_message`
+fail. It asserted `ok is False` without forcing a failure, so it had only ever
+passed because no provider was installed. Reaching the success branch it had
+never covered meant the suite **issued a real billable OpenAI request** using the
+key in `.env`. The probe text is a fixed literal, so no repository content was
+transmitted, but a gate depending on an optional provider and a network is what
+Section 4.3 forbids. It now removes the credential with `monkeypatch` — the
+failure is forced, the assertion holds in every environment, and no network call
+is made. This closes the "`POST /v1/models/test` success branch untested" item
+carried since the Phase 7 gate.
+
+#### ADR-0014 merged, and what it cost
+
+The "any open-source model" request was already built, tested, and
+**user-approved on 2026-08-04** as ADR-0014, stranded on the unmerged branch
+`per-repository-embedding-model` — the same branch the `documentation/` folder
+was stranded on. Merging rather than rebuilding was the obvious call; the merge
+was not clean.
+
+- **The Ollama pull was dropped.** The branch built a `POST /v1/models/ollama/pull`
+  route, service method, hook, and UI on 2026-08-04. `main` deleted the
+  underlying `pull_ollama_model` a day later in `89ebc54` on the product ground
+  that CodeAtlas does not download models. The merge silently rejoined the
+  branch's route to a function `main` no longer has — an `ImportError` waiting at
+  the first call. `main`'s newer decision was preserved and the whole pull
+  feature removed: route, request/response models, service method, hook,
+  interface, its two contract tests and one component test, and the four
+  operations-doc sections describing it. The embedding-model selection the merge
+  existed for was kept.
+- **`optionClass` regressed and was re-fixed.** The branch's component predates
+  `69023f3`, so its option card ignored `checked` when `disabled` — the exact bug
+  where a selected-but-unavailable provider draws as unselected. Ported forward.
+- **The coverage e2e assertion moved to the anchor it always wanted.** The branch
+  redesigned the coverage panel from a sentence to a percentage plus a
+  `progressbar`, and never touched `apps/web/e2e/settings.spec.ts`. That spec had
+  been changed by `3187742` *away* from a progressbar assertion — which had never
+  executed because no such element existed — with a comment recording that a
+  progress bar "would be the better anchor for a screen-reader user and is worth
+  building". ADR-0014 built it, so the assertion returns to it.
+- Generated `openapi.json` and `api-types.gen.ts` were regenerated, not
+  hand-edited.
+
+#### Files
+
+`src/codeatlas/api/routers/settings.py`, `src/codeatlas/application/settings.py`,
+`apps/web/src/features/settings/SemanticSettings.tsx`,
+`apps/web/src/lib/queries.ts`, `apps/web/e2e/settings.spec.ts`,
+`tests/contract/test_settings_api.py`,
+`apps/web/src/features/settings/SemanticSettings.test.tsx`, the four
+`docs/operations/*.md` that documented the pull, `documentation/*.md`, and the
+generated API artifacts. Plus everything ADR-0014 brought: migration `0014`,
+`docs/adr/0014-per-repository-embedding-model.md`, CLI, domain, stores.
+
+#### Contracts/migrations
+
+Migration `0014` adds a nullable `embedding_model` column;
+**`SCHEMA_VERSION` 13 → 14**, so an older build now refuses this database — the
+intended protection. `contract_version` stays `1.1`: one nullable column, one
+optional request field, one additive endpoint
+(`POST /v1/models/embedding/validate`), and one endpoint *removed* that no
+released build ever served.
+
+#### Verification
+
+- `uv run ruff check src tests scripts apps` — all checks passed.
+- `uv run mypy --no-incremental src tests scripts apps` — no issues, 313 files.
+- `scripts/check_phase7.ps1 -SkipSync` — **1886 passed, 3 skipped**; Playwright
+  green on both engines after the coverage assertion was corrected.
+- The 3 new skips are environment-conditional tests that assert default-environment
+  behavior and correctly skip now that `semantic-local` is installed.
+- `scripts/build_package.ps1` re-run: the gate's
+  `test_the_packaged_web_assets_match_the_source_build` guard (added `fc61152`)
+  caught the stale packaged bundle, which is precisely the failure mode that cost
+  three debugging rounds on 2026-08-05.
+
+#### Limitations
+
+- **The packaged build still cannot use semantic retrieval.** Extras were
+  installed into the source `.venv`; the executable bundles its own environment
+  and is built without `-SemanticLocal`, so its embedding options remain
+  correctly disabled. Enabling them there means `build_package.ps1 -SemanticLocal`
+  and the accepted 1.05 GB tree.
+- The OpenAI *embedding* model id remains `.env`-only. ADR-0014 covers the local
+  provider only, because an unknown OpenAI id also needs a declared width.
+- Frontend entry of the OpenAI API key is **not** delivered. The user chose
+  storage in the OS credential store (DPAPI); that needs its own ADR, a secret
+  store, a write-only endpoint, a GET that reports only set/not-set, and
+  redaction across logs, exports, and diagnostic bundles. Not started.
+
+#### Next
+
+ADR-0015 for frontend API-key entry backed by Windows DPAPI, per the user's
+recorded choice.
+
 ### 2026-08-06T00:00:00Z — The `documentation/` folder was never on `main`; recovered and corrected
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.
@@ -717,6 +842,106 @@ gap — wire it or correct the documentation — and consider making
 `scripts/build_package.ps1` refuse when `apps/web/dist` is newer than the
 release tree, so this mismatch reports itself instead of resurfacing as a
 phantom UI regression.
+### 2026-08-04T23:50:00Z — Per-repository embedding model (ADR-0014)
+
+- Agent: Claude Code `claude-opus-5`, branch `per-repository-embedding-model`,
+  ten commits ahead of `main` at `56c1431`.
+- Transition: none. Phases 0–7 stay `complete`; this is post-gate work from a
+  user request, not a reopened phase task.
+
+#### Outcome
+
+The user reported that the OpenAI embedding model was effectively selectable
+while no open-source model was. Investigation found two distinct causes, both
+by design and neither a defect:
+
+1. The **local provider radio was disabled** because the `semantic-local` extra
+   was not installed (`/v1/models` reported `available: false`,
+   `requires: extra:semantic-local`).
+2. **There was no embedding model field at all.** The page offered three
+   provider radios; model identity was a machine-wide `.env` value rendered as
+   read-only text, while answer generation already had a model input.
+
+Delivered, per the user's approved design:
+
+- Migration `0014` adds a nullable `embedding_model` to
+  `repository_provider_policy`, following the `answer_model` convention. Null
+  means "use the configured default", so existing databases upgrade to exactly
+  their current behaviour. `SCHEMA_VERSION` 13 → 14.
+- Resolution precedence is policy → `.env` → pinned default, threaded through
+  `build_embedding_provider` — the one choke point every caller reaches,
+  including the migration backfill via `ProviderFactory`. **The migration
+  service itself needed no change**, which the design had expected to modify;
+  resolving the model in two places would let them disagree about which is
+  current.
+- `POST /v1/models/embedding/validate` loads a candidate model and reports its
+  **measured** width. Save is gated on a successful check.
+- CLI parity: `codeatlas settings <id> --embedding-model <model>`.
+- Settings shows the field for the local provider, and offers **Re-embed with
+  the new model** when the saved model disagrees with the namespace serving
+  search, driving the existing P7-09 shadow migration.
+
+OpenAI embedding model identity stays in `.env`, unchanged and out of scope: an
+unknown OpenAI id also needs a declared width that cannot be measured for free.
+
+#### Files
+
+- New: `src/codeatlas/storage/sqlite/migrations/0014_embedding_model.sql`,
+  `docs/adr/0014-per-repository-embedding-model.md`,
+  `docs/superpowers/specs/2026-08-04-per-repository-embedding-model-design.md`,
+  `docs/superpowers/plans/2026-08-04-per-repository-embedding-model.md`.
+- Modified: `src/codeatlas/domain/semantic.py`,
+  `src/codeatlas/storage/sqlite/{semantic_stores,migrations}.py`,
+  `src/codeatlas/semantic/providers.py`,
+  `src/codeatlas/application/settings.py`,
+  `src/codeatlas/api/routers/settings.py`, `src/codeatlas/cli/main.py`,
+  `apps/web/src/lib/queries.ts`,
+  `apps/web/src/features/settings/SemanticSettings.tsx`,
+  `apps/web/{openapi.json,src/lib/api-types.gen.ts}` (regenerated, not
+  hand-edited), the matching tests, `.env.example`, `docs/adr/README.md`,
+  `docs/operations/semantic-search.md`, `documentation/architecture.md`,
+  `documentation/memory.md`, and this plan.
+
+#### Contracts and compatibility
+
+- `contract_version` stays `1.1`. Additive throughout: one nullable column, one
+  optional request field, one new endpoint.
+- Migration `0014`; `SCHEMA_VERSION` 14. An older build now refuses a database
+  written by this one, which is the intended protection.
+- Default behaviour unchanged. A repository that never chooses a model resolves
+  exactly as before.
+
+#### Verification
+
+- `powershell -File scripts/check_phase7.ps1 -SkipSync -SkipE2E` — **exit 0**:
+  1887 passed, 3 skipped, Ruff clean, MyPy clean across 313 files, 146 web
+  tests, web lint/types/build clean.
+- `uv run pytest tests -q --ignore=tests/end_to_end` — 1850 passed, 3 skipped.
+- Validation success path confirmed against a real model:
+  `EmbeddingModelValidation(model_id='sentence-transformers/all-MiniLM-L6-v2',
+  ok=True, dimensions=384, detail_code=None, latency_ms=22983)`.
+- `uv sync --extra semantic-local` installed sentence-transformers 5.6.1 and
+  torch 2.13.0 in this environment.
+
+#### Limitations
+
+- **The three skips in `tests/unit/test_embedding_providers.py` are new to this
+  environment, not to this branch.** They are by-design guards asserting
+  behaviour *without* the `semantic-local` extra, and installing the extra is
+  what skips them. A gate environment without the extra still runs them.
+- The validate endpoint's first call for an uncached model downloads weights and
+  took ~23 s locally; a large model will take minutes. No progress is streamed.
+- Validation is a client-side gate. The API accepts any syntactically valid id,
+  because it cannot verify a caller checked first; a bad id fails at first embed,
+  as a misconfigured `.env` model already does.
+- End-to-end suites were skipped (`-SkipE2E`). No Playwright coverage was added
+  for the new field.
+- OpenAI embedding models remain `.env`-only.
+
+#### Next
+
+User to review. If the branch is wanted on `main`, it needs a merge decision;
+Playwright coverage for the new Settings field is the obvious follow-up.
 
 ### 2026-08-04T22:05:00Z — Ephemeral session mode (ADR-0013)
 

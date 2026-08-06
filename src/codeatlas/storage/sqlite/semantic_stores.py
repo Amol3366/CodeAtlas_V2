@@ -387,8 +387,8 @@ class ProviderPolicyStore:
             "INSERT INTO repository_provider_policy ("
             " repository_id, embedding_provider, monthly_token_budget,"
             " per_run_token_budget, updated_at, answer_provider, answer_model,"
-            " answer_timeout_seconds"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            " answer_timeout_seconds, embedding_model"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
             " ON CONFLICT (repository_id) DO UPDATE SET"
             " embedding_provider = excluded.embedding_provider,"
             " monthly_token_budget = excluded.monthly_token_budget,"
@@ -396,7 +396,8 @@ class ProviderPolicyStore:
             " updated_at = excluded.updated_at,"
             " answer_provider = excluded.answer_provider,"
             " answer_model = excluded.answer_model,"
-            " answer_timeout_seconds = excluded.answer_timeout_seconds",
+            " answer_timeout_seconds = excluded.answer_timeout_seconds,"
+            " embedding_model = excluded.embedding_model",
             (
                 policy.repository_id,
                 policy.embedding_provider.value,
@@ -406,6 +407,7 @@ class ProviderPolicyStore:
                 policy.answer_provider.value,
                 policy.answer_model,
                 policy.answer_timeout_seconds,
+                policy.embedding_model,
             ),
         )
 
@@ -489,6 +491,7 @@ def _policy_of(row: sqlite3.Row) -> ProviderPolicy:
         answer_provider=AnswerProviderKind(row["answer_provider"]),
         answer_model=row["answer_model"],
         answer_timeout_seconds=row["answer_timeout_seconds"],
+        embedding_model=row["embedding_model"],
     )
 
 

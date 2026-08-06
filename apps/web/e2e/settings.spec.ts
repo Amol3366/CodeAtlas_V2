@@ -291,16 +291,19 @@ test("a repository whose policy transmits shows the warning, the budget, and its
     // The coverage branch a disabled repository can never reach: real counts
     // for a repository that opted in and has embedded nothing.
     //
-    // Asserted as the sentence `SemanticSettings` renders, because that is
-    // what it renders. A previous revision of this test waited on a
-    // `progressbar` with an accessible name and an `aria-valuenow` — no such
-    // element exists in the component, and the assertion had never been
-    // executed. A progress bar would be the better anchor for a screen-reader
-    // user and is worth building; until it is built, asserting it here only
-    // reports the test as broken.
-    await expect(
-      page.getByText(/% of this snapshot is embedded/i),
-    ).toBeVisible();
+    // Anchored on the progress bar. The history here is worth keeping: an
+    // early revision waited on exactly this element, it did not exist, and the
+    // assertion had never executed. `3187742` replaced it with the sentence the
+    // component actually rendered and recorded that a progress bar "would be
+    // the better anchor for a screen-reader user and is worth building". The
+    // ADR-0014 settings redesign built it, so the assertion returns to the
+    // anchor it always wanted — and the sentence it replaced is gone, which is
+    // why asserting the old copy now fails.
+    const coverage = page.getByRole("progressbar", {
+      name: "Semantic coverage",
+    });
+    await expect(coverage).toBeVisible();
+    await expect(coverage).toHaveAttribute("aria-valuenow", /^\d+$/);
   } finally {
     // Restored even on failure. The database outlives this test, and leaving a
     // transmitting policy behind would change what every later test sees.

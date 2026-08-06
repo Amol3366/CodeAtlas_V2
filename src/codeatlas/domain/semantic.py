@@ -187,6 +187,12 @@ class ProviderPolicy:
     # lets a machine-wide default exist without every repository storing a copy.
     answer_model: str | None = None
     answer_timeout_seconds: int | None = None
+    # ``None`` means "the configured default for this provider", matching
+    # ``answer_model``. Only meaningful for the local provider today: OpenAI
+    # model identity stays in ``.env`` because an unknown OpenAI model also
+    # needs a declared vector width, which cannot be measured for free
+    # (ADR-0011).
+    embedding_model: str | None = None
 
     @property
     def transmits_off_machine(self) -> bool:
