@@ -748,6 +748,55 @@
         "title": "CreateEmbeddingMigrationBody",
         "type": "object"
       },
+      "CredentialStatusResponse": {
+        "additionalProperties": false,
+        "description": "Status only. There is deliberately no field a value could occupy.\n\nNot even a masked one: a key suffix is still key material, and a response\nbody is logged by intermediaries, pasted into bug reports, and\nscreenshotted. `configured` plus `source` answers every question a user\nactually has about their own credential.",
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "credential_store",
+                  "env"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "store_available": {
+            "title": "Store Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured",
+          "source",
+          "store_available"
+        ],
+        "title": "CredentialStatusResponse",
+        "type": "object"
+      },
+      "CredentialsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "openai": {
+            "$ref": "#/components/schemas/CredentialStatusResponse"
+          }
+        },
+        "required": [
+          "openai"
+        ],
+        "title": "CredentialsResponse",
+        "type": "object"
+      },
       "Derivation": {
         "enum": [
           "deterministic",
@@ -2457,6 +2506,22 @@
         "title": "SemanticStatusResponse",
         "type": "object"
       },
+      "SetCredentialBody": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Api Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_key"
+        ],
+        "title": "SetCredentialBody",
+        "type": "object"
+      },
       "SettingsResponse": {
         "additionalProperties": false,
         "properties": {
@@ -3843,6 +3908,90 @@
         "summary": "Stream Conversation",
         "tags": [
           "conversations"
+        ]
+      }
+    },
+    "/v1/credentials": {
+      "get": {
+        "description": "Whether a provider credential is configured, and from where.\n\nNever what it is. `source` exists so a user whose saved key is being\nshadowed by `.env` can see that rather than guess.",
+        "operationId": "get_credentials_v1_credentials_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Credentials",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/credentials/openai": {
+      "delete": {
+        "description": "Remove the stored key. `.env` is not touched.",
+        "operationId": "clear_openai_credential_v1_credentials_openai_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clear Openai Credential",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "description": "Store the OpenAI API key. Write-only: the response is a status.\n\nSeparate from `PATCH /v1/settings` on purpose. A credential is not a\npolicy, and folding it into the settings save would report a failed\ncredential write as a failed settings save.",
+        "operationId": "set_openai_credential_v1_credentials_openai_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCredentialBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Openai Credential",
+        "tags": [
+          "settings"
         ]
       }
     },

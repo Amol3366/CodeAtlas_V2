@@ -249,18 +249,18 @@ class OpenAIEmbeddingProvider:
             return
 
         # The credential is checked before the import, and the order is chosen
-        # so each real misconfiguration gets its own accurate message. Reading
-        # an environment variable is free and needs no package; a user with a
-        # key but no package is told to install it, and a user with the package
-        # but no key is told to set it. Importing first would answer the second
-        # user's problem with the first user's instruction.
-        import os
+        # so each real misconfiguration gets its own accurate message. Resolving
+        # the credential is cheap and needs no package; a user with a key but no
+        # package is told to install it, and a user with the package but no key
+        # is told to set it. Importing first would answer the second user's
+        # problem with the first user's instruction.
+        from codeatlas.settings.credentials import resolve_openai_api_key
 
-        api_key = os.environ.get(OPENAI_API_KEY_VARIABLE)
+        api_key = resolve_openai_api_key()
         if not api_key:
             raise ProviderUnavailableError(
-                f"The OpenAI provider needs {OPENAI_API_KEY_VARIABLE} in the "
-                "environment.",
+                f"The OpenAI provider needs a key: save one in Settings, or set "
+                f"{OPENAI_API_KEY_VARIABLE} in .env.",
                 details={"provider": EmbeddingProviderKind.OPENAI.value},
             )
 
@@ -383,7 +383,7 @@ def describe_available_providers() -> dict[EmbeddingProviderKind, bool]:
     exceptions from a constructor would mean loading a multi-hundred-megabyte
     model to render a checkbox.
     """
-    import os
+    from codeatlas.settings.credentials import resolve_openai_api_key
 
     return {
         EmbeddingProviderKind.NONE: True,
@@ -395,9 +395,12 @@ def describe_available_providers() -> dict[EmbeddingProviderKind, bool]:
         # unconditionally — which this did until the OpenAI provider shipped in
         # P7-07 — leaves the option permanently disabled in the web settings
         # form, which binds its radio to this flag.
+        #
+        # The credential half now resolves through the store as well as `.env`
+        # (ADR-0015), so a key saved in Settings enables the option without a
+        # restart.
         EmbeddingProviderKind.OPENAI: (
-            _module_is_importable("openai")
-            and bool(os.environ.get(OPENAI_API_KEY_VARIABLE))
+            _module_is_importable("openai") and bool(resolve_openai_api_key())
         ),
     }
 

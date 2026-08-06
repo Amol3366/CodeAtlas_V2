@@ -71,9 +71,35 @@ OpenAI embedding model identity is **not** configurable per repository. It stays
 in `.env`, because an unknown OpenAI model also needs a declared width that
 cannot be measured without a billable call.
 
-## Configuring credentials and models (`.env`)
+## Configuring credentials and models
+
+### The API key, in Settings
+
+The OpenAI API key can be entered in **Settings → OpenAI API key** and is
+stored in the Windows Credential Manager, not in the database and not in a file
+(ADR-0015). The field is write-only: no response ever returns the key or any
+part of it, so the page reports only whether one is configured and where it
+came from.
+
+**Precedence is credential store → `.env`.** A key saved in Settings takes
+effect immediately and outranks the file, and Settings says *"Configured from
+.env"* when the file is what is actually in use — so a saved key being shadowed
+is visible rather than a mystery.
+
+**Clearing the key removes only the stored one.** `.env` is a file the user
+owns, and CodeAtlas does not edit it.
+
+**A backup does not carry the key**, because it is not in the database.
+Restoring onto another machine or user account means entering it again.
+
+On a platform with no credential store, Settings says so and `.env` is the only
+route.
+
+### Models, and the key without a UI (`.env`)
 
 Copy `.env.example` to `.env` in the CodeAtlas project folder and edit it.
+`.env` remains fully supported: it is what scripted and headless runs use, and
+it is where OpenAI *model* identity is configured.
 
 ```ini
 OPENAI_API_KEY=sk-...
@@ -93,8 +119,10 @@ searched**: running CodeAtlas from inside a repository you index must not let
 that repository configure the tool. Use `CODEATLAS_ENV_FILE` when the install
 folder is not writable.
 
-**Precedence** is real environment > `.env` > pinned default, so
-`set OPENAI_API_KEY=... && codeatlas ...` overrides the file for one command.
+**Precedence** for models is real environment > `.env` > pinned default, so
+`set CODEATLAS_LOCAL_EMBEDDING_MODEL=... && codeatlas ...` overrides the file
+for one command. For the *API key* the ladder starts one rung higher: a key
+saved in Settings outranks both (ADR-0015).
 
 **A custom OpenAI model must declare its width.** The vector namespace is
 labelled with it, and CodeAtlas will not guess: set

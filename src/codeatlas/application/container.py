@@ -13,6 +13,7 @@ from sqlite3 import Connection
 from codeatlas.application.answer_generation import RepositoryAnswerExplainer
 from codeatlas.application.change_analysis import ChangeAnalysisService
 from codeatlas.application.conversation_service import ConversationService
+from codeatlas.application.credentials import CredentialService
 from codeatlas.application.embedding_migrations import EmbeddingMigrationService
 from codeatlas.application.entities import EntityService
 from codeatlas.application.graph_queries import GraphQueryService
@@ -79,6 +80,9 @@ class ApplicationServices:
     # Built here for the same reason as `semantic_status`: it reads and
     # writes SQLite and constructs no provider until asked to test one.
     settings: SettingsService
+    # Holds no connection: the credential lives in an OS store, not in SQLite,
+    # so a backup and a support bundle cannot carry it.
+    credentials: CredentialService
     # Same application boundary as the settings service: model changes create
     # and activate shadow namespaces, and all adapters must share that logic.
     embedding_migrations: EmbeddingMigrationService
@@ -140,6 +144,7 @@ def build_services(
     vector_store = vectors or InMemoryVectorStore()
     semantic_status = SemanticStatusService(connection)
     settings = SettingsService(connection)
+    credentials = CredentialService()
 
     if embedding is None and vectors is not None:
         embedding = SnapshotEmbedder(connection=connection, vectors=vector_store)
@@ -287,6 +292,7 @@ def build_services(
         search=search,
         semantic_status=semantic_status,
         settings=settings,
+        credentials=credentials,
         embedding_migrations=EmbeddingMigrationService(
             connection=connection,
             vectors=vector_store,

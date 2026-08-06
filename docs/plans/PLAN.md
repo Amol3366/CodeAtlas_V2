@@ -207,6 +207,102 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-06T06:00:00Z — ADR-0015: the OpenAI key is entered in Settings
+
+- Agent: Claude Code `claude-opus-5`, branch `frontend-credential-entry`.
+- Transition: none. Post-gate work from a user request; Phases 0–7 stay `complete`.
+
+#### Outcome
+
+The OpenAI API key can be entered in Settings and is stored in the Windows
+Credential Manager rather than `.env`. Spec at
+`docs/superpowers/specs/2026-08-06-frontend-credential-entry-design.md`, plan at
+`docs/superpowers/plans/2026-08-06-frontend-credential-entry.md`, decision at
+ADR-0015. Eight planned tasks, executed test-first.
+
+The argument for it is not convenience. `.env` is a plaintext file inside a
+project folder, which is how credentials actually leak — committed, copied,
+zipped, screen-shared.
+
+#### What was built
+
+- `settings/credentials.py` — `CredentialStore` protocol,
+  `UnavailableCredentialStore`, platform selection, and
+  `resolve_openai_api_key()`.
+- `settings/windows_credentials.py` — `CredWriteW`/`CredReadW`/`CredDeleteW`
+  through `ctypes`. No new dependency. `CRED_PERSIST_LOCAL_MACHINE`, so the
+  entry does not roam onto another machine.
+- `application/credentials.py` — `CredentialService` and `CredentialStatus`,
+  wired into `ApplicationServices`.
+- Three additive endpoints: `GET /v1/credentials`,
+  `PUT`/`DELETE /v1/credentials/openai`.
+- A write-only `type="password"` field in Settings with four states.
+- The four `os.environ` read sites now resolve through one function.
+
+#### Decisions worth finding later
+
+- **The resolved key is never written back into `os.environ`.** Git runs as a
+  subprocess and inherits the parent environment, so publishing the key would
+  hand it to every Git invocation for the life of the server. `load_env_file`
+  already has this weakness for the `.env` path; this does not extend it.
+- **No masking in any response.** Not even a last-4. A suffix is still key
+  material, and a response body is logged by intermediaries and pasted into bug
+  reports. The contract test asserts the exact response key set, so adding a
+  masked field later fails the suite rather than passing review.
+- **Not stored in SQLite.** `create_backup()` copies the database and that file
+  is what a user attaches to a bug report.
+
+#### Two findings the work produced
+
+- **A security test that could not fail.** The first version of
+  `test_a_stored_key_never_enters_the_process_environment` saved a key and read
+  the status — but a stored key makes `status()` take its own branch and never
+  reach the resolver, so it passed against a deliberately leaking resolver.
+  Found by mutating the resolver to publish the key and observing that only the
+  *unit* test failed. The security test now calls `resolve_openai_api_key`
+  explicitly, and the mutation fails it.
+- **`.env` refills a deleted variable.** `create_app` calls `load_env_file`,
+  which fills any key the environment lacks — so a test that deleted
+  `OPENAI_API_KEY` had it restored from the developer's real `.env` before the
+  first request, and the suite would pass or fail depending on whose machine ran
+  it. Every fixture now sets it *empty* instead, which the file cannot override.
+
+#### Contracts/migrations
+
+**None.** `SCHEMA_VERSION` stays **14**, verified after the run;
+`contract_version` stays **`1.1`**. Three additive endpoints, no change to any
+existing response. A backup does not carry the credential — documented in
+`docs/operations/backup-and-restore.md`.
+
+#### Verification
+
+- `uv run ruff check src tests scripts apps` — clean.
+- `uv run mypy --no-incremental src tests scripts apps` — clean.
+- `pnpm --dir apps/web lint / typecheck / test / build` — clean; 160 tests.
+- `scripts/check_phase7.ps1 -SkipSync` — **exit 0, 1926 passed, 3 skipped**,
+  Playwright green on both engines.
+- `scripts/build_package.ps1` re-run: the packaging guard caught the stale
+  bundle, as designed.
+- Mutation check on the no-`os.environ` invariant: fails with the mutation
+  applied, passes without it. `cmdkey /list` confirms the Windows tests leave no
+  credential behind.
+
+#### Limitations
+
+- Windows only. Elsewhere `UnavailableCredentialStore` reads empty and refuses
+  writes, Settings says so, and `.env` is the only route.
+- **This does not protect the key from a local attacker.** Anything running as
+  the user can read the store back, including CodeAtlas. It removes the key from
+  a plaintext file in a project folder, which is the whole claim.
+- OpenAI *embedding model* identity stays `.env`-only (ADR-0011). Unchanged.
+- Three existing web tests and one e2e test needed their queries made precise —
+  "OpenAI API key" collides with an unscoped `/openai/i`, and "Save key" with an
+  unscoped `/save/i`. Made stricter, never weaker.
+
+#### Next
+
+Branch `frontend-credential-entry` is ready to merge. No further assigned work.
+
 ### 2026-08-06T02:00:00Z — Semantic extras installed; ADR-0014 merged; the Ollama pull dropped
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

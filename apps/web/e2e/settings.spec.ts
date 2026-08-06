@@ -226,7 +226,10 @@ test("a repository with no provider says so, and can be saved and tested", async
   await expect(page.getByText(/PROVIDER_DISABLED/)).toBeVisible();
 
   // --- A real PATCH /v1/settings ------------------------------------------
-  await page.getByRole("button", { name: "Save" }).click();
+  // `exact`, because the page also carries a "Save key" button for the
+  // credential field (ADR-0015) and an inexact name matches both. The settings
+  // form's own Save is the one under test here.
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
 
   // --- Persistence --------------------------------------------------------

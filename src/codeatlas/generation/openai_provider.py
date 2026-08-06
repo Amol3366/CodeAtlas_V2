@@ -13,7 +13,6 @@ the local repository root is not part of what leaves the machine.
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Iterator
 
 import httpx
@@ -32,6 +31,7 @@ from codeatlas.generation.providers import (
     GeneratedAnswer,
     collect_stream,
 )
+from codeatlas.settings.credentials import resolve_openai_api_key
 
 DEFAULT_MODEL_ID = "gpt-4o-mini"
 _BASE_URL = "https://api.openai.com/v1"
@@ -55,9 +55,7 @@ class OpenAIAnswerProvider:
         self._client = client or httpx.Client(
             base_url=_BASE_URL,
             timeout=timeout_seconds,
-            headers={
-                "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY', '')}"
-            },
+            headers={"Authorization": f"Bearer {resolve_openai_api_key() or ''}"},
         )
 
     def generate(self, prompt: EvidenceGroundedPrompt) -> GeneratedAnswer | None:

@@ -14,6 +14,9 @@ import { Skeleton } from "../../components/Skeleton";
 import type { AnswerModel, EmbeddingModel } from "../../lib/queries";
 import {
   useModels,
+  useClearOpenAiKey,
+  useCredentials,
+  useSetOpenAiKey,
   useValidateEmbeddingModel,
   useSemanticStatus,
   useStartEmbeddingMigration,
@@ -47,6 +50,9 @@ export function SemanticSettings({ repositoryId }: Props) {
   const update = useUpdateSettings(repositoryId);
   const test = useTestProvider(repositoryId);
   const validateModel = useValidateEmbeddingModel();
+  const credentials = useCredentials();
+  const setKey = useSetOpenAiKey();
+  const clearKey = useClearOpenAiKey();
   const startMigration = useStartEmbeddingMigration(repositoryId);
 
   const [provider, setProvider] = useState<string>("none");
@@ -54,6 +60,7 @@ export function SemanticSettings({ repositoryId }: Props) {
   const [answerProvider, setAnswerProvider] = useState<string>("none");
   const [answerModel, setAnswerModel] = useState<string>("");
   const [embeddingModel, setEmbeddingModel] = useState<string>("");
+  const [apiKey, setApiKey] = useState<string>("");
   // The model id proven to load. Reset whenever the field changes, because a
   // checked id and an edited one are not the same id.
   const [validatedModel, setValidatedModel] = useState<string | null>(null);
@@ -371,6 +378,76 @@ export function SemanticSettings({ repositoryId }: Props) {
               ) : null}
             </section>
           ) : null}
+
+          {/*
+            Write-only. The field is never populated from a response, because
+            the server has no field that carries the key and this form must not
+            invent one. It is emptied after a successful save so the secret does
+            not sit in the DOM waiting to be re-submitted.
+
+            Its own actions rather than part of the settings form's Save: a
+            credential is not a policy, and folding it in would report a failed
+            credential write as a failed settings save.
+          */}
+          <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">
+            <label
+              htmlFor="openai-api-key"
+              className="block text-sm font-medium"
+            >
+              OpenAI API key
+            </label>
+            <p className="mt-[var(--space-2)] text-xs leading-5 text-text-muted">
+              {credentials.data?.openai.store_available === false
+                ? "The credential store is unavailable on this platform. Set OPENAI_API_KEY in .env instead."
+                : credentials.data?.openai.source === "credential_store"
+                  ? "Configured, stored in the Windows Credential Manager."
+                  : credentials.data?.openai.source === "env"
+                    ? "Configured from .env. A key saved here would take precedence."
+                    : "Not configured. Stored in the Windows Credential Manager, never in the database or a backup."}
+            </p>
+            <input
+              id="openai-api-key"
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              disabled={credentials.data?.openai.store_available === false}
+              className="mt-[var(--space-2)] w-full rounded-[var(--radius-md)] border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] text-sm"
+            />
+            <div className="mt-[var(--space-3)] flex gap-[var(--space-2)]">
+              <button
+                type="button"
+                onClick={() => {
+                  setKey.mutate(apiKey.trim(), {
+                    onSuccess: () => setApiKey(""),
+                  });
+                }}
+                disabled={setKey.isPending || apiKey.trim() === ""}
+                className="flex-1 rounded-[var(--radius-md)] border border-border px-[var(--space-3)] py-[var(--space-2)] text-sm font-medium disabled:opacity-50"
+              >
+                {setKey.isPending ? "Saving..." : "Save key"}
+              </button>
+              <button
+                type="button"
+                onClick={() => clearKey.mutate()}
+                disabled={
+                  clearKey.isPending ||
+                  credentials.data?.openai.source !== "credential_store"
+                }
+                className="rounded-[var(--radius-md)] border border-border px-[var(--space-3)] py-[var(--space-2)] text-sm font-medium disabled:opacity-50"
+              >
+                Clear
+              </button>
+            </div>
+            {setKey.isError ? (
+              <p
+                role="alert"
+                className="mt-[var(--space-2)] text-sm text-danger"
+              >
+                {(setKey.error as Error).message}
+              </p>
+            ) : null}
+          </section>
 
           {answerProvider !== "none" ? (
             <section className="rounded-[var(--radius-md)] border border-border bg-surface p-[var(--space-4)] shadow-sm">

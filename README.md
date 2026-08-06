@@ -168,6 +168,11 @@ indexing it. Every setting in it is optional, and putting an API key there
 enables nothing on its own — a provider is granted permission per repository, in
 Settings.
 
+Since ADR-0015 the OpenAI key can also be entered **in Settings**, where it is
+stored in the Windows Credential Manager rather than a plaintext file. A key
+saved there outranks `.env`, no response ever returns it, and a backup does not
+carry it — restoring onto another machine means entering it again.
+
 ### Step 1 — Start the app
 
 ```powershell

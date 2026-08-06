@@ -146,6 +146,14 @@ decoration.
 
   Settings does **not** download models. Where a model must be fetched, the
   panel names it and shows the `ollama pull …` command to run in a terminal.
+- **OpenAI API key field** — `type="password"`, write-only, and **never
+  populated from a server response**, because no response carries the key.
+  Emptied after a successful save so the secret does not sit in the DOM. Save
+  and Clear are its own actions, not part of the settings form's Save: a
+  credential is not a policy. Four states, because "configured" alone is not
+  enough — *not configured*, *stored in the Credential Manager*, *configured
+  from `.env`* (so a shadowed key is visible), and *store unavailable on this
+  platform*.
 - **Embedding model field** (local provider only) — free-text, because a
   curated dropdown is not "any model you want". Save stays disabled until
   **Check model** succeeds, since the vector index is labelled with the width

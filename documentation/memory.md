@@ -84,6 +84,11 @@ development order is finished. A new phase requires an explicit user decision.
       had been stranded on since 2026-08-04, **minus** the Ollama pull feature —
       see Decisions. Gate green: 1886 passed.
 
+- [x] Frontend OpenAI credential entry (ADR-0015), 2026-08-06: the key is
+      entered in Settings and stored in the Windows Credential Manager,
+      machine-wide, precedence store → `.env`. No migration; `SCHEMA_VERSION`
+      stays 14 and `contract_version` stays `1.1`. Gate green: 1926 passed.
+
 ## In Progress
 
 **Ephemeral session mode** on branch `ephemeral-session-mode` — code complete
@@ -133,6 +138,25 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   OpenAI embedding widths are resolved automatically; unknown OpenAI models
   still require an explicit dimension. Local model widths are detected when the
   model loads.
+- **A credential is never published to `os.environ`** (ADR-0015). Git runs as a
+  subprocess and inherits the parent environment, so a key placed there is
+  handed to every Git invocation for the life of the server.
+  `resolve_openai_api_key()` returns the value to the caller that needs it and
+  writes nothing back. `load_env_file` already has this weakness for the `.env`
+  path — that is the thing not to copy.
+- **A response never carries a credential, not even part of one.** No masking,
+  no last-4: a suffix is still key material, and a response body is logged by
+  intermediaries and pasted into bug reports. The contract test asserts the
+  exact response key set so a masked field added later fails the suite.
+- **An absence test that never executes the leak path proves nothing.** The
+  first credential security test passed against a deliberately leaking
+  resolver, because a stored key made `status()` take a branch that never
+  called it. Mutate the invariant and watch the test fail before believing it.
+- **`.env` refills a deleted environment variable.** `create_app` calls
+  `load_env_file`, which fills any key the environment lacks — so a test that
+  deletes `OPENAI_API_KEY` gets the developer's real key back before the first
+  request. Set it *empty* instead; the file cannot override a key that is
+  present.
 - **An embedding model is measured, never declared.** A candidate local model is
   loaded once and asked for its width, because the namespace is labelled with
   that number and a wrong label never raises — it just returns worse results for
@@ -219,12 +243,11 @@ Carried into gate approvals as declared work rather than dropped:
 
 ## Next Up
 
-0. **ADR-0015: frontend OpenAI API-key entry backed by Windows DPAPI.** Chosen
-   by the user on 2026-08-06 over `.env`-only and over plaintext SQLite. Needs
-   a secret-store adapter, a write-only endpoint, a GET that reports only
-   set/not-set (Section 12.5 forbids the value appearing in any GET, log,
-   export, or diagnostic bundle), redaction coverage, and a migration. Not
-   started.
+0. ~~ADR-0015: frontend OpenAI API-key entry.~~ **Done 2026-08-06.** Landed on
+   branch `frontend-credential-entry`, awaiting merge. Built against the
+   Windows Credential Manager rather than a raw DPAPI blob: keeping the secret
+   out of the database entirely makes the Section 12.5 export and bundle
+   clauses structurally true rather than a redaction step to remember.
 
 
 No assigned work. Candidates, in the order they'd most likely be picked up:
