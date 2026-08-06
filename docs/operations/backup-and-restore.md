@@ -104,3 +104,12 @@ Messages, runs, and evidence links go with the conversation they belong to.
   export format; restoring it onto a machine where the repository roots do not
   exist leaves repositories that resolve to nothing. `codeatlas doctor` reports
   those as `ROOT_MISSING`.
+- **A backup does not contain the OpenAI API key.** The credential lives in the
+  Windows Credential Manager, not in the database (ADR-0015), so restoring onto
+  a different machine or user account means entering the key again there —
+  or supplying it through `.env`.
+
+  This is deliberate rather than an oversight. The database is the file most
+  likely to be copied elsewhere or attached to a support request, and a
+  credential that travelled with it would be disclosed by the most ordinary
+  troubleshooting step there is.

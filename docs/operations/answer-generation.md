@@ -95,7 +95,7 @@ citations; only the paragraph is missing, and the warning says why.
 | --- | --- | --- |
 | `GENERATION_PROVIDER_UNREACHABLE` | Nothing answered on the port | Start Ollama, or check `CODEATLAS_OLLAMA_BASE_URL` |
 | `GENERATION_MODEL_MISSING` | Ollama is running but lacks that model | `ollama pull <tag>`, or correct the tag in Settings |
-| `GENERATION_KEY_REJECTED` | OpenAI refused the credential | Check `OPENAI_API_KEY` in `.env` |
+| `GENERATION_KEY_REJECTED` | OpenAI refused the credential | Re-enter the key in Settings, or check `OPENAI_API_KEY` in `.env` |
 | `GENERATION_QUOTA_EXHAUSTED` | The OpenAI account has no credit | Add credit, or switch to Ollama |
 | `PROVIDER_BUDGET_EXCEEDED` | Your configured monthly budget is spent | Raise the budget in Settings, or switch to Ollama |
 | `GENERATION_TIMED_OUT` | The model did not finish in time | Raise `CODEATLAS_ANSWER_TIMEOUT_SECONDS`, or use a smaller model |

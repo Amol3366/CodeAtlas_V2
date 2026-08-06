@@ -36,6 +36,7 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 | [0012](0012-governed-answer-provider-policy.md) | Answer generation writes prose over untouched claims and evidence; local `llama3.2:3b` is primary, the default is off, and the feature ships available rather than admitted | 7 (post-gate) |
 | [0013](0013-ephemeral-session-mode.md) | Ephemeral sessions are opt-in and never the default; one injected database path makes indexing, embeddings, and storage fresh per run, and §8.2's persistence requirement is scoped to default mode | none (post-gate) |
 | [0014](0014-per-repository-embedding-model.md) | The embedding model is a per-repository decision for the local provider; migration `0014` stores it, precedence is policy → `.env` → default, and a candidate model's width is measured rather than declared | none (post-gate) |
+| [0015](0015-frontend-credential-entry.md) | The OpenAI API key is entered in Settings and stored in the Windows Credential Manager, machine-wide, precedence store → `.env`; no response carries the value or any part of it, and the resolved key is never published to `os.environ` | none (post-gate) |
 
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.

@@ -104,13 +104,13 @@ CodeAtlas_V2/
 │   ├── storage/sqlite/migrations/          # numbered, explicit, forward-only
 │   ├── delivery/                           # report rendering: JSON, Markdown, SARIF
 │   ├── api/ · cli/ · mcp/                  # adapters — thin
-│   ├── settings/
+│   ├── settings/                            # .env, credential store (ADR-0015)
 │   └── evaluation/
 ├── tests/
 │   ├── unit/ integration/ contract/ end_to_end/
 │   ├── security/ retrieval/ evaluation/ fixtures/
 ├── docs/
-│   ├── adr/                                # 0000-template + ADR-0001..0014
+│   ├── adr/                                # 0000-template + ADR-0001..0015
 │   ├── api/ · evaluation/ · operations/ · security/
 │   └── plans/PLAN.md                       # LIVE task status — the coordination file
 ├── documentation/                          # this folder: PRD, architecture, rules, phases, design, memory
@@ -258,6 +258,9 @@ UTC timestamps, cursor pagination.
 - Change analysis: working-tree, commits, get, report
 - Settings and providers: settings, models, model test, embedding-model
   validation, embedding migrations
+- Credentials: `GET /v1/credentials`, `PUT`/`DELETE /v1/credentials/openai`
+  (ADR-0015). Write-only; the GET reports `configured`, `source`, and
+  `store_available` and has no field a value could occupy
 
 One error envelope everywhere:
 
@@ -306,6 +309,16 @@ are resolved from the selected model id where the mapping is built in; unknown
 OpenAI-compatible ids still require explicit dimensions, because asking OpenAI
 for the width costs a billable call per construction.
 
+The OpenAI API key is entered in Settings and stored in the **Windows
+Credential Manager**, machine-wide (ADR-0015) — not in SQLite, because the
+database is copied by backup and attached to bug reports. Precedence is
+credential store → `.env`, and `.env` stays supported for scripted runs.
+
+`resolve_openai_api_key()` (`settings/credentials.py`) is the only place any
+caller learns the key, and it **never writes the resolved value back into
+`os.environ`**: CodeAtlas invokes Git as a subprocess, and a child inherits its
+parent's environment. That rule is a test, not a comment.
+
 **CodeAtlas never downloads a model for you.** Settings names the answer model
 it expects and displays the `ollama pull …` command for you to run in a
 terminal. There is no pull endpoint: `pull_ollama_model` was deleted on
@@ -318,6 +331,6 @@ wanted.
 | Topic | File |
 | --- | --- |
 | Live task status | `docs/plans/PLAN.md` |
-| Decisions and their rationale | `docs/adr/0001`–`0014` |
+| Decisions and their rationale | `docs/adr/0001`–`0015` |
 | Chunking, search, graph, change analysis | `docs/operations/*.md` |
 | Measured numbers and their caveats | `docs/evaluation/*.md` |
