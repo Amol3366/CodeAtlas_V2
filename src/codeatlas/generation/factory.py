@@ -16,8 +16,6 @@ chose it for this repository, in the app, rather than for the machine.
 
 from __future__ import annotations
 
-import os
-
 from codeatlas.domain.semantic import AnswerProviderKind, ProviderPolicy
 from codeatlas.generation.ollama_provider import DEFAULT_BASE_URL, OllamaAnswerProvider
 from codeatlas.generation.ollama_provider import (
@@ -28,6 +26,7 @@ from codeatlas.generation.openai_provider import (
 )
 from codeatlas.generation.openai_provider import OpenAIAnswerProvider
 from codeatlas.generation.providers import AnswerProvider, NoAnswerProvider
+from codeatlas.settings.credentials import resolve_openai_api_key
 from codeatlas.settings.env_file import (
     configured_answer_timeout_seconds,
     configured_ollama_answer_model,
@@ -86,9 +85,9 @@ def describe_available_answer_providers() -> dict[AnswerProviderKind, bool]:
     return {
         AnswerProviderKind.NONE: True,
         AnswerProviderKind.OLLAMA: True,
-        AnswerProviderKind.OPENAI: bool(
-            os.environ.get(OPENAI_API_KEY_VARIABLE, "").strip()
-        ),
+        # Resolved through the credential store as well as `.env` (ADR-0015),
+        # so a key saved in Settings enables the option without a restart.
+        AnswerProviderKind.OPENAI: bool((resolve_openai_api_key() or "").strip()),
     }
 
 

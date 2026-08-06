@@ -85,9 +85,35 @@ def default_credential_store() -> CredentialStore:
     return UnavailableCredentialStore()
 
 
+def resolve_openai_api_key(store: CredentialStore | None = None) -> str | None:
+    """The OpenAI API key, from the credential store or `.env`, in that order.
+
+    The single place any caller learns the key. Four call sites used to read
+    `os.environ` directly, and four readers means four chances for one to miss
+    a new source.
+
+    The return value is handed to the caller that needs it and is deliberately
+    *not* written back into `os.environ`: see the module docstring.
+    """
+    import os
+
+    resolved = store if store is not None else default_credential_store()
+
+    stored = resolved.get(OPENAI_CREDENTIAL_NAME)
+    if stored is not None and stored.strip():
+        return stored.strip()
+
+    # `load_env_file` has already applied `.env` to the environment by the time
+    # any request runs, so reading the environment covers both a real
+    # environment variable and a `.env` entry.
+    from_env = os.environ.get(OPENAI_CREDENTIAL_NAME, "").strip()
+    return from_env or None
+
+
 __all__ = [
     "OPENAI_CREDENTIAL_NAME",
     "CredentialStore",
     "UnavailableCredentialStore",
     "default_credential_store",
+    "resolve_openai_api_key",
 ]
