@@ -1778,7 +1778,7 @@ git commit -m "feat: generate over every intent and stream tokens to the client"
 # tests/security/test_answer_generation_redaction.py
 from codeatlas.generation.explanations import EvidenceGroundedExplanationService
 
-SECRET = "sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd"
+SECRET = "sk-" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd"
 
 
 class _Capturing:

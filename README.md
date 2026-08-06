@@ -1,4 +1,3 @@
-
 # CodeAtlas
 
 CodeAtlas is a local-first repository-intelligence and change-assurance layer.
@@ -308,13 +307,13 @@ suites **inside** the gate; `-SkipE2E` opts out for a fast inner loop.
 
 ### If something does not work
 
-| Symptom                                                     | Cause and fix                                                                     |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `INVALID_REQUEST: the web application has not been built` | `pnpm --dir apps/web build`, or use the packaged release                        |
-| `--host must be a loopback address`                       | Loopback only, by design. Use`127.0.0.1`                                        |
-| Port already in use                                         | `--port` on `serve`, `-ApiPort` on `run_dev.ps1`                          |
-| Script will not run                                         | Use the`-ExecutionPolicy Bypass -File` form                                     |
-| A repository will not reindex                               | `codeatlas doctor` names the blocking run and its pid                           |
+| Symptom                                                     | Cause and fix                                                                                                         |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_REQUEST: the web application has not been built` | `pnpm --dir apps/web build`, or use the packaged release                                                            |
+| `--host must be a loopback address`                       | Loopback only, by design. Use`127.0.0.1`                                                                            |
+| Port already in use                                         | `--port` on `serve`, `-ApiPort` on `run_dev.ps1`                                                              |
+| Script will not run                                         | Use the`-ExecutionPolicy Bypass -File` form                                                                         |
+| A repository will not reindex                               | `codeatlas doctor` names the blocking run and its pid                                                               |
 | The UI looks older than the code                            | You are almost certainly running the packaged build. Rebuild it with`scripts/build_package.ps1`, or run from source |
 
 ## Windows development

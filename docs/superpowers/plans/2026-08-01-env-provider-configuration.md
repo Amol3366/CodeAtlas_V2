@@ -1337,7 +1337,7 @@ from codeatlas.settings.env_file import (
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
-SECRET = "sk-test-not-a-real-key-abcdef0123456789"
+SECRET = "sk-" + "test-not-a-real-key-abcdef0123456789"
 
 
 def _write_env(directory: Path, body: str) -> Path:

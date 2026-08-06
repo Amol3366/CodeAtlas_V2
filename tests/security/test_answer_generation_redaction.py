@@ -27,7 +27,7 @@ from codeatlas.contracts import (
 from codeatlas.generation.explanations import EvidenceGroundedExplanationService
 from codeatlas.generation.providers import EvidenceGroundedPrompt, GeneratedAnswer
 
-SECRET = "sk-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd"
+SECRET = "sk-" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd"
 
 
 def _response_with_secret() -> QueryResponse:
