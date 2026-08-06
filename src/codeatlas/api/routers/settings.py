@@ -111,6 +111,30 @@ class ProviderTestResponse(StrictModel):
     latency_ms: int
 
 
+class CredentialStatusResponse(StrictModel):
+    """Status only. There is deliberately no field a value could occupy.
+
+    Not even a masked one: a key suffix is still key material, and a response
+    body is logged by intermediaries, pasted into bug reports, and
+    screenshotted. `configured` plus `source` answers every question a user
+    actually has about their own credential.
+    """
+
+    configured: bool
+    source: Literal["credential_store", "env"] | None
+    store_available: bool
+
+
+class CredentialsResponse(StrictModel):
+    openai: CredentialStatusResponse
+
+
+class SetCredentialBody(StrictModel):
+    # 500 rather than the 200 used for model ids: a key is not a model id and
+    # has grown longer across format changes.
+    api_key: str = Field(min_length=1, max_length=500)
+
+
 class ValidateEmbeddingModelBody(StrictModel):
     model_id: str = Field(min_length=1, max_length=200)
 
@@ -351,3 +375,48 @@ def _migration_response(
             else None
         ),
     )
+
+
+# --- provider credentials (ADR-0015) -------------------------------------
+
+
+def _credentials(services: Services) -> CredentialsResponse:
+    status = services.credentials.status()
+    return CredentialsResponse(
+        openai=CredentialStatusResponse(
+            configured=status.configured,
+            source=status.source,
+            store_available=status.store_available,
+        )
+    )
+
+
+@router.get("/v1/credentials")
+def get_credentials(services: Services) -> CredentialsResponse:
+    """Whether a provider credential is configured, and from where.
+
+    Never what it is. `source` exists so a user whose saved key is being
+    shadowed by `.env` can see that rather than guess.
+    """
+    return _credentials(services)
+
+
+@router.put("/v1/credentials/openai")
+def set_openai_credential(
+    services: Services, body: SetCredentialBody
+) -> CredentialsResponse:
+    """Store the OpenAI API key. Write-only: the response is a status.
+
+    Separate from `PATCH /v1/settings` on purpose. A credential is not a
+    policy, and folding it into the settings save would report a failed
+    credential write as a failed settings save.
+    """
+    services.credentials.set_openai_key(body.api_key)
+    return _credentials(services)
+
+
+@router.delete("/v1/credentials/openai")
+def clear_openai_credential(services: Services) -> CredentialsResponse:
+    """Remove the stored key. `.env` is not touched."""
+    services.credentials.clear_openai_key()
+    return _credentials(services)

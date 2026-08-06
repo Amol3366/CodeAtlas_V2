@@ -12,7 +12,7 @@ this machine can store one.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Literal
 
 from codeatlas.domain.errors import InvalidRequestError
 from codeatlas.settings.credentials import (
@@ -27,8 +27,14 @@ from codeatlas.settings.credentials import (
 # product is broken" while looking correct in tests.
 MAX_CREDENTIAL_LENGTH: Final[int] = 500
 
-SOURCE_STORE: Final[str] = "credential_store"
-SOURCE_ENV: Final[str] = "env"
+# The two places a key can come from, as a type rather than loose strings.
+# Delivery serialises this straight into a Literal field, so keeping it exact
+# here removes a cast at the boundary and makes a third source a type error
+# rather than a runtime surprise.
+CredentialSource = Literal["credential_store", "env"]
+
+SOURCE_STORE: Final[CredentialSource] = "credential_store"
+SOURCE_ENV: Final[CredentialSource] = "env"
 
 
 @dataclass(frozen=True)
@@ -38,7 +44,7 @@ class CredentialStatus:
     configured: bool
     # Which source is actually in effect: a user who saved a key and still sees
     # `env` is being shadowed, and needs to know that rather than guess.
-    source: str | None
+    source: CredentialSource | None
     store_available: bool
 
 
@@ -51,7 +57,7 @@ class CredentialService:
     def status(self) -> CredentialStatus:
         stored = self._store.get(OPENAI_CREDENTIAL_NAME)
         if stored is not None and stored.strip():
-            source: str | None = SOURCE_STORE
+            source: CredentialSource | None = SOURCE_STORE
         elif resolve_openai_api_key(self._store) is not None:
             source = SOURCE_ENV
         else:
@@ -93,5 +99,6 @@ class CredentialService:
 __all__ = [
     "MAX_CREDENTIAL_LENGTH",
     "CredentialService",
+    "CredentialSource",
     "CredentialStatus",
 ]

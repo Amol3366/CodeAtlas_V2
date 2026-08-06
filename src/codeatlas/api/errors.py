@@ -54,6 +54,10 @@ _STATUS_BY_CODE: dict[ErrorCode, int] = {
     ErrorCode.PROVIDER_DISABLED: status.HTTP_400_BAD_REQUEST,
     ErrorCode.PROVIDER_UNAVAILABLE: status.HTTP_409_CONFLICT,
     ErrorCode.PROVIDER_BUDGET_EXCEEDED: status.HTTP_409_CONFLICT,
+    # Conflict, not a server error: the request is well formed and the service
+    # is running; this machine simply has nowhere to put a credential.
+    ErrorCode.CREDENTIAL_STORE_UNAVAILABLE: status.HTTP_409_CONFLICT,
+    ErrorCode.CREDENTIAL_WRITE_FAILED: status.HTTP_409_CONFLICT,
     ErrorCode.INTERNAL_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

@@ -200,6 +200,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Credentials
+         * @description Whether a provider credential is configured, and from where.
+         *
+         *     Never what it is. `source` exists so a user whose saved key is being
+         *     shadowed by `.env` can see that rather than guess.
+         */
+        get: operations["get_credentials_v1_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/credentials/openai": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Openai Credential
+         * @description Store the OpenAI API key. Write-only: the response is a status.
+         *
+         *     Separate from `PATCH /v1/settings` on purpose. A credential is not a
+         *     policy, and folding it into the settings save would report a failed
+         *     credential write as a failed settings save.
+         */
+        put: operations["set_openai_credential_v1_credentials_openai_put"];
+        post?: never;
+        /**
+         * Clear Openai Credential
+         * @description Remove the stored key. `.env` is not touched.
+         */
+        delete: operations["clear_openai_credential_v1_credentials_openai_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evidence/{evidence_id}": {
         parameters: {
             query?: never;
@@ -1032,6 +1083,27 @@ export interface components {
             repository_id: string;
         };
         /**
+         * CredentialStatusResponse
+         * @description Status only. There is deliberately no field a value could occupy.
+         *
+         *     Not even a masked one: a key suffix is still key material, and a response
+         *     body is logged by intermediaries, pasted into bug reports, and
+         *     screenshotted. `configured` plus `source` answers every question a user
+         *     actually has about their own credential.
+         */
+        CredentialStatusResponse: {
+            /** Configured */
+            configured: boolean;
+            /** Source */
+            source: ("credential_store" | "env") | null;
+            /** Store Available */
+            store_available: boolean;
+        };
+        /** CredentialsResponse */
+        CredentialsResponse: {
+            openai: components["schemas"]["CredentialStatusResponse"];
+        };
+        /**
          * Derivation
          * @enum {string}
          */
@@ -1631,6 +1703,11 @@ export interface components {
             snapshot_id: string | null;
             /** Total Count */
             total_count: number | null;
+        };
+        /** SetCredentialBody */
+        SetCredentialBody: {
+            /** Api Key */
+            api_key: string;
         };
         /** SettingsResponse */
         SettingsResponse: {
@@ -2322,6 +2399,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_credentials_v1_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialsResponse"];
+                };
+            };
+        };
+    };
+    set_openai_credential_v1_credentials_openai_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCredentialBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_openai_credential_v1_credentials_openai_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialsResponse"];
                 };
             };
         };
