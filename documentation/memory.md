@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
 ## Current Phase
 
@@ -91,8 +91,12 @@ development order is finished. A new phase requires an explicit user decision.
 
 ## In Progress
 
-**Ephemeral session mode** on branch `ephemeral-session-mode` — code complete
-and verified; the `AGENTS.md` §8.2 amendment is awaiting user approval.
+**Nothing.** Verified 2026-08-07 rather than assumed.
+
+~~**Ephemeral session mode** awaiting approval of the `AGENTS.md` §8.2
+amendment.~~ **Closed 2026-08-07.** The amendment is present in §8.2, ADR-0013
+is accepted, and `serve --ephemeral` is in `main`. The entry had outlived the
+work by three days.
 
 ~~**Stale Settings view (Part B)** — deliberately not fixed.~~ **Closed
 2026-08-05.** Root cause was a packaged build predating the redesign, not the
@@ -195,14 +199,28 @@ Carried into gate approvals as declared work rather than dropped:
 
 - Unsigned packaged executable → SmartScreen warns on first run. Needs a
   purchased certificate.
-- Four conversation-route Playwright tests skipped on Chromium (renderer crashes
-  on `/conversations/{id}`; upstream browser defect). Firefox proves all seven.
+- **Five Playwright tests skipped on Chromium, across four spec files** —
+  `onboarding-to-citation`, `restart-persistence`, `settings`, and
+  `stream-reconnection` all use the skip helper. Upstream renderer defect, not
+  application code; Firefox runs every one of them.
+
+  **Correction (2026-08-07):** this used to read "four conversation-route tests
+  … on `/conversations/{id}`". The defect has since been hit on more routes, so
+  the route-specific wording understated it. `AGENTS.md` Section 20 still
+  describes the Phase 6 gate state and is deliberately not edited.
 - No pid-reuse detection in crash recovery — a reassigned pid keeps a repository
   blocked from reindexing. `codeatlas doctor` makes it visible, not automatic.
 - Packaged semantic tree is 1.05 GB (torch), accepted at the Phase 7 activation
   gate.
-- `POST /v1/models/test` success branch untested — needs an installed provider
-  extra; only `PROVIDER_DISABLED` is exercised.
+- **`POST /v1/models/test` success branch is still untested.** Both tests that
+  reach it assert `ok is False`; nothing asserts `ok is True`.
+
+  **Correction (2026-08-07):** the 2026-08-06 work claimed to close this. It did
+  not. It made the *failure* deterministic — the test had been passing only
+  because no provider was installed, and it issued a real billable OpenAI
+  request the moment one was — which was worth doing, but is not the success
+  branch. Improving a nearby test is not the same as closing the gap it sits
+  next to.
 - Primary evidence Recall@10 = 0.6667 vs a ≥0.90 target. Missed with *and*
   without the semantic layer, so not a regression. Never cite the uplift without
   `docs/evaluation/phase-7-baseline-environment.md`: the lexical stopword fix
@@ -238,32 +256,57 @@ Carried into gate approvals as declared work rather than dropped:
 
   If the feature is ever wanted, `git show 63c57cd` has the implementation.
 
-- **`renderWithProviders` accepts a `client` option nothing passes.** Harmless
-  unused extension point in `apps/web/src/test/harness.tsx`.
+- ~~**`renderWithProviders` accepts a `client` option nothing passes.**~~
+  **Not true as of 2026-08-07.** `SemanticSettings.test.tsx:147` passes one, to
+  prove the route waits for fresh settings instead of rendering cached route
+  data. The option is a used extension point, not a dead one.
+
+- [x] Pushed to GitHub (2026-08-06). `main` is synced with `origin/main`.
+      Push protection blocked it on a placeholder Slack token in
+      `test_secret_redaction.py`; the allowlist did not take effect, so the
+      commit was rewritten (104 commits, no force-push — the remote tip was one
+      commit behind the rewrite point). 29 commit hashes cited as evidence were
+      remapped, 57 references repaired. Full account in `docs/plans/PLAN.md`.
+
+- [x] Status pass (2026-08-07): corrected two claims this log had wrong — the
+      `POST /v1/models/test` success branch was **not** closed, and the
+      `renderWithProviders` known issue was false. See Known Issues.
 
 ## Next Up
 
-0. ~~ADR-0015: frontend OpenAI API-key entry.~~ **Done 2026-08-06.** Landed on
-   branch `frontend-credential-entry`, awaiting merge. Built against the
-   Windows Credential Manager rather than a raw DPAPI blob: keeping the secret
-   out of the database entirely makes the Section 12.5 export and bundle
-   clauses structurally true rather than a redaction step to remember.
-
-
 No assigned work. Candidates, in the order they'd most likely be picked up:
 
-1. **Rebuild the package whenever the web app changes.** The four-day-old
-   packaged bundle cost three misdiagnosed debugging rounds. Consider making
-   `build_package.ps1` refuse when `apps/web/dist` is newer than the release
-   tree, so the mismatch reports itself instead of surfacing as a phantom UI
-   regression.
-2. Close the untested `POST /v1/models/test` success branch by installing an
-   optional extra in a gate environment.
-3. Investigate Recall@10 — the stopword finding suggests lexical quality, not
-   embedding quality, is where the remaining headroom is.
-4. Decide on code signing (a purchasing decision, not an engineering one).
-5. ~~Decide the fate of branch `per-repository-embedding-model`.~~ **Done
-   2026-08-06 — merged.** The lesson stands: it sat unmerged for two days, took
-   the `documentation/` folder with it, and its merge silently resurrected a
-   feature `main` had deliberately deleted. A feature branch left to rot does
-   not stay still; it drifts against decisions made after it.
+1. **Close the untested `POST /v1/models/test` success branch.** Now the
+   cheapest item on the list: both semantic extras are installed in this
+   environment, so a test can finally reach `ok is True` — that was the blocker
+   when the item was carried from the Phase 7 gate. Note the trap found on
+   2026-08-06: a test that reaches the success branch with a real key configured
+   will issue a **real billable request**, so it must stub the provider rather
+   than call it.
+2. **Investigate Recall@10** (0.6667 against a ≥0.90 target). The stopword
+   finding suggests lexical quality, not embedding quality, is where the
+   remaining headroom is: that one fix was worth +0.53 recall while the entire
+   semantic layer on top of it was worth +0.07.
+3. **Decide on code signing** — a purchasing decision, not an engineering one.
+   Until then the packaged executable is unsigned and SmartScreen warns.
+4. **Consider deleting the five stale local branches** whose content is in
+   `main` but which point at pre-rewrite commit objects, so `git branch`
+   stops implying unmerged work. `backup-before-rewrite` can go with them once
+   the rewrite is trusted.
+
+Closed since this list was written:
+
+- ~~Rebuild the package whenever the web app changes.~~ **Delivered.** The
+  guard exists: `test_the_packaged_web_assets_match_the_source_build`
+  (`tests/end_to_end/test_packaged_build.py:198`) compares digests and failed
+  the gate twice on 2026-08-06, each time correctly, which is exactly the
+  self-reporting the item asked for.
+- ~~Decide the fate of branch `per-repository-embedding-model`.~~ **Merged
+  2026-08-06** as ADR-0014. The lesson stands: it sat unmerged for two days,
+  took the `documentation/` folder with it, and its merge silently resurrected
+  a feature `main` had deliberately deleted. A feature branch left to rot does
+  not stay still; it drifts against decisions made after it.
+- ~~ADR-0015: frontend OpenAI API-key entry.~~ **Merged 2026-08-06.** Built
+  against the Windows Credential Manager rather than a DPAPI blob in SQLite:
+  keeping the secret out of the database makes the Section 12.5 export and
+  bundle clauses structurally true rather than a redaction step to remember.

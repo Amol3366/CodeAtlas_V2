@@ -1,6 +1,6 @@
 # PRD — CodeAtlas
 
-Status: current as of 2026-08-06
+Status: current as of 2026-08-07
 Authority note: this file describes the product in plain language. The
 release-blocking contract is `AGENTS.md`; the deep technical rationale is
 `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`. Where this file and `AGENTS.md`
@@ -115,6 +115,15 @@ auto-resolved from the selected model, `[n]` citation markers in an answer open
 the evidence panel on demand, and `serve --ephemeral` (ADR-0013) runs from
 throwaway storage. CodeAtlas does **not** download models: Settings shows the
 `ollama pull …` command for you to run yourself.
+
+Two further additions landed 2026-08-06, both per-repository and both optional.
+Any open-source embedding model can now be chosen in Settings, with its true
+vector width **measured** before the choice can be saved (ADR-0014) — the index
+is labelled with that number, and a wrong label never raises, it just returns
+worse results for as long as the index lives. And the OpenAI API key can be
+entered in Settings, stored in the Windows Credential Manager rather than a
+plaintext `.env` (ADR-0015); no response returns it, and a backup does not
+carry it.
 
 The report of Settings "reverting" to an older view was root-caused on
 2026-08-05 and closed. It was never browser caching — a source checkout serves

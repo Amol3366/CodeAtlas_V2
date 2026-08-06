@@ -1,6 +1,6 @@
 # Architecture — CodeAtlas
 
-Status: current as of 2026-08-06
+Status: current as of 2026-08-07
 Normative source: `AGENTS.md` Sections 6–17. This file is the navigable map;
 that file is the contract.
 

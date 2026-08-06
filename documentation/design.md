@@ -1,6 +1,6 @@
 # Design — CodeAtlas
 
-Status: current as of 2026-08-06
+Status: current as of 2026-08-07
 
 The implemented source of truth is `apps/web/src/styles/tokens.css`. This file
 documents that system and the rules around it. **If the two disagree, the

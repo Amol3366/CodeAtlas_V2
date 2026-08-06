@@ -50,13 +50,13 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | none - Phases 0-7 are all `complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Active task     | none - post-gate work committed and merged 2026-08-05, package rebuilt and probed. Awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Task status     | `complete` - Phase 7 stays approved. The 2026-08-04/05 work is post-gate usability/provider polish, the inline-citation answer view, and documentation, not a reopened phase task                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Active task     | none - ADR-0014 (per-repository embedding model) and ADR-0015 (frontend credential entry) merged 2026-08-06; `main` pushed to `origin` 2026-08-06 after a history rewrite recorded in the log. Awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Task status     | `complete` - Phase 7 stays approved. Everything since is post-gate work, not a reopened phase task. `SCHEMA_VERSION` is now **14** (migration `0014`); `contract_version` remains `1.1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Agent           | Claude Code `claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Started UTC     | 2026-08-05T06:55:00Z (commit and merge of the previously uncommitted post-gate work; earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Git state       | Branch `main` at `8fd18b2`, merging `settings-and-provider-polish` (`ae019c9`) and `inline-citations-and-evidence-panel` (`b30b682`). Working tree clean apart from this plan and `documentation/memory.md`. The post-gate Settings/provider work is **no longer uncommitted** - it had been sitting in a working tree since 2026-08-04, on the branch of an unrelated feature                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Started UTC     | 2026-08-07T00:00:00Z (documentation status pass; all earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Git state       | Branch `main`, clean, synced with `origin/main`. ADRs `0001`-`0015`, migrations `0001`-`0014`. The local branches `env-provider-configuration`, `ephemeral-session-mode`, `inline-citations-and-evidence-panel`, `per-repository-embedding-model`, and `settings-and-provider-polish` all have their content in `main` but point at **pre-rewrite commit objects**, so `git branch --merged` will not list them; `backup-before-rewrite` holds the pre-rewrite tip deliberately |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision. The Settings old-view report is **root-caused and closed**: it was a packaged build predating the redesign, not browser caching (2026-08-05 handoff)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision |
 
 ### Phase 7 Task Board
 
@@ -206,6 +206,85 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-07T00:00:00Z — Status pass: two claims in this log were wrong
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Documentation only; **no source, test, contract, or schema
+  changed**, verified by diff before commit.
+
+#### Correction 1 — the `POST /v1/models/test` success branch is NOT closed
+
+The 2026-08-06T02:00:00Z entry, and the commit message of the test fix it
+describes, both claimed that item was closed. **That was wrong, and it is
+corrected here rather than by editing the entry that said it.**
+
+What that change actually did was force the failure deterministically with
+`monkeypatch.delenv`, so the assertion holds on any machine. That was worth
+doing — the test had been passing only because no provider was installed, and
+it briefly issued a real billable OpenAI request when one was. But forcing a
+*failure* is not testing the *success* branch.
+
+Verified today: `tests/contract/test_settings_api.py` reaches
+`/v1/models/test` twice, at lines 205 and 239, and both assert `ok is False`.
+No test anywhere asserts `ok is True`. The item carried from the Phase 7 gate
+stands, unchanged and still open, and `AGENTS.md` Section 20 is right to list
+it among the five remaining.
+
+Closing an item because a nearby test was improved is the failure mode this
+correction exists to name.
+
+#### Correction 2 — the Chromium skip description is out of date
+
+`documentation/memory.md` described "four conversation-route Playwright tests
+skipped on Chromium". The renderer defect has since been hit on more routes:
+the skip helper is now used by `onboarding-to-citation`, `restart-persistence`,
+`settings`, and `stream-reconnection` — **four spec files, five skipped tests**,
+not four tests on one route.
+
+`AGENTS.md` Section 20 still describes the Phase 6 state as it was at that
+gate, and is **deliberately left alone**: it was accurate when approved, and
+rewriting gate evidence to match today is what Section 4.5 and this plan's
+rule 8 forbid. The living summaries carry the current picture instead.
+
+#### Also corrected in the living docs
+
+- `documentation/memory.md` listed ephemeral session mode as *In Progress*,
+  "awaiting user approval" of the `AGENTS.md` §8.2 amendment. That amendment is
+  present in §8.2, ADR-0013 is accepted, and `serve --ephemeral` is in `main`.
+  Moved to Completed.
+- `documentation/memory.md` listed as a known issue that `renderWithProviders`
+  "accepts a `client` option nothing passes". Something does:
+  `apps/web/src/features/settings/SemanticSettings.test.tsx:147` passes one to
+  assert the route waits for fresh data instead of rendering cached data.
+  Removed.
+- The Active Work table above still described 2026-08-05 as the latest work.
+
+#### Branch state after the rewrite
+
+Five local branches — `env-provider-configuration`, `ephemeral-session-mode`,
+`inline-citations-and-evidence-panel`, `per-repository-embedding-model`,
+`settings-and-provider-polish` — have their content in `main` but point at
+**pre-rewrite commit objects**. `git merge-base --is-ancestor` reports each as
+unreachable, and `git branch --merged` will not list them, even though nothing
+is unmerged. Each was confirmed present in `main` by matching author date and
+subject.
+
+They are left in place rather than deleted: deleting a branch is a user
+decision, and the refs are harmless. Anyone reading `git branch` should know
+why they look unmerged.
+
+#### Verification
+
+- `git diff --stat` before commit: only `.md` files under `docs/` and
+  `documentation/`.
+- Claims re-checked against the tree rather than against earlier entries:
+  `SCHEMA_VERSION` 14, migrations `0001`-`0014`, ADRs `0001`-`0015`,
+  `contract_version` `1.1`.
+
+#### Next
+
+No assigned work. The five carried items from the Phase 7 gate remain five.
 
 ### 2026-08-06T08:00:00Z — History rewritten to clear a scanner false positive
 

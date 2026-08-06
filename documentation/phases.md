@@ -203,22 +203,49 @@ reopened tasks:
   **that feature was dropped during the merge** rather than reversing `main`'s
   newer decision. The embedding-model selection it existed for was kept.
 
+- Frontend OpenAI credential entry (ADR-0015), merged 2026-08-06: the key is
+  entered in Settings and stored in the **Windows Credential Manager**, not in
+  `.env` and not in SQLite — the database is copied by backup and attached to
+  bug reports. Precedence is store → `.env`, which stays supported. Three
+  additive endpoints; no migration, `SCHEMA_VERSION` stays 14 and
+  `contract_version` stays `1.1`.
+
+  Two rules are tests rather than comments: the resolved key never reaches
+  `os.environ` (Git runs as a subprocess and inherits it), and no response
+  carries the value or any part of it — no last-4 mask, since a suffix is still
+  key material. A backup therefore does not carry the credential.
+
+- Pushed to GitHub 2026-08-06, which required rewriting 104 commits to clear a
+  secret-scanner false positive on a placeholder in the redaction test fixtures.
+  No force-push was needed. The full account, including the 29 commit hashes
+  remapped afterwards, is in `docs/plans/PLAN.md`.
+
 ## Still Open
 
 Carried into approvals as declared work, with no later phase to absorb them:
 
 1. **The packaged executable is unsigned** — SmartScreen warns on first run.
    Needs a certificate, which is a purchasing decision.
-2. **Four conversation-route browser tests are skipped on Chromium**, whose
-   renderer crashes navigating to `/conversations/{id}`. A browser defect,
-   unresolved upstream. Firefox proves all seven.
+2. **Five browser tests are skipped on Chromium, across four spec files** —
+   `onboarding-to-citation`, `restart-persistence`, `settings`, and
+   `stream-reconnection`. The renderer dies on a client-side navigation; a
+   browser defect, unresolved upstream. Firefox runs every one of them.
+
+   *Updated 2026-08-07:* this previously read "four conversation-route tests …
+   on `/conversations/{id}`". The defect has since been hit on more routes, so
+   the route-specific wording understated it.
 3. **No pid-reuse detection in recovery** — if a dead run's pid is reassigned
    before the next start, that repository stays blocked from reindexing.
    `codeatlas doctor` names the run and its pid, so it is visible, not silent.
 4. **The packaged semantic tree is 1.05 GB.**
-5. **`POST /v1/models/test`'s success branch is untested** — it needs an
-   available provider, and no optional extra is installed in the gate
-   environment, so only the `PROVIDER_DISABLED` branch is exercised.
+5. **`POST /v1/models/test`'s success branch is untested.** Both tests that
+   reach it assert `ok is False`; nothing asserts `ok is True`.
+
+   *Updated 2026-08-07:* the original reason — no optional extra installed —
+   no longer holds, since both extras were installed on 2026-08-06. Work done
+   that day made the *failure* deterministic and was briefly recorded as
+   closing this item; it did not. The gap is unchanged, and now cheaper to
+   close than it has ever been.
 6. **Recall@10 is 0.6667 against a ≥0.90 target** (Phase 7, condition 7).
 7. **Changed-symbol precision is 0.9375 against ≥0.95** (Phase 4, structural).
 
