@@ -29,12 +29,12 @@ development order is finished. A new phase requires an explicit user decision.
 
       **Correction (2026-08-06):** only `memory.md` ever reached `main`. The
       other five were written on the unmerged branch
-      `per-repository-embedding-model` (`f30e74c`), so `CLAUDE.md` sent every
+      `per-repository-embedding-model` (`f76e1ff`), so `CLAUDE.md` sent every
       agent to five files that were not in the worktree. Recovered file-by-file
       and corrected on 2026-08-06 — see below.
 
 - [x] `documentation/` recovered and corrected (2026-08-06): the five missing
-      files restored from `f30e74c` **without merging that branch**, and
+      files restored from `f76e1ff` **without merging that branch**, and
       corrected for what `main` actually had at that moment.
 
       **Superseded hours later**, when the user asked for the embedding-model
@@ -180,7 +180,7 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 ## Known Issues
 
 - **The explanation A/B is no longer a gate step** (fixed 2026-08-04). It threw
-  on every run since `2d7e511` because the gate passed `--semantic-baseline` to
+  on every run since `ff08d1e` because the gate passed `--semantic-baseline` to
   a script rewritten to take `--dataset`. Removed rather than re-pointed: the
   rewrite measures a live `llama3.2:3b`, and `--check` measures first and
   compares afterwards, so any invocation needs Ollama running. Making the gate
@@ -236,7 +236,7 @@ Carried into gate approvals as declared work rather than dropped:
   UI prints the `ollama pull …` command for the user to run in a terminal, which
   is what `docs/operations/answer-generation.md` has always said.
 
-  If the feature is ever wanted, `git show 3c631ce` has the implementation.
+  If the feature is ever wanted, `git show 63c57cd` has the implementation.
 
 - **`renderWithProviders` accepts a `client` option nothing passes.** Harmless
   unused extension point in `apps/web/src/test/harness.tsx`.

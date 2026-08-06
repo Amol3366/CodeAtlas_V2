@@ -323,7 +323,7 @@ parent's environment. That rule is a test, not a comment.
 it expects and displays the `ollama pull …` command for you to run in a
 terminal. There is no pull endpoint: `pull_ollama_model` was deleted on
 2026-08-05 rather than left as unreachable code, and that decision was preserved
-when ADR-0014 landed. `git show 3c631ce` has the implementation if it is ever
+when ADR-0014 landed. `git show 63c57cd` has the implementation if it is ever
 wanted.
 
 ## Where to Read Next

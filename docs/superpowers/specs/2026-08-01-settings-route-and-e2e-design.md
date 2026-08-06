@@ -221,8 +221,8 @@ it. It is the conversation-route defect's class, on a second route.
 Given the choice between skipping the test on Chromium and reaching the same
 rendering by full page load, the user chose the full page load. So:
 
-- **Decision 4 is withdrawn.** No repository is seeded; commit `9ea1c33` was
-  reverted by `2f962c7`. The transmitting test sets the policy through the real
+- **Decision 4 is withdrawn.** No repository is seeded; commit `246edea` was
+  reverted by `71008ec`. The transmitting test sets the policy through the real
   API on whichever repository a fresh load will show, and restores it in a
   `finally` block.
 - **Decision 5 holds, and cost nothing.** Both tests run on both engines and no

@@ -188,7 +188,7 @@ reopened tasks:
 - 2026-08-05: `pull_ollama_model` was **deleted**. It had no route and no
   caller, so `POST /v1/models/ollama/pull` never existed. CodeAtlas does not
   download models; Settings prints the `ollama pull …` command for the user to
-  run. `git show 3c631ce` retains the implementation.
+  run. `git show 63c57cd` retains the implementation.
 - Per-repository embedding model (ADR-0014), merged 2026-08-06: the local
   provider takes any sentence-transformers model id per repository, chosen in
   Settings. `POST /v1/models/embedding/validate` loads the candidate and

@@ -54,7 +54,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Task status     | `complete` - Phase 7 stays approved. The 2026-08-04/05 work is post-gate usability/provider polish, the inline-citation answer view, and documentation, not a reopened phase task                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Agent           | Claude Code `claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Started UTC     | 2026-08-05T06:55:00Z (commit and merge of the previously uncommitted post-gate work; earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Git state       | Branch `main` at `f34e28c`, merging `settings-and-provider-polish` (`9f3b202`) and `inline-citations-and-evidence-panel` (`61f23e0`). Working tree clean apart from this plan and `documentation/memory.md`. The post-gate Settings/provider work is **no longer uncommitted** - it had been sitting in a working tree since 2026-08-04, on the branch of an unrelated feature                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Git state       | Branch `main` at `8fd18b2`, merging `settings-and-provider-polish` (`ae019c9`) and `inline-citations-and-evidence-panel` (`b30b682`). Working tree clean apart from this plan and `documentation/memory.md`. The post-gate Settings/provider work is **no longer uncommitted** - it had been sitting in a working tree since 2026-08-04, on the branch of an unrelated feature                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
 | Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision. The Settings old-view report is **root-caused and closed**: it was a packaged build predating the redesign, not browser caching (2026-08-05 handoff)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
@@ -207,6 +207,104 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-06T08:00:00Z — History rewritten to clear a scanner false positive
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: none. Repository maintenance; no product behaviour changed.
+
+**This entry records a rewrite of history, which this plan otherwise forbids.**
+It is written first and in full because the alternative — a rewrite that left no
+trace — is the thing the append-only rule exists to prevent.
+
+#### Why
+
+GitHub push protection refused every push of `main`, naming a **Slack API Token**
+at `tests/security/test_secret_redaction.py:31` in commit `5ea8ab8`. The string
+was an `xoxb-` prefix followed by counting digits and the alphabet — a
+placeholder fixture in the parametrised table that proves `redaction.py` strips
+credentials, sitting beside `AKIAIOSFODNN7EXAMPLE` and `sk-` + `"a" * 48`. It is
+described here rather than quoted, for the reason in *Next* below. No real
+credential was
+ever involved: `.env` is git-ignored, has never been committed, and the user's
+actual key appears in no commit on any branch (searched by exact value).
+
+The scanner was pattern-matching correctly; the pattern was a placeholder. The
+irony is worth keeping: the file that blocked the push is the suite whose whole
+job is proving secrets never escape.
+
+The user allowlisted the secret in GitHub's UI. Three subsequent pushes were
+rejected identically, so the bypass never took effect. After 14 commits were
+pushed successfully up to `5ea8ab8~1`, isolating the blocker to that one commit,
+the user chose the rewrite over further attempts.
+
+#### What changed
+
+One line, in every commit that carried it. The literal was split exactly as its
+neighbours in the same table already were:
+
+```python
+("slack bot token", "xoxb-" + "123456789012-1234567890123-abcdefghijklmnop"),
+```
+
+**The runtime value is byte-identical**, verified: the test still feeds
+`redact()` the same string and still asserts it is removed. What changed is that
+the source no longer contains the literal for a scanner to match. 25 tests in
+that file pass unchanged.
+
+`git filter-branch --tree-filter` over `5ea8ab8~1..HEAD`, which preserves merge
+topology — this range contains merge commits and a rebase would have flattened
+them. 104 commits rewritten.
+
+#### The cost, paid rather than hidden
+
+Rewriting `5ea8ab8` changed its SHA and every descendant's. **29 commit hashes
+cited as evidence in this log and in `documentation/` became dangling pointers**,
+including `3c631ce` (the deleted Ollama pull implementation), `89ebc54`,
+`f30e74c`, `69023f3`, `a93c273`, and `fc61152`.
+
+Each was remapped to the commit that replaced it, matched on author date and
+subject, and 57 references were rewritten across five files. Every SHA cited in
+`docs/` and `documentation/` now resolves on `main` — verified by walking every
+7-character hex string in those trees and checking ancestry.
+
+Two references remain dangling and were **deliberately left alone**: `a517bc9`
+("wip: snapshot of main's uncommitted partial Phase 4 work") and `f50c5cc`
+("Initial commit"). Both were already unreachable *before* this rewrite, so
+inventing replacements would have been fabricating a record rather than
+repairing one.
+
+The prose of every handoff entry is untouched. Only hash pointers moved, and
+only to the commits that now carry the same content.
+
+#### What was not rewritten
+
+Nothing already published. `origin/main` stood at `344ab7d` = `5ea8ab8~1`, so the
+rewrite began one commit after the remote tip and the subsequent push was an
+ordinary fast-forward. **No force-push was used or needed**, and no commit that
+anyone else could have fetched was altered.
+
+`backup-before-rewrite` holds the pre-rewrite tip (`854bea6`) for as long as it
+is useful.
+
+#### Verification
+
+- `tests/security/test_secret_redaction.py` — 25 passed, same values asserted.
+- Full gate re-run after the rewrite; result recorded below.
+- Every cited SHA in `docs/` and `documentation/` resolves on `main` except the
+  two named above, which predate this change.
+
+#### Next
+
+If the fixture ever needs to change again, split the literal at the point of
+writing. A test that must contain credential-shaped strings should never contain
+one a scanner will recognise.
+
+**And the same rule applies to this log.** The first version of this entry
+quoted the offending string verbatim to explain it, which reintroduced the exact
+literal the rewrite had just removed — the next push was blocked on
+`docs/plans/PLAN.md` instead of on the test file. Describe a scannable string;
+do not paste it. Documenting a secret is a way of committing one.
+
 ### 2026-08-06T06:00:00Z — ADR-0015: the OpenAI key is entered in Settings
 
 - Agent: Claude Code `claude-opus-5`, branch `frontend-credential-entry`.
@@ -355,7 +453,7 @@ was not clean.
 
 - **The Ollama pull was dropped.** The branch built a `POST /v1/models/ollama/pull`
   route, service method, hook, and UI on 2026-08-04. `main` deleted the
-  underlying `pull_ollama_model` a day later in `89ebc54` on the product ground
+  underlying `pull_ollama_model` a day later in `80fee12` on the product ground
   that CodeAtlas does not download models. The merge silently rejoined the
   branch's route to a function `main` no longer has — an `ImportError` waiting at
   the first call. `main`'s newer decision was preserved and the whole pull
@@ -364,12 +462,12 @@ was not clean.
   operations-doc sections describing it. The embedding-model selection the merge
   existed for was kept.
 - **`optionClass` regressed and was re-fixed.** The branch's component predates
-  `69023f3`, so its option card ignored `checked` when `disabled` — the exact bug
+  `b32c7fa`, so its option card ignored `checked` when `disabled` — the exact bug
   where a selected-but-unavailable provider draws as unselected. Ported forward.
 - **The coverage e2e assertion moved to the anchor it always wanted.** The branch
   redesigned the coverage panel from a sentence to a percentage plus a
   `progressbar`, and never touched `apps/web/e2e/settings.spec.ts`. That spec had
-  been changed by `3187742` *away* from a progressbar assertion — which had never
+  been changed by `4890706` *away* from a progressbar assertion — which had never
   executed because no such element existed — with a comment recording that a
   progress bar "would be the better anchor for a screen-reader user and is worth
   building". ADR-0014 built it, so the assertion returns to it.
@@ -405,7 +503,7 @@ released build ever served.
 - The 3 new skips are environment-conditional tests that assert default-environment
   behavior and correctly skip now that `semantic-local` is installed.
 - `scripts/build_package.ps1` re-run: the gate's
-  `test_the_packaged_web_assets_match_the_source_build` guard (added `fc61152`)
+  `test_the_packaged_web_assets_match_the_source_build` guard (added `7c0d9a0`)
   caught the stale packaged bundle, which is precisely the failure mode that cost
   three debugging rounds on 2026-08-05.
 
@@ -443,11 +541,11 @@ folder had been completed. Every agent entering through `CLAUDE.md` was being
 sent to five missing files on its first instruction.
 
 They were not lost. They were written on branch
-`per-repository-embedding-model` (`f30e74c`, 2026-08-04) and that branch was
+`per-repository-embedding-model` (`f76e1ff`, 2026-08-04) and that branch was
 never merged. `git log --all --diff-filter=A -- 'documentation/*'` found them;
 there is no deletion commit anywhere in the history.
 
-The five files were recovered individually with `git show f30e74c:<path>`
+The five files were recovered individually with `git show f76e1ff:<path>`
 rather than by merging the branch. That branch also carries ADR-0014 and the
 per-repository embedding-model feature, none of which is on `main`; merging it
 to recover documentation would have imported an unapproved feature and its ADR
@@ -471,18 +569,18 @@ Because the files were authored against that branch, they described a product
   citations, the commit/merge, and the `pull_ollama_model` deletion added.
 - `design.md` — "download an Ollama model" removed from the Settings component
   notes; inline citation markers, on-demand evidence-panel mounting, and the
-  selected-but-unavailable provider rule (`69023f3`) documented.
+  selected-but-unavailable provider rule (`b32c7fa`) documented.
 - `rules.md` — no change. It is policy, not status, and nothing in it had drifted.
 
 That endpoint never existed on `main`. `pull_ollama_model` had no route and no
-caller and was deleted in `89ebc54` on 2026-08-05; the recovered docs predate
+caller and was deleted in `80fee12` on 2026-08-05; the recovered docs predate
 that by a day and describe it as shipped.
 
 #### Files
 
 `documentation/PRD.md`, `documentation/architecture.md`,
 `documentation/design.md`, `documentation/phases.md`, `documentation/rules.md`
-(all recovered from `f30e74c`, four then corrected); `documentation/memory.md`;
+(all recovered from `f76e1ff`, four then corrected); `documentation/memory.md`;
 this file. `CLAUDE.md` was **not** edited — every path it names now resolves, so
 the table was correct and the worktree was the bug.
 
@@ -494,7 +592,7 @@ None. No source, schema, contract, or test was touched.
 
 - `git log --all --diff-filter=A -- 'documentation/*'` located the origin
   commit; `git log --all --diff-filter=D` confirmed no deletion exists.
-- `git merge-base --is-ancestor f30e74c main` → false, confirming the branch is
+- `git merge-base --is-ancestor f76e1ff main` → false, confirming the branch is
   unmerged and its contents are not otherwise on `main`.
 - Migration and ADR counts checked directly against `git ls-files`.
 - `ProviderPolicy` read at `src/codeatlas/domain/semantic.py:167` to confirm the
@@ -535,7 +633,7 @@ is today and would need updating alongside it.
 #### Outcome
 
 Verifying the packaged build found a defect in the styling committed in
-`a93c273`, hours old.
+`6986ba6`, hours old.
 
 `optionCardClass` returned the disabled treatment for any unavailable option
 and discarded the selected treatment with it. A repository stored as
@@ -552,7 +650,7 @@ environment problem.
 A selected-but-unavailable card now keeps its accent border and ring while
 staying muted, non-choosable, and stating what it requires.
 
-It was never a regression — before `a93c273` nothing was styled, so no selection
+It was never a regression — before `6986ba6` nothing was styled, so no selection
 was visible either — but it became wrong the moment selection started being
 expressed visually.
 
@@ -705,7 +803,7 @@ improvement, described in `apps/web/e2e/settings.spec.ts`.
 `check_phase7.ps1 -SkipSync` was run against the merged tree. **The first run
 failed**, exit 1, with three end-to-end failures — all in
 `apps/web/e2e/settings.spec.ts`, and both root causes introduced by commit
-`1d2080c`, whose assertions had never been executed before being written.
+`32fd8e9`, whose assertions had never been executed before being written.
 
 Neither was a product defect:
 
@@ -782,7 +880,7 @@ if the accessibility improvement is wanted, and consider making
 
 ### 2026-08-05T07:25:00Z — Packaged bundle probe: the Settings report is closed
 
-- Agent: Claude Code `claude-opus-5`, branch `main` at `f34e28c`.
+- Agent: Claude Code `claude-opus-5`, branch `main` at `8fd18b2`.
 - Transition: none. Completes the outstanding item declared in the
   2026-08-05T06:55:00Z entry below.
 
@@ -830,9 +928,9 @@ correct `README.md`, and consider making `build_package.ps1` refuse when
 ### 2026-08-05T06:55:00Z — Post-gate work committed and merged; the stale Settings view root-caused
 
 - Agent: Claude Code `claude-opus-5`. Branches: `settings-and-provider-polish`
-  at `9f3b202` (new, seven commits off `main`),
-  `inline-citations-and-evidence-panel` at `61f23e0` (pre-existing, eight
-  commits). Both merged into `main`, now at `f34e28c`.
+  at `ae019c9` (new, seven commits off `main`),
+  `inline-citations-and-evidence-panel` at `b30b682` (pre-existing, eight
+  commits). Both merged into `main`, now at `8fd18b2`.
 - Transition: none. Phases 0–7 stay `complete`. This is post-gate work from a
   user report, not a reopened phase task.
 
@@ -863,16 +961,16 @@ committed in seven scoped commits and merged.
 #### Files
 
 - Committed on `settings-and-provider-polish` (previously uncommitted):
-  `apps/web/src/routes/SettingsRoute.tsx` (`bc3671d`),
+  `apps/web/src/routes/SettingsRoute.tsx` (`519c0be`),
   `src/codeatlas/api/web.py` + `tests/integration/test_serve_web.py`
-  (`e5b9e72`), `src/codeatlas/conversations/intent.py` +
-  `tests/unit/test_intent_rules.py` (`884f41b`),
+  (`10fff8b`), `src/codeatlas/conversations/intent.py` +
+  `tests/unit/test_intent_rules.py` (`2440dd1`),
   `src/codeatlas/generation/ollama_provider.py` +
-  `tests/unit/test_ollama_answer_provider.py` (`3c631ce`),
-  `apps/web/e2e/settings.spec.ts` (`1d2080c`),
+  `tests/unit/test_ollama_answer_provider.py` (`63c57cd`),
+  `apps/web/e2e/settings.spec.ts` (`32fd8e9`),
   `apps/web/e2e/restart-persistence.spec.ts` +
-  `apps/web/src/test/harness.tsx` (`8c1e033`),
-  `README.md` + `CLAUDE.md` (`9f3b202`).
+  `apps/web/src/test/harness.tsx` (`f4b5f29`),
+  `README.md` + `CLAUDE.md` (`ae019c9`).
 - Modified after the merges: `documentation/memory.md`, this plan.
 - A pre-merge patch of the uncommitted tree (907 lines) was captured to the
   session scratchpad before any branch operation.
@@ -924,7 +1022,7 @@ separately but never together:
   REST route and no UI call it, so the `POST /v1/models/ollama/pull` endpoint
   described in `README.md` (~line 97) **does not exist**. The Settings UI only
   prints the `ollama pull …` command for the user to run themselves. It was
-  committed anyway to preserve the tested building block, and `3c631ce` says so.
+  committed anyway to preserve the tested building block, and `63c57cd` says so.
   Either wire it or correct the README.
 - `renderWithProviders` gained a `client` option that nothing passes.
 - No Playwright run was executed for this work. `settings.spec.ts` and
@@ -941,7 +1039,7 @@ phantom UI regression.
 ### 2026-08-04T23:50:00Z — Per-repository embedding model (ADR-0014)
 
 - Agent: Claude Code `claude-opus-5`, branch `per-repository-embedding-model`,
-  ten commits ahead of `main` at `56c1431`.
+  ten commits ahead of `main` at `abfe175`.
 - Transition: none. Phases 0–7 stay `complete`; this is post-gate work from a
   user request, not a reopened phase task.
 
@@ -1042,7 +1140,7 @@ Playwright coverage for the new Settings field is the obvious follow-up.
 ### 2026-08-04T22:05:00Z — Ephemeral session mode (ADR-0013)
 
 - Agent: Claude Code `claude-opus-5`, branch `ephemeral-session-mode` at
-  `af5ec06`, four commits ahead of `main` at `2d7e511`.
+  `7b5d9a6`, four commits ahead of `main` at `ff08d1e`.
 - Transition: none. Phases 0–7 stay `complete`; this is post-gate work from a
   user request, not a reopened phase task.
 
@@ -1116,7 +1214,7 @@ pending one user observation rather than a fourth guess.
 #### Gate repair (2026-08-04, on the user's instruction)
 
 The gate threw at "Phase 7 explanation A/B artifact" on every run since
-`2d7e511`, which rewrote `run_phase7_explanation_ab.py` to take `--dataset`
+`ff08d1e`, which rewrote `run_phase7_explanation_ab.py` to take `--dataset`
 while `check_phase7.ps1:115` still passed `--semantic-baseline`.
 
 **The step was removed rather than re-pointed.** The rewritten script measures a
@@ -1161,7 +1259,7 @@ freshly opened tab at `/settings` shows the current UI.
 
 ### 2026-08-03T20:17:35Z - Post-gate UX/provider polish and documentation refresh
 
-- Agent: Codex GPT-5, branch `main` at `2d7e511`.
+- Agent: Codex GPT-5, branch `main` at `ff08d1e`.
 - Transition: none. Phases 0-7 stay `complete`; this is post-gate work from
   the user's requests, not a reopened phase task.
 
@@ -1247,7 +1345,7 @@ old-view browser observation unless the user asks to resume that investigation.
 ### 2026-08-02T13:53:34Z — Evidence-grounded answer generation
 
 - Agent: Claude Code `claude-opus-5`, branch `env-provider-configuration` at
-  `32f1f75`, 28 commits ahead of `main` at `bb1580f`.
+  `3e97ce9`, 28 commits ahead of `main` at `6caaa5f`.
 - Transition: none. Phase 7 stays `complete`; this is post-gate work on the
   user's request, not a reopened task. **Phase 7's `declined` status for
   generated explanations is deliberately unchanged** — see "Admission status"
@@ -1376,9 +1474,9 @@ The five Phase 7 carried items are untouched by this work.
 
 Four commits of the user's in-flight work, committed first so it kept its own
 identity rather than being swept into this feature: the TypeScript type-member
-collision fix (`e4b0f79`, parser bundle 1.2.0 → 1.2.1), conversational greeting
-and project-overview intents (`72c4cfa`, retrieval policy 5.0 → 5.2), chat-first
-web routing (`dc72ffa`), and a `.gitignore` entry for dev-server logs.
+collision fix (`ed92964`, parser bundle 1.2.0 → 1.2.1), conversational greeting
+and project-overview intents (`532f1b0`, retrieval policy 5.0 → 5.2), chat-first
+web routing (`18ddac4`), and a `.gitignore` entry for dev-server logs.
 
 - Next: await user instruction. The branch is unmerged; `docs/plans/PLAN.md`
   also carries an unrelated formatter reflow in the working tree.
@@ -1411,7 +1509,7 @@ the same policy lineage.
 ### 2026-08-01T12:10:10Z — `.env` configuration for provider credentials and models
 
 - Agent: Claude Code `claude-opus-5`, branch `env-provider-configuration` off
-  `main` at `bb1580f`.
+  `main` at `6caaa5f`.
 - Transition: none. Phase 7 stays `complete`; this is post-gate work on the
   user's request, not a reopened task.
 - ADR: **ADR-0011**, which amends ADR-0009 decision 4 rather than editing it.
@@ -1519,7 +1617,7 @@ None required. Awaiting user instruction; the branch is unmerged.
 ### 2026-08-01T10:26:17Z — Two carried items closed: the settings route and its coverage
 
 - Agent: Claude Code `claude-opus-5`, branch `settings-route-and-e2e` off `main`
-  at `30900c6`.
+  at `719477d`.
 - Transition: none. Phase 7 stays `complete`; this is post-gate remediation of
   work carried into the approval, not a reopened task. No task ID was created,
   because the Section 20 development order is finished and reopening the board
@@ -1583,7 +1681,7 @@ repository a fresh load will show, and restored in a `finally` block.
   `apps/web/src/app/Shell.test.tsx`, `docs/operations/end-to-end-tests.md`,
   `docs/operations/web-application.md`, `CLAUDE.md`.
 - Reverted in place: `scripts/e2e_backend.py` and
-  `apps/web/e2e/support/backend.ts` (commit `9ea1c33`, reverted by `2f962c7`).
+  `apps/web/e2e/support/backend.ts` (commit `246edea`, reverted by `71008ec`).
 
 #### Contracts, migrations, compatibility
 
@@ -1626,7 +1724,7 @@ None required. Awaiting user instruction; the branch is unmerged.
 
 ### 2026-07-31T09:45:00Z — Post-gate code review: eight findings, all fixed
 
-- Agent: Claude Code `claude-opus-5`, branch `main` at `a51a7bf`.
+- Agent: Claude Code `claude-opus-5`, branch `main` at `4f802cc`.
 - Transition: none. Phase 7 stays `complete`; this is post-gate remediation, not
   a reopened task.
 - Trigger: the user ran a code review over the unpushed range after approving
@@ -1721,7 +1819,7 @@ Recorded because a gate approved on incomplete evidence should say so.
 
 ### 2026-07-31T09:08:23Z — Phase 7 gate approved by the user; Phase 7 complete
 
-- Agent: Claude Code `claude-opus-5`, branch `main` at `f0840ef`.
+- Agent: Claude Code `claude-opus-5`, branch `main` at `1187ee5`.
 - Transition: Phase 7 `awaiting_user_approval -> complete`.
 - **Approval: the user approved the Phase 7 completion gate on 2026-07-31**,
   after the condition-by-condition summary in the two P7-12 handoff entries
@@ -1782,7 +1880,7 @@ ADR-0009; migrations `0010` and `0011`; `scripts/check_phase7.ps1`;
 `docs/evaluation/rerank-phase-7.{json,md}`,
 `docs/evaluation/explanation-phase-7.{json,md}`;
 `docs/operations/semantic-search.md`; the Phase 7 enforcement table in
-`docs/security/threat-model.md`; commits `5ea8ab8` and `f0840ef`.
+`docs/security/threat-model.md`; commits `38cc393` and `1187ee5`.
 
 #### This closes the development order
 
@@ -1805,7 +1903,7 @@ should treat them as such rather than assuming a plan exists.
 
 ### 2026-07-31T09:20:00Z — P7-12 complete; Phase 7 awaiting user approval
 
-- Agent: Claude Code `claude-opus-5`, branch `main` at `5ea8ab8`.
+- Agent: Claude Code `claude-opus-5`, branch `main` at `38cc393`.
 - Transition: P7-12 `verifying -> complete`; Phase 7
   `in_progress -> awaiting_user_approval`.
 - This entry records the gate run promised by the previous entry. The condition
@@ -1904,7 +2002,7 @@ the activation gate; the settings page is not routed in the web shell; and the
 
 ### 2026-07-31T08:57:29Z — P7-12 verifying; Phase 7 gate summary prepared
 
-- Agent: Claude Code `claude-opus-5`, branch `main` at `5ea8ab8`.
+- Agent: Claude Code `claude-opus-5`, branch `main` at `38cc393`.
 - Transition: P7-12 `in_progress -> verifying`.
 - Context: this task was left `in_progress` by the previous agent with its
   measurement and documentation work done but uncommitted and unsummarised.
@@ -1916,7 +2014,7 @@ the activation gate; the settings page is not routed in the web shell; and the
 `344ab7d` (P7-04). P7-05 through P7-12 — the semantic retrieval channel,
 governance, the settings surface, migration `0011`, the rerank and explanation
 seams, and every Phase 7 evaluation artifact — were uncommitted: 102 files,
-12,964 insertions. Committed as `5ea8ab8`. A phase whose evidence lives in one
+12,964 insertions. Committed as `38cc393`. A phase whose evidence lives in one
 working tree is one `git checkout` from being unreproducible.
 
 Two unrelated edits were found in that diff and handled separately rather than
