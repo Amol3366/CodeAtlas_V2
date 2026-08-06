@@ -47,6 +47,8 @@ class ErrorCode(StrEnum):
     PROVIDER_DISABLED = "PROVIDER_DISABLED"
     PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
     PROVIDER_BUDGET_EXCEEDED = "PROVIDER_BUDGET_EXCEEDED"
+    CREDENTIAL_STORE_UNAVAILABLE = "CREDENTIAL_STORE_UNAVAILABLE"
+    CREDENTIAL_WRITE_FAILED = "CREDENTIAL_WRITE_FAILED"
     EMBEDDING_MIGRATION_NOT_FOUND = "EMBEDDING_MIGRATION_NOT_FOUND"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
@@ -366,4 +368,24 @@ class EmbeddingMigrationNotFoundError(CodeAtlasError):
     """No shadow embedding migration matches the supplied ID."""
 
     code = ErrorCode.EMBEDDING_MIGRATION_NOT_FOUND
+
+
+class CredentialStoreUnavailableError(CodeAtlasError):
+    """No OS credential store on this platform.
+
+    Not an internal error: on a non-Windows machine this is the expected
+    state, and `.env` remains a supported way to supply the key.
+    """
+
+    code = ErrorCode.CREDENTIAL_STORE_UNAVAILABLE
+
+
+class CredentialWriteFailedError(CodeAtlasError):
+    """The OS credential store rejected the write.
+
+    The underlying Windows error number goes in `details`, never the value
+    that was being written.
+    """
+
+    code = ErrorCode.CREDENTIAL_WRITE_FAILED
 
