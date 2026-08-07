@@ -12,7 +12,7 @@ import {
 import { keys } from "../../lib/queries";
 import type { StreamSubscription } from "../../lib/sse";
 import { subscribeToConversation } from "../../lib/sse";
-import { ErrorNotice } from "../repositories/RepositoryPanel";
+import { ErrorNotice } from "../../components/ErrorNotice";
 
 /**
  * One conversation thread.

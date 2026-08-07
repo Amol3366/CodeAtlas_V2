@@ -1,7 +1,7 @@
 import { useState } from "react";
 
+import { ErrorNotice } from "../../components/ErrorNotice";
 import { Skeleton } from "../../components/Skeleton";
-import { ApiError } from "../../lib/api";
 import {
   useAddRepository,
   useDiagnostics,
@@ -18,20 +18,6 @@ import {
  * a skeleton stands only for a request actually in flight, and a stage is
  * whatever the snapshot says it is (`AGENTS.md` Section 14.2).
  */
-
-export function ErrorNotice({ error }: { readonly error: unknown }) {
-  // The envelope's code appears beside the message so a user reporting a
-  // problem can quote something stable. A stack trace is never rendered.
-  const code = error instanceof ApiError ? error.code : "INTERNAL_ERROR";
-  const message =
-    error instanceof ApiError ? error.message : "The request failed.";
-  return (
-    <p role="alert" className="mt-[var(--space-3)] text-sm text-danger">
-      <span className="font-medium">{message}</span>{" "}
-      <code className="text-text-muted">{code}</code>
-    </p>
-  );
-}
 
 export function AddRepositoryForm({
   onAdded,

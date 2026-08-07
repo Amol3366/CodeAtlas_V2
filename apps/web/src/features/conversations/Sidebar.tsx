@@ -10,7 +10,7 @@ import {
   useDeleteConversation,
   useRenameConversation,
 } from "../../lib/conversations";
-import { ErrorNotice } from "../repositories/RepositoryPanel";
+import { ErrorNotice } from "../../components/ErrorNotice";
 
 /**
  * The conversation sidebar (`AGENTS.md` Section 14.1).

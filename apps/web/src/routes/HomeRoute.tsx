@@ -9,7 +9,7 @@ import {
   useCreateConversation,
 } from "../lib/conversations";
 import { useRepositoryStatus } from "../lib/queries";
-import { ErrorNotice } from "../features/repositories/RepositoryPanel";
+import { ErrorNotice } from "../components/ErrorNotice";
 
 /**
  * Chat entry route.

@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 
 import { api } from "../../lib/api";
-import { ErrorNotice } from "../repositories/RepositoryPanel";
+import { ErrorNotice } from "../../components/ErrorNotice";
 
 /**
  * The change-preflight experience (`AGENTS.md` Section 14.1).
