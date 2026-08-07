@@ -46,7 +46,12 @@ from codeatlas.application.ephemeral_bootstrap import (
 from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
-from codeatlas.contracts import ChangeAnalysisReport, QueryResponse
+from codeatlas.contracts import (
+    SEVERITY_ORDER,
+    ChangeAnalysisReport,
+    QueryResponse,
+    Severity,
+)
 from codeatlas.delivery import (
     render_markdown,
     render_pr_markdown,
@@ -85,6 +90,13 @@ EXIT_UNAVAILABLE = 3
 EXIT_PARTIAL = 4
 EXIT_POLICY_FAILURE = 5
 EXIT_INTERNAL_FAILURE = 6
+EXIT_RISK_THRESHOLD = 7
+"""A finding met the severity threshold a caller set with `--fail-on`.
+
+Deliberately not EXIT_POLICY_FAILURE, which already means PATH_NOT_ALLOWED
+and SCAN_LIMIT_EXCEEDED. A CI job must be able to tell "your change is
+risky" from "you pointed me at the wrong directory".
+"""
 
 # One list, checked by the guards and named in the help text. Two lists is
 # how `--format pr` shipped advertised in --help and rejected by the guard.
@@ -1250,6 +1262,13 @@ def impact(
     report_format: Annotated[
         str, typer.Option("--format", help="json, markdown, pr, sarif, or text.")
     ] = "text",
+    fail_on: Annotated[
+        str | None,
+        typer.Option(
+            "--fail-on",
+            help="Exit 7 if a finding is at or above this severity.",
+        ),
+    ] = None,
     database: DatabaseOption = None,
 ) -> None:
     """Analyze a working tree or commit range and print the report.
@@ -1264,6 +1283,20 @@ def impact(
             err=True,
         )
         raise typer.Exit(EXIT_INVALID_INPUT)
+
+    threshold: Severity | None = None
+    if fail_on is not None:
+        try:
+            threshold = Severity(fail_on)
+        except ValueError:
+            # A typo in a CI configuration must fail loudly rather than
+            # silently disabling the check it was meant to enforce.
+            typer.echo(
+                "INVALID_REQUEST: --fail-on must be one of "
+                f"{', '.join(item.value for item in SEVERITY_ORDER)}.",
+                err=True,
+            )
+            raise typer.Exit(EXIT_INVALID_INPUT) from None
 
     with _services(database) as services:
         try:
@@ -1294,6 +1327,20 @@ def impact(
             return
 
         _print_report(report, report_format)
+
+        if threshold is not None:
+            # SEVERITY_ORDER is most-severe-first, so "at or above" is a lower
+            # or equal index.
+            rank = SEVERITY_ORDER.index(threshold)
+            if any(
+                SEVERITY_ORDER.index(finding.severity) <= rank
+                for finding in report.findings
+            ):
+                raise typer.Exit(EXIT_RISK_THRESHOLD)
+            # A caller who asked "is anything at or above X?" got the answer
+            # "no", which is a success — not the no-findings partial below.
+            return
+
         if not report.findings:
             raise typer.Exit(EXIT_PARTIAL)
 
