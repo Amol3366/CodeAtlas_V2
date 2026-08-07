@@ -47,7 +47,7 @@ from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
 from codeatlas.contracts import ChangeAnalysisReport, QueryResponse
-from codeatlas.delivery import render_markdown, render_sarif
+from codeatlas.delivery import render_markdown, render_pr_markdown, render_sarif
 from codeatlas.domain.errors import (
     CodeAtlasError,
     ErrorCode,
@@ -1237,7 +1237,7 @@ def impact(
         ),
     ] = None,
     report_format: Annotated[
-        str, typer.Option("--format", help="json, markdown, or sarif.")
+        str, typer.Option("--format", help="json, markdown, pr, or sarif.")
     ] = "markdown",
     database: DatabaseOption = None,
 ) -> None:
@@ -1289,7 +1289,7 @@ def impact(
 def analysis(
     analysis_id: Annotated[str, typer.Argument(help="A stored analysis ID.")],
     report_format: Annotated[
-        str, typer.Option("--format", help="json, markdown, or sarif.")
+        str, typer.Option("--format", help="json, markdown, pr, or sarif.")
     ] = "markdown",
     database: DatabaseOption = None,
 ) -> None:
@@ -1312,6 +1312,8 @@ def analysis(
 def _print_report(report: ChangeAnalysisReport, report_format: str) -> None:
     if report_format == "markdown":
         typer.echo(render_markdown(report))
+    elif report_format == "pr":
+        typer.echo(render_pr_markdown(report))
     elif report_format == "sarif":
         typer.echo(json.dumps(render_sarif(report), indent=2))
     else:

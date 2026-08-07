@@ -31,7 +31,7 @@ from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import MAX_RESULTS, SymbolLookupRequest
 from codeatlas.application.registration import RegisterRepositoryRequest
 from codeatlas.contracts import ErrorDetail, ErrorEnvelope
-from codeatlas.delivery import render_markdown, render_sarif
+from codeatlas.delivery import render_markdown, render_pr_markdown, render_sarif
 from codeatlas.domain.errors import CodeAtlasError
 from codeatlas.retrieval.graph import MAX_ALLOWED_DEPTH, TraversalLimits
 from codeatlas.retrieval.lexical import MAX_SEARCH_RESULTS, SearchRequest
@@ -107,7 +107,7 @@ class AnalysisInput(ToolInput):
 class AnalysisReportInput(AnalysisInput):
     """Address one stored analysis and choose a rendering."""
 
-    report_format: Literal["json", "markdown", "sarif"] = "json"
+    report_format: Literal["json", "markdown", "pr", "sarif"] = "json"
 
 
 @dataclass(frozen=True)
@@ -493,6 +493,8 @@ def _get_change_report(services: ApplicationServices, payload: ToolInput) -> Any
     report = services.change_analysis.get(payload.analysis_id)
     if payload.report_format == "markdown":
         return {"format": "markdown", "content": render_markdown(report)}
+    if payload.report_format == "pr":
+        return {"format": "pr", "content": render_pr_markdown(report)}
     if payload.report_format == "sarif":
         return {"format": "sarif", "content": render_sarif(report)}
     return {"format": "json", "content": report.model_dump(mode="json")}

@@ -209,6 +209,7 @@ def test_a_stored_analysis_renders_in_three_formats_over_rest(
     for report_format, media in (
         ("json", "application/json"),
         ("markdown", "text/markdown"),
+        ("pr", "text/markdown"),
         ("sarif", "application/json"),
     ):
         response = client.get(
@@ -217,6 +218,43 @@ def test_a_stored_analysis_renders_in_three_formats_over_rest(
         )
         assert response.status_code == 200, response.text
         assert media in response.headers["content-type"]
+
+
+def test_the_pr_format_is_identical_through_every_adapter(
+    prepared: Fixture,
+) -> None:
+    """"Four ways in, one brain."
+
+    A format present in one adapter and not the others contradicts the claim
+    the PRD makes, and every format reads the same persisted rows — so the same
+    analysis must render identically regardless of which door it came through.
+    """
+    client = TestClient(create_app(prepared.database))
+    created = client.post(
+        "/v1/change-analysis/working-tree",
+        json={"repository_id": prepared.repository_id, "base_ref": "HEAD"},
+    ).json()
+    analysis_id = created["analysis_id"]
+
+    rest_text = client.get(
+        f"/v1/change-analysis/{analysis_id}/report",
+        params={"report_format": "pr"},
+    ).text
+
+    with connect(prepared.database) as connection:
+        services = build_services(connection)
+        registry = build_registry()
+        result = registry.call(
+            services,
+            "get_change_report",
+            {"analysis_id": analysis_id, "report_format": "pr"},
+        )
+    assert isinstance(result, dict)
+    mcp_text = str(result["content"])
+
+    assert "## CodeAtlas preflight" in rest_text
+    assert "## CodeAtlas preflight" in mcp_text
+    assert rest_text.strip() == mcp_text.strip()
 
 
 def test_an_unknown_analysis_is_a_404(prepared: Fixture) -> None:

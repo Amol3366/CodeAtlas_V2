@@ -16,11 +16,11 @@ from codeatlas.api.errors import request_id_for
 from codeatlas.api.routers.repositories import Services
 from codeatlas.application.change_analysis import ChangeAnalysisRequest
 from codeatlas.contracts import ChangeAnalysisReport, ContractModel
-from codeatlas.delivery import render_markdown, render_sarif
+from codeatlas.delivery import render_markdown, render_pr_markdown, render_sarif
 
 router = APIRouter(prefix="/v1/change-analysis", tags=["change-analysis"])
 
-ReportFormat = Literal["json", "markdown", "sarif"]
+ReportFormat = Literal["json", "markdown", "pr", "sarif"]
 
 _DEFAULT_FORMAT = Query(default="json")
 
@@ -85,6 +85,11 @@ def get_report(
     if report_format == "markdown":
         return PlainTextResponse(
             render_markdown(report), media_type="text/markdown; charset=utf-8"
+        )
+    if report_format == "pr":
+        return PlainTextResponse(
+            render_pr_markdown(report),
+            media_type="text/markdown; charset=utf-8",
         )
     if report_format == "sarif":
         return JSONResponse(render_sarif(report))
