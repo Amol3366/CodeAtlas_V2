@@ -787,7 +787,6 @@ def test_a_production_call_is_not_reported_as_called_not_imported() -> None:
     reason = by_name(result.test_gap_reasons, "orders.Order")
     assert reason is not None
     assert reason.reason is GapReasonCode.NO_TEST_FILE_REFERENCE
-    assert reason.reason is not GapReasonCode.CALLED_NOT_IMPORTED
 
 
 def test_an_imported_but_uncalled_symbol_says_so() -> None:
