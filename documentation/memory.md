@@ -432,16 +432,32 @@ Carried into gate approvals as declared work rather than dropped:
 Two follow-ups were raised by the ADR-0016 whole-branch review and deliberately
 **not** folded into that branch, so they are recorded here rather than lost:
 
-1. **The evaluation corpus cannot see derivation-tiered test edges.** The 24-case
-   Phase 4 corpus contains no fixture- or helper-mediated scenario, so
-   `run_phase4_baseline.py` produced a byte-identical report and
-   `check_phase4.ps1` passed. Nothing regressed — but the gate now reports green
-   on a feature it does not exercise. A future refactor could start promoting
-   fixture-mediated edges to `high_confidence_heuristic` and every published
-   metric would stay unchanged. The unit and integration tests do cover it, but
-   those are the same tests such a refactor would be tempted to update in step.
-   Add two change cases asserting a symbol *remains* in `test_gaps` with its
-   expected `GapReasonCode`, so the corpus fails if the invariant weakens.
+1. ~~**The evaluation corpus cannot see derivation-tiered test edges.**~~
+   **CLOSED 2026-08-08** by a separate invariant corpus
+   (`tests/evaluation/invariant_cases/` + `scripts/check_invariants.py`,
+   gated in `check_phase4.ps1`).
+
+   The original suggestion — "add two change cases to the Phase 4 corpus" —
+   turned out to be blocked, and finding out *why* is the reusable lesson.
+   `ChangeCase` is a `ContractModel` with `extra="forbid"`, so a case cannot
+   carry a gap expectation until the model carries the field; and adding a gap
+   metric to the evaluation report would change `baseline-phase-4.json`'s
+   shape, breaking the byte-for-byte `--check` that the project owner ruled
+   must keep passing. The two constraints together made extending that corpus
+   impossible without violating a standing ruling.
+
+   So the fix was a **second surface**, not a bigger first one: a corpus that
+   asserts a boolean rather than measuring accuracy, with its own committed
+   result artifact. Weakening the invariant now takes two visible acts in one
+   diff — editing corpus data and regenerating an artifact. Phase 4's corpus,
+   dataset models, runner, report model, and baseline are untouched, proven by
+   an empty `git diff --stat` against `main` on those paths.
+
+   Verified by mutation, not by assertion: making `LOW_CONFIDENCE_HEURISTIC`
+   qualify in `_test_gaps` makes the checker exit 7 naming `Order` and `total`.
+
+   **Standing rule:** this corpus does not grow into an accuracy corpus. A case
+   about how *well* something is detected belongs in the Phase 4 corpus.
 
 2. **`related_tests` is a second surface the invariant was never applied to.**
    `application/graph_queries.py` queries `kinds=(RelationKind.TESTS,)` with no

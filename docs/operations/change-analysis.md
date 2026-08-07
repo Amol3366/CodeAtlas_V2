@@ -105,6 +105,25 @@ failure modes. Finding a near-miss never removes the symbol from
 `test_gap_reasons` is an additive, optional field; `contract_version` stayed
 `"1.1"`.
 
+**How this is gated.** The Phase 4 corpus has no fixture- or helper-mediated
+case, so it cannot exercise the ADR-0016 invariant at all — every case there
+resolves through direct imports and calls, and nothing in that corpus moves
+when the tiering breaks. A separate corpus at
+`tests/evaluation/invariant_cases/` does exercise it, checked by
+`scripts/check_invariants.py` and recorded in `docs/evaluation/invariants.json`.
+Four cases run against one fixture tree whose four changed symbols are each
+reachable by exactly one path: fixture-mediated (`Order`), helper-mediated
+(`total`), a strict import-and-call edge that must still close a gap
+(`unused_helper`), and a symbol no test references (`audit`). One tree rather
+than four proves the reasons discriminate between each other in a single run.
+
+Regenerate the artifact by running the script without `--check`. A broken
+invariant exits 7; a stale artifact exits 5. The two are deliberately
+separate: one says the product regressed, the other says regenerate the file.
+
+This corpus asserts a boolean, never accuracy. A case about how *well*
+something is detected belongs in the Phase 4 corpus instead.
+
 **Reindex requirement.** `RESOLVER_VERSION` moved `1.1.0` → `1.2.0` because
 resolution now derives `CONSUMES_FIXTURE` and the two new `TESTS` tiers,
 which it did not derive before. Every snapshot resolved under `1.1.0` is
