@@ -505,10 +505,46 @@ Two follow-ups were raised by the ADR-0016 whole-branch review and deliberately
 
 No other assigned work. Candidates, in the order they'd most likely be picked up:
 
-1. **Investigate Recall@10** (0.6667 against a ≥0.90 target). The stopword
-   finding suggests lexical quality, not embedding quality, is where the
-   remaining headroom is: that one fix was worth +0.53 recall while the entire
-   semantic layer on top of it was worth +0.07.
+1. **Investigate the Phase 7 semantic baseline — four unmet targets, not one.**
+   Verified 2026-08-08 against `docs/evaluation/baseline-phase-7.json` and the
+   target table in `evaluation/runner.py:609-637`:
+
+   | Metric | Actual | Target |
+   | --- | ---: | ---: |
+   | `exact_symbol_resolution` | 0.2857 | 0.98 |
+   | `valid_evidence_rate` | 0.0563 | 1.00 |
+   | `changed_symbol_precision` | 0.2000 | 0.95 |
+   | `primary_evidence_recall_at_10` | 0.6667 | 0.90 |
+
+   **Start with `exact_symbol_resolution`, not Recall@10.** The previous version
+   of this entry named Recall@10 alone and sent a session at the mildest of the
+   four. `exact_symbol_resolution` at 0.2857 against a 0.98 target is the
+   largest and most specific gap on the board.
+
+   **Read every number here against the corpus size: 14 query cases and 1 change
+   case.** `changed_symbol_precision = 0.20` is computed from that single change
+   case — one prediction in five correct, once. It is an anecdote with a decimal
+   point. The semantic layer's whole Recall@10 gain (+0.0667) is about one
+   case's worth of movement, and semantics *lost* evidence precision to buy it
+   (exact evidence rate 0.0752 → 0.0563, containing 0.1278 → 0.1080).
+
+   So the first question is not "why is metric X low" but **whether this corpus
+   can distinguish a real fix from one tuned to three specific queries.** Same
+   failure mode as the two ADR-0016 corpus gaps closed on 2026-08-08: a metric
+   that cannot see what it claims to measure.
+
+   **Not yet verified, and worth doing first:** what `valid_evidence_rate`
+   counts as valid for this corpus. Its target is 1.0 (any imperfection is
+   unmet), so 0.0563 either means the evidence contract is failing badly or the
+   strict ADR-0003 reading measures something narrower than the name suggests.
+   Do not act on that number before checking its definition.
+
+   The stopword precedent still stands and is still the best lead on *lexical*
+   headroom: that one fix was worth +0.53 recall while the entire semantic layer
+   above it was worth +0.07. But the per-case results needed to act on it are
+   not in the artifact — it stores aggregates only, so diagnosing requires an
+   evaluation run with per-case output.
+
 2. **Decide on code signing** — a purchasing decision, not an engineering one.
    Until then the packaged executable is unsigned and SmartScreen warns.
 3. **Consider deleting the five stale local branches** whose content is in
