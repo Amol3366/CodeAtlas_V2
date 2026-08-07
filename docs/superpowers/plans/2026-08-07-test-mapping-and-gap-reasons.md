@@ -430,7 +430,7 @@ git commit -m "feat: emit CONSUMES_FIXTURE references for injected test paramete
 
 **Files:**
 - Modify: `src/codeatlas/extraction/resolution.py` (new `_derive_fixture_test_edges`, called from `resolve` after line 172)
-- Test: `tests/unit/test_resolution.py`
+- Test: `tests/integration/test_resolution.py`
 
 **Interfaces:**
 - Consumes: Task 3's `CONSUMES_FIXTURE` references; Task 2's `SymbolKind.FIXTURE`.
@@ -438,7 +438,7 @@ git commit -m "feat: emit CONSUMES_FIXTURE references for injected test paramete
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `tests/unit/test_resolution.py`, using the file's existing resolver-invocation helper.
+Add to `tests/integration/test_resolution.py`, using the file's existing resolver-invocation helper.
 
 ```python
 def test_a_fixture_mediated_test_produces_a_weak_edge() -> None:
@@ -479,7 +479,7 @@ Build each `resolve_*_repo` helper from the file's existing fixture-construction
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `uv run pytest tests/unit/test_resolution.py -k fixture -v`
+Run: `uv run pytest tests/integration/test_resolution.py -k fixture -v`
 Expected: FAIL — no fixture-mediated edge exists.
 
 - [ ] **Step 3: Implement**
@@ -647,17 +647,17 @@ Order matters: it runs after `_derive_test_edges` so `existing` already contains
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `uv run pytest tests/unit/test_resolution.py -v`
+Run: `uv run pytest tests/integration/test_resolution.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Mutation-check the precedence guard**
 
-Temporarily delete the `if key in existing or key in seen: continue` line. Run `uv run pytest tests/unit/test_resolution.py -k strict -v` and confirm `test_a_strict_edge_is_not_replaced_by_a_fixture_edge` FAILS. Restore the line and confirm it passes again. A guard whose removal breaks no test is not tested.
+Temporarily delete the `if key in existing or key in seen: continue` line. Run `uv run pytest tests/integration/test_resolution.py -k strict -v` and confirm `test_a_strict_edge_is_not_replaced_by_a_fixture_edge` FAILS. Restore the line and confirm it passes again. A guard whose removal breaks no test is not tested.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/codeatlas/extraction/resolution.py tests/unit/test_resolution.py
+git add src/codeatlas/extraction/resolution.py tests/integration/test_resolution.py
 git commit -m "feat: derive fixture-mediated TESTS edges at low confidence"
 ```
 
@@ -667,7 +667,7 @@ git commit -m "feat: derive fixture-mediated TESTS edges at low confidence"
 
 **Files:**
 - Modify: `src/codeatlas/extraction/resolution.py` (new `_derive_helper_test_edges`, called from `resolve` after Task 4's line)
-- Test: `tests/unit/test_resolution.py`
+- Test: `tests/integration/test_resolution.py`
 
 **Interfaces:**
 - Consumes: Task 4's `existing`-edge precedence convention.
@@ -707,7 +707,7 @@ def test_a_strict_edge_is_not_replaced_by_a_helper_edge() -> None:
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `uv run pytest tests/unit/test_resolution.py -k helper -v`
+Run: `uv run pytest tests/integration/test_resolution.py -k helper -v`
 Expected: the first FAILS (no edge). The three negative tests pass already — keep them; they are the guards that make the positive case meaningful.
 
 - [ ] **Step 3: Implement**
@@ -794,7 +794,7 @@ In `resolve`, immediately after the Task 4 line:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `uv run pytest tests/unit/test_resolution.py -v`
+Run: `uv run pytest tests/integration/test_resolution.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Mutation-check the depth limit**
@@ -804,7 +804,7 @@ Temporarily add a third hop to the implementation (walk `calls_by_source` once m
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/codeatlas/extraction/resolution.py tests/unit/test_resolution.py
+git add src/codeatlas/extraction/resolution.py tests/integration/test_resolution.py
 git commit -m "feat: derive helper-mediated TESTS edges at low confidence"
 ```
 
