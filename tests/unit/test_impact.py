@@ -732,6 +732,64 @@ def test_a_production_import_does_not_masquerade_as_a_test_reference() -> None:
     assert reason.evidence_ids == []
 
 
+def test_an_inherit_only_test_reference_is_not_claimed_absent() -> None:
+    # `class TestFoo(orders.Order):` in a test file produces an INHERITS
+    # edge from test code, but `_gap_reason` only inspects IMPORTS and CALLS.
+    # It must still land on NO_TEST_FILE_REFERENCE, but the explanation text
+    # may only claim what was actually checked -- not that no test file
+    # references the symbol at all, which would be false here.
+    graph = _side(
+        {"orders.Order": SymbolKind.CLASS, "test_orders.TestFoo": SymbolKind.TEST},
+        [
+            _relation(
+                "test_orders.TestFoo", "orders.Order", RelationKind.INHERITS
+            ),
+        ],
+        file_ids={"test_orders.TestFoo": "file_test"},
+        test_file_ids=frozenset({"file_test"}),
+    )
+
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+
+    assert "orders.Order" in result.test_gaps
+    reason = by_name(result.test_gap_reasons, "orders.Order")
+    assert reason is not None
+    assert reason.reason is GapReasonCode.NO_TEST_FILE_REFERENCE
+    assert reason.explanation == "No test file imports or calls this symbol."
+    assert "references this symbol" not in reason.explanation
+
+
+def test_a_production_call_is_not_reported_as_called_not_imported() -> None:
+    # Exercises the `calls` comprehension's `from_test` guard, which the
+    # existing negative test (production import) never touched -- it built
+    # only an IMPORTS edge. A production CALLS edge must fall through to
+    # NO_TEST_FILE_REFERENCE, not CALLED_NOT_IMPORTED (that code's text
+    # claims "a test calls this", which would be false for production code).
+    graph = _side(
+        {"orders.Order": SymbolKind.CLASS, "app.main": SymbolKind.MODULE},
+        [
+            _relation("app.main", "orders.Order", RelationKind.CALLS),
+        ],
+        # No file_ids override and no test_file_ids: "file_1" is production.
+    )
+
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+
+    assert "orders.Order" in result.test_gaps
+    reason = by_name(result.test_gap_reasons, "orders.Order")
+    assert reason is not None
+    assert reason.reason is GapReasonCode.NO_TEST_FILE_REFERENCE
+    assert reason.reason is not GapReasonCode.CALLED_NOT_IMPORTED
+
+
 def test_an_imported_but_uncalled_symbol_says_so() -> None:
     _, reasons = analyze_imported_not_called()
     reason = by_name(reasons, "orders.Order")

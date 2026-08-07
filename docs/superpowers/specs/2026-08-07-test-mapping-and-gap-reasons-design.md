@@ -205,7 +205,7 @@ class GapReason(ContractModel):
 
 | `GapReasonCode` | Meaning |
 | --- | --- |
-| `NO_TEST_FILE_REFERENCE` | No test file references this symbol at all |
+| `NO_TEST_FILE_REFERENCE` | No test file imports or calls this symbol |
 | `IMPORTED_NOT_CALLED` | A test imports it but never exercises it |
 | `CALLED_NOT_IMPORTED` | A test calls the name without importing it — likely a different symbol |
 | `FIXTURE_MEDIATED_ONLY` | Reached only through a fixture; a candidate, not coverage |

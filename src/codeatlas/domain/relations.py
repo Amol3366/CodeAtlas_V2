@@ -44,8 +44,7 @@ FIXTURE_HINT: Final[str] = "<fixture>"
 """A weak `TESTS` edge derived by following a `CONSUMES_FIXTURE` reference."""
 
 HELPER_HINT: Final[str] = "<helper>"
-"""A weak `TESTS` edge derived by following a test-helper call. Reserved for a
-later derivation pass; not yet produced anywhere."""
+"""A weak `TESTS` edge derived by following a test-helper call."""
 
 
 @dataclass(frozen=True)

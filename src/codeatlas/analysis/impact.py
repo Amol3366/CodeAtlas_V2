@@ -611,10 +611,18 @@ def _gap_reason(
             ),
             evidence_ids=[relation.relation_id for relation in calls],
         )
+    # This is the fallback after every stronger reason has missed. It must
+    # only claim what was actually checked: `imports` and `calls` above look
+    # solely at RelationKind.IMPORTS and RelationKind.CALLS edges from test
+    # code. `incoming` (built by _Adjacency.build) indexes every resolved
+    # relation kind, so a test file can still reach this symbol through some
+    # other kind -- e.g. INHERITS or a resolved REFERENCES edge -- without
+    # either comprehension seeing it. Saying "no test file references this
+    # symbol" would be false in that case; say only what was verified.
     return GapReason(
         qualified_name=qualified_name,
         reason=GapReasonCode.NO_TEST_FILE_REFERENCE,
-        explanation="No test file references this symbol.",
+        explanation="No test file imports or calls this symbol.",
         evidence_ids=[],
     )
 
