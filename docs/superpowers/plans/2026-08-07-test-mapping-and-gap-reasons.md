@@ -1273,11 +1273,22 @@ Record each command, its exit code, and its output. Fix failures; do not skip or
 
 - [ ] **Step 2: Re-run the evaluation**
 
+Measure into scratch paths, **not** over the Phase 4 baseline:
+
 ```bash
-uv run python scripts/run_evaluation.py
+uv run python scripts/run_phase4_baseline.py \
+  --dataset tests/evaluation/cases \
+  --json-output .superpowers/sdd/2026-08-07-test-mapping-and-gap-reasons/eval-after.json \
+  --markdown-output .superpowers/sdd/2026-08-07-test-mapping-and-gap-reasons/eval-after.md
 ```
 
-Check the script's actual flags with `--help` before running.
+Omit `--check`. With `--check` the script asserts byte-for-byte reproduction of
+`docs/evaluation/baseline-phase-4.json`; here we are measuring a deliberate
+behavior change, so the comparison is the deliverable, not a pass/fail gate.
+
+**`scripts/check_phase4.ps1` runs that same script WITH `--check`, so it will
+fail after this change.** That is expected and must be reported, not silenced by
+regenerating the baseline. See Step 3.
 
 - [ ] **Step 3: Record the deltas honestly**
 
@@ -1285,7 +1296,17 @@ Write `docs/evaluation/test-mapping-2026-08-07.md` with the new numbers beside t
 
 **If direct-impact precision dropped, report it as a finding.** Do not weaken the derivation passes until the number recovers. **If the unsupported-claim rate moved off 0.0000, stop** — a `low_confidence_heuristic` edge is a labeled candidate, not a claim, so any movement indicates a labeling defect that must be fixed rather than recorded.
 
-The Phase 4 baseline files are not edited. They are gate evidence approved on 2026-07-27.
+**The Phase 4 baseline files are not edited, and are not regenerated.** They are
+gate evidence approved on 2026-07-27. Ruled by the user on 2026-08-07.
+
+Because of that ruling, `scripts/check_phase4.ps1` will fail at its "Phase 4
+engine baseline" step for as long as this behavior change stands. Do not silence
+it. Document it in the new evaluation artifact and in
+`documentation/memory.md`: which step fails, the exact delta that causes it, and
+that re-baselining is a deliberate open decision rather than an oversight.
+
+If the numbers turn out not to have moved at all, say so plainly — then the gate
+still passes and there is nothing to document beyond that fact.
 
 - [ ] **Step 4: Write ADR-0016**
 
