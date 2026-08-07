@@ -699,6 +699,38 @@ def test_an_unreferenced_symbol_reports_no_reference() -> None:
     assert reason.evidence_ids == []
 
 
+def test_a_production_import_does_not_masquerade_as_a_test_reference() -> None:
+    # `from_test` exists to stop an ordinary production import/call from being
+    # reported as `IMPORTED_NOT_CALLED` / `CALLED_NOT_IMPORTED` — text that
+    # claims "a test" imports or calls the symbol. No test does; the source
+    # here is production code, so that claim would be fabricated, not just
+    # weak. Only a real test-file reference may ever produce those two codes.
+    graph = _side(
+        {"orders.Order": SymbolKind.CLASS, "app.main": SymbolKind.MODULE},
+        [
+            # Imported but never called — the exact shape that, if `from_test`
+            # were missing, `_gap_reason` would report as `IMPORTED_NOT_CALLED`
+            # ("a test imports this but never calls it"). `app.main` is
+            # production code, so that text would name a test that isn't there.
+            _relation("app.main", "orders.Order", RelationKind.IMPORTS),
+        ],
+        # No file_ids override: both symbols sit in "file_1", and
+        # test_file_ids is left empty, so "file_1" is production code.
+    )
+
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+
+    assert "orders.Order" in result.test_gaps
+    reason = by_name(result.test_gap_reasons, "orders.Order")
+    assert reason is not None
+    assert reason.reason is GapReasonCode.NO_TEST_FILE_REFERENCE
+    assert reason.evidence_ids == []
+
+
 def test_an_imported_but_uncalled_symbol_says_so() -> None:
     _, reasons = analyze_imported_not_called()
     reason = by_name(reasons, "orders.Order")
