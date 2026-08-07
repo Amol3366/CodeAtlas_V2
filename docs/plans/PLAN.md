@@ -207,6 +207,50 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T04:00:00Z — CLI impact UX; `--format pr` defect fixed
+
+- Agent: Claude Code `claude-opus-5`, branch `cli-impact-ux`.
+- Transition: post-gate work. Phases 0-7 remain `complete`.
+- **Defect fixed first, and it was shipped by the previous slice:**
+  `codeatlas impact --format pr` and `codeatlas analysis --format pr` were
+  advertised in `--help` and rejected by each command's own allow-list. The
+  PR-export slice updated the help strings and `_print_report` and neither
+  guard; its cross-adapter test asserted REST and MCP returned identical `pr`
+  output and never invoked the CLI. Both guards now check one
+  `ADVERTISED_FORMATS` set that a parameterised test iterates.
+- Outcome: `impact` defaults to a new `text` rendering — verdict, risk-ordered
+  findings, gaps with reasons, impact as a count that still names its
+  `low_confidence_heuristic` total. Added `--fail-on <severity>`
+  (`EXIT_RISK_THRESHOLD = 7`) and `--since <ref>` (real merge base).
+  `_SEVERITY_ORDER`, duplicated across two renderers by the previous slice,
+  moved to `contracts.py`.
+- Files: `delivery/text_report.py` (new); `contracts.py`; `delivery/__init__.py`,
+  `markdown_report.py`, `pr_report.py`; `cli/main.py`;
+  `application/change_analysis.py` (`analyze_since`); `repositories/git_diff.py`
+  (`merge_base`); `tests/unit/test_text_report.py`,
+  `tests/contract/test_impact_cli.py`, `tests/integration/test_git_merge_base.py`.
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION` 14.
+  `SEVERITY_ORDER` is an additive module-level constant.
+- **`render_sarif` unchanged**, verified by an empty diff. The other two
+  renderers changed only by deleting their local ordering copy.
+- Verification: `uv run ruff check src tests scripts` exit 0;
+  `uv run mypy --no-incremental src` — no issues in 143 files;
+  `uv run pytest -q` — **2052 passed, 3 skipped**.
+- Mutation-checked: removing the terminal gap disclaimer fails
+  `test_the_gap_disclaimer_is_present_whenever_a_gap_is`.
+- Corrections to this log: the 2026-08-08T00:30:00Z entry recorded a follow-up
+  claiming `_print_report` silently prints JSON for an unknown `--format`. That
+  is false — both commands validate first, so the `else` branch is unreachable.
+  That entry is annotated in place; an imagined defect was recorded while the
+  real one went unrecorded.
+- Limitations:
+  - `impact` still exits `4` when there are no findings, so a clean change
+    returns non-zero. Documented in the command's docstring and deliberately
+    unchanged; `--fail-on` has its own code rather than redefining it.
+  - The Phase 4 evaluation corpus remains blind to fixture- and
+    helper-mediated scenarios (recorded after ADR-0016, still open).
+- Next: all five slices from the 2026-08-07 planning session are complete.
+
 ### 2026-08-08T00:30:00Z — PR-ready Markdown export
 
 - Agent: Claude Code `claude-opus-5`, branch `pr-markdown-export`.

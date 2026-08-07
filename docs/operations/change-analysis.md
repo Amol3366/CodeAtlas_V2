@@ -123,6 +123,22 @@ structure, close a code span, or move a terminal cursor. SARIF 2.1.0 is an
 export: repository-relative URIs only, and a finding with no citable
 location produces no result rather than an invented one.
 
+### `text` — for a terminal, and `impact`'s default
+
+`codeatlas impact` prints this. It is a verdict, not a document: a risk line
+with counts, findings ordered most severe first, and possible test gaps with
+the reason each is still a gap. Impact is a count rather than a table, but the
+`low_confidence_heuristic` count is named — a weak edge is a candidate, not
+coverage, and a summary that hid the distinction would undo ADR-0016.
+
+No colour is used. `documentation/design.md` requires that colour is never the
+only signal, and not depending on it is the simplest way to satisfy that — it
+also means the output is identical piped, redirected, or captured by CI, with
+no terminal detection to get wrong.
+
+`codeatlas analysis` still defaults to `markdown`: it prints a stored record,
+which is the archival case.
+
 ### `pr` — for pasting into a pull request
 
 `markdown` is the audit format: complete, flat, every evidence row present,
@@ -157,6 +173,39 @@ only format with stability guarantees.
 
 Available identically through REST (`?report_format=pr`), the CLI
 (`--format pr`), and MCP (`report_format: "pr"`).
+
+## Running it from the CLI
+
+```
+codeatlas impact <repository-id>                 # working tree vs HEAD
+codeatlas impact <repository-id> --since main    # everything on this branch
+codeatlas impact <repository-id> --commits A..B  # one commit range
+codeatlas impact <repository-id> --fail-on high  # exit 7 at or above high
+```
+
+`--since`, `--commits`, and `--base` are mutually exclusive; passing two is
+refused rather than resolved by a precedence rule the caller cannot see.
+
+**`--since main` is not `--base main`.** It analyses from the *merge base* of
+that ref and `HEAD`. A two-dot diff against a trunk that has moved would report
+the trunk's own new commits as changes to your branch, inverted.
+
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | The analysis ran. With `--fail-on`, nothing met the threshold. |
+| `2` | Invalid input — an unknown `--format`, an unknown `--fail-on` severity, or conflicting range selectors. |
+| `3` | A required resource was unavailable. |
+| `4` | The analysis ran and found nothing to report. **A clean change returns 4, not 0** — this predates `--fail-on` and is unchanged by it. |
+| `5` | A policy failure, such as a path outside the repository root. |
+| `6` | An internal failure. |
+| `7` | `--fail-on` was given and a finding met or exceeded that severity. |
+
+`7` is separate from `5` deliberately: a CI job must be able to tell "your
+change is risky" from "you pointed me at the wrong directory", which need
+opposite responses. And `--fail-on` always prints the report before setting the
+code — a CI log showing only a failure number is not diagnosable.
 
 ## Performance
 

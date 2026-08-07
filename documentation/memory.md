@@ -89,6 +89,39 @@ development order is finished. A new phase requires an explicit user decision.
       machine-wide, precedence store → `.env`. No migration; `SCHEMA_VERSION`
       stays 14 and `contract_version` stays `1.1`. Gate green: 1926 passed.
 
+- [x] CLI impact UX (2026-08-08): `codeatlas impact` now prints a verdict by
+      default — a `text` rendering shaped for a terminal, with findings
+      risk-ordered and gaps carrying their reasons. Added `--fail-on <severity>`
+      (new exit code `7`, deliberately not `EXIT_POLICY_FAILURE`, so CI can tell
+      a risky change from a bad path) and `--since <ref>`, which analyses from a
+      real merge base. `contract_version` `1.1`; no migration.
+
+      **It opened by fixing a defect the previous slice shipped and pushed:**
+      `--format pr` was advertised in both commands' `--help` and rejected by
+      their guards, because that slice updated the help strings and
+      `_print_report` and left two allow-lists spelling
+      `{"json", "markdown", "sarif"}`. Its cross-adapter test covered REST and
+      MCP and never invoked the CLI. Both guards now check one
+      `ADVERTISED_FORMATS` set that a parameterised test iterates — when `text`
+      was added, its coverage appeared automatically, which is the point.
+
+      Three things worth remembering. **`--since main` is not `--base main`**: a
+      two-dot diff against a moved trunk reports the trunk's own commits as your
+      changes, inverted, so it needed a real `merge_base` on the Git adapter.
+      **The merge-base resolution lives in `ChangeAnalysisService.analyze_since`,
+      not the CLI** — resolving a root and invoking Git is repository logic, and
+      an adapter doing it would leave REST and MCP unable to offer the same
+      capability. And **`_SEVERITY_ORDER` had been duplicated across two
+      renderers** by the PR-export slice — the same slice that carefully
+      extracted the *escaping* to avoid exactly that. It now lives once, in
+      `contracts.py`, where `--fail-on` also reaches it.
+
+      Deliberately unchanged: `impact` still exits `4` when there are no
+      findings, so a clean change returns non-zero. It is surprising and it is
+      documented in the command's own docstring; redefining it silently would be
+      a breaking change dressed as an improvement. `--fail-on` gets its own code
+      instead.
+
 - [x] PR-ready Markdown export (2026-08-07): a second renderer beside
       `render_markdown`. Verdict first, findings and test gaps expanded,
       supporting detail in `<details>`, bounded at 60,000 characters with any
