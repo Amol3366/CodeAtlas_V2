@@ -30,7 +30,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 
 import typer
 import uvicorn
@@ -80,6 +80,12 @@ EXIT_UNAVAILABLE = 3
 EXIT_PARTIAL = 4
 EXIT_POLICY_FAILURE = 5
 EXIT_INTERNAL_FAILURE = 6
+
+# One list, checked by the guards and named in the help text. Two lists is
+# how `--format pr` shipped advertised in --help and rejected by the guard.
+ADVERTISED_FORMATS: Final[frozenset[str]] = frozenset(
+    {"json", "markdown", "pr", "sarif"}
+)
 
 _SEARCH_KINDS = ("text", "files", "symbols")
 
@@ -1246,9 +1252,11 @@ def impact(
     Exit code 4 means the analysis ran and found nothing to report, which is a
     different fact from a failure and scripts need to tell them apart.
     """
-    if report_format not in {"json", "markdown", "sarif"}:
+    if report_format not in ADVERTISED_FORMATS:
         typer.echo(
-            "INVALID_REQUEST: --format must be json, markdown, or sarif.", err=True
+            "INVALID_REQUEST: --format must be one of "
+            f"{', '.join(sorted(ADVERTISED_FORMATS))}.",
+            err=True,
         )
         raise typer.Exit(EXIT_INVALID_INPUT)
 
@@ -1294,9 +1302,11 @@ def analysis(
     database: DatabaseOption = None,
 ) -> None:
     """Print a stored analysis. Reads the same rows every adapter reads."""
-    if report_format not in {"json", "markdown", "sarif"}:
+    if report_format not in ADVERTISED_FORMATS:
         typer.echo(
-            "INVALID_REQUEST: --format must be json, markdown, or sarif.", err=True
+            "INVALID_REQUEST: --format must be one of "
+            f"{', '.join(sorted(ADVERTISED_FORMATS))}.",
+            err=True,
         )
         raise typer.Exit(EXIT_INVALID_INPUT)
 

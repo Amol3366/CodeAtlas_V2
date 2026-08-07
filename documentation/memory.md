@@ -112,13 +112,26 @@ development order is finished. A new phase requires an explicit user decision.
       sharing it. Two copies of security-relevant escaping is one that gets
       reviewed and one that does not.
 
-      Follow-up recorded: `_print_report` (`src/codeatlas/cli/main.py`) falls
-      through to JSON for an unknown `--format`, so `--format prr` prints JSON
-      and reports success. A fourth format makes that typo likelier, not less.
-      REST and MCP validate against a `Literal` and reject unknown values at
-      the boundary, so they do not share the wart. Left alone deliberately:
-      making it an error is a CLI behaviour change that could break a script
-      relying on the leniency.
+      ~~Follow-up recorded: `_print_report` falls through to JSON for an
+      unknown `--format`, so `--format prr` prints JSON and reports success.~~
+      **Wrong, corrected 2026-08-08.** Both `impact` and `analysis` validate
+      the format *before* reaching `_print_report`, so its `else` branch is
+      unreachable from either and no such leniency exists.
+
+      **The real defect went the other way and was not recorded at all:
+      `--format pr` was advertised in both commands' `--help` and rejected by
+      their guards.** The slice updated the help strings and `_print_report`
+      and left two allow-lists spelling `{"json", "markdown", "sarif"}`. Its
+      cross-adapter test asserted REST and MCP returned identical `pr` output
+      and never invoked the CLI, which is exactly why the guard was never
+      exercised. Fixed 2026-08-08: both guards now check one
+      `ADVERTISED_FORMATS` set that a parameterised test iterates, so a format
+      added without a guard fails in the suite rather than in a terminal.
+
+      The lesson is not "check the guards". It is that a capability claimed
+      across N adapters needs a test that exercises N adapters — the same
+      one-surface-missed shape that hid the `GapReason` data in the first
+      place.
 
 - [x] Preflight promoted to a first-class web screen (2026-08-07): `/preflight`
       launches an analysis and `/preflight/:analysisId` loads the persisted

@@ -242,11 +242,12 @@ Every handoff entry contains:
   guard, `test_both_renderers_escape_a_hostile_name_identically`, fails if the
   two renderers ever stop sharing `markdown_text`.
 - Limitations:
-  - **`_print_report` (`src/codeatlas/cli/main.py`) falls through to JSON for an
-    unknown `--format`**, so `--format prr` prints JSON and reports success. A
-    fourth format makes that typo likelier. Left unchanged deliberately: making
-    it an error could break a script relying on the current leniency. REST and
-    MCP validate against a `Literal` and do not share the wart.
+  - ~~**`_print_report` falls through to JSON for an unknown `--format`.**~~
+    **Wrong; corrected in the 2026-08-08 handoff below.** Both commands validate
+    before reaching `_print_report`, so its `else` branch is unreachable and no
+    such leniency exists. The real defect was the inverse — `--format pr`
+    advertised in `--help` and rejected by both guards — and this entry recorded
+    an imagined defect while the real one went unrecorded.
   - The PR format is not exercised by the Phase 4 evaluation corpus, which
     remains blind to fixture- and helper-mediated scenarios generally (recorded
     after ADR-0016 and still open).
