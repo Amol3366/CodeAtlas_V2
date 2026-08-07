@@ -40,6 +40,13 @@ MENTION_HINT: Final[str] = "<mention>"
 DERIVED_HINT: Final[str] = "<derived>"
 """The edge was combined from several references and must be re-derived."""
 
+FIXTURE_HINT: Final[str] = "<fixture>"
+"""A weak `TESTS` edge derived by following a `CONSUMES_FIXTURE` reference."""
+
+HELPER_HINT: Final[str] = "<helper>"
+"""A weak `TESTS` edge derived by following a test-helper call. Reserved for a
+later derivation pass; not yet produced anywhere."""
+
 
 @dataclass(frozen=True)
 class StoredEvidence:

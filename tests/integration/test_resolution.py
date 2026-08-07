@@ -309,3 +309,247 @@ def test_the_snapshot_records_its_resolver_version(harness: Harness) -> None:
     result = harness.services.indexing.index(harness.repository_id)
 
     assert result.snapshot.resolver_version != ""
+
+
+# --- Fixture-mediated TESTS derivation -----------------------------------------
+
+
+def _tests_edges(
+    harness: Harness,
+    snapshot_id: str,
+    relations: tuple[RelationRecord, ...],
+    *,
+    source_hint: str,
+    target_hint: str,
+) -> tuple[RelationRecord, ...]:
+    """`TESTS` edges from the named source to the named target.
+
+    Filtering by target hint alone is not enough: a fixture function that
+    itself imports and calls the target produces its own strict `TESTS` edge
+    (fixtures live in `conftest.py`, which is `TEST_CODE` too), and that edge
+    must not be mistaken for the one under test.
+    """
+    source_id = _symbol_id(harness, snapshot_id, source_hint)
+    return tuple(
+        item
+        for item in relations
+        if item.kind is RelationKind.TESTS
+        and item.target_hint == target_hint
+        and item.source_symbol_id == source_id
+    )
+
+
+def _build_repo(tmp_path: Path, name: str, files: dict[str, str]) -> Path:
+    root = tmp_path / name
+    for relative_path, content in files.items():
+        path = root / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    return root
+
+
+# Never closed: these are tmp_path-scoped sqlite files that vanish with the test
+# directory, and closing early is the bug `_index` works around (see below).
+_OPEN_CONNECTION_MANAGERS: list[object] = []
+
+
+def _index(
+    tmp_path: Path, root: Path
+) -> tuple[Harness, str, tuple[RelationRecord, ...]]:
+    """Register and index a fresh repository, connection kept open for the caller.
+
+    The connection is deliberately never closed here: closing it would make the
+    harness unusable for a second ``index`` call or a later query, exactly the
+    trap the fixture-based ``harness`` avoids via `Iterator` + `yield`.
+    """
+    # The context manager object itself must be kept alive: if it is garbage
+    # collected, its generator's `finally` runs and closes the connection out
+    # from under this function, well before the caller is done with it.
+    manager = connect(tmp_path / "db.sqlite")
+    connection = manager.__enter__()
+    _OPEN_CONNECTION_MANAGERS.append(manager)
+    apply_migrations(connection)
+    services = build_services(connection)
+    repository = services.registration.register(
+        RegisterRepositoryRequest(path=str(root))
+    )
+    harness = Harness(
+        services=services,
+        connection=connection,
+        repository_id=repository.repository_id,
+        root=root,
+    )
+    result = harness.services.indexing.index(harness.repository_id)
+    snapshot_id = result.snapshot.snapshot_id
+    relations = _relations(harness, snapshot_id)
+    return harness, snapshot_id, relations
+
+
+def test_a_fixture_mediated_test_produces_a_weak_edge(tmp_path: Path) -> None:
+    """conftest.py builds the object; the test never imports or calls it."""
+    root = _build_repo(
+        tmp_path,
+        "fixture_repo",
+        {
+            "orders.py": "class Order:\n    pass\n",
+            "conftest.py": (
+                "import pytest\n"
+                "from orders import Order\n"
+                "\n"
+                "@pytest.fixture\n"
+                "def order():\n"
+                "    return Order()\n"
+            ),
+            "test_orders.py": (
+                "def test_total(order):\n"
+                "    assert order is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness, snapshot_id, relations, source_hint="test_total", target_hint="Order"
+    )
+    assert len(edges) == 1
+    assert edges[0].derivation is Derivation.LOW_CONFIDENCE_HEURISTIC
+
+
+def test_a_strict_edge_is_not_replaced_by_a_fixture_edge(tmp_path: Path) -> None:
+    """The test both imports+calls the target AND consumes a fixture reaching it."""
+    root = _build_repo(
+        tmp_path,
+        "strict_and_fixture_repo",
+        {
+            "orders.py": "class Order:\n    pass\n",
+            "conftest.py": (
+                "import pytest\n"
+                "from orders import Order\n"
+                "\n"
+                "@pytest.fixture\n"
+                "def order():\n"
+                "    return Order()\n"
+            ),
+            "test_orders.py": (
+                "from orders import Order\n"
+                "\n"
+                "def test_total(order):\n"
+                "    assert Order() is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness, snapshot_id, relations, source_hint="test_total", target_hint="Order"
+    )
+    assert len(edges) == 1
+    assert edges[0].derivation is Derivation.HIGH_CONFIDENCE_HEURISTIC
+
+
+def test_a_fixture_in_an_ancestor_conftest_resolves(tmp_path: Path) -> None:
+    root = _build_repo(
+        tmp_path,
+        "ancestor_conftest_repo",
+        {
+            "orders.py": "class Order:\n    pass\n",
+            "conftest.py": (
+                "import pytest\n"
+                "from orders import Order\n"
+                "\n"
+                "@pytest.fixture\n"
+                "def order():\n"
+                "    return Order()\n"
+            ),
+            "tests/unit/test_orders.py": (
+                "def test_total(order):\n"
+                "    assert order is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    assert _tests_edges(
+        harness,
+        snapshot_id,
+        relations,
+        source_hint="test_total",
+        target_hint="Order",
+    )
+
+
+def test_the_nearest_conftest_wins(tmp_path: Path) -> None:
+    """Two conftest.py files define `store`; the deeper one must be chosen."""
+    root = _build_repo(
+        tmp_path,
+        "shadowed_conftest_repo",
+        {
+            "orders.py": (
+                "class Distant:\n    pass\n\n\nclass Nearest:\n    pass\n"
+            ),
+            "conftest.py": (
+                "import pytest\n"
+                "from orders import Distant\n"
+                "\n"
+                "@pytest.fixture\n"
+                "def store():\n"
+                "    return Distant()\n"
+            ),
+            "tests/unit/conftest.py": (
+                "import pytest\n"
+                "from orders import Nearest\n"
+                "\n"
+                "@pytest.fixture\n"
+                "def store():\n"
+                "    return Nearest()\n"
+            ),
+            "tests/unit/test_orders.py": (
+                "def test_total(store):\n"
+                "    assert store is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness,
+        snapshot_id,
+        relations,
+        source_hint="test_total",
+        target_hint="Nearest",
+    )
+    assert len(edges) == 1
+    distant_edges = _tests_edges(
+        harness,
+        snapshot_id,
+        relations,
+        source_hint="test_total",
+        target_hint="Distant",
+    )
+    assert distant_edges == ()
+
+
+def test_an_unresolved_parameter_produces_no_edge_and_no_error(
+    tmp_path: Path,
+) -> None:
+    """A parameter naming no fixture in scope is ordinary — it may come from a
+    plugin. It is not a defect to report."""
+    root = _build_repo(
+        tmp_path,
+        "unknown_parameter_repo",
+        {
+            "orders.py": "class Order:\n    pass\n",
+            "test_orders.py": (
+                "def test_total(mystery_plugin_fixture):\n"
+                "    assert mystery_plugin_fixture is not None\n"
+            ),
+        },
+    )
+    _harness, _snapshot_id, relations = _index(tmp_path, root)
+
+    tests_from_source = [
+        item
+        for item in relations
+        if item.kind is RelationKind.TESTS
+    ]
+    assert tests_from_source == []

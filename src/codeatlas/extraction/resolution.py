@@ -27,6 +27,7 @@ from codeatlas.contracts import Derivation, RelationKind, SymbolKind
 from codeatlas.domain.ids import relation_id as build_relation_id
 from codeatlas.domain.relations import (
     DERIVED_HINT,
+    FIXTURE_HINT,
     MENTION_HINT,
     ROUTE_HINT,
     RelationRecord,
@@ -170,6 +171,7 @@ class SnapshotResolver:
                 )
 
         relations.extend(_derive_test_edges(relations, index))
+        relations.extend(_derive_fixture_test_edges(relations, index))
         relations.extend(_derive_document_edges(routes, mentions, index, route_index))
         relations.sort(
             key=lambda item: (item.file_id, item.start_line, item.relation_id)
@@ -717,6 +719,133 @@ def _derive_test_edges(
                 candidate_count=1,
             )
         )
+    return edges
+
+
+def _conftest_scope(index: _Index) -> dict[str, list[str]]:
+    """Directory prefix -> file IDs of `conftest.py` files at that prefix.
+
+    Keys are the containing directory of each conftest, normalized to use "/"
+    and to be "" at the repository root.
+    """
+    scope: dict[str, list[str]] = {}
+    for record in index.files_by_id.values():
+        path = record.relative_path.replace("\\", "/")
+        if path.rsplit("/", 1)[-1] != "conftest.py":
+            continue
+        directory = path.rsplit("/", 1)[0] if "/" in path else ""
+        scope.setdefault(directory, []).append(record.file_id)
+    for file_ids in scope.values():
+        file_ids.sort()
+    return scope
+
+
+def _visible_fixture(
+    name: str, test_file_id: str, index: _Index, conftests: dict[str, list[str]]
+) -> SymbolRecord | None:
+    """The fixture `name` refers to, searched own file then ancestor conftests.
+
+    Scoping is deliberately partial: pytest also resolves fixtures through
+    plugins, `usefixtures`, and dynamic registration, none of which are visible
+    to static analysis. Partial scoping over-matches rather than under-matches,
+    and over-matching at a derivation that cannot close a test gap is the safe
+    direction to be wrong in.
+    """
+    own = index.name_in_file.get((test_file_id, name), ())
+    for symbol in own:
+        if symbol.kind is SymbolKind.FIXTURE:
+            return symbol
+
+    record = index.files_by_id.get(test_file_id)
+    if record is None:
+        return None
+    path = record.relative_path.replace("\\", "/")
+    directory = path.rsplit("/", 1)[0] if "/" in path else ""
+
+    # Nearest ancestor wins, so walk from the test's own directory upward.
+    while True:
+        for file_id in conftests.get(directory, ()):
+            for symbol in index.name_in_file.get((file_id, name), ()):
+                if symbol.kind is SymbolKind.FIXTURE:
+                    return symbol
+        if directory == "":
+            return None
+        directory = directory.rsplit("/", 1)[0] if "/" in directory else ""
+
+
+def _derive_fixture_test_edges(
+    relations: Sequence[RelationRecord], index: _Index
+) -> list[RelationRecord]:
+    """Emit `TESTS` where a test consumes a fixture that reaches the target.
+
+    The edge is `low_confidence_heuristic`: a fixture constructing an object is
+    evidence that the test exercises it, but the test never names the target,
+    so the link is inference rather than a statement the source makes.
+    """
+    existing = {
+        (relation.source_symbol_id, relation.target_symbol_id)
+        for relation in relations
+        if relation.kind is RelationKind.TESTS
+    }
+    calls_by_source: dict[str, list[RelationRecord]] = {}
+    for relation in relations:
+        if (
+            relation.kind is RelationKind.CALLS
+            and relation.target_symbol_id is not None
+        ):
+            calls_by_source.setdefault(relation.source_symbol_id, []).append(relation)
+
+    conftests = _conftest_scope(index)
+    edges: list[RelationRecord] = []
+    seen: set[tuple[str, str]] = set()
+    for relation in relations:
+        if relation.kind is not RelationKind.CONSUMES_FIXTURE:
+            continue
+        fixture = _visible_fixture(
+            relation.target_hint, relation.file_id, index, conftests
+        )
+        if fixture is None:
+            continue
+        for call in calls_by_source.get(fixture.symbol_id, ()):
+            target = call.target_symbol_id
+            if target is None:
+                continue
+            target_file = index.files_by_id.get(index.file_of_symbol.get(target, ""))
+            if (
+                target_file is None
+                or target_file.classification is FileClassification.TEST_CODE
+            ):
+                continue
+            key = (relation.source_symbol_id, target)
+            # A strict import-and-call edge already states this more strongly.
+            if key in existing or key in seen:
+                continue
+            seen.add(key)
+            edges.append(
+                RelationRecord(
+                    relation_id=build_relation_id(
+                        relation.source_symbol_id,
+                        RelationKind.TESTS.value,
+                        f"fixture:{relation.target_hint}:{call.target_hint}",
+                        relation.start_line,
+                    ),
+                    source_symbol_id=relation.source_symbol_id,
+                    target_symbol_id=target,
+                    file_id=relation.file_id,
+                    kind=RelationKind.TESTS,
+                    target_hint=call.target_hint,
+                    resolution=ResolutionState.RESOLVED,
+                    derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+                    confidence=_CONFIDENCE[Derivation.LOW_CONFIDENCE_HEURISTIC],
+                    start_line=relation.start_line,
+                    end_line=relation.end_line,
+                    candidate_count=1,
+                    # How this edge was derived, so a gap reason can name it
+                    # without re-deriving. `_derive_document_edges` already uses
+                    # `module_hint` this way (`DERIVED_HINT`).
+                    module_hint=FIXTURE_HINT,
+                )
+            )
     return edges
 
 
