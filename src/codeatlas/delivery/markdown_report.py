@@ -161,17 +161,40 @@ def _impact(report: ChangeAnalysisReport) -> list[str]:
 
 
 def _test_gaps(report: ChangeAnalysisReport) -> list[str]:
+    """Every gap, with the reason it is still a gap.
+
+    The disclaimer is not a footnote to be trimmed. A missing `TESTS` edge does
+    not prove absence of coverage, and only executing the suite could cross that
+    line — which CodeAtlas does not do.
+    """
     if not report.test_gaps:
         return []
-    return [
+
+    by_name = {item.qualified_name: item for item in report.test_gap_reasons}
+    by_id = {item.evidence_id: item for item in report.evidence}
+
+    lines = [
         "## Possible test gaps",
         "",
         "A missing `TESTS` edge does not prove absence of coverage. CodeAtlas "
         "does not execute tests and cannot claim any symbol is untested.",
         "",
-        *(f"- `{escape_inline(name)}`" for name in report.test_gaps),
-        "",
     ]
+    for name in report.test_gaps:
+        lines.append(f"- `{escape_inline(name)}`")
+        reason = by_name.get(name)
+        if reason is None:
+            # A gap with no recorded reason is still a gap. Reporting the name
+            # alone is honest; inventing a reason would not be.
+            continue
+        lines.append(f"  - Reason: `{escape_inline(reason.reason.value)}`")
+        lines.append(f"  - {escape_inline(reason.explanation)}")
+        for evidence_id in reason.evidence_ids:
+            item = by_id.get(evidence_id)
+            if item is not None:
+                lines.append(f"  - Evidence: {_location(item)}")
+    lines.append("")
+    return lines
 
 
 def _evidence(evidence: Sequence[ChangeEvidenceItem]) -> list[str]:
