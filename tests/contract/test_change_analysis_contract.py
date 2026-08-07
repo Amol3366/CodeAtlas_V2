@@ -19,14 +19,14 @@ from codeatlas.contracts import (
     Derivation,
     FileChangeKind,
     Finding,
+    GapReason,
+    GapReasonCode,
     ImpactEdge,
     OverallRisk,
     RelationKind,
     Severity,
     SnapshotFreshness,
     SymbolKind,
-    TestGapReason,
-    TestGapReasonCode,
 )
 
 
@@ -159,9 +159,9 @@ def test_the_contract_version_is_unchanged_by_the_addition() -> None:
 
 
 def test_a_reason_carries_its_supporting_evidence() -> None:
-    reason = TestGapReason(
+    reason = GapReason(
         qualified_name="orders.total",
-        reason=TestGapReasonCode.FIXTURE_MEDIATED_ONLY,
+        reason=GapReasonCode.FIXTURE_MEDIATED_ONLY,
         explanation="Reached only through fixture `store`.",
         evidence_ids=["ev-1"],
     )

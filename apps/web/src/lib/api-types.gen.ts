@@ -905,7 +905,7 @@ export interface components {
             status: components["schemas"]["ChangeAnalysisStatus"];
             target: components["schemas"]["AnalysisStateRef"];
             /** Test Gap Reasons */
-            test_gap_reasons?: components["schemas"]["TestGapReason"][];
+            test_gap_reasons?: components["schemas"]["GapReason"][];
             /** Test Gaps */
             test_gaps?: string[];
             /** Timing Ms */
@@ -1308,6 +1308,32 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * GapReason
+         * @description One explanation for one entry in `test_gaps`.
+         *
+         *     This never states that a symbol is untested. It states what CodeAtlas found
+         *     and did not find in the relation graph, which is a different and smaller
+         *     claim.
+         */
+        GapReason: {
+            /** Evidence Ids */
+            evidence_ids?: string[];
+            /** Explanation */
+            explanation: string;
+            /** Qualified Name */
+            qualified_name: string;
+            reason: components["schemas"]["GapReasonCode"];
+        };
+        /**
+         * GapReasonCode
+         * @description Why a changed symbol has no qualifying test edge.
+         *
+         *     Every code describes a symbol that IS in `test_gaps`. A symbol whose kind is
+         *     untestable is skipped before it can become a gap, so no code exists for it.
+         * @enum {string}
+         */
+        GapReasonCode: "FIXTURE_MEDIATED_ONLY" | "HELPER_MEDIATED_ONLY" | "IMPORTED_NOT_CALLED" | "CALLED_NOT_IMPORTED" | "NO_TEST_FILE_REFERENCE";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1826,32 +1852,6 @@ export interface components {
              */
             visibility: "public" | "private";
         };
-        /**
-         * TestGapReason
-         * @description One explanation for one entry in `test_gaps`.
-         *
-         *     This never states that a symbol is untested. It states what CodeAtlas found
-         *     and did not find in the relation graph, which is a different and smaller
-         *     claim.
-         */
-        TestGapReason: {
-            /** Evidence Ids */
-            evidence_ids?: string[];
-            /** Explanation */
-            explanation: string;
-            /** Qualified Name */
-            qualified_name: string;
-            reason: components["schemas"]["TestGapReasonCode"];
-        };
-        /**
-         * TestGapReasonCode
-         * @description Why a changed symbol has no qualifying test edge.
-         *
-         *     Every code describes a symbol that IS in `test_gaps`. A symbol whose kind is
-         *     untestable is skipped before it can become a gap, so no code exists for it.
-         * @enum {string}
-         */
-        TestGapReasonCode: "FIXTURE_MEDIATED_ONLY" | "HELPER_MEDIATED_ONLY" | "IMPORTED_NOT_CALLED" | "CALLED_NOT_IMPORTED" | "NO_TEST_FILE_REFERENCE";
         /**
          * UpdateConversationRequest
          * @description Rename, archive, or both. Unarchiving is not offered yet: nothing in

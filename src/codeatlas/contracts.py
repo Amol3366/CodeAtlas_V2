@@ -483,7 +483,7 @@ class ChangeEvidenceItem(ContractModel):
         return self
 
 
-class TestGapReasonCode(StrEnum):
+class GapReasonCode(StrEnum):
     """Why a changed symbol has no qualifying test edge.
 
     Every code describes a symbol that IS in `test_gaps`. A symbol whose kind is
@@ -497,7 +497,7 @@ class TestGapReasonCode(StrEnum):
     NO_TEST_FILE_REFERENCE = "NO_TEST_FILE_REFERENCE"
 
 
-class TestGapReason(ContractModel):
+class GapReason(ContractModel):
     """One explanation for one entry in `test_gaps`.
 
     This never states that a symbol is untested. It states what CodeAtlas found
@@ -506,7 +506,7 @@ class TestGapReason(ContractModel):
     """
 
     qualified_name: NonEmptyText
-    reason: TestGapReasonCode
+    reason: GapReasonCode
     explanation: NonEmptyText
     evidence_ids: list[NonEmptyText] = Field(default_factory=list)
 
@@ -531,7 +531,7 @@ class ChangeAnalysisReport(ContractModel):
     test_gaps: list[NonEmptyText] = Field(default_factory=list)
     # Additive beside `test_gaps`, which keeps its type and meaning, so
     # `contract_version` stays "1.1" and a Phase 4 client is unaffected.
-    test_gap_reasons: list[TestGapReason] = Field(default_factory=list)
+    test_gap_reasons: list[GapReason] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     timing_ms: dict[str, NonNegativeDuration] = Field(default_factory=dict)

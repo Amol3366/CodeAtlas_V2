@@ -269,7 +269,7 @@
           },
           "test_gap_reasons": {
             "items": {
-              "$ref": "#/components/schemas/TestGapReason"
+              "$ref": "#/components/schemas/GapReason"
             },
             "title": "Test Gap Reasons",
             "type": "array"
@@ -1440,6 +1440,52 @@
         ],
         "title": "Finding",
         "type": "object"
+      },
+      "GapReason": {
+        "additionalProperties": false,
+        "description": "One explanation for one entry in `test_gaps`.\n\nThis never states that a symbol is untested. It states what CodeAtlas found\nand did not find in the relation graph, which is a different and smaller\nclaim.",
+        "properties": {
+          "evidence_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "explanation": {
+            "minLength": 1,
+            "title": "Explanation",
+            "type": "string"
+          },
+          "qualified_name": {
+            "minLength": 1,
+            "title": "Qualified Name",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/GapReasonCode"
+          }
+        },
+        "required": [
+          "qualified_name",
+          "reason",
+          "explanation"
+        ],
+        "title": "GapReason",
+        "type": "object"
+      },
+      "GapReasonCode": {
+        "description": "Why a changed symbol has no qualifying test edge.\n\nEvery code describes a symbol that IS in `test_gaps`. A symbol whose kind is\nuntestable is skipped before it can become a gap, so no code exists for it.",
+        "enum": [
+          "FIXTURE_MEDIATED_ONLY",
+          "HELPER_MEDIATED_ONLY",
+          "IMPORTED_NOT_CALLED",
+          "CALLED_NOT_IMPORTED",
+          "NO_TEST_FILE_REFERENCE"
+        ],
+        "title": "GapReasonCode",
+        "type": "string"
       },
       "HTTPValidationError": {
         "properties": {
@@ -2893,52 +2939,6 @@
         ],
         "title": "SymbolRecord",
         "type": "object"
-      },
-      "TestGapReason": {
-        "additionalProperties": false,
-        "description": "One explanation for one entry in `test_gaps`.\n\nThis never states that a symbol is untested. It states what CodeAtlas found\nand did not find in the relation graph, which is a different and smaller\nclaim.",
-        "properties": {
-          "evidence_ids": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "title": "Evidence Ids",
-            "type": "array"
-          },
-          "explanation": {
-            "minLength": 1,
-            "title": "Explanation",
-            "type": "string"
-          },
-          "qualified_name": {
-            "minLength": 1,
-            "title": "Qualified Name",
-            "type": "string"
-          },
-          "reason": {
-            "$ref": "#/components/schemas/TestGapReasonCode"
-          }
-        },
-        "required": [
-          "qualified_name",
-          "reason",
-          "explanation"
-        ],
-        "title": "TestGapReason",
-        "type": "object"
-      },
-      "TestGapReasonCode": {
-        "description": "Why a changed symbol has no qualifying test edge.\n\nEvery code describes a symbol that IS in `test_gaps`. A symbol whose kind is\nuntestable is skipped before it can become a gap, so no code exists for it.",
-        "enum": [
-          "FIXTURE_MEDIATED_ONLY",
-          "HELPER_MEDIATED_ONLY",
-          "IMPORTED_NOT_CALLED",
-          "CALLED_NOT_IMPORTED",
-          "NO_TEST_FILE_REFERENCE"
-        ],
-        "title": "TestGapReasonCode",
-        "type": "string"
       },
       "UpdateConversationRequest": {
         "additionalProperties": false,
