@@ -47,7 +47,7 @@ from codeatlas.contracts import (
 from codeatlas.domain.change import FileChange, SymbolChange
 from codeatlas.domain.ids import file_id as build_file_id
 from codeatlas.domain.relations import SymbolReference
-from codeatlas.domain.repository import FileRecord
+from codeatlas.domain.repository import FileClassification, FileRecord
 from codeatlas.domain.symbols import SymbolRecord
 from codeatlas.extraction.resolution import SnapshotResolver
 from codeatlas.parsing.registry import (
@@ -248,6 +248,11 @@ class ChangeAnalysisEngine:
                 symbols={symbol.symbol_id: symbol for symbol in symbols},
                 relations=relations,
                 file_paths=paths,
+                test_file_ids=frozenset(
+                    record.file_id
+                    for record in files
+                    if record.classification is FileClassification.TEST_CODE
+                ),
             ),
             documents=documents,
             diagnostics=tuple(diagnostics),

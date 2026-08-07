@@ -21,11 +21,18 @@ from codeatlas.analysis.impact import (
 from codeatlas.contracts import (
     ChangeKind,
     Derivation,
+    GapReason,
+    GapReasonCode,
     RelationKind,
     SymbolKind,
 )
 from codeatlas.domain.change import SymbolChange
-from codeatlas.domain.relations import RelationRecord, ResolutionState
+from codeatlas.domain.relations import (
+    FIXTURE_HINT,
+    HELPER_HINT,
+    RelationRecord,
+    ResolutionState,
+)
 from codeatlas.domain.symbols import SymbolRecord
 
 
@@ -60,6 +67,8 @@ def _relation(
     *,
     file_id: str = "file_1",
     line: int = 1,
+    derivation: Derivation = Derivation.STATIC_RESOLVED,
+    module_hint: str = "",
 ) -> RelationRecord:
     return RelationRecord(
         relation_id=f"rel_{source}_{kind.value}_{target}_{line}",
@@ -73,20 +82,30 @@ def _relation(
             if target is not None
             else ResolutionState.UNRESOLVED
         ),
-        derivation=Derivation.STATIC_RESOLVED,
+        derivation=derivation,
         confidence=0.95,
         start_line=line,
         end_line=line,
         candidate_count=1 if target is not None else 0,
+        module_hint=module_hint,
     )
 
 
-def _side(names: dict[str, SymbolKind], relations: list[RelationRecord]) -> GraphSide:
+def _side(
+    names: dict[str, SymbolKind],
+    relations: list[RelationRecord],
+    *,
+    file_ids: dict[str, str] | None = None,
+    test_file_ids: frozenset[str] = frozenset(),
+) -> GraphSide:
+    file_ids = file_ids or {}
     return GraphSide(
         symbols={
-            f"sym_{name}": _symbol(name, kind=kind) for name, kind in names.items()
+            f"sym_{name}": _symbol(name, kind=kind, file_id=file_ids.get(name, "file_1"))
+            for name, kind in names.items()
         },
         relations=tuple(relations),
+        test_file_ids=test_file_ids,
     )
 
 
@@ -413,7 +432,14 @@ def test_a_changed_symbol_without_an_inbound_tests_edge_is_a_gap() -> None:
 def test_a_changed_symbol_with_an_inbound_tests_edge_is_not_a_gap() -> None:
     graph = _side(
         {"total": SymbolKind.FUNCTION, "test_total": SymbolKind.TEST},
-        [_relation("test_total", "total", RelationKind.TESTS)],
+        [
+            _relation(
+                "test_total",
+                "total",
+                RelationKind.TESTS,
+                derivation=Derivation.HIGH_CONFIDENCE_HEURISTIC,
+            )
+        ],
     )
 
     result = analyze_impact([_change("total")], base=graph, target=graph)
@@ -443,6 +469,269 @@ def test_a_changed_document_is_never_a_coverage_gap() -> None:
     )
 
     assert result.test_gaps == ()
+
+
+# --- Gap reasons ----------------------------------------------------------------
+
+
+def by_name(reasons: tuple[GapReason, ...], qualified_name: str) -> GapReason | None:
+    for reason in reasons:
+        if reason.qualified_name == qualified_name:
+            return reason
+    return None
+
+
+def one(edges: tuple[object, ...], *, target: str) -> object:
+    matches = [edge for edge in edges if edge.target == target]  # type: ignore[attr-defined]
+    assert len(matches) == 1, matches
+    return matches[0]
+
+
+def _fixture_mediated_graph() -> GraphSide:
+    """`test_orders.test_total` reaches `orders.Order` only through a fixture.
+
+    The fixture calls `Order` directly (evidence the strict pass never sees,
+    since the test itself names only the fixture), and the test's
+    `CONSUMES_FIXTURE` edge records which fixture it asked for. A synthetic
+    weak `TESTS` edge, tagged `FIXTURE_HINT`, is what Task 4's derivation pass
+    would have produced from those two facts.
+    """
+    return _side(
+        {
+            "orders.Order": SymbolKind.CLASS,
+            "order_fixture": SymbolKind.FIXTURE,
+            "test_orders.test_total": SymbolKind.TEST,
+        },
+        [
+            _relation("order_fixture", "orders.Order", RelationKind.CALLS),
+            _relation(
+                "test_orders.test_total",
+                "order_fixture",
+                RelationKind.CONSUMES_FIXTURE,
+            ),
+            _relation(
+                "test_orders.test_total",
+                "orders.Order",
+                RelationKind.TESTS,
+                derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+                module_hint=FIXTURE_HINT,
+            ),
+        ],
+        file_ids={
+            "order_fixture": "file_test",
+            "test_orders.test_total": "file_test",
+        },
+        test_file_ids=frozenset({"file_test"}),
+    )
+
+
+def analyze_fixture_mediated() -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
+    graph = _fixture_mediated_graph()
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+    return result.test_gaps, result.test_gap_reasons
+
+
+def impact_edges_for_fixture_mediated() -> tuple[object, ...]:
+    graph = _fixture_mediated_graph()
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+    return result.edges
+
+
+def analyze_strictly_tested() -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
+    graph = _side(
+        {"orders.Order": SymbolKind.CLASS, "test_orders.test_total": SymbolKind.TEST},
+        [
+            _relation(
+                "test_orders.test_total",
+                "orders.Order",
+                RelationKind.TESTS,
+                derivation=Derivation.HIGH_CONFIDENCE_HEURISTIC,
+            )
+        ],
+    )
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+    return result.test_gaps, result.test_gap_reasons
+
+
+def analyze_unreferenced() -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
+    graph = _side({"orders.Order": SymbolKind.CLASS}, [])
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+    return result.test_gaps, result.test_gap_reasons
+
+
+def analyze_imported_not_called() -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
+    graph = _side(
+        {"orders.Order": SymbolKind.CLASS, "test_orders": SymbolKind.MODULE},
+        [_relation("test_orders", "orders.Order", RelationKind.IMPORTS)],
+        file_ids={"test_orders": "file_test"},
+        test_file_ids=frozenset({"file_test"}),
+    )
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+    return result.test_gaps, result.test_gap_reasons
+
+
+def analyze_fixture_and_bare_import() -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
+    graph = _fixture_mediated_graph()
+    extra = _relation(
+        "test_orders",
+        "orders.Order",
+        RelationKind.IMPORTS,
+        file_id="file_test",
+    )
+    graph = GraphSide(
+        symbols={
+            **graph.symbols,
+            "sym_test_orders": _symbol(
+                "test_orders", kind=SymbolKind.MODULE, file_id="file_test"
+            ),
+        },
+        relations=(*graph.relations, extra),
+        test_file_ids=graph.test_file_ids,
+    )
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+    return result.test_gaps, result.test_gap_reasons
+
+
+def analyze_mixed() -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
+    """Three changed symbols, each landing in a different bucket."""
+    graph = _side(
+        {
+            "orders.Order": SymbolKind.CLASS,
+            "order_fixture": SymbolKind.FIXTURE,
+            "test_orders.test_total": SymbolKind.TEST,
+            "orders.Total": SymbolKind.FUNCTION,
+            "orders.Helper": SymbolKind.FUNCTION,
+            "test_orders": SymbolKind.MODULE,
+        },
+        [
+            _relation("order_fixture", "orders.Order", RelationKind.CALLS),
+            _relation(
+                "test_orders.test_total",
+                "order_fixture",
+                RelationKind.CONSUMES_FIXTURE,
+            ),
+            _relation(
+                "test_orders.test_total",
+                "orders.Order",
+                RelationKind.TESTS,
+                derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+                module_hint=FIXTURE_HINT,
+            ),
+            _relation(
+                "test_orders.test_total",
+                "orders.Total",
+                RelationKind.TESTS,
+                derivation=Derivation.HIGH_CONFIDENCE_HEURISTIC,
+                line=2,
+            ),
+            _relation(
+                "test_orders", "orders.Helper", RelationKind.IMPORTS, line=3
+            ),
+        ],
+        file_ids={
+            "order_fixture": "file_test",
+            "test_orders.test_total": "file_test",
+            "test_orders": "file_test",
+        },
+        test_file_ids=frozenset({"file_test"}),
+    )
+    result = analyze_impact(
+        [
+            _change("orders.Order", symbol_kind=SymbolKind.CLASS),
+            _change("orders.Total", symbol_kind=SymbolKind.FUNCTION),
+            _change("orders.Helper", symbol_kind=SymbolKind.FUNCTION),
+        ],
+        base=graph,
+        target=graph,
+    )
+    return result.test_gaps, result.test_gap_reasons
+
+
+def test_a_fixture_mediated_symbol_stays_a_gap() -> None:
+    # The governing principle: a weak edge explains a gap, it does not close it.
+    gaps, _ = analyze_fixture_mediated()
+    assert "orders.Order" in gaps
+
+
+def test_a_fixture_mediated_gap_says_why() -> None:
+    _, reasons = analyze_fixture_mediated()
+    reason = by_name(reasons, "orders.Order")
+    assert reason is not None
+    assert reason.reason is GapReasonCode.FIXTURE_MEDIATED_ONLY
+    assert reason.evidence_ids != []
+
+
+def test_a_strictly_tested_symbol_is_not_a_gap() -> None:
+    gaps, reasons = analyze_strictly_tested()
+    assert "orders.Order" not in gaps
+    assert by_name(reasons, "orders.Order") is None
+
+
+def test_an_unreferenced_symbol_reports_no_reference() -> None:
+    _, reasons = analyze_unreferenced()
+    reason = by_name(reasons, "orders.Order")
+    assert reason is not None
+    assert reason.reason is GapReasonCode.NO_TEST_FILE_REFERENCE
+    assert reason.evidence_ids == []
+
+
+def test_an_imported_but_uncalled_symbol_says_so() -> None:
+    _, reasons = analyze_imported_not_called()
+    reason = by_name(reasons, "orders.Order")
+    assert reason is not None
+    assert reason.reason is GapReasonCode.IMPORTED_NOT_CALLED
+
+
+def test_fixture_mediation_outranks_import_without_call() -> None:
+    # Precedence runs strongest near-miss first.
+    _, reasons = analyze_fixture_and_bare_import()
+    reason = by_name(reasons, "orders.Order")
+    assert reason is not None
+    assert reason.reason is GapReasonCode.FIXTURE_MEDIATED_ONLY
+
+
+def test_every_gap_has_exactly_one_reason() -> None:
+    gaps, reasons = analyze_mixed()
+    assert sorted(gaps) == sorted(reason.qualified_name for reason in reasons)
+
+
+def test_a_weak_edge_appears_in_impact_with_its_derivation() -> None:
+    edges = impact_edges_for_fixture_mediated()
+    edge = one(edges, target="test_orders.test_total")
+    assert edge.derivation is Derivation.LOW_CONFIDENCE_HEURISTIC  # type: ignore[attr-defined]
+
+
+def test_consumes_fixture_is_not_an_impact_edge() -> None:
+    # It is an extraction intermediate, not a dependency.
+    edges = impact_edges_for_fixture_mediated()
+    assert all(
+        edge.kind is not RelationKind.CONSUMES_FIXTURE  # type: ignore[attr-defined]
+        for edge in edges
+    )
 
 
 # --- Determinism --------------------------------------------------------------

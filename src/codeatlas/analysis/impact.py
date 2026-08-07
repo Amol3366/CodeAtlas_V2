@@ -24,10 +24,23 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Final
 
-from codeatlas.contracts import ChangeKind, Derivation, RelationKind, SymbolKind
+from codeatlas.contracts import (
+    ChangeKind,
+    Derivation,
+    GapReason,
+    GapReasonCode,
+    RelationKind,
+    SymbolKind,
+)
 from codeatlas.domain.change import SymbolChange
 from codeatlas.domain.errors import InvalidRequestError
-from codeatlas.domain.relations import ROUTE_HINT, RelationRecord, ResolutionState
+from codeatlas.domain.relations import (
+    FIXTURE_HINT,
+    HELPER_HINT,
+    ROUTE_HINT,
+    RelationRecord,
+    ResolutionState,
+)
 from codeatlas.domain.symbols import SymbolRecord
 
 MAX_ALLOWED_DEPTH: Final[int] = 5
@@ -69,6 +82,13 @@ _CONSTRUCTOR_NAMES: Final[frozenset[str]] = frozenset({"__init__", "constructor"
 # every symbol back up to its file.
 _STRUCTURAL_KINDS: Final[frozenset[RelationKind]] = frozenset(
     {RelationKind.CONTAINS, RelationKind.EXPORTS}
+)
+
+# An extraction intermediate: it records which fixture a test asked for, not
+# what depends on what. Following it would report a fixture name as blast
+# radius.
+_NON_IMPACT_KINDS: Final[frozenset[RelationKind]] = frozenset(
+    {RelationKind.CONSUMES_FIXTURE}
 )
 
 
@@ -115,6 +135,11 @@ class GraphSide:
     symbols: Mapping[str, SymbolRecord]
     relations: tuple[RelationRecord, ...]
     file_paths: Mapping[str, str] = field(default_factory=dict)
+    # Which files are test code, so a gap reason can tell a test's import from
+    # a production one. Defaulted because impact itself never needs it — the
+    # reason text does, and inventing "a test imports this" about a production
+    # import would be a fabricated claim.
+    test_file_ids: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -137,6 +162,7 @@ class ImpactResult:
     edges: tuple[ImpactEdge, ...] = ()
     paths: tuple[tuple[str, str], ...] = ()
     test_gaps: tuple[str, ...] = ()
+    test_gap_reasons: tuple[GapReason, ...] = ()
     unresolved_dependents: tuple[str, ...] = ()
     visited_count: int = 0
     max_depth_reached: int = 0
@@ -267,10 +293,12 @@ def analyze_impact(
         edges = edges[: limits.max_paths]
 
     warnings = tuple(f"GRAPH_TRUNCATED_{item.upper()}" for item in truncated)
+    gaps, gap_reasons = _test_gaps(changes, target, target_ids, target_edges)
     return ImpactResult(
         edges=edges,
         paths=tuple((edge.source, edge.target) for edge in edges),
-        test_gaps=_test_gaps(changes, target, target_ids, target_edges),
+        test_gaps=gaps,
+        test_gap_reasons=gap_reasons,
         unresolved_dependents=_unresolved_dependents(
             changes, base, base_ids, base_edges, target_ids
         ),
@@ -404,7 +432,7 @@ def _carries_impact(relation: RelationRecord, depth: int) -> bool:
     is not a related test, and listing it would make the tests section grow with
     distance rather than with relevance.
     """
-    if relation.kind in _STRUCTURAL_KINDS:
+    if relation.kind in _STRUCTURAL_KINDS or relation.kind in _NON_IMPACT_KINDS:
         return False
     return not (relation.kind is RelationKind.TESTS and depth > 1)
 
@@ -461,15 +489,18 @@ def _test_gaps(
     target: GraphSide,
     ids: Mapping[str, str],
     adjacency: _Adjacency,
-) -> tuple[str, ...]:
-    """Changed code symbols that no stored `TESTS` edge reaches.
+) -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
+    """Changed code symbols with no *qualifying* `TESTS` edge, and why.
 
-    This is informational and must never become a finding. A missing `TESTS`
-    edge means CodeAtlas found no test that both imports and calls the symbol.
-    It does not mean the symbol is untested — `AGENTS.md` Section 3.9 draws that
-    line explicitly, and only executing the suite could cross it.
+    A qualifying edge is one the strict import-and-call pass produced. A
+    fixture- or helper-mediated edge is reported as the reason the gap remains
+    rather than as coverage that closes it: it is a candidate, and promoting a
+    candidate to a fact is the one thing this product must not do.
+
+    None of this claims a symbol is untested. Only executing the suite could.
     """
     gaps: list[str] = []
+    reasons: list[GapReason] = []
     for change in changes:
         if change.symbol_kind in _UNTESTABLE_KINDS:
             continue
@@ -478,13 +509,114 @@ def _test_gaps(
         symbol_id = ids.get(change.qualified_name)
         if symbol_id is None:
             continue
-        tested = any(
-            relation.kind is RelationKind.TESTS
-            for relation in adjacency.by_target.get(symbol_id, ())
+        if change.qualified_name in gaps:
+            continue
+
+        incoming = tuple(adjacency.by_target.get(symbol_id, ()))
+        qualifying = [
+            relation
+            for relation in incoming
+            if relation.kind is RelationKind.TESTS
+            and relation.derivation is Derivation.HIGH_CONFIDENCE_HEURISTIC
+        ]
+        if qualifying:
+            continue
+
+        gaps.append(change.qualified_name)
+        reasons.append(_gap_reason(change.qualified_name, incoming, target))
+    order = sorted(range(len(gaps)), key=lambda position: gaps[position])
+    return (
+        tuple(gaps[position] for position in order),
+        tuple(reasons[position] for position in order),
+    )
+
+
+def _gap_reason(
+    qualified_name: str, incoming: Sequence[RelationRecord], target: GraphSide
+) -> GapReason:
+    """The single strongest near-miss explaining one gap.
+
+    Precedence runs from the strongest near-miss to the weakest, so the reason
+    names the closest thing to coverage that was actually found.
+    """
+
+    def from_test(relation: RelationRecord) -> bool:
+        """Is this edge's source inside test code?
+
+        Without this, an ordinary production import would be reported as
+        `IMPORTED_NOT_CALLED` — a reason whose text claims a *test* imports the
+        symbol. That is a fabricated claim, not a weaker one.
+
+        The check is on the file, not the symbol kind: a module-level
+        `from orders import Order` in a test file has the MODULE symbol as its
+        source, not a TEST symbol, so filtering by kind would miss the most
+        common case entirely.
+        """
+        symbol = target.symbols.get(relation.source_symbol_id)
+        return symbol is not None and symbol.file_id in target.test_file_ids
+
+    weak = [
+        relation
+        for relation in incoming
+        if relation.kind is RelationKind.TESTS
+        and relation.derivation is Derivation.LOW_CONFIDENCE_HEURISTIC
+    ]
+    fixture = [item for item in weak if item.module_hint == FIXTURE_HINT]
+    helper = [item for item in weak if item.module_hint == HELPER_HINT]
+    imports = [
+        relation
+        for relation in incoming
+        if relation.kind is RelationKind.IMPORTS and from_test(relation)
+    ]
+    calls = [
+        relation
+        for relation in incoming
+        if relation.kind is RelationKind.CALLS and from_test(relation)
+    ]
+
+    if fixture:
+        return GapReason(
+            qualified_name=qualified_name,
+            reason=GapReasonCode.FIXTURE_MEDIATED_ONLY,
+            explanation=(
+                "A test reaches this only through a fixture. That is a "
+                "candidate, not coverage."
+            ),
+            evidence_ids=[relation.relation_id for relation in fixture],
         )
-        if not tested and change.qualified_name not in gaps:
-            gaps.append(change.qualified_name)
-    return tuple(sorted(gaps))
+    if helper:
+        return GapReason(
+            qualified_name=qualified_name,
+            reason=GapReasonCode.HELPER_MEDIATED_ONLY,
+            explanation=(
+                "A test reaches this only through a test helper. That is a "
+                "candidate, not coverage."
+            ),
+            evidence_ids=[relation.relation_id for relation in helper],
+        )
+    if imports and not calls:
+        return GapReason(
+            qualified_name=qualified_name,
+            reason=GapReasonCode.IMPORTED_NOT_CALLED,
+            explanation="A test imports this but never calls it.",
+            evidence_ids=[relation.relation_id for relation in imports],
+        )
+    if calls and not imports:
+        return GapReason(
+            qualified_name=qualified_name,
+            reason=GapReasonCode.CALLED_NOT_IMPORTED,
+            explanation=(
+                "A test calls this name without importing it, so the call may "
+                "resolve to a different symbol."
+            ),
+            evidence_ids=[relation.relation_id for relation in calls],
+        )
+    return GapReason(
+        qualified_name=qualified_name,
+        reason=GapReasonCode.NO_TEST_FILE_REFERENCE,
+        explanation="No test file references this symbol.",
+        evidence_ids=[],
+    )
 
 
 def _unresolved_dependents(

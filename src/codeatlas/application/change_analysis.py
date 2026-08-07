@@ -269,6 +269,7 @@ class ChangeAnalysisService:
             findings=findings,
             evidence=evidence,
             test_gaps=list(report.impact.test_gaps),
+            test_gap_reasons=list(report.impact.test_gap_reasons),
             warnings=list(report.warnings),
             limitations=list(report.limitations),
             timing_ms=dict(report.timing_ms),
