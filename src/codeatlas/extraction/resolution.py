@@ -28,6 +28,7 @@ from codeatlas.domain.ids import relation_id as build_relation_id
 from codeatlas.domain.relations import (
     DERIVED_HINT,
     FIXTURE_HINT,
+    HELPER_HINT,
     MENTION_HINT,
     ROUTE_HINT,
     RelationRecord,
@@ -172,6 +173,7 @@ class SnapshotResolver:
 
         relations.extend(_derive_test_edges(relations, index))
         relations.extend(_derive_fixture_test_edges(relations, index))
+        relations.extend(_derive_helper_test_edges(relations, index))
         relations.extend(_derive_document_edges(routes, mentions, index, route_index))
         relations.sort(
             key=lambda item: (item.file_id, item.start_line, item.relation_id)
@@ -846,6 +848,77 @@ def _derive_fixture_test_edges(
                     module_hint=FIXTURE_HINT,
                 )
             )
+    return edges
+
+
+def _derive_helper_test_edges(
+    relations: Sequence[RelationRecord], index: _Index
+) -> list[RelationRecord]:
+    """Emit `TESTS` where a test calls a test helper that calls the target.
+
+    Exactly one intermediate hop. Two hops through shared test utilities would
+    reach a large fraction of any codebase, which makes the signal worthless
+    rather than merely weak.
+    """
+    existing = {
+        (relation.source_symbol_id, relation.target_symbol_id)
+        for relation in relations
+        if relation.kind is RelationKind.TESTS
+    }
+    calls_by_source: dict[str, list[RelationRecord]] = {}
+    for relation in relations:
+        if (
+            relation.kind is RelationKind.CALLS
+            and relation.target_symbol_id is not None
+        ):
+            calls_by_source.setdefault(relation.source_symbol_id, []).append(relation)
+
+    def in_test_code(symbol_id: str) -> bool:
+        record = index.files_by_id.get(index.file_of_symbol.get(symbol_id, ""))
+        return (
+            record is not None
+            and record.classification is FileClassification.TEST_CODE
+        )
+
+    edges: list[RelationRecord] = []
+    seen: set[tuple[str, str]] = set()
+    for symbol in index.symbols_by_id.values():
+        if symbol.kind is not SymbolKind.TEST:
+            continue
+        for first in calls_by_source.get(symbol.symbol_id, ()):
+            helper_id = first.target_symbol_id
+            if helper_id is None or not in_test_code(helper_id):
+                continue
+            for second in calls_by_source.get(helper_id, ()):
+                target = second.target_symbol_id
+                if target is None or in_test_code(target):
+                    continue
+                key = (symbol.symbol_id, target)
+                if key in existing or key in seen:
+                    continue
+                seen.add(key)
+                edges.append(
+                    RelationRecord(
+                        relation_id=build_relation_id(
+                            symbol.symbol_id,
+                            RelationKind.TESTS.value,
+                            f"helper:{first.target_hint}:{second.target_hint}",
+                            first.start_line,
+                        ),
+                        source_symbol_id=symbol.symbol_id,
+                        target_symbol_id=target,
+                        file_id=first.file_id,
+                        kind=RelationKind.TESTS,
+                        target_hint=second.target_hint,
+                        resolution=ResolutionState.RESOLVED,
+                        derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+                        confidence=_CONFIDENCE[Derivation.LOW_CONFIDENCE_HEURISTIC],
+                        start_line=first.start_line,
+                        end_line=first.end_line,
+                        candidate_count=1,
+                        module_hint=HELPER_HINT,
+                    )
+                )
     return edges
 
 

@@ -553,3 +553,132 @@ def test_an_unresolved_parameter_produces_no_edge_and_no_error(
         if item.kind is RelationKind.TESTS
     ]
     assert tests_from_source == []
+
+
+# --- Helper-mediated TESTS derivation ------------------------------------------
+
+
+def test_a_helper_mediated_test_produces_a_weak_edge(tmp_path: Path) -> None:
+    """test_total -> _build (same test file) -> orders.Order."""
+    root = _build_repo(
+        tmp_path,
+        "helper_repo",
+        {
+            "orders.py": "class Order:\n    pass\n",
+            "test_orders.py": (
+                "from orders import Order\n"
+                "\n"
+                "def _build():\n"
+                "    return Order()\n"
+                "\n"
+                "def test_total():\n"
+                "    assert _build() is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness, snapshot_id, relations, source_hint="test_total", target_hint="Order"
+    )
+    assert len(edges) == 1
+    assert edges[0].derivation is Derivation.LOW_CONFIDENCE_HEURISTIC
+
+
+def test_a_two_hop_helper_chain_produces_nothing(tmp_path: Path) -> None:
+    """test_total -> _outer -> _inner -> orders.Order.
+
+    Depth is fixed at one intermediate hop; two hops through shared utilities
+    would reach most of a codebase and make the signal worthless.
+    """
+    root = _build_repo(
+        tmp_path,
+        "two_hop_helper_repo",
+        {
+            "orders.py": "class Order:\n    pass\n",
+            "test_orders.py": (
+                "from orders import Order\n"
+                "\n"
+                "def _inner():\n"
+                "    return Order()\n"
+                "\n"
+                "def _outer():\n"
+                "    return _inner()\n"
+                "\n"
+                "def test_total():\n"
+                "    assert _outer() is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    assert (
+        _tests_edges(
+            harness,
+            snapshot_id,
+            relations,
+            source_hint="test_total",
+            target_hint="Order",
+        )
+        == ()
+    )
+
+
+def test_a_helper_outside_a_test_file_is_not_a_helper(tmp_path: Path) -> None:
+    """The intermediate must itself live in test code, or this is an ordinary
+    two-hop call chain through production code."""
+    root = _build_repo(
+        tmp_path,
+        "production_intermediate_repo",
+        {
+            "orders.py": (
+                "class Order:\n    pass\n\n\ndef build():\n    return Order()\n"
+            ),
+            "test_orders.py": (
+                "from orders import build\n"
+                "\n"
+                "def test_total():\n"
+                "    assert build() is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    assert (
+        _tests_edges(
+            harness,
+            snapshot_id,
+            relations,
+            source_hint="test_total",
+            target_hint="Order",
+        )
+        == ()
+    )
+
+
+def test_a_strict_edge_is_not_replaced_by_a_helper_edge(tmp_path: Path) -> None:
+    """The test both imports+calls the target AND reaches it via a helper."""
+    root = _build_repo(
+        tmp_path,
+        "strict_and_helper_repo",
+        {
+            "orders.py": "class Order:\n    pass\n",
+            "test_orders.py": (
+                "from orders import Order\n"
+                "\n"
+                "def _build():\n"
+                "    return Order()\n"
+                "\n"
+                "def test_total():\n"
+                "    _build()\n"
+                "    assert Order() is not None\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness, snapshot_id, relations, source_hint="test_total", target_hint="Order"
+    )
+    assert len(edges) == 1
+    assert edges[0].derivation is Derivation.HIGH_CONFIDENCE_HEURISTIC
