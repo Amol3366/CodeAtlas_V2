@@ -9,7 +9,10 @@ import pytest
 
 from codeatlas.contracts import GapReasonCode
 from codeatlas.evaluation.invariants import (
+    InvariantCase,
+    InvariantCorpus,
     InvariantCorpusError,
+    check_corpus,
     load_corpus,
 )
 
@@ -103,3 +106,69 @@ def test_duplicate_case_ids_are_refused(tmp_path: Path) -> None:
 
     with pytest.raises(InvariantCorpusError):
         load_corpus(directory)
+
+
+def _corpus(case: InvariantCase, root: Path) -> InvariantCorpus:
+    return InvariantCorpus(cases=[case], root=root)
+
+
+def _fixture_root() -> Path:
+    return Path("tests/evaluation/invariant_cases")
+
+
+def test_an_unrunnable_case_fails_rather_than_skipping(tmp_path: Path) -> None:
+    # "did not hold" and "was not measured" must not be the same result.
+    # A missing fixture is the realistic way this happens: DirectoryStateView
+    # returns an empty scan for a nonexistent root rather than raising, so
+    # without an explicit existence check the case would report "nothing
+    # changed" and fail for a misleading reason.
+    case = InvariantCase(
+        id="i001",
+        invariant="x",
+        fixture="does-not-exist",
+        expect_gap_reasons={"Order": GapReasonCode.FIXTURE_MEDIATED_ONLY},
+        expect_not_gaps=[],
+    )
+
+    result = check_corpus(_corpus(case, tmp_path))
+
+    assert result.held is False
+    assert result.results[0].held is False
+    assert "fixture" in " ".join(result.results[0].failures)
+
+
+def test_a_wrong_reason_fails_even_though_it_is_a_gap() -> None:
+    # `Order` IS a gap in the real fixture, but for the fixture reason.
+    # Demanding the helper reason must fail, or membership alone is all that
+    # is being checked.
+    case = InvariantCase(
+        id="i001",
+        invariant="x",
+        fixture="orders",
+        expect_gap_reasons={"Order": GapReasonCode.HELPER_MEDIATED_ONLY},
+        expect_not_gaps=[],
+    )
+
+    result = check_corpus(_corpus(case, _fixture_root()))
+
+    assert result.held is False
+
+
+def test_a_symbol_wrongly_expected_to_be_covered_fails() -> None:
+    case = InvariantCase(
+        id="i001",
+        invariant="x",
+        fixture="orders",
+        expect_gap_reasons={},
+        expect_not_gaps=["Order"],
+    )
+
+    result = check_corpus(_corpus(case, _fixture_root()))
+
+    assert result.held is False
+
+
+def test_the_real_corpus_holds() -> None:
+    result = check_corpus(load_corpus(_fixture_root()))
+
+    assert result.held is True
