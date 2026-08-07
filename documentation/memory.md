@@ -533,11 +533,22 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
    failure mode as the two ADR-0016 corpus gaps closed on 2026-08-08: a metric
    that cannot see what it claims to measure.
 
-   **Not yet verified, and worth doing first:** what `valid_evidence_rate`
-   counts as valid for this corpus. Its target is 1.0 (any imperfection is
-   unmet), so 0.0563 either means the evidence contract is failing badly or the
-   strict ADR-0003 reading measures something narrower than the name suggests.
-   Do not act on that number before checking its definition.
+   **`valid_evidence_rate` resolved 2026-08-08 — do not read it as "94% of
+   evidence is invalid".** It *equals* `exact_evidence_rate` by definition
+   (ADR-0003, `runner.py:164-167`), retained under the old name so historical
+   numbers keep their meaning. Confirmed in the artifact: both are exactly
+   0.0563 in the semantic column. So it measures **exact span match**, and
+   0.0563 means 5.6% of evidence items land on precisely the expected span. The
+   looser `containing_evidence_rate` — evidence that *contains* the expected
+   span — is 0.1080.
+
+   That reframes it as a **target problem before an engine problem**: the unmet
+   rule demands `valid_evidence_rate >= 1.0`, i.e. every evidence item matching
+   its expected span exactly. Whether that is achievable, or whether the gate
+   should be reading `containing_evidence_rate`, is a decision for the project
+   owner — ADR-0003 requires any claim to name which of the three rates it used,
+   and the gate currently names the strictest. Settle that before treating
+   0.0563 as an engine defect.
 
    The stopword precedent still stands and is still the best lead on *lexical*
    headroom: that one fix was worth +0.53 recall while the entire semantic layer
