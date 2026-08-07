@@ -1,5 +1,6 @@
 import { screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { axe } from "vitest-axe";
 
 import { apiError, renderWithProviders, stubFetch } from "../test/harness";
 import { PreflightAnalysisRoute } from "./PreflightAnalysisRoute";
@@ -104,5 +105,96 @@ describe("PreflightAnalysisRoute", () => {
     expect(
       screen.getByRole("link", { name: /run a preflight/i }),
     ).toHaveAttribute("href", "/preflight");
+  });
+
+  it("has no accessibility violations with a fully populated report", async () => {
+    stubFetch({
+      "/v1/change-analysis/a1": {
+        body: report({
+          findings: [
+            {
+              code: "PUBLIC_CONTRACT_CHANGED",
+              severity: "high",
+              title: "Public contract changed",
+              description: "The signature changed.",
+              derivation: "static_resolved",
+              confidence: 0.9,
+              evidence_ids: ["e1"],
+              limitations: [],
+            },
+            {
+              code: "DOC_MAY_BE_STALE",
+              severity: "low",
+              title: "A document may be stale",
+              description: "A document references the changed symbol.",
+              derivation: "low_confidence_heuristic",
+              confidence: 0.3,
+              evidence_ids: [],
+              limitations: [],
+            },
+          ],
+          changed_symbols: [
+            {
+              qualified_name: "orders.Order.total",
+              symbol_kind: "METHOD",
+              change_kind: "modified",
+              file_path: "src/orders.py",
+              target_start_line: 40,
+              target_end_line: 52,
+              confidence: 1,
+              derivation: "deterministic",
+              public: true,
+              signature_changed: true,
+            },
+          ],
+          changed_files: [
+            {
+              path: "pyproject.toml",
+              change_kind: "modified",
+              content_hash_changed: true,
+            },
+          ],
+          impact_edges: [
+            {
+              source: "orders.Order.total",
+              kind: "CALLS",
+              target: "api.checkout",
+              derivation: "static_resolved",
+              confidence: 0.9,
+            },
+          ],
+          test_gaps: ["orders.Order"],
+          test_gap_reasons: [
+            {
+              qualified_name: "orders.Order",
+              reason: "FIXTURE_MEDIATED_ONLY",
+              explanation: "A test reaches this only through a fixture.",
+              evidence_ids: ["e1"],
+            },
+          ],
+          evidence: [
+            {
+              evidence_id: "e1",
+              side: "target",
+              file_path: "src/orders.py",
+              symbol: "orders.Order.total",
+              start_line: 40,
+              end_line: 52,
+              content_hash: "h",
+              derivation: "static_resolved",
+              confidence: 0.9,
+            },
+          ],
+          warnings: ["EVIDENCE_EXCERPT_TRUNCATED"],
+          limitations: ["Impact expansion stopped at the depth bound."],
+        }),
+      },
+    });
+
+    const { container } = renderAnalysis("a1");
+    await screen.findByTestId("overall-risk");
+
+    const results = await axe(container);
+    expect(results.violations).toEqual([]);
   });
 });

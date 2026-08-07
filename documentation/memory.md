@@ -89,6 +89,32 @@ development order is finished. A new phase requires an explicit user decision.
       machine-wide, precedence store → `.env`. No migration; `SCHEMA_VERSION`
       stays 14 and `contract_version` stays `1.1`. Gate green: 1926 passed.
 
+- [x] Preflight promoted to a first-class web screen (2026-08-07): `/preflight`
+      launches an analysis and `/preflight/:analysisId` loads the persisted
+      report, so an audit record survives a reload instead of living in
+      component state. The screen renders what the API always sent and the old
+      147-line embedded component discarded — changed symbols and files, impact
+      edges **with their derivation**, and the `test_gaps` / `GapReason` pairs
+      from ADR-0016. Frontend-only: nothing under `src/codeatlas/` changed.
+
+      Three things worth remembering. **Evidence renders inline without an
+      excerpt**, because `GET /v1/evidence/{id}` re-verifies *stored*,
+      snapshot-scoped evidence while analysis evidence carries a `side` — the
+      base side of a working tree has no snapshot, only a commit, and routing
+      one through the other would erase that distinction. **The e2e harness
+      serves `apps/web/dist` via `vite preview`**, so the Playwright spec failed
+      against a stale bundle until `npm run build` was re-run — the same class
+      of trap as the 2026-08-05 Settings incident, now on the e2e path. And a
+      run of component tests that failed *including a negative assertion* turned
+      out to be a shell whose working directory had drifted out of `apps/web`,
+      so vitest ran without `vite.config.ts` and therefore without jsdom; when
+      everything fails, including what cannot be wrong, suspect the harness.
+
+      Follow-up recorded: `ChangeAnalysisRequiresGitError` is declared
+      `retryable = True` (`src/codeatlas/domain/errors.py:155`), which is wrong
+      for a condition that cannot change on retry. The screen suppresses retry
+      for that code rather than changing the backend flag.
+
 - [x] CodeAtlas V2 working guide (2026-08-07): added
       `documentation/codeatlas-v2-working-guide.md` as a human-readable overview
       of what CodeAtlas is, how it works, its main operating scenarios, change

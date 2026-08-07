@@ -207,6 +207,50 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-07T22:30:00Z — Preflight promoted to a first-class web screen
+
+- Agent: Claude Code `claude-opus-5`, branch `preflight-web-screen`.
+- Transition: post-gate work. Phases 0-7 remain `complete`; this reopens no phase task.
+- Outcome: change preflight moved from a section embedded in `RepositoriesRoute`
+  to a route pair — `/preflight` launches, `/preflight/:analysisId` loads the
+  persisted report. The screen now renders what the API always sent and the old
+  one discarded: changed symbols and files, impact edges **with their
+  derivation**, and the `test_gaps` / `GapReason` pairs from ADR-0016. Evidence
+  renders inline from the report.
+- Files: `apps/web/src/routes/Preflight{,Analysis}Route.tsx`; eight components
+  under `apps/web/src/features/change-analysis/`; `components/ErrorNotice.tsx`
+  (moved out of `RepositoryPanel`); `app/App.tsx`, `app/Shell.tsx`,
+  `routes/RepositoriesRoute.tsx`; `e2e/preflight.spec.ts`. Deleted
+  `features/change-analysis/Preflight.tsx` and its test.
+- Contracts/migrations: **none.** Frontend-only. No file under `src/codeatlas/`
+  changed; `contract_version` stays `1.1`, `SCHEMA_VERSION` stays 14.
+- Verification: `npx tsc --noEmit` clean; `npm run test` 193 passed across 21
+  files, including an axe pass on a fully populated report with zero
+  violations; `npx playwright test preflight --project=firefox` 1 passed;
+  `--project=chromium` 1 skipped, cleanly.
+- Two invariants were mutation-checked rather than asserted: removing the
+  derivation span fails `shows the derivation on EVERY edge`, and removing the
+  coverage disclaimer fails `always shows the disclaimer when any gap is shown`.
+- Limitations:
+  - **Chromium skip, fourth route.** Running a preflight navigates client-side
+    to `/preflight/{id}`, the exact shape of the renderer crash in
+    `e2e/support/chromium-crash.ts`. Unlike the settings suite, the navigation
+    cannot be swapped for a page load — the navigation *is* what the test
+    proves. Declared in the spec with its reason; Firefox runs every assertion.
+  - **Evidence has no excerpt.** `GET /v1/evidence/{id}` re-verifies *stored*,
+    snapshot-scoped evidence; analysis evidence carries a `side` instead,
+    because the base side of a working tree has no snapshot, only a commit.
+    Routing one through the other would erase that distinction, so the screen
+    shows location, symbol, side, derivation and confidence, and no excerpt.
+    An excerpt endpoint is a backend decision with its own staleness contract.
+  - **`ChangeAnalysisRequiresGitError` is declared `retryable = True`**
+    (`src/codeatlas/domain/errors.py:155`), which is wrong for a condition that
+    cannot change on retry. The screen suppresses the retry affordance for that
+    code and says what would fix it; the backend flag was deliberately not
+    changed here.
+- Next: no assigned work. The remaining slices from the 2026-08-07 planning
+  session are PR-ready Markdown export and the CLI impact UX.
+
 ### 2026-08-07T18:00:00Z — Task 10 (gate, evaluation, ADR-0016, docs) completed; test-mapping-and-gap-reasons feature closed
 
 - Agent: Claude Code `claude-sonnet-5`, branch `test-mapping-and-gap-reasons`.
