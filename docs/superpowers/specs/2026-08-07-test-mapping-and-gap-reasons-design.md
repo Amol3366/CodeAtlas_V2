@@ -1,6 +1,6 @@
 # Fixture- and helper-mediated test mapping, with evidence-backed absence reasons
 
-Status: approved design, not yet implemented
+Status: implemented and merged to `test-mapping-and-gap-reasons` (ADR-0016)
 Date: 2026-08-07
 Authority: `AGENTS.md` is the contract. This spec is subordinate to it.
 Related: ADR-0003 (evidence granularity), ADR-0004 (relation model), and the

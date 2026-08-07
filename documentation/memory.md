@@ -326,7 +326,32 @@ Carried into gate approvals as declared work rather than dropped:
 
 ## Next Up
 
-No assigned work. Candidates, in the order they'd most likely be picked up:
+Two follow-ups were raised by the ADR-0016 whole-branch review and deliberately
+**not** folded into that branch, so they are recorded here rather than lost:
+
+1. **The evaluation corpus cannot see derivation-tiered test edges.** The 24-case
+   Phase 4 corpus contains no fixture- or helper-mediated scenario, so
+   `run_phase4_baseline.py` produced a byte-identical report and
+   `check_phase4.ps1` passed. Nothing regressed — but the gate now reports green
+   on a feature it does not exercise. A future refactor could start promoting
+   fixture-mediated edges to `high_confidence_heuristic` and every published
+   metric would stay unchanged. The unit and integration tests do cover it, but
+   those are the same tests such a refactor would be tempted to update in step.
+   Add two change cases asserting a symbol *remains* in `test_gaps` with its
+   expected `GapReasonCode`, so the corpus fails if the invariant weakens.
+
+2. **`related_tests` is a second surface the invariant was never applied to.**
+   `application/graph_queries.py` queries `kinds=(RelationKind.TESTS,)` with no
+   derivation filter, so it now returns fixture- and helper-mediated candidates
+   beside genuine coverage and renders each as flat prose. The claim does carry
+   `derivation` and `confidence` — the designated mechanism — so this is not a
+   correctness bug. But the cited line for a fixture-mediated edge is the
+   *fixture parameter*, which never names the target, so the prose reads like a
+   fact while its evidence line does not show the relationship. ADR-0016's
+   consequences section discusses `impact` only and never mentions this surface.
+   Worth an explicit decision rather than an accident.
+
+No other assigned work. Candidates, in the order they'd most likely be picked up:
 
 1. **Close the untested `POST /v1/models/test` success branch.** Now the
    cheapest item on the list: both semantic extras are installed in this
