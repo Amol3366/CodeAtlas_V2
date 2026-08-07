@@ -44,17 +44,22 @@ untouched **by construction**, not by care.
 tests/evaluation/invariant_cases/
   cases.json                                   declarative expectations
   fixtures/
-    i001-fixture-mediated/{base,target}/
-    i002-helper-mediated/{base,target}/
-    i003-strict-coverage/{base,target}/
-    i004-no-reference/{base,target}/
+    orders/{base,target}/                      one tree, four changed symbols
 scripts/check_invariants.py                    the checker
 docs/evaluation/invariants.json                committed result artifact
 docs/evaluation/invariants.md                  the human reading
 ```
 
-Each case is two committed directories in the layout the `python_app` fixture
-already uses (`src/`, `tests/`). No Git, no database, no state materialisation:
+All four cases share **one** committed pair of directories, in the layout the
+`python_app` fixture already uses (`src/`, `tests/`). Four separate trees would
+each prove a reason in isolation; one tree proves the four reasons
+*discriminate between each other* in a single engine run, which is what the
+precedence logic actually has to get right. The source shapes are carried from
+`tests/integration/test_fixture_test_mapping.py`, where they are already proven
+to produce one distinct reason each. The `fixture` field stays per-case so a
+later invariant can add its own tree without restructuring the corpus.
+
+No Git, no database, no state materialisation:
 the engine is called directly with a `DirectoryStateView` per side, which is
 exactly what `predict_changes`
 (`src/codeatlas/evaluation/engine_adapter.py:469`) does after it materialises
@@ -75,8 +80,8 @@ breaks the Phase 4 baseline. A separate, minimal contract:
     {
       "id": "i001",
       "invariant": "a fixture-mediated symbol stays a gap",
-      "fixture": "i001-fixture-mediated",
-      "expect_gap_reasons": { "Order.total": "FIXTURE_MEDIATED_ONLY" },
+      "fixture": "orders",
+      "expect_gap_reasons": { "Order": "FIXTURE_MEDIATED_ONLY" },
       "expect_not_gaps": []
     }
   ]
@@ -93,18 +98,18 @@ Without it, a bug that made every symbol a permanent gap would satisfy every
 other assertion in the corpus. This field is what proves the strict path still
 closes a gap, and it is the reason case i003 exists.
 
-Qualified names follow the Phase 4 corpus convention — `PaymentService.capture`,
-not a module-prefixed path. The exact strings are established by running the
-engine once during implementation rather than guessed into the corpus.
+Qualified names are bare — `Order`, not a module-prefixed path — as
+`test_fixture_test_mapping.py` confirms. They are verified against the engine
+during implementation rather than trusted from this document.
 
 ## The four cases
 
-| Case | Shape | Asserts |
-| --- | --- | --- |
-| i001 | Test requests the changed symbol's object through a `conftest.py` fixture parameter | `FIXTURE_MEDIATED_ONLY`, still a gap |
-| i002 | Test calls a helper in `tests/helpers.py` that calls the changed symbol | `HELPER_MEDIATED_ONLY`, still a gap |
-| i003 | Test imports and calls the changed symbol directly | `expect_not_gaps` — the strict path still closes |
-| i004 | No test references the changed symbol at all | `NO_TEST_FILE_REFERENCE` |
+| Case | Symbol | Shape | Asserts |
+| --- | --- | --- | --- |
+| i001 | `Order` | Requested through a root `conftest.py` fixture parameter | `FIXTURE_MEDIATED_ONLY`, still a gap |
+| i002 | `total` | Reached through a module-local helper in the test file | `HELPER_MEDIATED_ONLY`, still a gap |
+| i003 | `unused_helper` | Imported and called directly by a test | `expect_not_gaps` — the strict path still closes |
+| i004 | `audit` | Referenced by no test at all | `NO_TEST_FILE_REFERENCE` |
 
 i001 and i002 are the two scenarios the Phase 4 corpus lacks and the reason
 this work exists. i003 is the control. i004 anchors the bare-absence arm of
