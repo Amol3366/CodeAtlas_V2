@@ -15,25 +15,15 @@ they are the part that keeps the rest honest.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Final
 
 from codeatlas.contracts import (
+    SEVERITY_ORDER,
     ChangeAnalysisReport,
     ChangedSymbol,
     ChangeEvidenceItem,
     Finding,
-    Severity,
 )
 from codeatlas.delivery.markdown_text import escape_cell, escape_inline, table
-
-_SEVERITY_ORDER: Final[tuple[Severity, ...]] = (
-    Severity.CRITICAL,
-    Severity.HIGH,
-    Severity.MEDIUM,
-    Severity.LOW,
-    Severity.INFO,
-)
-
 
 
 def render_markdown(report: ChangeAnalysisReport) -> str:
@@ -113,7 +103,7 @@ def _findings(
 
     by_id = {item.evidence_id: item for item in evidence}
     lines = ["## Findings", ""]
-    for severity in _SEVERITY_ORDER:
+    for severity in SEVERITY_ORDER:
         matching = [item for item in findings if item.severity is severity]
         if not matching:
             continue

@@ -15,22 +15,13 @@ from collections.abc import Sequence
 from typing import Final
 
 from codeatlas.contracts import (
+    SEVERITY_ORDER,
     ChangeAnalysisReport,
     ChangeEvidenceItem,
     Finding,
     GapReason,
-    Severity,
 )
 from codeatlas.delivery.markdown_text import escape_cell, escape_inline, table
-
-_SEVERITY_ORDER: Final[tuple[Severity, ...]] = (
-    Severity.CRITICAL,
-    Severity.HIGH,
-    Severity.MEDIUM,
-    Severity.LOW,
-    Severity.INFO,
-)
-
 
 MAX_CHARACTERS: Final[int] = 60_000
 """A conservative bound, deliberately not named after any platform's limit.
@@ -246,7 +237,7 @@ def _findings(report: ChangeAnalysisReport) -> list[str]:
 
     by_id = {item.evidence_id: item for item in report.evidence}
     lines = ["### Findings", ""]
-    for severity in _SEVERITY_ORDER:
+    for severity in SEVERITY_ORDER:
         for finding in [item for item in report.findings if item.severity is severity]:
             lines += _one_finding(finding, by_id)
     return lines

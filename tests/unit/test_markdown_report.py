@@ -118,3 +118,19 @@ def test_a_hostile_gap_name_is_escaped() -> None:
     markdown = render_markdown(_report(test_gaps=["a|b`c"]))
 
     assert "a\\|b\\`c" in markdown
+
+
+def test_the_severity_ordering_lives_in_one_place() -> None:
+    """Three renderers and --fail-on all rank severity.
+
+    Copies of "which severity is worse" are places for them to disagree.
+    """
+    from codeatlas.contracts import SEVERITY_ORDER, Severity
+
+    assert SEVERITY_ORDER == (
+        Severity.CRITICAL,
+        Severity.HIGH,
+        Severity.MEDIUM,
+        Severity.LOW,
+        Severity.INFO,
+    )

@@ -6,7 +6,7 @@ import unicodedata
 from datetime import datetime, timedelta
 from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from pydantic import (
     AfterValidator,
@@ -113,6 +113,22 @@ class Severity(StrEnum):
     MEDIUM = "medium"
     LOW = "low"
     INFO = "info"
+
+
+SEVERITY_ORDER: Final[tuple[Severity, ...]] = (
+    Severity.CRITICAL,
+    Severity.HIGH,
+    Severity.MEDIUM,
+    Severity.LOW,
+    Severity.INFO,
+)
+"""Severity from worst to least, most-severe first.
+
+Here rather than in a renderer because the ordering is a property of the
+severity vocabulary itself, and the CLI's `--fail-on` needs it from outside
+`delivery` entirely. Three copies of "which severity is worse" would be three
+places for them to disagree.
+"""
 
 
 class SymbolKind(StrEnum):
