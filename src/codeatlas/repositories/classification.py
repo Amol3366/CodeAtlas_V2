@@ -150,6 +150,12 @@ def classify(relative_path: str) -> tuple[FileClassification, str]:
 def _is_test_path(stem: str, directories: tuple[str, ...]) -> bool:
     if any(directory in _TEST_DIRECTORIES for directory in directories):
         return True
+    # `conftest.py` is pytest's fixture file and is frequently placed at a
+    # repository root or beside a package, where no other rule here matches it.
+    # Fixtures defined in one are invisible to test-edge derivation unless the
+    # file is classified as test code.
+    if stem == "conftest":
+        return True
     return (
         stem.startswith("test_")
         or stem.endswith("_test")

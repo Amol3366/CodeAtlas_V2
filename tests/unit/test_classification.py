@@ -44,3 +44,19 @@ def test_classification_and_language(
 def test_classification_is_case_insensitive_on_extensions() -> None:
     assert classify("src/App.PY") == (FileClassification.SOURCE_CODE, "python")
     assert classify("README.MD") == (FileClassification.DOCUMENTATION, "markdown")
+
+
+def test_a_root_conftest_is_test_code() -> None:
+    classification, _ = classify("conftest.py")
+    assert classification is FileClassification.TEST_CODE
+
+
+def test_a_package_conftest_is_test_code() -> None:
+    classification, _ = classify("src/orders/conftest.py")
+    assert classification is FileClassification.TEST_CODE
+
+
+def test_a_module_merely_starting_with_conftest_is_not_test_code() -> None:
+    # Exact stem only. `conftest_helpers.py` is ordinary source.
+    classification, _ = classify("src/orders/conftest_helpers.py")
+    assert classification is FileClassification.SOURCE_CODE
