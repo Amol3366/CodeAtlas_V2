@@ -291,11 +291,16 @@ def test_each_parameter_becomes_its_own_reference() -> None:
     assert [ref.target_hint for ref in refs] == ["store", "clock"]
 
 
-def test_parameters_on_one_line_get_distinct_parts() -> None:
-    # `part` is what keeps two references on the same line apart.
+def test_parameters_with_different_names_share_part_zero() -> None:
+    # `part` separates references that are OTHERWISE IDENTICAL on one line —
+    # `f(f(x))`, per the docstring in `domain/relations.py`. `store` and `clock`
+    # differ in `target_hint`, which `build_relation_id` already hashes, so both
+    # are `part=0`. Do NOT change `_Collector.add`'s dedup key to make distinct
+    # names produce distinct parts: that key is shared by every reference kind,
+    # and doing so silently renumbers `IMPORTS` on `from x import a, b`.
     source = "def test_orders(store, clock):\n    assert store and clock\n"
     refs = fixture_references(source, path="test_orders.py")
-    assert len({ref.part for ref in refs}) == 2
+    assert [ref.part for ref in refs] == [0, 0]
 
 
 def test_a_defaulted_parameter_is_not_injected() -> None:
@@ -609,12 +614,28 @@ def _derive_fixture_test_edges(
     return edges
 ```
 
-Add the marker beside the existing `DERIVED_HINT` constant:
+Add the markers in `src/codeatlas/domain/relations.py`, beside `DERIVED_HINT`
+(~line 40) — **not** in `resolution.py`. That module is where the reference
+vocabulary lives, and its header comment states why: extraction writes these,
+resolution reads them, indexing depends on them.
 
 ```python
-FIXTURE_HINT: Final[str] = "derived:fixture"
-HELPER_HINT: Final[str] = "derived:helper"
+FIXTURE_HINT: Final[str] = "<fixture>"
+"""``TESTS`` edge derived through a fixture the test consumed."""
+
+HELPER_HINT: Final[str] = "<helper>"
+"""``TESTS`` edge derived through a helper the test called."""
 ```
+
+The angle brackets are required, not decorative: the surrounding comment states
+each hint "contains a character that cannot appear in an expression, so none can
+collide with a real receiver." A bare `derived:fixture` would break that
+guarantee.
+
+Import both into `resolution.py` alongside the existing `DERIVED_HINT` import.
+
+Note `RelationRecord` already treats any `TESTS` edge as non-reusable across
+snapshots (`domain/relations.py:142`), so these markers need no change there.
 
 In `resolve`, after line 172:
 
@@ -971,7 +992,41 @@ def test_consumes_fixture_is_not_an_impact_edge() -> None:
 Run: `uv run pytest tests/unit/test_impact.py -k gap -v`
 Expected: FAIL — `_test_gaps` returns a single tuple, so unpacking raises.
 
-- [ ] **Step 3: Exclude `CONSUMES_FIXTURE` from expansion**
+- [ ] **Step 3: Give `GraphSide` the test-file set**
+
+`_gap_reason` must distinguish a test's import from a production import, and
+`GraphSide` currently carries no classification. Add a defaulted field to
+`GraphSide` (`src/codeatlas/analysis/impact.py:106-117`) so no existing
+construction breaks:
+
+```python
+    # Which files are test code, so a gap reason can tell a test's import from
+    # a production one. Defaulted because impact itself never needs it — the
+    # reason text does, and inventing "a test imports this" about a production
+    # import would be a fabricated claim.
+    test_file_ids: frozenset[str] = frozenset()
+```
+
+Populate it at the single construction site, `src/codeatlas/analysis/engine.py:247`.
+The `files` sequence is already in scope there:
+
+```python
+            graph=GraphSide(
+                symbols={symbol.symbol_id: symbol for symbol in symbols},
+                relations=relations,
+                file_paths=paths,
+                test_file_ids=frozenset(
+                    record.file_id
+                    for record in files
+                    if record.classification is FileClassification.TEST_CODE
+                ),
+            ),
+```
+
+Import `FileClassification` from `codeatlas.domain.repository` in `engine.py` if
+it is not already imported.
+
+- [ ] **Step 4: Exclude `CONSUMES_FIXTURE` from expansion**
 
 In `src/codeatlas/analysis/impact.py`, beside `_STRUCTURAL_KINDS`:
 
@@ -986,7 +1041,7 @@ _NON_IMPACT_KINDS: Final[frozenset[RelationKind]] = frozenset(
 
 Skip these in the expansion walk beside the existing `_STRUCTURAL_KINDS` check — read the walk and place the guard where structural kinds are already filtered.
 
-- [ ] **Step 4: Rewrite `_test_gaps`**
+- [ ] **Step 5: Rewrite `_test_gaps`**
 
 ```python
 def _test_gaps(
@@ -1028,7 +1083,7 @@ def _test_gaps(
             continue
 
         gaps.append(change.qualified_name)
-        reasons.append(_gap_reason(change.qualified_name, incoming))
+        reasons.append(_gap_reason(change.qualified_name, incoming, target))
     order = sorted(range(len(gaps)), key=lambda position: gaps[position])
     return (
         tuple(gaps[position] for position in order),
@@ -1037,13 +1092,28 @@ def _test_gaps(
 
 
 def _gap_reason(
-    qualified_name: str, incoming: Sequence[RelationRecord]
+    qualified_name: str, incoming: Sequence[RelationRecord], target: GraphSide
 ) -> TestGapReason:
     """The single strongest near-miss explaining one gap.
 
     Precedence runs from the strongest near-miss to the weakest, so the reason
     names the closest thing to coverage that was actually found.
     """
+
+    def from_test(relation: RelationRecord) -> bool:
+        """Is this edge's source inside test code?
+
+        Without this, an ordinary production import would be reported as
+        `IMPORTED_NOT_CALLED` — a reason whose text claims a *test* imports the
+        symbol. That is a fabricated claim, not a weaker one.
+
+        The check is on the file, not the symbol kind: a module-level
+        `from orders import Order` in a test file has the MODULE symbol as its
+        source, not a TEST symbol, so filtering by kind would miss the most
+        common case entirely.
+        """
+        symbol = target.symbols.get(relation.source_symbol_id)
+        return symbol is not None and symbol.file_id in target.test_file_ids
     weak = [
         relation
         for relation in incoming
@@ -1053,9 +1123,15 @@ def _gap_reason(
     fixture = [item for item in weak if item.module_hint == FIXTURE_HINT]
     helper = [item for item in weak if item.module_hint == HELPER_HINT]
     imports = [
-        relation for relation in incoming if relation.kind is RelationKind.IMPORTS
+        relation
+        for relation in incoming
+        if relation.kind is RelationKind.IMPORTS and from_test(relation)
     ]
-    calls = [relation for relation in incoming if relation.kind is RelationKind.CALLS]
+    calls = [
+        relation
+        for relation in incoming
+        if relation.kind is RelationKind.CALLS and from_test(relation)
+    ]
 
     if fixture:
         chosen = fixture
@@ -1103,20 +1179,20 @@ def _gap_reason(
     )
 ```
 
-`FIXTURE_HINT` and `HELPER_HINT` are the `module_hint` markers set by Tasks 4 and 5. Import them from `codeatlas.extraction.resolution`. Matching on them rather than re-deriving means the reason cites the edge that actually exists.
+`FIXTURE_HINT` and `HELPER_HINT` are the `module_hint` markers set by Tasks 4 and 5. Import them from `codeatlas.domain.relations`, where they are defined beside `DERIVED_HINT`. Matching on them rather than re-deriving means the reason cites the edge that actually exists.
 
 Update the caller at line 273 to unpack both values and carry `test_gap_reasons` through, then populate the field on the report in `src/codeatlas/analysis/engine.py`.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/unit/test_impact.py tests/integration/test_change_analysis.py -v`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check the governing principle**
+- [ ] **Step 7: Mutation-check the governing principle**
 
 Change the `qualifying` filter to accept any `TESTS` edge regardless of derivation. Confirm `test_a_fixture_mediated_symbol_stays_a_gap` FAILS. Revert and confirm it passes. This is the invariant the whole design rests on; if no test catches its removal, the design is not implemented.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/codeatlas/analysis/ tests/
@@ -1130,12 +1206,22 @@ git commit -m "feat: explain every test gap with its strongest near-miss"
 A `RESOLVER_VERSION` bump does not reindex anything. An existing snapshot keeps its old relations and will report gaps the new resolver would explain.
 
 **Files:**
-- Modify: `src/codeatlas/analysis/engine.py` (append to `report.limitations`)
-- Test: `tests/integration/test_change_analysis.py`
+- Modify: `src/codeatlas/application/change_analysis.py` (in `_persist`, ~line 273, where `limitations=list(report.limitations)` is built)
+- Test: `tests/integration/test_change_analysis_service.py`
 
 **Interfaces:**
-- Consumes: `RESOLVER_VERSION` from `codeatlas.extraction.resolution`; `Snapshot.resolver_version`.
+- Consumes: `RESOLVER_VERSION` from `codeatlas.extraction.resolution`; `Snapshot.resolver_version` (`src/codeatlas/domain/snapshot.py:62`); the `SnapshotStore` already held as `self._snapshots`.
 - Produces: a limitation string on `ChangeAnalysisReport.limitations`.
+
+**Do NOT put this in `src/codeatlas/analysis/engine.py`.** That engine takes two
+`StateView` objects and has no snapshot in scope — it is a pure diff engine and
+must stay that way. The snapshot is only reachable in the application service.
+
+`snapshot_id` may be `None` (the service already handles that case). When it is
+`None`, or the snapshot cannot be loaded, emit no limitation — an absent snapshot
+is a different condition, already reported elsewhere, and inventing a
+resolver-staleness claim about a snapshot that does not exist would be a
+fabricated finding.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1157,10 +1243,13 @@ Expected: the first FAILS; the second passes vacuously.
 
 - [ ] **Step 3: Implement**
 
-In `src/codeatlas/analysis/engine.py`, where limitations are assembled:
+In `src/codeatlas/application/change_analysis.py`, in `_persist`, where the
+contract report's `limitations` are assembled. Load the snapshot via
+`self._snapshots` using the `snapshot_id` already in scope; skip silently if it
+is `None` or missing:
 
 ```python
-        if snapshot.resolver_version != RESOLVER_VERSION:
+        if snapshot is not None and snapshot.resolver_version != RESOLVER_VERSION:
             # A resolver bump does not reindex. Until this repository is
             # reindexed, test-gap data came from the older derivation passes and
             # will overstate gaps. Reporting it without saying so is exactly the
