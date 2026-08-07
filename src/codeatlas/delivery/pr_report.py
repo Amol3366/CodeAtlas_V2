@@ -32,13 +32,56 @@ _SEVERITY_ORDER: Final[tuple[Severity, ...]] = (
 )
 
 
+MAX_CHARACTERS: Final[int] = 60_000
+"""A conservative bound, deliberately not named after any platform's limit.
+
+CodeAtlas does not know what its output is being pasted into. Leaving it
+unbounded is not the safer choice: the destination would truncate it
+arbitrarily, mid-sentence, with no notice — the same silent drop, relocated
+somewhere CodeAtlas does not control.
+"""
+
+
 def render_pr_markdown(report: ChangeAnalysisReport) -> str:
     """Render one persisted analysis for pasting into a pull request."""
-    lines = _headline(report) + _findings(report) + _gaps(report)
-    for _name, section in _optional_sections(report):
-        lines += section
-    lines += _notes(report)
+    # Never cut: the verdict, what to act on, and the caveats on all of it.
+    essential = _headline(report) + _findings(report) + _gaps(report)
+    notes = _notes(report)
+    fixed = _length(essential) + _length(notes)
+
+    kept: list[str] = []
+    omitted: list[str] = []
+    for name, section in _optional_sections(report):
+        if fixed + _length(kept) + _length(section) <= MAX_CHARACTERS:
+            kept += section
+        else:
+            omitted.append(name)
+
+    lines = essential + kept + notes
+    if omitted:
+        lines += _omission_notice(omitted)
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _omission_notice(omitted: Sequence[str]) -> list[str]:
+    """Say exactly what was left out and where to get it.
+
+    An undeclared cut is the failure this bound exists to prevent, so this line
+    is emitted even if it pushes the output past `MAX_CHARACTERS`: the accuracy
+    of the notice outranks the bound it reports on.
+    """
+    names = ", ".join(escape_inline(name) for name in omitted)
+    return [
+        "",
+        f"> Omitted to fit: {names}. Use the `markdown` or `json` report "
+        "format for the complete analysis.",
+        "",
+    ]
+
+
+def _length(lines: Sequence[str]) -> int:
+    """Rendered length of a section, counting the newline each line will get."""
+    return sum(len(line) + 1 for line in lines)
 
 
 def _optional_sections(

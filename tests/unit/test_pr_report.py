@@ -29,6 +29,7 @@ from codeatlas.contracts import (
 )
 from codeatlas.delivery import render_markdown, render_pr_markdown
 from codeatlas.delivery.markdown_text import escape_inline
+from codeatlas.delivery.pr_report import MAX_CHARACTERS
 
 
 def _state(ref: str) -> AnalysisStateRef:
@@ -305,3 +306,44 @@ def test_both_renderers_escape_a_hostile_name_identically() -> None:
     escaped = escape_inline(hostile)
     assert escaped in audit
     assert escaped in pull_request
+
+
+def _many_evidence(count: int) -> list[ChangeEvidenceItem]:
+    return [_evidence(index) for index in range(1, count + 1)]
+
+
+def test_a_large_report_stays_within_the_bound() -> None:
+    markdown = render_pr_markdown(_report(evidence=_many_evidence(4000)))
+
+    assert len(markdown) <= MAX_CHARACTERS
+
+
+def test_an_omission_is_declared() -> None:
+    # A report that quietly drops content is worse than one that does not fit.
+    markdown = render_pr_markdown(_report(evidence=_many_evidence(4000)))
+
+    assert "omitted" in markdown.lower()
+    assert "markdown" in markdown.lower()
+
+
+def test_findings_and_gaps_survive_truncation() -> None:
+    # They are rendered first precisely so the budget is spent on supporting
+    # detail instead.
+    markdown = render_pr_markdown(
+        _report(
+            findings=[_finding(Severity.CRITICAL, "Critical one")],
+            test_gaps=["orders.Order"],
+            evidence=_many_evidence(4000),
+        )
+    )
+
+    assert "Critical one" in markdown
+    assert "orders.Order" in markdown
+    assert "does not prove absence of coverage" in markdown
+
+
+def test_a_small_report_is_not_truncated() -> None:
+    markdown = render_pr_markdown(_report(impact_edges=[_edge()]))
+
+    assert "omitted" not in markdown.lower()
+    assert "What it reaches" in markdown
