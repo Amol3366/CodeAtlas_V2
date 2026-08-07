@@ -265,11 +265,24 @@ def test_each_parameter_becomes_its_own_reference() -> None:
     assert [ref.target_hint for ref in refs] == ["store", "clock"]
 
 
-def test_parameters_on_one_line_get_distinct_parts() -> None:
-    # `part` is what keeps two references on the same line apart.
+def test_parameters_with_different_names_share_part_zero() -> None:
+    # `part` separates references that are OTHERWISE IDENTICAL on one line —
+    # `f(f(x))`, per the docstring in `domain/relations.py`. `store` and `clock`
+    # differ in `target_hint`, which `build_relation_id` already hashes, so both
+    # are `part=0`. Do NOT change `_Collector.add`'s dedup key to make distinct
+    # names produce distinct parts: that key is shared by every reference kind,
+    # and doing so silently renumbers `IMPORTS` on `from x import a, b`.
     source = "def test_orders(store, clock):\n    assert store and clock\n"
     refs = fixture_references(source, path="test_orders.py")
-    assert len({ref.part for ref in refs}) == 2
+    assert [ref.part for ref in refs] == [0, 0]
+
+
+def test_two_imported_names_on_one_line_both_get_part_zero() -> None:
+    # Guards the shared `_seen` key: `a` and `b` differ in `target_hint`, so
+    # neither is a repeat of the other.
+    source = "from orders import a, b\n"
+    refs = _kinds(_parse(source).references, RelationKind.IMPORTS)
+    assert [ref.part for ref in refs] == [0, 0]
 
 
 def test_a_defaulted_parameter_is_not_injected() -> None:

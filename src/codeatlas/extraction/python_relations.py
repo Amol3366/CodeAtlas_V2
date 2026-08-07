@@ -77,7 +77,7 @@ class _Collector:
     dynamic_attributes: int = 0
     dynamic_imports: int = 0
     star_imports: int = 0
-    _seen: dict[tuple[str, str, int], int] = field(default_factory=dict)
+    _seen: dict[tuple[str, str, str, int], int] = field(default_factory=dict)
 
     def add(
         self,
@@ -96,10 +96,7 @@ class _Collector:
             # happens only for constructs the parser did not turn into a symbol.
             return
 
-        # `target_hint` is deliberately excluded: `part` distinguishes any two
-        # references on the same source line, whether or not they share a
-        # target (e.g. two distinct fixture parameters on one `def` line).
-        key = (source_symbol_id, kind.value, start_line)
+        key = (source_symbol_id, kind.value, target_hint, start_line)
         part = self._seen.get(key, 0)
         self._seen[key] = part + 1
         self.references.append(
