@@ -56,7 +56,7 @@ _UNMENTIONABLE_KINDS: Final[frozenset[SymbolKind]] = frozenset(
     {SymbolKind.MODULE, SymbolKind.CONFIG_KEY, SymbolKind.DOCUMENT_SECTION}
 )
 
-RESOLVER_VERSION: str = "1.1.0"
+RESOLVER_VERSION: str = "1.2.0"
 
 # Tried in order for a TypeScript/JavaScript specifier that names no extension.
 _TSJS_EXTENSIONS: Final[tuple[str, ...]] = (

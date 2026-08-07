@@ -25,7 +25,7 @@ import ast
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from codeatlas.contracts import RelationKind
+from codeatlas.contracts import RelationKind, SymbolKind
 from codeatlas.domain.relations import SymbolReference
 from codeatlas.extraction.routes import ROUTE_HINT, normalize_route
 from codeatlas.parsing.registry import ParseDiagnostic
@@ -70,13 +70,14 @@ class ReferenceExtraction:
 class _Collector:
     file_id: str
     symbol_ids: Mapping[str, str]
+    symbol_kinds: Mapping[str, SymbolKind]
     module_path: str
     references: list[SymbolReference] = field(default_factory=list)
     dynamic_calls: int = 0
     dynamic_attributes: int = 0
     dynamic_imports: int = 0
     star_imports: int = 0
-    _seen: dict[tuple[str, str, str, int], int] = field(default_factory=dict)
+    _seen: dict[tuple[str, str, int], int] = field(default_factory=dict)
 
     def add(
         self,
@@ -95,7 +96,10 @@ class _Collector:
             # happens only for constructs the parser did not turn into a symbol.
             return
 
-        key = (source_symbol_id, kind.value, target_hint, start_line)
+        # `target_hint` is deliberately excluded: `part` distinguishes any two
+        # references on the same source line, whether or not they share a
+        # target (e.g. two distinct fixture parameters on one `def` line).
+        key = (source_symbol_id, kind.value, start_line)
         part = self._seen.get(key, 0)
         self._seen[key] = part + 1
         self.references.append(
@@ -110,6 +114,38 @@ class _Collector:
                 part=part,
             )
         )
+
+    def add_fixture_parameters(
+        self, *, source: str, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> None:
+        """Record one reference per parameter pytest would inject into a test.
+
+        Only a TEST symbol is considered. A fixture consumed by another fixture
+        is a real pytest behavior, but chaining it would let one weak link
+        stand on another, and the resulting edge would be too far from the
+        evidence to be worth reporting.
+        """
+        if self.symbol_kinds.get(source) is not SymbolKind.TEST:
+            return
+        arguments = node.args
+        # A defaulted parameter already has a value, so pytest does not inject
+        # it. Defaults bind to the tail of `args`, hence the slice.
+        defaulted = len(arguments.defaults)
+        positional = arguments.posonlyargs + arguments.args
+        injected = (
+            positional[: len(positional) - defaulted] if defaulted else positional
+        )
+        for argument in injected:
+            if argument.arg in {"self", "cls"}:
+                continue
+            self.add(
+                source=source,
+                kind=RelationKind.CONSUMES_FIXTURE,
+                target_hint=argument.arg,
+                module_hint="",
+                start_line=node.lineno,
+                end_line=node.lineno,
+            )
 
     def diagnostics(self) -> tuple[ParseDiagnostic, ...]:
         """Report each unemitted category so the gap is measurable."""
@@ -146,14 +182,20 @@ def extract_python_references(
     module_path: str,
     file_id: str,
     symbol_ids: Mapping[str, str],
+    symbol_kinds: Mapping[str, SymbolKind],
 ) -> ReferenceExtraction:
     """Extract references from an already-parsed Python module.
 
     ``symbol_ids`` maps a qualified name to the symbol ID the parser assigned, so
-    extraction never re-derives symbol kinds or identity.
+    extraction never re-derives symbol kinds or identity. ``symbol_kinds`` maps
+    the same qualified names to their kind, so extraction can tell a TEST
+    function apart without re-deriving it.
     """
     collector = _Collector(
-        file_id=file_id, symbol_ids=symbol_ids, module_path=module_path
+        file_id=file_id,
+        symbol_ids=symbol_ids,
+        symbol_kinds=symbol_kinds,
+        module_path=module_path,
     )
     _walk_body(
         body=module.body,
@@ -218,6 +260,7 @@ def _walk_body(
                 end_line=node.end_lineno or node.lineno,
             )
             _collect_annotations(node, qualified_name, collector)
+            collector.add_fixture_parameters(source=qualified_name, node=node)
             for decorator in node.decorator_list:
                 _collect_route(decorator, qualified_name, collector)
                 _visit_expression(decorator, qualified_name, class_name, collector)

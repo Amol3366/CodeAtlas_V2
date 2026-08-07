@@ -71,6 +71,7 @@ def _python_references(source: str) -> tuple[SymbolReference, ...]:
         module_path="app",
         file_id="file_1",
         symbol_ids=symbols,
+        symbol_kinds={},
     ).references
 
 

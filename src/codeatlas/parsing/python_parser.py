@@ -165,6 +165,9 @@ class PythonParser:
             symbol_ids={
                 symbol.qualified_name: symbol.symbol_id for symbol in symbols
             },
+            symbol_kinds={
+                symbol.qualified_name: symbol.kind for symbol in symbols
+            },
         )
 
         return ParseResult(

@@ -241,3 +241,61 @@ def test_a_file_with_no_references_produces_none() -> None:
 
     assert _kinds(result.references, RelationKind.CALLS) == []
     assert _kinds(result.references, RelationKind.IMPORTS) == []
+
+
+# --- CONSUMES_FIXTURE: one reference per injected test parameter --------------
+
+
+def fixture_references(
+    source: str, path: str = "test_orders.py"
+) -> list[SymbolReference]:
+    result = _parse(source, relative_path=path)
+    return _kinds(result.references, RelationKind.CONSUMES_FIXTURE)
+
+
+def test_a_test_parameter_becomes_a_fixture_reference() -> None:
+    source = "def test_orders(store):\n    assert store\n"
+    refs = fixture_references(source, path="test_orders.py")
+    assert [(ref.target_hint, ref.module_hint) for ref in refs] == [("store", "")]
+
+
+def test_each_parameter_becomes_its_own_reference() -> None:
+    source = "def test_orders(store, clock):\n    assert store and clock\n"
+    refs = fixture_references(source, path="test_orders.py")
+    assert [ref.target_hint for ref in refs] == ["store", "clock"]
+
+
+def test_parameters_on_one_line_get_distinct_parts() -> None:
+    # `part` is what keeps two references on the same line apart.
+    source = "def test_orders(store, clock):\n    assert store and clock\n"
+    refs = fixture_references(source, path="test_orders.py")
+    assert len({ref.part for ref in refs}) == 2
+
+
+def test_a_defaulted_parameter_is_not_injected() -> None:
+    # pytest does not inject a parameter that already has a value.
+    source = "def test_orders(store, limit=5):\n    assert store and limit\n"
+    refs = fixture_references(source, path="test_orders.py")
+    assert [ref.target_hint for ref in refs] == ["store"]
+
+
+def test_varargs_and_kwargs_are_not_injected() -> None:
+    source = "def test_orders(store, *args, **kwargs):\n    assert store\n"
+    refs = fixture_references(source, path="test_orders.py")
+    assert [ref.target_hint for ref in refs] == ["store"]
+
+
+def test_self_and_cls_are_not_injected() -> None:
+    source = (
+        "class TestOrders:\n"
+        "    def test_orders(self, store):\n"
+        "        assert store\n"
+    )
+    refs = fixture_references(source, path="test_orders.py")
+    assert "self" not in [ref.target_hint for ref in refs]
+
+
+def test_a_non_test_function_emits_no_fixture_reference() -> None:
+    source = "def build_orders(store):\n    return store\n"
+    refs = fixture_references(source, path="test_orders.py")
+    assert refs == []
