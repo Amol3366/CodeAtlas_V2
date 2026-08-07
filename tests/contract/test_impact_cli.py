@@ -225,3 +225,53 @@ def test_without_fail_on_the_exit_codes_are_unchanged(
     code, _ = _run("impact", repository_id, "--db", str(database))
 
     assert code in (0, 4)
+
+
+def test_since_and_commits_together_are_refused(
+    tmp_path: Path, git_repo: Path
+) -> None:
+    # A silent precedence rule would analyse a range the user did not ask for.
+    database = tmp_path / "cli.sqlite"
+    repository_id = _prepare(database, git_repo)
+
+    code, _ = _run(
+        "impact",
+        repository_id,
+        "--since",
+        "main",
+        "--commits",
+        "HEAD..HEAD",
+        "--db",
+        str(database),
+    )
+
+    assert code == EXIT_INVALID_INPUT
+
+
+def test_since_analyses_from_the_merge_base(
+    tmp_path: Path, git_repo: Path
+) -> None:
+    database = tmp_path / "cli.sqlite"
+    repository_id = _prepare(database, git_repo)
+
+    code, output = _run(
+        "impact", repository_id, "--since", "main", "--db", str(database)
+    )
+
+    assert code in (0, 4), output
+    assert "risk ·" in output
+
+
+def test_an_unresolvable_since_ref_is_reported(
+    tmp_path: Path, git_repo: Path
+) -> None:
+    database = tmp_path / "cli.sqlite"
+    repository_id = _prepare(database, git_repo)
+
+    code, _ = _run(
+        "impact", repository_id, "--since", "no-such-branch", "--db", str(database)
+    )
+
+    # GIT_REF_UNRESOLVABLE maps through the existing error table; the point is
+    # that it is reported rather than crashing.
+    assert code != 0

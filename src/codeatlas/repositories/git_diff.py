@@ -84,6 +84,30 @@ class GitDiffAdapter:
             )
         return resolved
 
+    def merge_base(self, root: Path, ref: str) -> str:
+        """Return the commit where ``ref`` and HEAD diverged.
+
+        ``--since main`` is not ``--base main``. A two-dot diff against a trunk
+        that has moved reports the trunk's own new commits as changes to this
+        branch, inverted. Only the merge base answers "what did I change".
+        """
+        self._validate_ref(ref)
+        stdout, failure = self._run(root, "merge-base", ref, "HEAD")
+        if failure is not None or stdout is None:
+            raise GitRefUnresolvableError(
+                f"No merge base between {ref!r} and HEAD.",
+                details={"ref": ref},
+            )
+        resolved = stdout.strip()
+        if len(resolved) != 40 or not all(
+            character in "0123456789abcdef" for character in resolved
+        ):
+            raise GitRefUnresolvableError(
+                f"The merge base for {ref!r} resolved to unexpected output.",
+                details={"ref": ref, "output": resolved},
+            )
+        return resolved
+
     def changed_files(
         self,
         root: Path,

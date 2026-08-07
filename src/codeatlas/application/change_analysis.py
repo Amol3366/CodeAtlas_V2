@@ -141,6 +141,38 @@ class ChangeAnalysisService:
             target_view=target_view,
         )
 
+    def analyze_since(
+        self, request: ChangeAnalysisRequest, since_ref: str
+    ) -> ChangeAnalysisReport:
+        """Analyze from where ``since_ref`` and HEAD diverged, through to HEAD.
+
+        Not the same as a base of ``since_ref``: a two-dot diff against a trunk
+        that has moved reports the trunk's own new commits as changes to this
+        branch, inverted. Only the merge base answers "what did I change".
+
+        Lives here rather than in the CLI because resolving a repository root
+        and invoking Git is repository logic, and an adapter that did it would
+        both cross the boundary and leave the other adapters unable to offer
+        the same capability.
+        """
+        root = self._resolve(request.repository_id)
+        state = self._git.read_state(root)
+        if not state.is_repository:
+            raise ChangeAnalysisRequiresGitError(
+                "A --since analysis needs a Git repository to find the merge "
+                "base in."
+            )
+
+        base_commit = self._diff.merge_base(root, since_ref)
+        return self.analyze_commit_range(
+            ChangeAnalysisRequest(
+                repository_id=request.repository_id,
+                base_ref=base_commit,
+                target_ref="HEAD",
+                request_id=request.request_id,
+            )
+        )
+
     def analyze_commit_range(
         self, request: ChangeAnalysisRequest
     ) -> ChangeAnalysisReport:

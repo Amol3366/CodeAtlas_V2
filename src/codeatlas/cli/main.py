@@ -1259,6 +1259,13 @@ def impact(
             help="Analyze a commit range instead of the working tree, as A..B.",
         ),
     ] = None,
+    since: Annotated[
+        str | None,
+        typer.Option(
+            "--since",
+            help="Analyze from where this ref and HEAD diverged, to HEAD.",
+        ),
+    ] = None,
     report_format: Annotated[
         str, typer.Option("--format", help="json, markdown, pr, sarif, or text.")
     ] = "text",
@@ -1284,6 +1291,21 @@ def impact(
         )
         raise typer.Exit(EXIT_INVALID_INPUT)
 
+    selectors = [
+        name
+        for name, value in (("--since", since), ("--commits", commits))
+        if value is not None
+    ]
+    if len(selectors) > 1 or (selectors and base != "HEAD"):
+        # A silent precedence rule would analyse a range the caller did not ask
+        # for, with no way for them to notice.
+        typer.echo(
+            "INVALID_REQUEST: --since, --commits, and --base are mutually "
+            "exclusive.",
+            err=True,
+        )
+        raise typer.Exit(EXIT_INVALID_INPUT)
+
     threshold: Severity | None = None
     if fail_on is not None:
         try:
@@ -1300,7 +1322,15 @@ def impact(
 
     with _services(database) as services:
         try:
-            if commits is None:
+            if since is not None:
+                report = services.change_analysis.analyze_since(
+                    ChangeAnalysisRequest(
+                        repository_id=repository_id,
+                        request_id=f"cli_{uuid.uuid4().hex}",
+                    ),
+                    since_ref=since,
+                )
+            elif commits is None:
                 report = services.change_analysis.analyze_working_tree(
                     ChangeAnalysisRequest(
                         repository_id=repository_id,
