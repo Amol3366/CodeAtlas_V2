@@ -259,14 +259,16 @@ def test_repository_text_cannot_break_out_of_the_markdown() -> None:
     Escaping is asserted on the renderer directly rather than through a Git
     fixture, so the hostile value is exact and the assertion can be precise.
     """
-    from codeatlas.delivery.markdown_report import _cell, _inline
+    # The escaping moved to its own module so both renderers share one copy;
+    # these assertions follow it rather than being weakened or dropped.
+    from codeatlas.delivery.markdown_text import escape_cell, escape_inline
 
-    assert _inline("a | b") == r"a \| b"
-    assert _inline("`code`") == r"\`code\`"
-    assert _inline("<script>") == "&lt;script&gt;"
-    assert "\n" not in _inline("two\nlines")
-    assert _inline("bell\x07") == "bell"
-    assert len(_cell("x" * 500)) <= 160
+    assert escape_inline("a | b") == r"a \| b"
+    assert escape_inline("`code`") == r"\`code\`"
+    assert escape_inline("<script>") == "&lt;script&gt;"
+    assert "\n" not in escape_inline("two\nlines")
+    assert escape_inline("bell\x07") == "bell"
+    assert len(escape_cell("x" * 500)) <= 160
 
 
 def test_a_hostile_heading_survives_a_whole_rendered_report(
