@@ -1296,7 +1296,27 @@ Build a repository under `tmp_path` containing:
 - `tests/conftest.py` — `@pytest.fixture def clock(): return 0`
 - `tests/test_orders.py` — `def test_total(store)` (fixture-mediated to `Order`); `def _build(): return total(...)` and `def test_via_helper(): _build()` (helper-mediated to `total`); `def test_direct()` importing and calling `unused_helper` directly (strict edge)
 
-Register, index, and run a working-tree change analysis after editing all three source symbols. Assert:
+**The fixture repository MUST be a real Git repository.**
+`ChangeAnalysisService.analyze_working_tree` raises `ChangeAnalysisRequiresGitError`
+when the root is not a Git repository, because a working-tree analysis needs a
+base ref and only Git can supply one. Follow the existing convention in
+`tests/integration/test_change_analysis_service.py:48-81` — a `_git(root, *args)`
+subprocess helper, then `init -b main`, `add .`, `commit -m base` — rather than
+inventing a new one.
+
+Build the services the way `tests/integration/test_incremental_indexing.py:34-47`
+does: `connect(tmp_path / "db.sqlite")` → `apply_migrations(connection)` →
+`build_services(connection)` → `services.registration.register(RegisterRepositoryRequest(path=str(root)))`.
+
+Do **not** reuse the shared `sample_repo` fixture (`tests/conftest.py:92`). This
+test needs its own tree with a specific fixture/helper/strict layout, and editing
+a shared fixture would change what other tests measure.
+
+Sequence: build the tree → `git init` + commit → register → index → edit the
+three source symbols in the working tree → `analyze_working_tree`. The commit is
+what the edits are compared against, so it must happen before the edits.
+
+Assert:
 
 ```python
 def test_the_pipeline_maps_fixtures_helpers_and_gaps(tmp_path: Path) -> None:
