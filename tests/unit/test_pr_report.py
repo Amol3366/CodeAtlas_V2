@@ -11,16 +11,24 @@ from codeatlas.contracts import (
     ChangeAnalysisKind,
     ChangeAnalysisReport,
     ChangeAnalysisStatus,
+    ChangedFile,
+    ChangedSymbol,
     ChangeEvidenceItem,
+    ChangeKind,
     Derivation,
+    FileChangeKind,
     Finding,
     GapReason,
     GapReasonCode,
+    ImpactEdge,
     OverallRisk,
+    RelationKind,
     Severity,
     SnapshotFreshness,
+    SymbolKind,
 )
-from codeatlas.delivery import render_pr_markdown
+from codeatlas.delivery import render_markdown, render_pr_markdown
+from codeatlas.delivery.markdown_text import escape_inline
 
 
 def _state(ref: str) -> AnalysisStateRef:
@@ -175,3 +183,125 @@ def test_no_forge_url_is_ever_constructed() -> None:
 
     assert "http://" not in markdown
     assert "https://" not in markdown
+
+
+def _symbol(name: str = "orders.Order.total") -> ChangedSymbol:
+    return ChangedSymbol(
+        qualified_name=name,
+        symbol_kind=SymbolKind.METHOD,
+        change_kind=ChangeKind.MODIFIED,
+        file_path="src/orders.py",
+        target_start_line=40,
+        target_end_line=52,
+        confidence=1.0,
+        derivation=Derivation.DETERMINISTIC,
+        public=True,
+        signature_changed=True,
+    )
+
+
+def _file(path: str = "src/orders.py") -> ChangedFile:
+    return ChangedFile(
+        path=path,
+        change_kind=FileChangeKind.MODIFIED,
+        content_hash_changed=True,
+    )
+
+
+def _edge(
+    kind: RelationKind = RelationKind.CALLS,
+    target: str = "api.checkout",
+    derivation: Derivation = Derivation.STATIC_RESOLVED,
+) -> ImpactEdge:
+    return ImpactEdge(
+        source="orders.Order.total",
+        kind=kind,
+        target=target,
+        derivation=derivation,
+        confidence=0.9,
+    )
+
+
+def test_supporting_detail_is_collapsed_not_dropped() -> None:
+    markdown = render_pr_markdown(
+        _report(
+            changed_symbols=[_symbol()],
+            changed_files=[_file()],
+            impact_edges=[_edge()],
+        )
+    )
+
+    assert "<details>" in markdown
+    assert "What changed" in markdown
+    assert "What it reaches" in markdown
+
+
+def test_every_impact_edge_shows_its_derivation() -> None:
+    # ADR-0016: a fixture-mediated TESTS edge is a candidate, not coverage.
+    # Rendering an edge without its derivation would undo that distinction in
+    # the surface most likely to be quoted into a review.
+    markdown = render_pr_markdown(
+        _report(
+            impact_edges=[
+                _edge(),
+                _edge(
+                    kind=RelationKind.TESTS,
+                    target="test_total",
+                    derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+                ),
+            ]
+        )
+    )
+
+    assert "static_resolved" in markdown
+    assert "low_confidence_heuristic" in markdown
+
+
+def test_a_changed_file_with_no_symbol_is_still_listed() -> None:
+    markdown = render_pr_markdown(_report(changed_files=[_file("pyproject.toml")]))
+
+    assert "pyproject.toml" in markdown
+
+
+def test_a_file_that_already_has_a_symbol_is_not_repeated() -> None:
+    markdown = render_pr_markdown(
+        _report(changed_symbols=[_symbol()], changed_files=[_file("src/orders.py")])
+    )
+
+    assert markdown.count("src/orders.py") == 1
+
+
+def test_warnings_and_limitations_are_never_collapsed() -> None:
+    # They qualify everything above them, and a qualification behind a
+    # disclosure triangle is one most readers never see.
+    markdown = render_pr_markdown(
+        _report(warnings=["W_CODE"], limitations=["A stated limit."])
+    )
+
+    notes = markdown[markdown.index("W_CODE") :]
+    assert "<details>" not in notes
+    assert "A stated limit." in markdown
+
+
+def test_an_empty_section_is_omitted_rather_than_shown_empty() -> None:
+    markdown = render_pr_markdown(_report())
+
+    assert "What it reaches" not in markdown
+
+
+def test_both_renderers_escape_a_hostile_name_identically() -> None:
+    """The two renderings differ in shape, never in how they neutralise text.
+
+    If someone later gives one renderer its own escaping — or "fixes" one and
+    not the other — this is what catches it. Escaping untrusted repository text
+    is the one thing the two must never diverge on.
+    """
+    hostile = "a|b`c<d>e\f"
+    report = _report(test_gaps=[hostile])
+
+    audit = render_markdown(report)
+    pull_request = render_pr_markdown(report)
+
+    escaped = escape_inline(hostile)
+    assert escaped in audit
+    assert escaped in pull_request

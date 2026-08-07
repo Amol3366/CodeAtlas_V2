@@ -11,6 +11,7 @@ carries, and it never drops a finding or a test gap.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Final
 
 from codeatlas.contracts import (
@@ -20,7 +21,7 @@ from codeatlas.contracts import (
     GapReason,
     Severity,
 )
-from codeatlas.delivery.markdown_text import escape_inline
+from codeatlas.delivery.markdown_text import escape_cell, escape_inline, table
 
 _SEVERITY_ORDER: Final[tuple[Severity, ...]] = (
     Severity.CRITICAL,
@@ -34,7 +35,136 @@ _SEVERITY_ORDER: Final[tuple[Severity, ...]] = (
 def render_pr_markdown(report: ChangeAnalysisReport) -> str:
     """Render one persisted analysis for pasting into a pull request."""
     lines = _headline(report) + _findings(report) + _gaps(report)
+    for _name, section in _optional_sections(report):
+        lines += section
+    lines += _notes(report)
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _optional_sections(
+    report: ChangeAnalysisReport,
+) -> list[tuple[str, list[str]]]:
+    """Supporting detail, folded, each paired with its display name.
+
+    Collapsing costs nothing and hides nothing — the content is present in the
+    document. An empty section is omitted rather than rendered empty: a
+    disclosure triangle over nothing wastes a reader's click.
+
+    Returned as (name, lines) pairs so the bound in :func:`render_pr_markdown`
+    can name exactly what it left out.
+    """
+    sections: list[tuple[str, list[str]]] = []
+
+    changed = _changed_rows(report)
+    if changed:
+        sections.append(
+            (
+                "What changed",
+                _fold(
+                    f"What changed ({len(changed)})",
+                    table(("Symbol", "Kind", "Change", "File"), changed),
+                ),
+            )
+        )
+
+    if report.impact_edges:
+        rows = [
+            (
+                escape_cell(edge.source),
+                escape_cell(edge.kind.value),
+                escape_cell(edge.target),
+                escape_cell(edge.derivation.value),
+            )
+            for edge in report.impact_edges
+        ]
+        sections.append(
+            (
+                "What it reaches",
+                _fold(
+                    f"What it reaches ({len(rows)})",
+                    table(("Changed", "Relation", "Reaches", "Derivation"), rows),
+                ),
+            )
+        )
+
+    if report.evidence:
+        cited = [
+            (
+                escape_cell(item.file_path),
+                escape_cell(f"{item.start_line}-{item.end_line}"),
+                escape_cell(item.side.value),
+                escape_cell(item.symbol or ""),
+                escape_cell(item.derivation.value),
+            )
+            for item in report.evidence
+        ]
+        sections.append(
+            (
+                "Evidence",
+                _fold(
+                    f"Evidence ({len(cited)})",
+                    table(
+                        ("File", "Lines", "Side", "Symbol", "Derivation"), cited
+                    ),
+                ),
+            )
+        )
+
+    return sections
+
+
+def _changed_rows(report: ChangeAnalysisReport) -> list[tuple[str, ...]]:
+    """Changed symbols, then files that produced no symbol of their own.
+
+    A file with no changed symbol is still a real change — a deleted
+    configuration file has nothing to attach to — but repeating a file that
+    already has symbols would pad the table.
+    """
+    rows: list[tuple[str, ...]] = [
+        (
+            escape_cell(item.qualified_name),
+            escape_cell(item.symbol_kind.value),
+            escape_cell(item.change_kind.value),
+            escape_cell(item.file_path),
+        )
+        for item in report.changed_symbols
+    ]
+    covered = {item.file_path for item in report.changed_symbols}
+    rows += [
+        (escape_cell(item.path), "", escape_cell(item.change_kind.value), "")
+        for item in report.changed_files
+        if item.path not in covered
+    ]
+    return rows
+
+
+def _fold(summary: str, body: Sequence[str]) -> list[str]:
+    return [
+        "<details>",
+        f"<summary>{escape_inline(summary)}</summary>",
+        "",
+        *body,
+        "",
+        "</details>",
+        "",
+    ]
+
+
+def _notes(report: ChangeAnalysisReport) -> list[str]:
+    """Warnings and limitations, never folded.
+
+    They qualify everything above them, and a qualification behind a disclosure
+    triangle is a qualification most readers never see.
+    """
+    if not report.warnings and not report.limitations:
+        return []
+    return [
+        "### Warnings and limitations",
+        "",
+        *(f"- `{escape_inline(item)}`" for item in report.warnings),
+        *(f"- {escape_inline(item)}" for item in report.limitations),
+        "",
+    ]
 
 
 def _headline(report: ChangeAnalysisReport) -> list[str]:
