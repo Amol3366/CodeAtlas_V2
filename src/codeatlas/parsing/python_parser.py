@@ -241,7 +241,10 @@ def _collect(
                 _build_symbol(
                     request=request,
                     kind=_function_kind(
-                        node.name, inside_class=inside_class, is_test_file=is_test_file
+                        node.name,
+                        inside_class=inside_class,
+                        is_test_file=is_test_file,
+                        decorators=node.decorator_list,
                     ),
                     name=node.name,
                     qualified_name=qualified_name,
@@ -328,13 +331,52 @@ def _build_symbol(
     )
 
 
+# pytest's fixture decorator, as written at a definition site. Both the bare
+# form (`@pytest.fixture`) and the called form (`@pytest.fixture(scope="session")`)
+# appear, and either may be imported directly as `fixture`.
+_FIXTURE_DECORATORS: Final[frozenset[str]] = frozenset(
+    {"pytest.fixture", "fixture"}
+)
+
+
+def _decorator_name(node: ast.expr) -> str:
+    """The dotted name a decorator expression names, or "" if it names none.
+
+    The name is read from the AST, never from source text: a comment or a
+    docstring mentioning `pytest.fixture` must not classify anything.
+    """
+    if isinstance(node, ast.Call):
+        return _decorator_name(node.func)
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = _decorator_name(node.value)
+        return f"{prefix}.{node.attr}" if prefix else node.attr
+    return ""
+
+
+def _is_fixture(decorators: list[ast.expr]) -> bool:
+    return any(
+        _decorator_name(decorator) in _FIXTURE_DECORATORS
+        for decorator in decorators
+    )
+
+
 def _function_kind(
-    name: str, *, inside_class: bool, is_test_file: bool
+    name: str,
+    *,
+    inside_class: bool,
+    is_test_file: bool,
+    decorators: list[ast.expr],
 ) -> SymbolKind:
     if inside_class:
         return SymbolKind.CONSTRUCTOR if name == "__init__" else SymbolKind.METHOD
+    # The TEST branch stays first: a `test_*` function carrying a fixture
+    # decorator is still what pytest collects and runs as a test.
     if is_test_file and name.startswith("test_"):
         return SymbolKind.TEST
+    if is_test_file and _is_fixture(decorators):
+        return SymbolKind.FIXTURE
     return SymbolKind.FUNCTION
 
 
@@ -476,7 +518,13 @@ def _recover_symbols(
                 SymbolKind.CLASS
                 if is_class
                 else _function_kind(
-                    name, inside_class=inside_class, is_test_file=is_test_file
+                    name,
+                    inside_class=inside_class,
+                    is_test_file=is_test_file,
+                    # The error-tolerant tree-sitter node carries no decorator
+                    # list here, so a fixture in a malformed file still lands
+                    # as FUNCTION rather than being misclassified.
+                    decorators=[],
                 )
             )
             symbols.append(

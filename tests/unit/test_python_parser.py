@@ -225,6 +225,62 @@ def test_registry_rejects_a_duplicate_language() -> None:
     raise AssertionError("registering a duplicate language should fail")
 
 
+def test_a_bare_pytest_fixture_is_a_fixture_symbol() -> None:
+    source = b"import pytest\n\n@pytest.fixture\ndef store():\n    return 1\n"
+    result = PythonParser().parse(_request(source, "conftest.py"))
+    by_name = {symbol.qualified_name: symbol for symbol in result.symbols}
+    assert by_name["store"].kind is SymbolKind.FIXTURE
+
+
+def test_a_called_pytest_fixture_is_a_fixture_symbol() -> None:
+    source = (
+        b'import pytest\n\n@pytest.fixture(scope="session")\n'
+        b"def store():\n    return 1\n"
+    )
+    result = PythonParser().parse(_request(source, "conftest.py"))
+    by_name = {symbol.qualified_name: symbol for symbol in result.symbols}
+    assert by_name["store"].kind is SymbolKind.FIXTURE
+
+
+def test_a_bare_imported_fixture_name_is_a_fixture_symbol() -> None:
+    source = b"from pytest import fixture\n\n@fixture\ndef store():\n    return 1\n"
+    result = PythonParser().parse(_request(source, "conftest.py"))
+    by_name = {symbol.qualified_name: symbol for symbol in result.symbols}
+    assert by_name["store"].kind is SymbolKind.FIXTURE
+
+
+def test_a_decorated_test_function_stays_a_test() -> None:
+    # pytest collects this as a test. The TEST branch must win.
+    source = b"import pytest\n\n@pytest.fixture\ndef test_store():\n    return 1\n"
+    result = PythonParser().parse(_request(source, "test_orders.py"))
+    by_name = {symbol.qualified_name: symbol for symbol in result.symbols}
+    assert by_name["test_store"].kind is SymbolKind.TEST
+
+
+def test_an_undecorated_function_in_a_test_file_is_a_function() -> None:
+    source = b"def build_store():\n    return 1\n"
+    result = PythonParser().parse(_request(source, "conftest.py"))
+    by_name = {symbol.qualified_name: symbol for symbol in result.symbols}
+    assert by_name["build_store"].kind is SymbolKind.FUNCTION
+
+
+def test_a_string_naming_pytest_fixture_classifies_nothing() -> None:
+    # Matching reads the AST decorator name, never source text.
+    source = (
+        b'def store():\n    """Use pytest.fixture for this."""\n    return 1\n'
+    )
+    result = PythonParser().parse(_request(source, "conftest.py"))
+    by_name = {symbol.qualified_name: symbol for symbol in result.symbols}
+    assert by_name["store"].kind is SymbolKind.FUNCTION
+
+
+def test_an_unrelated_decorator_does_not_make_a_fixture() -> None:
+    source = b"import functools\n\n@functools.cache\ndef store():\n    return 1\n"
+    result = PythonParser().parse(_request(source, "conftest.py"))
+    by_name = {symbol.qualified_name: symbol for symbol in result.symbols}
+    assert by_name["store"].kind is SymbolKind.FUNCTION
+
+
 def test_an_empty_file_has_no_symbols() -> None:
     """An empty `__init__.py` has zero lines, so there is nothing to cite: a
     module symbol claiming line 1 would be invalid evidence and fails
