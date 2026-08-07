@@ -67,7 +67,22 @@ GRAPH_INTENTS: dict[str, str] = {
 # answered. Everything still unimplemented abstains rather than guessing.
 LEXICAL_INTENTS = ("CONFIG_LOOKUP", "DOCUMENT_LOOKUP")
 SUPPORTED_INTENTS = (SUPPORTED_INTENT, *LEXICAL_INTENTS, *GRAPH_INTENTS)
-SUPPORTED_FIXTURES = ("python_app", "docs_config", "mixed_app")
+# Every corpus fixture except the deliberately hostile one. This list is a
+# measurement gate, not a capability flag: a fixture missing here has its cases
+# scored `False`, not skipped, so leaving it stale reports working capability as
+# failure. It was written in Phase 1 and not revisited when Phase 3 added
+# TypeScript/JavaScript and Phase 4 added Git, which understated
+# `exact_symbol_resolution` by 0.23 and `abstention_correctness` by 0.22 for
+# four phases. `malicious_unsupported` stays out on purpose — it carries
+# prompt-injection text, and what the engine should return for hostile input is
+# a security question that the accuracy corpus must not quietly answer.
+SUPPORTED_FIXTURES = (
+    "python_app",
+    "docs_config",
+    "mixed_app",
+    "tsjs_app",
+    "git_changes",
+)
 
 
 def predict_exact_symbols(

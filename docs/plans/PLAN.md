@@ -207,6 +207,99 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T19:30:00Z — The evaluation fixture gate was stale; two live baselines regenerated (ADR-0017)
+
+- Agent: Claude Code `claude-opus-5`, branch `main`
+- Transition: no phase task. Post-gate correction, taken from the
+  `documentation/memory.md` "Next Up" candidate 1
+  (`exact_symbol_resolution` 0.98 target unmet).
+- Outcome: **The largest open metric gap was a harness defect, not an engine
+  defect.** `SUPPORTED_FIXTURES` (`src/codeatlas/evaluation/engine_adapter.py`)
+  gates whole query cases out of the measurement by repository fixture. A gated
+  case is answered by `_abstention()`, and `exact_symbol_resolved` is `None`
+  only when a case has *no* expected symbols (`runner.py:270`) — so a gated case
+  with expected symbols scores `False` and lands in the denominator as a miss,
+  indistinguishable from a wrong answer. The tuple was introduced in `b2ea98e`
+  (the Phase 1 commit) and never revisited, while `SUPPORTED_INTENTS` directly
+  above it *was* maintained and carries comments recording its Phase 2 and
+  Phase 3 widenings. Consequence: 16 of 39 scored query cases never reached the
+  engine — `tsjs_app` excluded though TS/JS parsing shipped in Phase 3, and
+  `git_changes` though Git shipped in Phase 4. Nine of the twelve
+  previously-excluded scored cases resolve their expected symbol top-1 on the
+  first attempt.
+- Decision (user chose regeneration over a parallel artifact): widen
+  `SUPPORTED_FIXTURES` to every corpus fixture except `malicious_unsupported`,
+  which stays out deliberately — it carries prompt-injection text, and what the
+  engine should return for hostile input is a security question the accuracy
+  corpus must not answer by side effect.
+- Measured effect on `tests/evaluation/cases` (40 query, 24 change):
+
+  | Metric | Before | After | Δ |
+  | --- | ---: | ---: | ---: |
+  | `exact_symbol_resolution` | 0.3846 | 0.6154 | +0.2308 |
+  | `mean_reciprocal_rank` | 0.3846 | 0.6154 | +0.2308 |
+  | `abstention_correctness` | 0.5250 | 0.7500 | +0.2250 |
+  | `symbol_recall_at_10` | 0.3718 | 0.5897 | +0.2179 |
+  | `primary_evidence_recall_at_10` | 0.5556 | 0.6508 | +0.0952 |
+  | `changed_symbol_precision` | 0.9375 | 0.9375 | 0.0000 |
+  | `changed_symbol_recall` / `direct_impact_recall` / `finding_precision` | 1.0000 | 1.0000 | 0.0000 |
+
+  The `abstention_correctness` movement is the serious one: the harness was
+  recording incorrect abstentions, so the baseline reported CodeAtlas declining
+  to answer questions it answers correctly. For a product whose central claim is
+  that abstention is deliberate and trustworthy, that misrepresented the feature
+  the product exists for.
+- Baselines: `baseline-phase-3` and `baseline-phase-4` (`.json` and `.md`)
+  regenerated — both are re-checked byte-for-byte by `check_phase4.ps1` and so
+  are assertions about the *current* engine. Both returned exit 5 (stale) before
+  regeneration and exit 0 after, which is the byte-for-byte check doing its job.
+  **`baseline-phase-1` and `baseline-phase-2` were deliberately NOT
+  regenerated**: `check_phase1.ps1` and `check_phase2.ps1` are marked SUPERSEDED
+  and state that re-running them exits 5 by design, because those artifacts
+  record what the Phase 1 and Phase 2 engines did. Regenerating them would
+  overwrite the record those gates were approved on, which
+  `documentation/rules.md` forbids. The initial framing of this task said
+  "regenerate Phase 1–4"; that was corrected to 3–4 before any file was written.
+- Corpus: **not edited.** ADR-0003's rule holds — no case added, removed, or
+  reworded. The numbers moved because the harness stopped discarding answers.
+- Files: `src/codeatlas/evaluation/engine_adapter.py` (constant + rationale
+  comment), `tests/evaluation/test_engine_adapter.py` (two new guards),
+  `docs/adr/0017-evaluation-fixture-gate-correction.md` (new),
+  `docs/adr/README.md` (indexed 0017 — **and 0016, which had never been
+  indexed**), `docs/evaluation/baseline-phase-3.{json,md}`,
+  `docs/evaluation/baseline-phase-4.{json,md}`,
+  `docs/evaluation/phase-4-baseline-environment.md` (appended a dated
+  correction; the 2026-07-27 gate table left unedited),
+  `documentation/memory.md`.
+- Contracts/migrations: none. `contract_version` stays `1.1`, `SCHEMA_VERSION`
+  stays `14`. No source outside `evaluation/` changed.
+- Test-first: both guards were written and observed failing (5 failed, 5 passed)
+  before the constant was touched, then passing (10 passed) after.
+  `test_unsupported_intents_abstain_rather_than_guess` builds its expectation by
+  reading `SUPPORTED_FIXTURES`, so it passed for four phases against a stale
+  value — the replacement,
+  `test_every_corpus_fixture_is_measured_unless_deliberately_unsupported`,
+  derives from the corpus instead, so a fixture added later forces a decision.
+- Verification: `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  exited **0** — 2081 passed, 3 skipped; ruff clean; mypy clean on 337 source
+  files; dataset valid (6 fixtures / 40 queries / 24 changes); Phase 0 null,
+  Phase 3, and Phase 4 baselines all reproduce byte-for-byte; ADR-0016
+  invariants pass. The three skips are the pre-existing
+  `semantic-local`-installed environment assertions.
+- Limitations: **the target is still unmet — 0.6154 against 0.98.** This is a
+  measurement correction and closes no capability gap; it must not be cited as
+  though it did. The Phase 7 semantic corpus is unaffected — `predict_conceptual`
+  has no fixture gate — so its 0.2857 is a separate question, and on a corpus of
+  14 verbatim conceptual questions a 0.98 top-1 target is a target problem
+  before an engine problem, the same conclusion already recorded for
+  `valid_evidence_rate`. Not committed; left in the working tree for review.
+- Next / open: the real engine gap the fixture gate was hiding — **TS/JS graph
+  intents abstain.** `q015` `DEPENDENCIES`, `q016` `CALLERS`, `q017` `EXPORTS`,
+  all on `tsjs_app`, return `<abstained>` while TS/JS symbol resolution works.
+  That is now the largest identified contributor to the remaining main-corpus
+  gap. Deliberately not fixed here so the moved baseline stays attributable to
+  one cause.
+
 ### 2026-08-08T16:00:00Z — `related_tests` no longer asserts coverage it cannot show
 
 - Agent: Claude Code, branch `related-tests-derivation-prose`

@@ -238,6 +238,41 @@ development order is finished. A new phase requires an explicit user decision.
       not touched regardless of this outcome. See ADR-0016 and
       `docs/evaluation/test-mapping-2026-08-07.md` for the full record.
 
+- [x] Evaluation fixture gate corrected (ADR-0017), 2026-08-08: the
+      `exact_symbol_resolution` investigation this file listed as candidate 1
+      found a **harness defect, not an engine defect.**
+      `SUPPORTED_FIXTURES` in `evaluation/engine_adapter.py` was written in the
+      Phase 1 commit (`b2ea98e`) and never revisited, so `tsjs_app` (TypeScript,
+      Phase 3) and `git_changes` (Git, Phase 4) were gated out of the
+      measurement. A gated case is answered with `_abstention` and scores
+      **`False`, not `None`** — `exact_symbol_resolved` is `None` only when a
+      case has no expected symbols — so 16 of 39 scored query cases counted as
+      misses the engine never saw. Widening the tuple moved
+      `exact_symbol_resolution` 0.3846 → 0.6154, `abstention_correctness`
+      0.5250 → 0.7500, `mean_reciprocal_rank` 0.3846 → 0.6154, and
+      Recall@10 0.5556 → 0.6508. Every change-side metric is unchanged, so the
+      Phase 4 gate approval is unaffected. `baseline-phase-3` and
+      `baseline-phase-4` were regenerated; **`baseline-phase-1` and
+      `-2` deliberately were not** — their gate scripts are marked SUPERSEDED
+      and document that re-running them exits 5 by design, so regenerating them
+      would overwrite the record those gates were approved on. The corpus was
+      not edited (ADR-0003 holds). Full gate green: 2081 passed, 3 skipped,
+      ruff clean, mypy clean on 337 files, all baselines reproduce, exit 0.
+
+      **The target is still unmet — 0.6154 against 0.98.** This corrected a
+      measurement error; it did not close the gap, and it must not be cited as
+      though it did.
+
+      Two things worth remembering. **A test that derives its expectation from
+      the constant it tests cannot detect that the constant is wrong** —
+      `test_unsupported_intents_abstain_rather_than_guess` builds its
+      expectation by reading `SUPPORTED_FIXTURES`, so it passed for four phases
+      against a stale value. The replacement guard derives from the *corpus*
+      instead. And the constant directly above it, `SUPPORTED_INTENTS`, *was*
+      maintained, with comments recording its Phase 2 and Phase 3 widenings —
+      one gate tracked the engine and its neighbour did not, while both fed the
+      same scoring path.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -516,10 +551,29 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
    | `changed_symbol_precision` | 0.2000 | 0.95 |
    | `primary_evidence_recall_at_10` | 0.6667 | 0.90 |
 
-   **Start with `exact_symbol_resolution`, not Recall@10.** The previous version
-   of this entry named Recall@10 alone and sent a session at the mildest of the
-   four. `exact_symbol_resolution` at 0.2857 against a 0.98 target is the
-   largest and most specific gap on the board.
+   ~~**Start with `exact_symbol_resolution`, not Recall@10.**~~ **Partly
+   resolved 2026-08-08 — see ADR-0017, and read the two corpora separately.**
+
+   The table above is the **semantic corpus** (`tests/evaluation/semantic_cases`,
+   14 cases, all `CONCEPTUAL`, run through `predict_conceptual`).
+   `predict_conceptual` has **no fixture gate**, so ADR-0017 does not move these
+   numbers. But on that corpus `exact_symbol_resolution` is top-1 precision on
+   14 deliberately fuzzy natural-language questions, asked verbatim by design,
+   scored against a 0.98 target built for exact symbol lookup. That is a
+   **target problem before an engine problem** — the same conclusion already
+   reached for `valid_evidence_rate` below, and it needs the same owner ruling.
+
+   On the **main corpus** (`tests/evaluation/cases`, 40 cases,
+   `predict_exact_symbols`) the same metric was 0.3846 and is now 0.6154,
+   because the fixture gate had been discarding 16 of 39 cases. Still short of
+   0.98.
+
+   **The real engine gap the harness was hiding: TS/JS graph intents abstain.**
+   `q015` `DEPENDENCIES`, `q016` `CALLERS`, `q017` `EXPORTS` — all on
+   `tsjs_app` — return `<abstained>` while TS/JS *symbol* resolution works.
+   That is now the largest identified contributor to the remaining main-corpus
+   gap and is a genuine capability question. Deliberately not fixed inside
+   ADR-0017, so the moved baseline stays attributable to one cause.
 
    **Read every number here against the corpus size: 14 query cases and 1 change
    case.** `changed_symbol_precision = 0.20` is computed from that single change

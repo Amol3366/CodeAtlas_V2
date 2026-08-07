@@ -9,11 +9,11 @@
 | --- | ---: |
 | Query cases | 40 |
 | Change cases | 24 |
-| Exact symbol resolution | 0.3846 |
-| Primary evidence Recall@10 | 0.5556 |
-| Valid evidence rate | 0.6610 |
-| Exact evidence rate | 0.6610 |
-| Containing evidence rate | 0.7458 |
+| Exact symbol resolution | 0.6154 |
+| Primary evidence Recall@10 | 0.6508 |
+| Valid evidence rate | 0.6618 |
+| Exact evidence rate | 0.6618 |
+| Containing evidence rate | 0.7353 |
 | Changed-symbol precision | 0.9375 |
 | Changed-symbol recall | 1.0000 |
 | Direct-impact recall | 1.0000 |

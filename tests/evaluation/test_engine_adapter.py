@@ -70,6 +70,54 @@ def test_unsupported_intents_abstain_rather_than_guess(
         assert prediction.ranked_evidence == []
 
 
+def test_every_corpus_fixture_is_measured_unless_deliberately_unsupported() -> None:
+    """A new fixture must force a decision instead of silently scoring zero.
+
+    `SUPPORTED_FIXTURES` gates whole cases out of the measurement, and a gated
+    case scores `False` rather than `None` — it lands in the denominator as a
+    miss. The tuple was written in Phase 1 and stayed put while the engine
+    gained TypeScript (Phase 3) and Git (Phase 4), so four years of capability
+    were being reported as failure. Deriving this expectation from the corpus
+    rather than from the constant is the whole point: the neighbouring
+    abstention test reads `SUPPORTED_FIXTURES` to build its own expectation and
+    therefore passed throughout.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+    corpus_fixtures = {case.repository_fixture for case in dataset.query_cases}
+
+    # `malicious_unsupported` carries prompt-injection text and is excluded on
+    # purpose: measuring it would assert what the engine *should* return for
+    # hostile input, which is a security question, not an accuracy one.
+    assert corpus_fixtures - {"malicious_unsupported"} == set(SUPPORTED_FIXTURES)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "fixture", "expected_symbol"),
+    [
+        ("q011", "tsjs_app", "Order"),
+        ("q014", "tsjs_app", "render"),
+        ("q033", "git_changes", "process"),
+        ("q036", "git_changes", "legacy"),
+    ],
+)
+def test_capabilities_shipped_after_phase_1_are_measured(
+    predictions: PredictionFile,
+    case_id: str,
+    fixture: str,
+    expected_symbol: str,
+) -> None:
+    """TypeScript shipped in Phase 3 and Git in Phase 4; both must be scored."""
+    dataset = load_dataset(DATASET_ROOT)
+    case = next(item for item in dataset.query_cases if item.id == case_id)
+    assert case.repository_fixture == fixture, "corpus case moved fixture"
+
+    by_id = {item.case_id: item for item in predictions.query_predictions}
+    prediction = by_id[case_id]
+
+    assert prediction.abstained is False
+    assert prediction.ranked_symbols[:1] == [expected_symbol]
+
+
 def test_no_evidence_references_a_file_the_engine_did_not_index(
     predictions: PredictionFile,
 ) -> None:
