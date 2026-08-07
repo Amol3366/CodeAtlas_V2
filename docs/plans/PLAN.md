@@ -207,6 +207,57 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T16:00:00Z — `related_tests` no longer asserts coverage it cannot show
+
+- Agent: Claude Code, branch `related-tests-derivation-prose`
+- Outcome: ADR-0016's second surface is closed. `related_tests` rendered a
+  fixture- or helper-mediated `TESTS` edge as "X tests Y" while citing the
+  mediating line, which never names Y. A reader was told a fact and shown
+  evidence that could not support it.
+- Not a contract bug: the `Claim` already carried the edge's `derivation` and
+  `confidence`, which is the designated mechanism and was already correct. Only
+  the sentence overclaimed, and only the sentence changed. No change to
+  `contract_version` (`1.1`), `SCHEMA_VERSION` (`14`), `RESOLVER_VERSION`
+  (`1.2.0`), or the `QueryResponse` shape.
+- Files: `src/codeatlas/application/graph_queries.py` (new pure `claim_text()`,
+  called from `_claims`), `tests/unit/test_claim_text.py`,
+  `docs/adr/0016-derivation-tiered-test-edges.md`, `documentation/memory.md`.
+- Design: keep the edge, change the wording. Filtering weak edges out would
+  return "no tests recorded" for a symbol several tests do reach, and the caller
+  could not tell "none exist" from "none strong enough" — silence worse than a
+  hedge. Detection is by `module_hint` (`<fixture>` / `<helper>`) rather than
+  `derivation`: a derivation is a strength and cannot name the path an edge came
+  from.
+- Sentence extracted into a pure function first, then changed. It previously
+  lived inline in a private method reachable only through a database-backed
+  harness; as `claim_text()` the rule is unit-testable in milliseconds.
+- Verification: mutation. Dropping the `edge.kind is RelationKind.TESTS`
+  condition fails exactly `test_a_hint_on_a_non_tests_edge_is_ignored` — a live
+  risk, since `module_hint` is also used by document derivation. The strict-verb
+  test guards the opposite failure, where a fix hedges every claim.
+  `tests/integration/test_graph_queries.py` and `tests/contract/test_mcp_tools.py`
+  (30 tests) confirm existing claims read exactly as before.
+- Blast radius: all six call sites — REST (`graph.py`, `query.py`), CLI, MCP,
+  `conversations/pipeline.py`, `evaluation/engine_adapter.py` — route through
+  the one application service, so a single change reached every surface. The
+  opposite of the `--format pr` defect, where each adapter carried its own copy
+  of a guard and the CLI's copy was missed.
+- Baselines: `baseline-phase-3` and `baseline-phase-4` both still reproduce
+  byte-for-byte (checked before commit, since `QueryPrediction` carries `claims`
+  and the scored metrics read them).
+- **Limitation, not reassurance:** those baselines are unchanged because the
+  evaluation corpus contains no fixture- or helper-mediated case. It cannot see
+  this fix any more than it could see the gap reasons. The invariant corpus does
+  not cover this surface either — its checker runs `ChangeAnalysisEngine` over
+  two directories, while this needs a snapshot and a database — so the guard here
+  is unit tests alone.
+- Deliberately not fixed: the citation still points at the mediating line.
+  Pointing at the fixture definition needs the resolver to store the
+  intermediate hop, bumping `RESOLVER_VERSION` to `1.3.0` and making every
+  snapshot stale until re-indexed. Weighed and declined; the wording carries the
+  imprecision instead.
+- Next: both ADR-0016 follow-ups are now closed.
+
 ### 2026-08-08T12:00:00Z — ADR-0016 invariant corpus; evaluation gap closed
 
 - Agent: Claude Code, branch `evaluation-invariant-corpus`

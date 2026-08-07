@@ -47,7 +47,11 @@ from codeatlas.domain.errors import (
     RepositoryNotFoundError,
     SnapshotNotReadyError,
 )
-from codeatlas.domain.relations import RelationRecord
+from codeatlas.domain.relations import (
+    FIXTURE_HINT,
+    HELPER_HINT,
+    RelationRecord,
+)
 from codeatlas.domain.snapshot import Snapshot
 from codeatlas.domain.symbols import SymbolRecord
 from codeatlas.retrieval.graph import (
@@ -391,14 +395,13 @@ class GraphQueryService:
             claims.append(
                 Claim(
                     claim_id=f"c{index + 1}",
-                    text=(
-                        f"{other} {_verb(edge.kind)} {root.qualified_name}"
-                        f" at {evidence.file_path}:{evidence.start_line}."
-                        if inbound
-                        else (
-                            f"{root.qualified_name} {_verb(edge.kind)} {other}"
-                            f" at {evidence.file_path}:{evidence.start_line}."
-                        )
+                    text=claim_text(
+                        edge=edge,
+                        other=other,
+                        root_name=root.qualified_name,
+                        file_path=evidence.file_path,
+                        start_line=evidence.start_line,
+                        inbound=inbound,
                     ),
                     derivation=edge.derivation,
                     confidence=edge.confidence,
@@ -488,6 +491,50 @@ def _label(symbol_id: str | None, symbols_by_id: dict[str, SymbolRecord]) -> str
         return ""
     symbol = symbols_by_id.get(symbol_id)
     return symbol.qualified_name if symbol is not None else ""
+
+
+# How a mediated `TESTS` edge was derived, in the words the sentence uses.
+# Keyed on `module_hint` rather than `derivation`: a derivation is a strength,
+# and a strength cannot name the path an edge came from. See ADR-0016.
+_MEDIATION: dict[str, str] = {
+    FIXTURE_HINT: "a fixture",
+    HELPER_HINT: "a helper",
+}
+
+
+def claim_text(
+    *,
+    edge: RelationRecord,
+    other: str,
+    root_name: str,
+    file_path: str,
+    start_line: int,
+    inbound: bool,
+) -> str:
+    """The sentence one claim renders.
+
+    A `TESTS` edge reached through a fixture parameter or a helper call names a
+    test worth running, but it cannot show that the test covers the symbol --
+    its citation is the mediating line, which never mentions the target. So it
+    is reported and cited, and worded so it does not assert what it cannot
+    support.
+    """
+    citation = f" at {file_path}:{start_line}."
+    mediation = (
+        _MEDIATION.get(edge.module_hint)
+        if edge.kind is RelationKind.TESTS
+        else None
+    )
+    if mediation is not None:
+        subject, obj = (other, root_name) if inbound else (root_name, other)
+        return (
+            f"{subject} may exercise {obj} indirectly,"
+            f" through {mediation},{citation}"
+        )
+
+    if inbound:
+        return f"{other} {_verb(edge.kind)} {root_name}{citation}"
+    return f"{root_name} {_verb(edge.kind)} {other}{citation}"
 
 
 def _verb(kind: RelationKind) -> str:

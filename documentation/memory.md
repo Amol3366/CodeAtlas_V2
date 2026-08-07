@@ -459,7 +459,40 @@ Two follow-ups were raised by the ADR-0016 whole-branch review and deliberately
    **Standing rule:** this corpus does not grow into an accuracy corpus. A case
    about how *well* something is detected belongs in the Phase 4 corpus.
 
-2. **`related_tests` is a second surface the invariant was never applied to.**
+2. ~~**`related_tests` is a second surface the invariant was never applied
+   to.**~~ **CLOSED 2026-08-08** by `claim_text()` in
+   `application/graph_queries.py`, guarded by `tests/unit/test_claim_text.py`.
+
+   The contract was never wrong: the `Claim` already carried the edge's
+   `derivation` and `confidence`. The defect was entirely in the prose — a
+   fixture-mediated edge read "test_total tests Order" while citing the fixture
+   parameter line, which never names `Order`. A reader was told a fact and
+   shown evidence that could not support it.
+
+   Decided: keep the edge, change the wording. Filtering weak edges out would
+   return "no tests recorded" for a symbol several tests do reach, and the
+   caller could not tell "none exist" from "none strong enough" — silence worse
+   than a hedge. A mediated edge now reads "may exercise X indirectly, through
+   a fixture".
+
+   **Detection is by `module_hint`, not `derivation`** — a derivation is a
+   strength and cannot name the path an edge came from, and any future edge
+   assigned the same strength for an unrelated reason would be swept in.
+
+   The weak citation was accepted rather than fixed: pointing at the fixture
+   definition needs the resolver to store the intermediate hop, which bumps
+   `RESOLVER_VERSION` and makes every snapshot stale until re-indexed.
+
+   All six call sites route through the one application service, so a single
+   change reached REST, CLI, MCP, conversations, and evaluation — the opposite
+   of the `--format pr` defect, where each adapter held its own copy of a guard.
+
+   **Both tracked baselines still reproduce byte-for-byte.** That is a
+   limitation, not a reassurance: the corpus has no fixture- or helper-mediated
+   case, so it cannot see this fix either. Same blind spot the invariant corpus
+   (`tests/evaluation/invariant_cases/`) was built to work around.
+
+   ORIGINAL NOTE: **`related_tests` is a second surface the invariant was never applied to.**
    `application/graph_queries.py` queries `kinds=(RelationKind.TESTS,)` with no
    derivation filter, so it now returns fixture- and helper-mediated candidates
    beside genuine coverage and renders each as flat prose. The claim does carry

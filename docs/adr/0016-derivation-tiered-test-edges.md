@@ -237,3 +237,30 @@ The Phase 4 evaluation corpus cannot enforce this — it contains no fixture- or
 helper-mediated case, so no metric there moves when the invariant breaks. That
 is why the enforcement lives in a separate corpus rather than as an added
 metric.
+
+### The second surface
+
+`related_tests` (`application/graph_queries.py`) returns weak `TESTS` edges too.
+It does not filter them — a fixture-mediated edge names a test worth running,
+and returning silence would be more misleading than a hedge — but it no longer
+renders them with the bare verb. A mediated edge reads "may exercise ...
+indirectly, through a fixture", keyed on `module_hint` rather than `derivation`,
+because a strength cannot name the path an edge came from.
+
+The contract was never wrong here: the `Claim` already carried the edge's
+`derivation` and `confidence`. Only the sentence overclaimed, and only the
+sentence changed.
+
+Its citation remains the mediating line, which does not show the relationship.
+Citing the fixture definition instead would require the resolver to store the
+intermediate hop, bumping `RESOLVER_VERSION` and making every snapshot stale
+until re-indexed; that was weighed and declined. The wording carries the
+imprecision instead — "indirectly" is what makes the mismatch legible rather
+than misleading.
+
+Guarded by `tests/unit/test_claim_text.py`, not by the invariant corpus: that
+checker runs `ChangeAnalysisEngine` over two directories, while this surface
+needs a snapshot and a database. Both tracked baselines still reproduce
+byte-for-byte after the change — which is itself a limitation, not a
+reassurance: the evaluation corpus contains no fixture- or helper-mediated
+case, so it cannot see this fix any more than it could see the gap reasons.
