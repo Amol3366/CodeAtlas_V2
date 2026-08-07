@@ -34,3 +34,9 @@ dist/
 
 # Dev-server logs written by scripts/run_dev.ps1.
 .run/
+
+# Subagent-driven-development scratch: ledgers, briefs, reports, review packages.
+# Per-run working files, never part of the repository. Several agents assumed this
+# rule already existed and reported their scratch as "gitignored"; it was not, and
+# one report reached a commit before this line was added.
+.superpowers/
