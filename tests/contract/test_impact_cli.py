@@ -94,3 +94,45 @@ def test_an_unknown_format_is_refused(tmp_path: Path, git_repo: Path) -> None:
     # runner keeps separate from stdout, and the suite's convention throughout
     # is to assert the code rather than the wording.
     assert code == EXIT_INVALID_INPUT
+
+
+def test_a_bare_impact_prints_the_terminal_rendering(
+    tmp_path: Path, git_repo: Path
+) -> None:
+    database = tmp_path / "cli.sqlite"
+    repository_id = _prepare(database, git_repo)
+
+    _, output = _run("impact", repository_id, "--db", str(database))
+
+    assert "risk ·" in output
+    assert "# Change analysis" not in output
+
+
+def test_markdown_is_still_available_and_unchanged(
+    tmp_path: Path, git_repo: Path
+) -> None:
+    database = tmp_path / "cli.sqlite"
+    repository_id = _prepare(database, git_repo)
+
+    _, output = _run(
+        "impact", repository_id, "--format", "markdown", "--db", str(database)
+    )
+
+    assert "# Change analysis" in output
+
+
+def test_analysis_still_defaults_to_markdown(
+    tmp_path: Path, git_repo: Path
+) -> None:
+    # `analysis` prints a stored record, which is the archival case.
+    database = tmp_path / "cli.sqlite"
+    repository_id = _prepare(database, git_repo)
+    _run("impact", repository_id, "--format", "json", "--db", str(database))
+    with connect(database) as connection:
+        stored = build_services(connection).change_analysis.list_for_repository(
+            repository_id
+        )
+
+    _, output = _run("analysis", stored[0], "--db", str(database))
+
+    assert "# Change analysis" in output

@@ -1249,7 +1249,7 @@ def impact(
     ] = None,
     report_format: Annotated[
         str, typer.Option("--format", help="json, markdown, pr, sarif, or text.")
-    ] = "markdown",
+    ] = "text",
     database: DatabaseOption = None,
 ) -> None:
     """Analyze a working tree or commit range and print the report.
