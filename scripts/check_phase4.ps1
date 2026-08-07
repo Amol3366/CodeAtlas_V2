@@ -18,7 +18,9 @@ param(
     [string]$Phase3BaselineJson = "docs/evaluation/baseline-phase-3.json",
     [string]$Phase3BaselineMarkdown = "docs/evaluation/baseline-phase-3.md",
     [string]$Phase4BaselineJson = "docs/evaluation/baseline-phase-4.json",
-    [string]$Phase4BaselineMarkdown = "docs/evaluation/baseline-phase-4.md"
+    [string]$Phase4BaselineMarkdown = "docs/evaluation/baseline-phase-4.md",
+    [string]$InvariantsJson = "docs/evaluation/invariants.json",
+    [string]$InvariantsMarkdown = "docs/evaluation/invariants.md"
 )
 
 $ErrorActionPreference = "Stop"
@@ -83,6 +85,17 @@ Invoke-Checked "Phase 4 engine baseline" @(
     "--dataset", "tests/evaluation/cases",
     "--json-output", $Phase4BaselineJson,
     "--markdown-output", $Phase4BaselineMarkdown,
+    "--check"
+)
+
+# The Phase 4 corpus measures accuracy across 24 representative cases. It has
+# no fixture- or helper-mediated scenario, so it cannot see the ADR-0016
+# invariant at all. This step is the one that can.
+Invoke-Checked "ADR-0016 invariants" @(
+    "run", "python", "scripts/check_invariants.py",
+    "--corpus", "tests/evaluation/invariant_cases",
+    "--json-output", $InvariantsJson,
+    "--markdown-output", $InvariantsMarkdown,
     "--check"
 )
 

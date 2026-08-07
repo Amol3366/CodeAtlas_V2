@@ -1,0 +1,33 @@
+{
+  "contract_version": "1.0",
+  "cases": [
+    {
+      "id": "i001",
+      "invariant": "a fixture-mediated symbol is explained, not covered",
+      "fixture": "orders",
+      "expect_gap_reasons": { "Order": "FIXTURE_MEDIATED_ONLY" },
+      "expect_not_gaps": []
+    },
+    {
+      "id": "i002",
+      "invariant": "a helper-mediated symbol is explained, not covered",
+      "fixture": "orders",
+      "expect_gap_reasons": { "total": "HELPER_MEDIATED_ONLY" },
+      "expect_not_gaps": []
+    },
+    {
+      "id": "i003",
+      "invariant": "a strict import-and-call edge still closes a gap",
+      "fixture": "orders",
+      "expect_gap_reasons": {},
+      "expect_not_gaps": ["unused_helper"]
+    },
+    {
+      "id": "i004",
+      "invariant": "an unreferenced symbol reports bare absence",
+      "fixture": "orders",
+      "expect_gap_reasons": { "audit": "NO_TEST_FILE_REFERENCE" },
+      "expect_not_gaps": []
+    }
+  ]
+}

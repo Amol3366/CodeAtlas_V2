@@ -207,6 +207,62 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T12:00:00Z — ADR-0016 invariant corpus; evaluation gap closed
+
+- Agent: Claude Code, branch `evaluation-invariant-corpus`
+- Outcome: The ADR-0016 invariant ("a weak edge explains a gap rather than
+  closing it") is now enforced by a gate. It previously was not: the 24-case
+  Phase 4 corpus has no fixture- or helper-mediated scenario, so
+  `check_phase4.ps1` reported green on behaviour it could not exercise.
+- Why not extend the Phase 4 corpus: `ChangeCase` is a `ContractModel` with
+  `extra="forbid"`, so a case cannot carry a gap expectation until the model
+  does; and a gap metric would change `baseline-phase-4.json`'s shape and break
+  the byte-for-byte `--check` the project owner ruled must keep passing. Those
+  two constraints together made extending it impossible without violating a
+  standing ruling, so the fix is a second surface rather than a bigger first.
+- Files: `tests/evaluation/invariant_cases/` (corpus + one fixture tree),
+  `src/codeatlas/evaluation/invariants.py`, `scripts/check_invariants.py`,
+  `docs/evaluation/invariants.{json,md}`, `tests/unit/test_invariants.py`,
+  `tests/integration/test_invariant_corpus.py`, `scripts/check_phase4.ps1`,
+  `pyproject.toml`, `docs/adr/0016-derivation-tiered-test-edges.md`,
+  `docs/operations/change-analysis.md`.
+- Contracts/migrations: none. `contract_version` stays `"1.1"`;
+  `SCHEMA_VERSION` and `RESOLVER_VERSION` unchanged. The corpus carries its own
+  independent `"1.0"`. No new dependency.
+- Design: one fixture tree, not four, whose four changed symbols are each
+  reachable by exactly one path — `Order` (fixture-mediated), `total`
+  (helper-mediated), `unused_helper` (strict, must NOT be a gap), `audit` (no
+  reference). One tree proves the reasons discriminate between each other in a
+  single engine run; separate trees would only prove each in isolation. Source
+  shapes are carried from `tests/integration/test_fixture_test_mapping.py`,
+  where they were already proven, including the comments recording why the
+  imports are function-local and why `import orders` is used rather than
+  `from orders import Order`.
+- Verification: mutation, not assertion. Making `LOW_CONFIDENCE_HEURISTIC`
+  qualify alongside `HIGH_CONFIDENCE_HEURISTIC` in `_test_gaps`
+  (`analysis/impact.py`) makes the checker exit 7 naming `Order` and `total`;
+  reverting returns exit 0. Separately, deleting the `expect_not_gaps` loop
+  fails exactly one unit test. Phase 4 separation proven by an empty
+  `git diff --stat main` on `baseline-phase-4.{json,md}`, `dataset.py`,
+  `runner.py`, and `cases/changes.json`.
+- Incidental fix: `tests/unit/test_impact.py` asserted a reason `is not
+  CALLED_NOT_IMPORTED` immediately after asserting it `is
+  NO_TEST_FILE_REFERENCE` — vacuous, and flagged by mypy as a non-overlapping
+  identity check. Pre-existing on `main`; removed because it blocked the gate.
+- Exit codes: a broken invariant exits 7, a stale artifact exits 5. Kept
+  separate deliberately — one says the product regressed, the other says
+  regenerate the file.
+- Limitations: the corpus covers `FIXTURE_MEDIATED_ONLY`,
+  `HELPER_MEDIATED_ONLY`, `NO_TEST_FILE_REFERENCE`, and the strict control.
+  `IMPORTED_NOT_CALLED` and `CALLED_NOT_IMPORTED` remain unit-tested only —
+  they are direct-path failure modes, not the weak-edge invariant.
+- Standing rule: this corpus asserts a boolean and does not grow into an
+  accuracy corpus. A case about how *well* something is detected belongs in the
+  Phase 4 corpus.
+- Next: the second ADR-0016 follow-up is still open — `related_tests` in
+  `application/graph_queries.py` surfaces weak edges as prose without the
+  derivation filter `impact` applies.
+
 ### 2026-08-08T04:00:00Z — CLI impact UX; `--format pr` defect fixed
 
 - Agent: Claude Code `claude-opus-5`, branch `cli-impact-ux`.

@@ -67,6 +67,7 @@ norecursedirs = [
     "tests/evaluation/cases/variants",
     "tests/evaluation/semantic_cases/fixtures",
     "tests/evaluation/semantic_cases/variants",
+    "tests/evaluation/invariant_cases/fixtures",
 ]
 
 [tool.ruff]
@@ -77,6 +78,7 @@ exclude = [
     "tests/evaluation/cases/variants",
     "tests/evaluation/semantic_cases/fixtures",
     "tests/evaluation/semantic_cases/variants",
+    "tests/evaluation/invariant_cases/fixtures",
 ]
 
 [tool.ruff.lint]
@@ -94,6 +96,7 @@ exclude = [
     "tests/evaluation/cases/variants/",
     "tests/evaluation/semantic_cases/fixtures/",
     "tests/evaluation/semantic_cases/variants/",
+    "tests/evaluation/invariant_cases/fixtures/",
 ]
 
 [[tool.mypy.overrides]]
