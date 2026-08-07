@@ -52,6 +52,7 @@ from codeatlas.domain.errors import (
     ChangeAnalysisRequiresGitError,
     RepositoryNotFoundError,
 )
+from codeatlas.extraction.resolution import RESOLVER_VERSION
 from codeatlas.repositories.git_diff import GitDiffAdapter
 from codeatlas.repositories.git_state import GitAdapter
 from codeatlas.storage.sqlite.connection import write_transaction
@@ -235,6 +236,26 @@ class ChangeAnalysisService:
             base_view=base_view,
             target_view=target_view,
         )
+
+        limitations = list(report.limitations)
+        # A resolver bump does not reindex. Until this repository is
+        # reindexed, test-gap data came from the older derivation passes and
+        # will overstate gaps. Reporting it without saying so is exactly the
+        # failure this product exists to prevent. An absent or unloadable
+        # snapshot is a different condition (already reported elsewhere), so
+        # it is deliberately not treated as stale here.
+        snapshot = (
+            self._snapshots.get(target.snapshot_id)
+            if target.snapshot_id is not None
+            else None
+        )
+        if snapshot is not None and snapshot.resolver_version != RESOLVER_VERSION:
+            limitations.append(
+                "Test-gap data was produced by an older resolver "
+                f"({snapshot.resolver_version}; current is {RESOLVER_VERSION}) "
+                "and may overstate gaps. Reindex this repository to refresh it."
+            )
+
         contract = ChangeAnalysisReport(
             analysis_id=analysis_id,
             request_id=request.request_id or analysis_id,
@@ -271,7 +292,7 @@ class ChangeAnalysisService:
             test_gaps=list(report.impact.test_gaps),
             test_gap_reasons=list(report.impact.test_gap_reasons),
             warnings=list(report.warnings),
-            limitations=list(report.limitations),
+            limitations=limitations,
             timing_ms=dict(report.timing_ms),
             created_at=created,
             completed_at=datetime.now(UTC),

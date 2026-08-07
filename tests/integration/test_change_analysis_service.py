@@ -354,6 +354,48 @@ def test_analyses_are_listed_newest_first(repo: Harness) -> None:
     assert {first.analysis_id, second.analysis_id} <= set(listed)
 
 
+# --- Resolver staleness --------------------------------------------------------
+
+
+def test_a_stale_resolver_snapshot_reports_a_limitation(repo: Harness) -> None:
+    """A resolver bump does not reindex existing repositories. Until this one is
+    reindexed, its test-gap data came from the older derivation passes, and
+    reporting it without saying so would overstate gaps silently."""
+    first = repo.services.change_analysis.analyze_working_tree(
+        ChangeAnalysisRequest(repository_id=repo.repository_id)
+    )
+    snapshot_id = first.target.snapshot_id
+    assert snapshot_id is not None
+
+    # Simulate a snapshot indexed before the resolver bump by writing the
+    # older version directly through the row the store already owns. This is
+    # more honest than monkeypatching RESOLVER_VERSION: it exercises the real
+    # comparison against a snapshot that genuinely disagrees with the
+    # constant, rather than making the constant itself lie.
+    repo.connection.execute(
+        "UPDATE snapshots SET resolver_version = ? WHERE snapshot_id = ?",
+        ("1.1.0", snapshot_id),
+    )
+    repo.connection.commit()
+
+    report = repo.services.change_analysis.analyze_working_tree(
+        ChangeAnalysisRequest(repository_id=repo.repository_id)
+    )
+
+    assert any("older resolver" in item for item in report.limitations)
+
+
+def test_a_current_resolver_snapshot_reports_no_such_limitation(
+    repo: Harness,
+) -> None:
+    report = repo.services.change_analysis.analyze_working_tree(
+        ChangeAnalysisRequest(repository_id=repo.repository_id)
+    )
+
+    assert report.target.snapshot_id is not None
+    assert not any("older resolver" in item for item in report.limitations)
+
+
 def test_an_analysis_survives_reindexing_the_repository(repo: Harness) -> None:
     """An audit record must outlive the snapshot it examined."""
     (repo.root / "orders.py").write_text(TARGET_PY, encoding="utf-8")
