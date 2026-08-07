@@ -123,6 +123,41 @@ structure, close a code span, or move a terminal cursor. SARIF 2.1.0 is an
 export: repository-relative URIs only, and a finding with no citable
 location produces no result rather than an invented one.
 
+### `pr` — for pasting into a pull request
+
+`markdown` is the audit format: complete, flat, every evidence row present,
+ordered for the record. `pr` is the same analysis ordered for a reviewer.
+
+It leads with the risk verdict and the counts, then the two things a reviewer
+must act on — findings, risk-ordered, and possible test gaps with the reason
+each is still a gap. Changed symbols, impact edges, and the evidence table
+follow inside `<details>` blocks. Warnings and limitations are never collapsed:
+they qualify everything above them, and a qualification behind a disclosure
+triangle is one most readers never see.
+
+Impact edges keep their derivation inside the collapsed block. A
+fixture-mediated `TESTS` edge carries `low_confidence_heuristic`, so "a test you
+should probably run" cannot read as "a test that covers this" — see ADR-0016.
+
+**Bounded, and any cut is declared.** The output is capped at 60,000
+characters — a conservative bound, not any platform's limit. Findings and test
+gaps are never what gets cut; supporting detail is dropped whole-section from
+the end, and the report ends with a line naming exactly what was omitted and
+pointing at `markdown` or `json` for the complete analysis. Leaving it
+unbounded would not be safer: the destination would truncate it arbitrarily,
+mid-sentence, with no notice.
+
+It contains no forge URLs and posts nothing. A permalink needs a host, owner,
+repository and commit that CodeAtlas does not have, and a guessed one is a
+citation pointing at the wrong code.
+
+**Which to use.** `pr` for a human reading a review. `markdown` for a complete
+archival record. `json` for anything scripted — it is the contract, and the
+only format with stability guarantees.
+
+Available identically through REST (`?report_format=pr`), the CLI
+(`--format pr`), and MCP (`report_format: "pr"`).
+
 ## Performance
 
 Two numbers are measured by `scripts/measure_phase4_perf.py` and recorded

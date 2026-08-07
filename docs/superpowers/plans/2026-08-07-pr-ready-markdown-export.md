@@ -1255,7 +1255,17 @@ git commit -m "docs: document the pr report format"
 
 **Test helper names are illustrative.** `_report`, `_state`, `_finding`, `_symbol`, `_edge`, `_file`, and `_evidence` describe what each helper must build. The assertions are the contract.
 
-**Check enum member names before running.** This plan spells contract enums as `Severity.CRITICAL`, `Derivation.STATIC_RESOLVED`, `GapReasonCode.FIXTURE_MEDIATED_ONLY`, `AnalysisSide.TARGET`, `RelationKind.TESTS`, `SnapshotFreshness.FRESH`, `OverallRisk.LOW`, `ChangeAnalysisKind.WORKING_TREE`, `ChangeAnalysisStatus.COMPLETE`. Verify each against `src/codeatlas/contracts.py` and correct any that differ, noting the correction in your report.
+**Verified contract facts — checked against `src/codeatlas/contracts.py`. Five of these correct errors in this plan's own test snippets; build every helper to satisfy them or the first run fails on validation rather than on the behaviour under test.**
+
+1. The status member is **`ChangeAnalysisStatus.COMPLETED`**, not `COMPLETE`.
+2. **`created_at` is required** and must be a timezone-aware UTC `datetime`, not a string. Use `datetime(2026, 8, 7, tzinfo=UTC)`.
+3. **`Finding.evidence_ids` has `min_length=1`** — a finding with no citation is not constructible.
+4. **Every cited evidence id must exist in `report.evidence`** (`validate_membership`). A finding citing `"e1"` requires an evidence item with that id in the same report.
+5. **`changed_symbols` cannot be non-empty while `changed_files` is empty** (`validate_membership`). Any test passing `changed_symbols` must pass a `changed_files` entry too.
+
+Other names are as spelled: `Severity.CRITICAL`, `Derivation.STATIC_RESOLVED`, `GapReasonCode.FIXTURE_MEDIATED_ONLY`, `AnalysisSide.TARGET`, `RelationKind.TESTS`, `SnapshotFreshness.FRESH`, `OverallRisk.LOW`/`HIGH`, `ChangeAnalysisKind.WORKING_TREE`, `ChangeKind.MODIFIED`.
+
+These constraints are a feature, not an obstacle: the report model refuses to describe an analysis that cites evidence it does not carry.
 
 **Line numbers drift.** Every `path:line` reference was accurate at `f0439b2`. If a line does not contain what this plan says, locate the construct by name.
 

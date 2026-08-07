@@ -89,6 +89,37 @@ development order is finished. A new phase requires an explicit user decision.
       machine-wide, precedence store → `.env`. No migration; `SCHEMA_VERSION`
       stays 14 and `contract_version` stays `1.1`. Gate green: 1926 passed.
 
+- [x] PR-ready Markdown export (2026-08-07): a second renderer beside
+      `render_markdown`. Verdict first, findings and test gaps expanded,
+      supporting detail in `<details>`, bounded at 60,000 characters with any
+      cut declared rather than silently dropped. Available identically through
+      REST, CLI, and MCP. `contract_version` stays `1.1`; no migration.
+
+      **It also closed a defect worth remembering.** Neither existing renderer
+      showed the `GapReason` data from ADR-0016 — so the work that most
+      distinguishes CodeAtlas was visible *only* in the web Preflight screen,
+      and every CLI, REST, and MCP consumer saw bare gap names with no
+      explanation. Shipping a feature to one surface and assuming the others
+      followed is the recurring shape of this class of bug; the same pattern
+      was flagged for `related_tests` and is still open.
+
+      **SARIF deliberately unchanged.** A test gap is explicitly not a finding,
+      so emitting gaps as SARIF results would assert exactly what ADR-0016
+      refuses. Verified by an empty `git diff` on `sarif_report.py`.
+
+      The Markdown escaping moved to `delivery/markdown_text.py` first, shared
+      by both renderers, with a parity test that fails if they ever stop
+      sharing it. Two copies of security-relevant escaping is one that gets
+      reviewed and one that does not.
+
+      Follow-up recorded: `_print_report` (`src/codeatlas/cli/main.py`) falls
+      through to JSON for an unknown `--format`, so `--format prr` prints JSON
+      and reports success. A fourth format makes that typo likelier, not less.
+      REST and MCP validate against a `Literal` and reject unknown values at
+      the boundary, so they do not share the wart. Left alone deliberately:
+      making it an error is a CLI behaviour change that could break a script
+      relying on the leniency.
+
 - [x] Preflight promoted to a first-class web screen (2026-08-07): `/preflight`
       launches an analysis and `/preflight/:analysisId` loads the persisted
       report, so an audit record survives a reload instead of living in

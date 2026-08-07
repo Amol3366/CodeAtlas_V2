@@ -207,6 +207,52 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T00:30:00Z — PR-ready Markdown export
+
+- Agent: Claude Code `claude-opus-5`, branch `pr-markdown-export`.
+- Transition: post-gate work. Phases 0-7 remain `complete`; no phase task reopened.
+- Outcome: `render_pr_markdown` renders one analysis for a pull request —
+  verdict, then findings and possible test gaps expanded, then changed symbols,
+  impact edges and evidence inside `<details>`, then warnings and limitations
+  uncollapsed. Bounded at 60,000 characters; findings and gaps are never cut and
+  any omission is named. Exposed as `pr` through REST, CLI, and MCP.
+- **Defect closed alongside it:** neither existing renderer showed the
+  `GapReason` data from ADR-0016, so it was visible only in the web Preflight
+  screen. `render_markdown` now renders each gap's reason code, explanation, and
+  evidence.
+- Files: `src/codeatlas/delivery/markdown_text.py` (new, shared escaping),
+  `pr_report.py` (new), `markdown_report.py`, `__init__.py`;
+  `api/routers/change_analysis.py`, `cli/main.py`, `mcp/tools.py`;
+  `tests/unit/test_markdown_text.py`, `test_markdown_report.py`,
+  `test_pr_report.py`, `tests/contract/test_change_cross_adapter.py`.
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION` 14.
+  `ReportFormat`, `AnalysisReportInput.report_format`, and both CLI `--format`
+  help strings gained `pr` — additive, existing values unaffected.
+- **`render_sarif` deliberately unchanged**, verified by an empty
+  `git diff main...HEAD -- src/codeatlas/delivery/sarif_report.py`. A test gap
+  is explicitly not a finding, and emitting gaps as SARIF results would assert
+  what ADR-0016 refuses.
+- Verification: `uv run ruff check src tests scripts` exit 0;
+  `uv run mypy --no-incremental src` — no issues in 142 files;
+  `uv run pytest -q` — **2014 passed, 3 skipped**.
+- Three invariants mutation-checked: removing the gap disclaimer fails
+  `test_the_gap_disclaimer_is_present_whenever_a_gap_is`; blanking the
+  derivation column fails `test_every_impact_edge_shows_its_derivation`;
+  silencing `_omission_notice` fails `test_an_omission_is_declared`. A fourth
+  guard, `test_both_renderers_escape_a_hostile_name_identically`, fails if the
+  two renderers ever stop sharing `markdown_text`.
+- Limitations:
+  - **`_print_report` (`src/codeatlas/cli/main.py`) falls through to JSON for an
+    unknown `--format`**, so `--format prr` prints JSON and reports success. A
+    fourth format makes that typo likelier. Left unchanged deliberately: making
+    it an error could break a script relying on the current leniency. REST and
+    MCP validate against a `Literal` and do not share the wart.
+  - The PR format is not exercised by the Phase 4 evaluation corpus, which
+    remains blind to fixture- and helper-mediated scenarios generally (recorded
+    after ADR-0016 and still open).
+- Next: no assigned work. The remaining slice from the 2026-08-07 planning
+  session is the CLI impact UX.
+
 ### 2026-08-07T22:30:00Z — Preflight promoted to a first-class web screen
 
 - Agent: Claude Code `claude-opus-5`, branch `preflight-web-screen`.
