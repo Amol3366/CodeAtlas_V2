@@ -97,6 +97,44 @@ development order is finished. A new phase requires an explicit user decision.
       chat. `README.md` now points to it from the docs list. Documentation
       only; no product contract, schema, or code change.
 
+- [x] Derivation-tiered test edges and gap reasons (ADR-0016), 2026-08-07:
+      ten-task feature. `SymbolKind.FIXTURE` (declared since Phase 0) is now
+      emitted for `@pytest.fixture`-decorated functions; `conftest.py`
+      classifies as test code; `RelationKind.CONSUMES_FIXTURE` is a new
+      stored, citable, intermediate relation kind excluded from impact
+      expansion; `TESTS` is now derivation-tiered
+      (`high_confidence_heuristic` direct, `low_confidence_heuristic`
+      fixture- or helper-mediated); `GapReason`/`GapReasonCode` explain every
+      remaining `test_gaps` entry with its strongest near-miss. Governing
+      principle: a weak edge explains a gap, it never closes it — finding a
+      fixture- or helper-mediated path never removes the symbol from
+      `test_gaps`. `RESOLVER_VERSION` moved `1.1.0` → `1.2.0`;
+      `contract_version` stayed `"1.1"`; `SCHEMA_VERSION` stayed `14`
+      (additive fields, no migration). Full gate green: `ruff check`,
+      `mypy --no-incremental src`, and `pytest -q` all passed (1974 passed, 3
+      skipped) after fixing two pre-existing lint findings in
+      `tests/unit/test_impact.py` (an unused import and a line-length
+      violation left over from Task 9's end-to-end test, unrelated to this
+      task's own changes but caught by this task's gate run).
+      **Evaluation surprise:** the re-measured Phase 4 corpus
+      (`docs/evaluation/test-mapping-2026-08-07.md`) came back **byte-for-byte
+      identical** to `docs/evaluation/baseline-phase-4.json`/`.md` — every
+      metric unchanged (changed-symbol recall 1.0000, direct-impact recall
+      1.0000, changed-symbol precision 0.9375, unsupported-claim rate
+      0.0000). The task brief anticipated this feature would make
+      `scripts/check_phase4.ps1`'s Phase 4 baseline `--check` step fail and
+      instructed that the failure be documented rather than silenced by
+      regenerating the baseline. Instead, running `check_phase4.ps1` in full
+      (frozen sync, tests, lint, types, dataset validation, all three
+      baselines including Phase 4 with `--check`) **passed end to end**,
+      because `tests/evaluation/cases` does not contain a case whose expected
+      findings depend on fixture- or helper-mediated `TESTS` edges or on
+      `GapReason` content — the new derivation paths are real and covered by
+      unit/integration tests from Tasks 1–9, just not by this particular
+      corpus. Per the project owner's ruling, the Phase 4 baseline files were
+      not touched regardless of this outcome. See ADR-0016 and
+      `docs/evaluation/test-mapping-2026-08-07.md` for the full record.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.

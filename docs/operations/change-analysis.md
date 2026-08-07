@@ -69,7 +69,14 @@ file diff -> parse+resolve both sides -> symbol diff -> body classification
   `REFERENCES`), one hop for `TESTS`, bounded (depth 3 default, caps on
   visited nodes and paths). Truncation is a warning plus a limitation, never
   silence. A deleted symbol's surviving referrers are reported as
-  unresolved dependents.
+  unresolved dependents. `TESTS` now carries two confidence tiers: a test
+  that imports and calls the target directly is `high_confidence_heuristic`;
+  a test that only reaches it through a fixture parameter or a helper call is
+  `low_confidence_heuristic`, and still appears in impact citing the
+  intermediate hop (see ADR-0016). `RelationKind.CONSUMES_FIXTURE` — a test
+  requesting a fixture by parameter name — is stored and citable but is
+  never walked during impact expansion; it names which fixture a test asked
+  for, not what depends on what.
 - **Findings** fire from a fixed rule table, one primary finding per changed
   symbol plus independent file/document/architecture rules. An extra
   plausible finding costs gate precision, so a rule fires only on what its
@@ -81,6 +88,31 @@ file diff -> parse+resolve both sides -> symbol diff -> body classification
   `tomllib`; unknown fields refused). Only edges absent from the base graph
   are violations, so adopting rules mid-life does not bury a repository in
   its history.
+
+## Test gap reasons
+
+Every changed symbol with no qualifying `TESTS` edge is reported in
+`test_gaps`. Each gap now also carries a `GapReason` naming why, not just
+that: `FIXTURE_MEDIATED_ONLY` and `HELPER_MEDIATED_ONLY` cite the
+low-confidence `TESTS` edge found one hop away (through a fixture or a
+helper) as `evidence_ids`, so the report explains its strongest near-miss
+instead of reporting bare absence; `IMPORTED_NOT_CALLED`,
+`CALLED_NOT_IMPORTED`, and `NO_TEST_FILE_REFERENCE` cover the direct-path
+failure modes. Finding a near-miss never removes the symbol from
+`test_gaps` — a low-confidence edge explains a gap, it does not close it
+(ADR-0016).
+
+`test_gap_reasons` is an additive, optional field; `contract_version` stayed
+`"1.1"`.
+
+**Reindex requirement.** `RESOLVER_VERSION` moved `1.1.0` → `1.2.0` because
+resolution now derives `CONSUMES_FIXTURE` and the two new `TESTS` tiers,
+which it did not derive before. Every snapshot resolved under `1.1.0` is
+stale for this feature's purposes: it will not carry the new edges or the
+new gap reasons until re-indexed. The working-tree freshness gate re-indexes
+automatically; a stored analysis or a snapshot that predates the resolver
+bump is reported with a limitation from the resolver-staleness guard
+(`change_analysis.py`) rather than silently under-counting test coverage.
 
 ## Reports
 

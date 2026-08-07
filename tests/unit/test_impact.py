@@ -29,7 +29,6 @@ from codeatlas.contracts import (
 from codeatlas.domain.change import SymbolChange
 from codeatlas.domain.relations import (
     FIXTURE_HINT,
-    HELPER_HINT,
     RelationRecord,
     ResolutionState,
 )
@@ -101,7 +100,9 @@ def _side(
     file_ids = file_ids or {}
     return GraphSide(
         symbols={
-            f"sym_{name}": _symbol(name, kind=kind, file_id=file_ids.get(name, "file_1"))
+            f"sym_{name}": _symbol(
+                name, kind=kind, file_id=file_ids.get(name, "file_1")
+            )
             for name, kind in names.items()
         },
         relations=tuple(relations),

@@ -207,6 +207,94 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-07T18:00:00Z — Task 10 (gate, evaluation, ADR-0016, docs) completed; test-mapping-and-gap-reasons feature closed
+
+- Agent: Claude Code `claude-sonnet-5`, branch `test-mapping-and-gap-reasons`.
+- Transition: Task 10 `ready -> complete`. This closes the ten-task
+  "test mapping and gap reasons" feature plan
+  (`.superpowers/sdd/2026-08-07-test-mapping-and-gap-reasons/`).
+
+#### Outcome
+
+Ran the full quality gate, re-measured the Phase 4 evaluation corpus into a
+scratch path, and wrote the feature's documentation: ADR-0016, a new
+evaluation artifact, and updates to `docs/operations/change-analysis.md`,
+`documentation/architecture.md`, and `documentation/memory.md`.
+
+Two pre-existing lint findings in `tests/unit/test_impact.py` (an unused
+`HELPER_HINT` import and one line over 88 columns, both left over from Task
+9's end-to-end test) were fixed as part of getting `ruff check` green; no
+test assertions were touched.
+
+#### Verification
+
+- `uv run ruff check src tests scripts` — exit 0 (after the two fixes above;
+  initially exit 1 with 2 findings).
+- `uv run mypy --no-incremental src` — exit 0, "Success: no issues found in
+  140 source files".
+- `uv run pytest -q` — exit 0, 1974 passed, 3 skipped (semantic-local extra
+  installed), 363s.
+- `uv run python scripts/run_phase4_baseline.py --dataset tests/evaluation/cases --json-output .superpowers/sdd/2026-08-07-test-mapping-and-gap-reasons/eval-after.json --markdown-output .superpowers/sdd/2026-08-07-test-mapping-and-gap-reasons/eval-after.md` (no `--check`, scratch paths) — exit 0.
+- The resulting JSON/Markdown are **byte-for-byte identical** to
+  `docs/evaluation/baseline-phase-4.json`/`.md`. Confirmed by direct diff.
+- Running `--check` against the tracked baseline paths directly (read-only
+  comparison, no write) — exit 0, i.e. the comparison the real
+  `scripts/check_phase4.ps1` performs actually **passes** for this feature.
+- Ran `scripts/check_phase4.ps1` in full (via
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1`) —
+  exit 0. Every stage passed: frozen sync, contract schema freshness, tests
+  (1952 passed under the frozen/no-extras environment), lint, types, dataset
+  validation, and all three baselines including Phase 4 with `--check`.
+  Restored the dev environment afterward with
+  `uv sync --all-groups --all-extras` since the frozen sync step removes
+  optional embedding extras.
+
+#### The anticipated failure did not happen — reported as a finding, not fixed
+
+The task brief anticipated this feature's behavior change would make the
+Phase 4 `--check` step fail, and instructed that the failure be documented
+rather than silenced by regenerating the baseline. Instead the numbers did
+not move at all: `tests/evaluation/cases` does not contain a case whose
+expected findings depend on a fixture- or helper-mediated `TESTS` edge or on
+`GapReason` content. The new derivation paths are real and are covered by
+unit and integration tests added in Tasks 1–9 of this feature; they are just
+not exercised by this particular 24-case corpus. Per the project owner's
+2026-08-07 ruling, `docs/evaluation/baseline-phase-4.json`/`.md` were **not**
+edited or regenerated regardless of this outcome. The full delta and
+reasoning are recorded in `docs/evaluation/test-mapping-2026-08-07.md`.
+Unsupported-claim rate held at `0.0000` throughout — no stop-and-fix
+condition was triggered.
+
+#### Files
+
+- Created: `docs/adr/0016-derivation-tiered-test-edges.md`,
+  `docs/evaluation/test-mapping-2026-08-07.md`.
+- Modified: `docs/operations/change-analysis.md`,
+  `documentation/architecture.md`, `documentation/memory.md`,
+  `tests/unit/test_impact.py` (lint fixes only).
+- Not modified (by ruling): `docs/evaluation/baseline-phase-4.json`,
+  `docs/evaluation/baseline-phase-4.md`.
+
+#### Contracts/migrations
+
+None from this task. The feature as a whole (Tasks 1–9) moved
+`RESOLVER_VERSION` `1.1.0` → `1.2.0`; `contract_version` stayed `"1.1"`;
+`SCHEMA_VERSION` stayed `14`. No migration in this task.
+
+#### Limitations
+
+The Phase 4 evaluation corpus does not currently contain a case that
+exercises fixture- or helper-mediated `TESTS` edges or `GapReason` content,
+so this gate run cannot speak to those paths' effect on corpus-level
+precision/recall — only to their unit/integration-level correctness
+(established in Tasks 1–9). Extending the corpus with such a case is future
+work, not required by this task.
+
+#### Next
+
+No task remains `ready` in this feature plan. Next work is whatever the
+project owner assigns from `docs/plans/PLAN.md`'s broader backlog.
+
 ### 2026-08-07T02:00:00Z — The `/v1/models/test` success branch is covered
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.
