@@ -17,6 +17,7 @@ from pydantic import Field, ValidationError, model_validator
 from codeatlas.analysis.engine import ChangeAnalysisEngine
 from codeatlas.analysis.states import DirectoryStateView
 from codeatlas.contracts import ContractModel, GapReasonCode
+from codeatlas.delivery.markdown_text import escape_cell
 
 
 class InvariantCorpusError(Exception):
@@ -172,3 +173,32 @@ def _check_case(
         held=not failures,
         failures=failures,
     )
+
+
+def render_invariant_markdown(result: InvariantResult) -> str:
+    """The human reading of the artifact.
+
+    Fixture text is repository text and is escaped for the cell it lands in,
+    exactly as the change report's markdown is.
+    """
+    verdict = "held" if result.held else "BROKEN"
+    upheld = sum(1 for item in result.results if item.held)
+    lines = [
+        "# ADR-0016 invariants",
+        "",
+        "A weak `TESTS` edge explains a gap rather than closing it.",
+        "",
+        f"Result: **{verdict}** ({upheld}/{len(result.results)} cases held)",
+        "",
+        "| Case | Invariant | Held | Detail |",
+        "| --- | --- | --- | --- |",
+    ]
+    for item in result.results:
+        detail = escape_cell("; ".join(item.failures)) if item.failures else ""
+        lines.append(
+            f"| {escape_cell(item.case_id)} "
+            f"| {escape_cell(item.invariant)} "
+            f"| {'yes' if item.held else 'NO'} "
+            f"| {detail} |"
+        )
+    return "\n".join(lines) + "\n"

@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 from codeatlas.contracts import GapReasonCode
 from codeatlas.evaluation.invariants import (
+    CaseResult,
     InvariantCase,
     InvariantCorpus,
     InvariantCorpusError,
+    InvariantResult,
     check_corpus,
     load_corpus,
+    render_invariant_markdown,
 )
 
 
@@ -172,3 +176,37 @@ def test_the_real_corpus_holds() -> None:
     result = check_corpus(load_corpus(_fixture_root()))
 
     assert result.held is True
+
+
+def test_the_markdown_names_a_failure_rather_than_only_counting_it() -> None:
+    result = InvariantResult(
+        results=[
+            CaseResult(
+                case_id="i001",
+                invariant="a fixture-mediated symbol stays a gap",
+                held=False,
+                failures=["Order is a gap for None but FIXTURE... expected"],
+            )
+        ]
+    )
+
+    text = render_invariant_markdown(result)
+
+    assert "i001" in text
+    assert "Order is a gap" in text
+
+
+def test_a_pipe_in_a_failure_cannot_break_the_table() -> None:
+    result = InvariantResult(
+        results=[
+            CaseResult(case_id="i001", invariant="a|b", held=False, failures=["x|y"])
+        ]
+    )
+
+    text = render_invariant_markdown(result)
+
+    row = next(line for line in text.splitlines() if line.startswith("| i001"))
+    # `escape_cell` renders a pipe as `\|`, which still contains the character.
+    # What must hold is that no *unescaped* pipe was introduced, since only an
+    # unescaped one creates a new column.
+    assert re.findall(r"(?<!\\)\|", row) == ["|"] * 5

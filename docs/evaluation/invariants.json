@@ -1,0 +1,29 @@
+{
+  "contract_version": "1.0",
+  "results": [
+    {
+      "case_id": "i001",
+      "failures": [],
+      "held": true,
+      "invariant": "a fixture-mediated symbol is explained, not covered"
+    },
+    {
+      "case_id": "i002",
+      "failures": [],
+      "held": true,
+      "invariant": "a helper-mediated symbol is explained, not covered"
+    },
+    {
+      "case_id": "i003",
+      "failures": [],
+      "held": true,
+      "invariant": "a strict import-and-call edge still closes a gap"
+    },
+    {
+      "case_id": "i004",
+      "failures": [],
+      "held": true,
+      "invariant": "an unreferenced symbol reports bare absence"
+    }
+  ]
+}
