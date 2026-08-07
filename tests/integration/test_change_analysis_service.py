@@ -396,6 +396,28 @@ def test_a_current_resolver_snapshot_reports_no_such_limitation(
     assert not any("older resolver" in item for item in report.limitations)
 
 
+def test_no_resolver_limitation_is_claimed_when_there_is_no_snapshot(
+    repo: Harness,
+) -> None:
+    """A commit-range analysis never binds either side to a stored snapshot
+    (see test_neither_side_of_a_commit_range_claims_to_be_fresh). Asserting a
+    resolver-staleness claim about a snapshot that does not exist would be a
+    fabricated finding; an absent snapshot is a different condition, already
+    reported elsewhere, and must produce no such limitation."""
+    (repo.root / "orders.py").write_text(TARGET_PY, encoding="utf-8")
+    _git(repo.root, "add", ".")
+    _git(repo.root, "commit", "-m", "target")
+
+    report = repo.services.change_analysis.analyze_commit_range(
+        ChangeAnalysisRequest(
+            repository_id=repo.repository_id, base_ref="HEAD~1", target_ref="HEAD"
+        )
+    )
+
+    assert report.target.snapshot_id is None
+    assert not any("older resolver" in item for item in report.limitations)
+
+
 def test_an_analysis_survives_reindexing_the_repository(repo: Harness) -> None:
     """An audit record must outlive the snapshot it examined."""
     (repo.root / "orders.py").write_text(TARGET_PY, encoding="utf-8")
