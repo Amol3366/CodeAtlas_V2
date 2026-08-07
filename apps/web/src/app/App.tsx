@@ -7,6 +7,8 @@ import { ThemeProvider } from "./theme";
 import { queryClient } from "./queryClient";
 import { ConversationRoute } from "../routes/ConversationRoute";
 import { HomeRoute } from "../routes/HomeRoute";
+import { PreflightAnalysisRoute } from "../routes/PreflightAnalysisRoute";
+import { PreflightRoute } from "../routes/PreflightRoute";
 import { RepositoriesRoute } from "../routes/RepositoriesRoute";
 import { SettingsRoute } from "../routes/SettingsRoute";
 
@@ -20,6 +22,10 @@ const router = createBrowserRouter([
       // reload or a shared link lands on the same thread.
       { path: "conversations/:conversationId", element: <ConversationRoute /> },
       { path: "repositories", element: <RepositoriesRoute /> },
+      // The launcher and one persisted analysis. The id is in the URL so a
+      // reload or a shared link resolves to the same audit record.
+      { path: "preflight", element: <PreflightRoute /> },
+      { path: "preflight/:analysisId", element: <PreflightAnalysisRoute /> },
       { path: "settings", element: <SettingsRoute /> },
       // Last, always: the catch-all would otherwise swallow every route
       // declared after it.

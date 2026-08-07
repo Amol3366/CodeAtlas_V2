@@ -95,6 +95,12 @@ export function Shell() {
                   Repositories
                 </NavLink>
                 <NavLink
+                  to="/preflight"
+                  className="rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-xs text-text-muted hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-medium"
+                >
+                  Preflight
+                </NavLink>
+                <NavLink
                   to="/settings"
                   className="rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-xs text-text-muted hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-medium"
                 >
