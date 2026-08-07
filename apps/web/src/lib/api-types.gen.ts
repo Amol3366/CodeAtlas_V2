@@ -904,6 +904,8 @@ export interface components {
             request_id: string;
             status: components["schemas"]["ChangeAnalysisStatus"];
             target: components["schemas"]["AnalysisStateRef"];
+            /** Test Gap Reasons */
+            test_gap_reasons?: components["schemas"]["TestGapReason"][];
             /** Test Gaps */
             test_gaps?: string[];
             /** Timing Ms */
@@ -1634,7 +1636,7 @@ export interface components {
          * RelationKind
          * @enum {string}
          */
-        RelationKind: "CONTAINS" | "IMPORTS" | "EXPORTS" | "CALLS" | "MAY_CALL" | "INHERITS" | "IMPLEMENTS" | "OVERRIDES" | "ROUTES_TO" | "TESTS" | "DOCUMENTS" | "READS" | "WRITES" | "QUERIES" | "CONFIGURES" | "REFERENCES" | "DEPENDS_ON";
+        RelationKind: "CONTAINS" | "IMPORTS" | "EXPORTS" | "CALLS" | "MAY_CALL" | "INHERITS" | "IMPLEMENTS" | "OVERRIDES" | "ROUTES_TO" | "TESTS" | "CONSUMES_FIXTURE" | "DOCUMENTS" | "READS" | "WRITES" | "QUERIES" | "CONFIGURES" | "REFERENCES" | "DEPENDS_ON";
         /** RelationPath */
         RelationPath: {
             /** Steps */
@@ -1824,6 +1826,32 @@ export interface components {
              */
             visibility: "public" | "private";
         };
+        /**
+         * TestGapReason
+         * @description One explanation for one entry in `test_gaps`.
+         *
+         *     This never states that a symbol is untested. It states what CodeAtlas found
+         *     and did not find in the relation graph, which is a different and smaller
+         *     claim.
+         */
+        TestGapReason: {
+            /** Evidence Ids */
+            evidence_ids?: string[];
+            /** Explanation */
+            explanation: string;
+            /** Qualified Name */
+            qualified_name: string;
+            reason: components["schemas"]["TestGapReasonCode"];
+        };
+        /**
+         * TestGapReasonCode
+         * @description Why a changed symbol has no qualifying test edge.
+         *
+         *     Every code describes a symbol that IS in `test_gaps`. A symbol whose kind is
+         *     untestable is skipped before it can become a gap, so no code exists for it.
+         * @enum {string}
+         */
+        TestGapReasonCode: "FIXTURE_MEDIATED_ONLY" | "HELPER_MEDIATED_ONLY" | "IMPORTED_NOT_CALLED" | "CALLED_NOT_IMPORTED" | "NO_TEST_FILE_REFERENCE";
         /**
          * UpdateConversationRequest
          * @description Rename, archive, or both. Unarchiving is not offered yet: nothing in

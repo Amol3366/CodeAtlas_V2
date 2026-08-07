@@ -483,6 +483,34 @@ class ChangeEvidenceItem(ContractModel):
         return self
 
 
+class TestGapReasonCode(StrEnum):
+    """Why a changed symbol has no qualifying test edge.
+
+    Every code describes a symbol that IS in `test_gaps`. A symbol whose kind is
+    untestable is skipped before it can become a gap, so no code exists for it.
+    """
+
+    FIXTURE_MEDIATED_ONLY = "FIXTURE_MEDIATED_ONLY"
+    HELPER_MEDIATED_ONLY = "HELPER_MEDIATED_ONLY"
+    IMPORTED_NOT_CALLED = "IMPORTED_NOT_CALLED"
+    CALLED_NOT_IMPORTED = "CALLED_NOT_IMPORTED"
+    NO_TEST_FILE_REFERENCE = "NO_TEST_FILE_REFERENCE"
+
+
+class TestGapReason(ContractModel):
+    """One explanation for one entry in `test_gaps`.
+
+    This never states that a symbol is untested. It states what CodeAtlas found
+    and did not find in the relation graph, which is a different and smaller
+    claim.
+    """
+
+    qualified_name: NonEmptyText
+    reason: TestGapReasonCode
+    explanation: NonEmptyText
+    evidence_ids: list[NonEmptyText] = Field(default_factory=list)
+
+
 class ChangeAnalysisReport(ContractModel):
     """The persisted, machine-readable rendering of one change analysis."""
 
@@ -501,6 +529,9 @@ class ChangeAnalysisReport(ContractModel):
     findings: list[Finding] = Field(default_factory=list)
     evidence: list[ChangeEvidenceItem] = Field(default_factory=list)
     test_gaps: list[NonEmptyText] = Field(default_factory=list)
+    # Additive beside `test_gaps`, which keeps its type and meaning, so
+    # `contract_version` stays "1.1" and a Phase 4 client is unaffected.
+    test_gap_reasons: list[TestGapReason] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     timing_ms: dict[str, NonNegativeDuration] = Field(default_factory=dict)

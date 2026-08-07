@@ -473,6 +473,7 @@
             "OVERRIDES",
             "ROUTES_TO",
             "TESTS",
+            "CONSUMES_FIXTURE",
             "DOCUMENTS",
             "READS",
             "WRITES",
@@ -529,6 +530,52 @@
             "DOCUMENT_SECTION"
           ],
           "title": "SymbolKind",
+          "type": "string"
+        },
+        "TestGapReason": {
+          "additionalProperties": false,
+          "description": "One explanation for one entry in `test_gaps`.\n\nThis never states that a symbol is untested. It states what CodeAtlas found\nand did not find in the relation graph, which is a different and smaller\nclaim.",
+          "properties": {
+            "evidence_ids": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "title": "Evidence Ids",
+              "type": "array"
+            },
+            "explanation": {
+              "minLength": 1,
+              "title": "Explanation",
+              "type": "string"
+            },
+            "qualified_name": {
+              "minLength": 1,
+              "title": "Qualified Name",
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/TestGapReasonCode"
+            }
+          },
+          "required": [
+            "qualified_name",
+            "reason",
+            "explanation"
+          ],
+          "title": "TestGapReason",
+          "type": "object"
+        },
+        "TestGapReasonCode": {
+          "description": "Why a changed symbol has no qualifying test edge.\n\nEvery code describes a symbol that IS in `test_gaps`. A symbol whose kind is\nuntestable is skipped before it can become a gap, so no code exists for it.",
+          "enum": [
+            "FIXTURE_MEDIATED_ONLY",
+            "HELPER_MEDIATED_ONLY",
+            "IMPORTED_NOT_CALLED",
+            "CALLED_NOT_IMPORTED",
+            "NO_TEST_FILE_REFERENCE"
+          ],
+          "title": "TestGapReasonCode",
           "type": "string"
         }
       },
@@ -633,6 +680,13 @@
         },
         "target": {
           "$ref": "#/$defs/AnalysisStateRef"
+        },
+        "test_gap_reasons": {
+          "items": {
+            "$ref": "#/$defs/TestGapReason"
+          },
+          "title": "Test Gap Reasons",
+          "type": "array"
         },
         "test_gaps": {
           "items": {
@@ -2122,6 +2176,7 @@
             "OVERRIDES",
             "ROUTES_TO",
             "TESTS",
+            "CONSUMES_FIXTURE",
             "DOCUMENTS",
             "READS",
             "WRITES",

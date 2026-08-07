@@ -25,6 +25,8 @@ from codeatlas.contracts import (
     Severity,
     SnapshotFreshness,
     SymbolKind,
+    TestGapReason,
+    TestGapReasonCode,
 )
 
 
@@ -112,6 +114,7 @@ def valid_report_data() -> dict[str, object]:
             }
         ],
         "test_gaps": [],
+        "test_gap_reasons": [],
         "warnings": [],
         "limitations": ["Phase 4 resolves relations statically."],
         "timing_ms": {"total": 1.25},
@@ -135,6 +138,34 @@ def test_valid_report_round_trips_as_contract_v1() -> None:
     assert report.evidence[0].side is AnalysisSide.TARGET
     # The model is frozen and forbids unknown fields, so the round-trip is exact.
     assert report.model_dump(mode="json") == valid_report_data()
+
+
+def test_test_gap_reasons_defaults_to_empty() -> None:
+    report = ChangeAnalysisReport.model_validate(valid_report_data())
+    assert report.test_gap_reasons == []
+
+
+def test_test_gaps_is_still_a_list_of_plain_strings() -> None:
+    # The existing field is unchanged. A Phase 4 client keeps working.
+    data = deepcopy(valid_report_data())
+    data["test_gaps"] = ["orders.total"]
+    report = ChangeAnalysisReport.model_validate(data)
+    assert report.test_gaps == ["orders.total"]
+
+
+def test_the_contract_version_is_unchanged_by_the_addition() -> None:
+    report = ChangeAnalysisReport.model_validate(valid_report_data())
+    assert report.contract_version == "1.1"
+
+
+def test_a_reason_carries_its_supporting_evidence() -> None:
+    reason = TestGapReason(
+        qualified_name="orders.total",
+        reason=TestGapReasonCode.FIXTURE_MEDIATED_ONLY,
+        explanation="Reached only through fixture `store`.",
+        evidence_ids=["ev-1"],
+    )
+    assert reason.evidence_ids == ["ev-1"]
 
 
 def test_report_rejects_unknown_fields() -> None:
