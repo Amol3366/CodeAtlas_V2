@@ -505,25 +505,30 @@ Two follow-ups were raised by the ADR-0016 whole-branch review and deliberately
 
 No other assigned work. Candidates, in the order they'd most likely be picked up:
 
-1. **Close the untested `POST /v1/models/test` success branch.** Now the
-   cheapest item on the list: both semantic extras are installed in this
-   environment, so a test can finally reach `ok is True` — that was the blocker
-   when the item was carried from the Phase 7 gate. Note the trap found on
-   2026-08-06: a test that reaches the success branch with a real key configured
-   will issue a **real billable request**, so it must stub the provider rather
-   than call it.
-2. **Investigate Recall@10** (0.6667 against a ≥0.90 target). The stopword
+1. **Investigate Recall@10** (0.6667 against a ≥0.90 target). The stopword
    finding suggests lexical quality, not embedding quality, is where the
    remaining headroom is: that one fix was worth +0.53 recall while the entire
    semantic layer on top of it was worth +0.07.
-3. **Decide on code signing** — a purchasing decision, not an engineering one.
+2. **Decide on code signing** — a purchasing decision, not an engineering one.
    Until then the packaged executable is unsigned and SmartScreen warns.
-4. **Consider deleting the five stale local branches** whose content is in
+3. **Consider deleting the five stale local branches** whose content is in
    `main` but which point at pre-rewrite commit objects, so `git branch`
    stops implying unmerged work. `backup-before-rewrite` can go with them once
    the rewrite is trusted.
 
 Closed since this list was written:
+
+- ~~Close the untested `POST /v1/models/test` success branch.~~ **Already
+  delivered 2026-08-07**, and this list was stale for a day. The test is
+  `test_a_working_provider_is_reported_as_ok`
+  (`tests/contract/test_settings_api.py:241`), and it avoided the billing trap
+  exactly as the note warned: it stubs `ProviderFactory.build` rather than
+  calling a provider. `docs/plans/PLAN.md` recorded it as done the same day.
+
+  The lesson is about this file, not that endpoint. PLAN.md is the authority and
+  memory.md is a summary; when they disagree the summary is the bug (CLAUDE.md).
+  A candidate list that is not reconciled against the handoff log will hand
+  someone finished work — which is what happened here.
 
 - ~~Rebuild the package whenever the web app changes.~~ **Delivered.** The
   guard exists: `test_the_packaged_web_assets_match_the_source_build`
