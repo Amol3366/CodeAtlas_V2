@@ -192,18 +192,18 @@ in name, type, and meaning. A new sibling field is added to
 `ChangeAnalysisReport`:
 
 ```python
-test_gap_reasons: list[TestGapReason] = Field(default_factory=list)
+test_gap_reasons: list[GapReason] = Field(default_factory=list)
 ```
 
 ```python
-class TestGapReason(ContractModel):
+class GapReason(ContractModel):
     qualified_name: NonEmptyText
-    reason: TestGapReasonCode
+    reason: GapReasonCode
     explanation: NonEmptyText
     evidence_ids: list[NonEmptyText] = Field(default_factory=list)
 ```
 
-| `TestGapReasonCode` | Meaning |
+| `GapReasonCode` | Meaning |
 | --- | --- |
 | `NO_TEST_FILE_REFERENCE` | No test file references this symbol at all |
 | `IMPORTED_NOT_CALLED` | A test imports it but never exercises it |

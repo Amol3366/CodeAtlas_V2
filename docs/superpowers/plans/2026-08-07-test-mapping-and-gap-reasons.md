@@ -810,7 +810,7 @@ git commit -m "feat: derive helper-mediated TESTS edges at low confidence"
 
 ---
 
-### Task 6: `TestGapReason` contract
+### Task 6: `GapReason` contract
 
 **Files:**
 - Modify: `src/codeatlas/contracts.py` (new enum + model, new field on `ChangeAnalysisReport` near line 502)
@@ -818,7 +818,7 @@ git commit -m "feat: derive helper-mediated TESTS edges at low confidence"
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `TestGapReasonCode` (StrEnum), `TestGapReason` (ContractModel with `qualified_name: NonEmptyText`, `reason: TestGapReasonCode`, `explanation: NonEmptyText`, `evidence_ids: list[NonEmptyText]`), and `ChangeAnalysisReport.test_gap_reasons: list[TestGapReason]`.
+- Produces: `GapReasonCode` (StrEnum), `GapReason` (ContractModel with `qualified_name: NonEmptyText`, `reason: GapReasonCode`, `explanation: NonEmptyText`, `evidence_ids: list[NonEmptyText]`), and `ChangeAnalysisReport.test_gap_reasons: list[GapReason]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -841,9 +841,9 @@ def test_the_contract_version_is_unchanged_by_the_addition() -> None:
 
 
 def test_a_reason_carries_its_supporting_evidence() -> None:
-    reason = TestGapReason(
+    reason = GapReason(
         qualified_name="orders.total",
-        reason=TestGapReasonCode.FIXTURE_MEDIATED_ONLY,
+        reason=GapReasonCode.FIXTURE_MEDIATED_ONLY,
         explanation="Reached only through fixture `store`.",
         evidence_ids=["ev-1"],
     )
@@ -860,7 +860,7 @@ Expected: FAIL with `ImportError` / `AttributeError` — the names do not exist.
 In `src/codeatlas/contracts.py`, above `ChangeAnalysisReport`:
 
 ```python
-class TestGapReasonCode(StrEnum):
+class GapReasonCode(StrEnum):
     """Why a changed symbol has no qualifying test edge.
 
     Every code describes a symbol that IS in `test_gaps`. A symbol whose kind is
@@ -874,7 +874,7 @@ class TestGapReasonCode(StrEnum):
     NO_TEST_FILE_REFERENCE = "NO_TEST_FILE_REFERENCE"
 
 
-class TestGapReason(ContractModel):
+class GapReason(ContractModel):
     """One explanation for one entry in `test_gaps`.
 
     This never states that a symbol is untested. It states what CodeAtlas found
@@ -883,7 +883,7 @@ class TestGapReason(ContractModel):
     """
 
     qualified_name: NonEmptyText
-    reason: TestGapReasonCode
+    reason: GapReasonCode
     explanation: NonEmptyText
     evidence_ids: list[NonEmptyText] = Field(default_factory=list)
 ```
@@ -893,7 +893,7 @@ On `ChangeAnalysisReport`, directly after `test_gaps` (line 502):
 ```python
     # Additive beside `test_gaps`, which keeps its type and meaning, so
     # `contract_version` stays "1.1" and a Phase 4 client is unaffected.
-    test_gap_reasons: list[TestGapReason] = Field(default_factory=list)
+    test_gap_reasons: list[GapReason] = Field(default_factory=list)
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -927,8 +927,8 @@ git commit -m "feat: add additive test_gap_reasons to the change report"
 - Test: `tests/unit/test_impact.py`, `tests/integration/test_change_analysis.py`
 
 **Interfaces:**
-- Consumes: Tasks 4, 5 (weak edges), Task 6 (`TestGapReason`, `TestGapReasonCode`).
-- Produces: `_test_gaps(...) -> tuple[tuple[str, ...], tuple[TestGapReason, ...]]`.
+- Consumes: Tasks 4, 5 (weak edges), Task 6 (`GapReason`, `GapReasonCode`).
+- Produces: `_test_gaps(...) -> tuple[tuple[str, ...], tuple[GapReason, ...]]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -942,7 +942,7 @@ def test_a_fixture_mediated_symbol_stays_a_gap() -> None:
 def test_a_fixture_mediated_gap_says_why() -> None:
     _, reasons = analyze_fixture_mediated()
     reason = by_name(reasons, "orders.Order")
-    assert reason.reason is TestGapReasonCode.FIXTURE_MEDIATED_ONLY
+    assert reason.reason is GapReasonCode.FIXTURE_MEDIATED_ONLY
     assert reason.evidence_ids != []
 
 
@@ -955,19 +955,19 @@ def test_a_strictly_tested_symbol_is_not_a_gap() -> None:
 def test_an_unreferenced_symbol_reports_no_reference() -> None:
     _, reasons = analyze_unreferenced()
     reason = by_name(reasons, "orders.Order")
-    assert reason.reason is TestGapReasonCode.NO_TEST_FILE_REFERENCE
+    assert reason.reason is GapReasonCode.NO_TEST_FILE_REFERENCE
     assert reason.evidence_ids == []
 
 
 def test_an_imported_but_uncalled_symbol_says_so() -> None:
     _, reasons = analyze_imported_not_called()
-    assert by_name(reasons, "orders.Order").reason is TestGapReasonCode.IMPORTED_NOT_CALLED
+    assert by_name(reasons, "orders.Order").reason is GapReasonCode.IMPORTED_NOT_CALLED
 
 
 def test_fixture_mediation_outranks_import_without_call() -> None:
     # Precedence runs strongest near-miss first.
     _, reasons = analyze_fixture_and_bare_import()
-    assert by_name(reasons, "orders.Order").reason is TestGapReasonCode.FIXTURE_MEDIATED_ONLY
+    assert by_name(reasons, "orders.Order").reason is GapReasonCode.FIXTURE_MEDIATED_ONLY
 
 
 def test_every_gap_has_exactly_one_reason() -> None:
@@ -1049,7 +1049,7 @@ def _test_gaps(
     target: GraphSide,
     ids: Mapping[str, str],
     adjacency: _Adjacency,
-) -> tuple[tuple[str, ...], tuple[TestGapReason, ...]]:
+) -> tuple[tuple[str, ...], tuple[GapReason, ...]]:
     """Changed code symbols with no *qualifying* `TESTS` edge, and why.
 
     A qualifying edge is one the strict import-and-call pass produced. A
@@ -1060,7 +1060,7 @@ def _test_gaps(
     None of this claims a symbol is untested. Only executing the suite could.
     """
     gaps: list[str] = []
-    reasons: list[TestGapReason] = []
+    reasons: list[GapReason] = []
     for change in changes:
         if change.symbol_kind in _UNTESTABLE_KINDS:
             continue
@@ -1093,7 +1093,7 @@ def _test_gaps(
 
 def _gap_reason(
     qualified_name: str, incoming: Sequence[RelationRecord], target: GraphSide
-) -> TestGapReason:
+) -> GapReason:
     """The single strongest near-miss explaining one gap.
 
     Precedence runs from the strongest near-miss to the weakest, so the reason
@@ -1135,9 +1135,9 @@ def _gap_reason(
 
     if fixture:
         chosen = fixture
-        return TestGapReason(
+        return GapReason(
             qualified_name=qualified_name,
-            reason=TestGapReasonCode.FIXTURE_MEDIATED_ONLY,
+            reason=GapReasonCode.FIXTURE_MEDIATED_ONLY,
             explanation=(
                 "A test reaches this only through a fixture. That is a "
                 "candidate, not coverage."
@@ -1145,9 +1145,9 @@ def _gap_reason(
             evidence_ids=[relation.relation_id for relation in chosen],
         )
     if helper:
-        return TestGapReason(
+        return GapReason(
             qualified_name=qualified_name,
-            reason=TestGapReasonCode.HELPER_MEDIATED_ONLY,
+            reason=GapReasonCode.HELPER_MEDIATED_ONLY,
             explanation=(
                 "A test reaches this only through a test helper. That is a "
                 "candidate, not coverage."
@@ -1155,25 +1155,25 @@ def _gap_reason(
             evidence_ids=[relation.relation_id for relation in helper],
         )
     if imports and not calls:
-        return TestGapReason(
+        return GapReason(
             qualified_name=qualified_name,
-            reason=TestGapReasonCode.IMPORTED_NOT_CALLED,
+            reason=GapReasonCode.IMPORTED_NOT_CALLED,
             explanation="A test imports this but never calls it.",
             evidence_ids=[relation.relation_id for relation in imports],
         )
     if calls and not imports:
-        return TestGapReason(
+        return GapReason(
             qualified_name=qualified_name,
-            reason=TestGapReasonCode.CALLED_NOT_IMPORTED,
+            reason=GapReasonCode.CALLED_NOT_IMPORTED,
             explanation=(
                 "A test calls this name without importing it, so the call may "
                 "resolve to a different symbol."
             ),
             evidence_ids=[relation.relation_id for relation in calls],
         )
-    return TestGapReason(
+    return GapReason(
         qualified_name=qualified_name,
-        reason=TestGapReasonCode.NO_TEST_FILE_REFERENCE,
+        reason=GapReasonCode.NO_TEST_FILE_REFERENCE,
         explanation="No test file references this symbol.",
         evidence_ids=[],
     )
@@ -1189,7 +1189,7 @@ looks, and `engine.py` is **not** part of it — `ChangeReport` holds an
    defaulted so no other construction site breaks:
 
    ```python
-       test_gap_reasons: tuple[TestGapReason, ...] = ()
+       test_gap_reasons: tuple[GapReason, ...] = ()
    ```
 
 2. `src/codeatlas/analysis/impact.py:273` — unpack both return values before
@@ -1209,8 +1209,8 @@ looks, and `engine.py` is **not** part of it — `ChangeReport` holds an
                test_gap_reasons=list(report.impact.test_gap_reasons),
    ```
 
-That is the whole chain. `impact.py` must import `TestGapReason` and
-`TestGapReasonCode` from `codeatlas.contracts`, where Task 6 defined them.
+That is the whole chain. `impact.py` must import `GapReason` and
+`GapReasonCode` from `codeatlas.contracts`, where Task 6 defined them.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
@@ -1354,10 +1354,10 @@ def test_the_pipeline_maps_fixtures_helpers_and_gaps(tmp_path: Path) -> None:
 
     # Fixture-mediated: still a gap, explained.
     assert "orders.Order" in report.test_gaps
-    assert reasons["orders.Order"] is TestGapReasonCode.FIXTURE_MEDIATED_ONLY
+    assert reasons["orders.Order"] is GapReasonCode.FIXTURE_MEDIATED_ONLY
 
     # Helper-mediated: still a gap, explained.
-    assert reasons["orders.total"] is TestGapReasonCode.HELPER_MEDIATED_ONLY
+    assert reasons["orders.total"] is GapReasonCode.HELPER_MEDIATED_ONLY
 
     # Strict import-and-call: not a gap at all.
     assert "orders.unused_helper" not in report.test_gaps
