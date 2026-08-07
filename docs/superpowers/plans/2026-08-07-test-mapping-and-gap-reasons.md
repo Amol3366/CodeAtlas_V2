@@ -1181,7 +1181,36 @@ def _gap_reason(
 
 `FIXTURE_HINT` and `HELPER_HINT` are the `module_hint` markers set by Tasks 4 and 5. Import them from `codeatlas.domain.relations`, where they are defined beside `DERIVED_HINT`. Matching on them rather than re-deriving means the reason cites the edge that actually exists.
 
-Update the caller at line 273 to unpack both values and carry `test_gap_reasons` through, then populate the field on the report in `src/codeatlas/analysis/engine.py`.
+Then thread the new value along the **exact** chain below. It is shorter than it
+looks, and `engine.py` is **not** part of it — `ChangeReport` holds an
+`ImpactResult` and passes it through untouched.
+
+1. `src/codeatlas/analysis/impact.py:139` — add the field to `ImpactResult`,
+   defaulted so no other construction site breaks:
+
+   ```python
+       test_gap_reasons: tuple[TestGapReason, ...] = ()
+   ```
+
+2. `src/codeatlas/analysis/impact.py:273` — unpack both return values before
+   constructing `ImpactResult`, since a call cannot be split across two keyword
+   arguments:
+
+   ```python
+       gaps, gap_reasons = _test_gaps(changes, target, target_ids, target_edges)
+   ```
+
+   then pass `test_gaps=gaps, test_gap_reasons=gap_reasons`.
+
+3. `src/codeatlas/application/change_analysis.py:271` — beside the existing
+   `test_gaps=list(report.impact.test_gaps),` add:
+
+   ```python
+               test_gap_reasons=list(report.impact.test_gap_reasons),
+   ```
+
+That is the whole chain. `impact.py` must import `TestGapReason` and
+`TestGapReasonCode` from `codeatlas.contracts`, where Task 6 defined them.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
