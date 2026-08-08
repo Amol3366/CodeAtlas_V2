@@ -207,6 +207,68 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T23:00:00Z — Export evidence names the symbol its lines show (ADR-0019)
+
+- Agent: Claude Code `claude-opus-5`, branch `export-evidence-labelling`
+- Transition: no phase task. Post-gate, taken as ADR-0018's deferred finding #1
+  after the two evaluation corrections below were merged to `main` (`9c07b02`).
+- Outcome: **the first engine defect of this series**, and narrower than
+  ADR-0018 described it. `GraphQueryService._respond` labelled every evidence
+  item with the edge's *source* symbol. That is correct for almost every
+  relation kind, which cites a **reference site** — a call, an import, a name
+  use — living inside the source. `EXPORTS` is the exception: it cites the
+  **exported symbol's own definition**, so `orders.ts:1-3` (`export interface
+  Order`) was labelled `src.orders`. The evidence named one symbol and showed
+  another — the ADR-0016 defect on a new surface, on a product whose whole claim
+  is that a reader can verify what they are shown.
+- Fix: `_cited_symbol` labels with the symbol whose definition the cited range
+  covers — `EXPORTS` takes the target, every other kind keeps the source. The
+  rule is expressed as "what do these lines show", not "which end is the
+  answer": those coincide for `EXPORTS` but are different questions, and the
+  second is already answered by the claim.
+- Why it survived since Phase 3: `tests/integration/test_graph_queries.py`
+  asserted **claim text only** and never an evidence label. The claims were
+  always right — `_claims` resolves the other party by direction — so
+  `src.orders exports Order` read correctly beside mislabelled evidence.
+- Counterpart pinned: `test_import_evidence_stays_labelled_with_the_importing_module`
+  asserts an `IMPORTS` range keeps the source label, because that range is the
+  import statement at module scope. A test asserting only the new behaviour
+  would have permitted fixing exports by breaking imports.
+- Measured: `exact_symbol_resolution` 0.6667 → 0.6923 (q017). **No other metric
+  moved** — evidence counts, Recall@10, and all three evidence rates unchanged,
+  which is the correct signature for a pure relabel. Change-side metrics
+  untouched; the Phase 4 gate approval stands.
+- Contract surface: the label is contract-visible and reaches CLI, REST, MCP,
+  and the web app identically, since all four route through this one
+  application service. `contract_version` stays `1.1`; `SCHEMA_VERSION` stays
+  `14`; no migration.
+- Files: `src/codeatlas/application/graph_queries.py`,
+  `tests/integration/test_graph_queries.py` (two tests),
+  `docs/adr/0019-export-evidence-labelling.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-3` and `baseline-phase-4`,
+  `documentation/memory.md`.
+- Test-first: the export test was written and observed failing (1 failed, 16
+  passed) before `_cited_symbol` existed, then passing (17 passed).
+- Verification: full `uv run pytest -q` — **2086 passed, 3 skipped**; then
+  `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  exited **0** (ruff clean, mypy clean on 337 files, dataset valid, Phase 0/3/4
+  baselines reproduce, ADR-0016 invariants pass).
+- Limitations: target still unmet, **0.6923 against 0.98**.
+- Next / open: **the other half of ADR-0018's finding #1 is a harness question,
+  not an engine one.** For an outgoing query the evidence correctly cites the
+  reference site inside the subject and the answer lives in the claim, so the
+  harness projecting `ranked_symbols` from evidence labels
+  (`[item.symbol for item in response.evidence]`) is right for inbound queries
+  and wrong for outbound ones. q010 and q015 still miss for that reason alone.
+  Also still open: `related_tests` does not resolve a method subject to its
+  class-level edge (do **not** fix by moving the edge — that breaks ADR-0004's
+  import-and-call rule).
+- Process note: this is the fourth consecutive finding in the series, and the
+  first to be genuinely in the engine. ADR-0018 recorded the *symptom*
+  ("returns `src.client` at rank 1") as though it were the diagnosis; reading
+  each evidence item against the source lines it cites is what separated the
+  real defect from the harness issue. Run output alone could not have.
+
 ### 2026-08-08T21:00:00Z — Graph cases declare their subject; ADR-0017's remaining-gap claim corrected (ADR-0018)
 
 - Agent: Claude Code `claude-opus-5`, branch `evaluation-fixture-gate-correction`

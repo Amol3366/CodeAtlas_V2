@@ -307,6 +307,36 @@ development order is finished. A new phase requires an explicit user decision.
       false account of the product. Probe the service directly before calling
       anything an engine gap.
 
+- [x] Export evidence labelling (ADR-0019), 2026-08-08: the first **engine**
+      defect of this series, and it was narrower than ADR-0018's description of
+      it. `GraphQueryService` labelled every evidence item with the edge's
+      *source*. That is right for almost every relation kind, which cites a
+      reference site (a call, an import, a name use) living inside the source.
+      `EXPORTS` is the exception: it cites the **exported symbol's own
+      definition**, so `orders.ts:1-3` — which is `export interface Order` —
+      was labelled `src.orders`. The evidence named one symbol and showed
+      another: exactly the ADR-0016 defect on a new surface.
+
+      Fixed by `_cited_symbol`: label with the symbol whose definition the range
+      covers. `exact_symbol_resolution` 0.6667 → 0.6923 and **nothing else
+      moved** — the correct signature for a pure relabel. Gate green: 2086
+      passed, 3 skipped, exit 0.
+
+      **The `IMPORTS` counterpart is pinned by its own test.** An import range
+      is the import statement, inside the importing module, so that label must
+      not flip along with `EXPORTS`; a test asserting only the new behaviour
+      would have allowed fixing exports by breaking imports.
+
+      Why it survived since Phase 3: the integration tests asserted **claim text
+      only**, never an evidence label. The claims were always correct —
+      `_claims` resolves the other party by direction — so `src.orders exports
+      Order` read fine beside mislabelled evidence.
+
+      **ADR-0018 recorded the symptom as the diagnosis** ("returns `src.client`
+      at rank 1"). Reading each evidence item against the source lines it cites
+      is what separated the real defect from the harness issue; run output alone
+      could not.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -611,13 +641,18 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
    Two real findings survive from that investigation, both deferred on purpose
    so a measurement correction stays attributable:
 
-   - **Module-scoped graph queries rank the module's own symbol first.**
-     `dependencies(module)` / `exports(module)` return `src.client`,
-     `src.orders`, `src.payments.service` at rank 1, ahead of what they depend
-     on or export; q015's rank-2 *is* the expected `total`, and q017 returns
-     `src.orders` twice where `Order` and `total` should be. A
-     `GraphQueryService` contract question, not an evaluation one — and the
-     largest remaining identified contributor.
+   - ~~**Module-scoped graph queries rank the module's own symbol first.**~~
+     **Split and half-closed 2026-08-08 by ADR-0019.** The framing was
+     imprecise. The `EXPORTS` half was a real engine defect (evidence labelled
+     with the module while citing the exported symbol's own definition) and is
+     fixed. The `DEPENDENCIES` half is **not** an engine issue: for an outgoing
+     query the evidence correctly cites the reference site inside the subject,
+     and the answer lives in the *claim*. What is wrong there is the evaluation
+     harness projecting `ranked_symbols` from evidence labels
+     (`[item.symbol for item in response.evidence]`) — right for inbound
+     queries where the label is the answer, wrong for outbound ones. q010 and
+     q015 still score as misses for that reason alone. **Open, and it is a
+     harness question.**
    - **`related_tests` does not resolve a method subject to its class-level
      edge.** The `TESTS` edge sits on `PaymentService` because the test imports
      the class and calls the method on an instance (correct per ADR-0004), so

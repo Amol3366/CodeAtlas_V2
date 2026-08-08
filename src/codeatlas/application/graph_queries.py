@@ -308,7 +308,7 @@ class GraphQueryService:
                     file_id=edge.file_id,
                     start_line=edge.start_line,
                     end_line=edge.end_line,
-                    symbol=_label(edge.source_symbol_id, symbols_by_id),
+                    symbol=_cited_symbol(edge, symbols_by_id),
                     derivation=edge.derivation,
                     confidence=edge.confidence,
                 )
@@ -484,6 +484,25 @@ def weakest_derivation(derivations: Sequence[Derivation]) -> Derivation:
     if not derivations:
         return Derivation.UNSUPPORTED
     return min(derivations, key=_DERIVATION_STRENGTH.index)
+
+
+def _cited_symbol(
+    edge: RelationRecord, symbols_by_id: dict[str, SymbolRecord]
+) -> str:
+    """Name the symbol whose definition the edge's cited range actually covers.
+
+    Almost every relation cites a *reference site* — a call, an import, a name
+    use — and that line sits inside the source symbol, so the source is the
+    right label. `EXPORTS` is the exception: it cites the exported symbol's own
+    definition (`export interface Order` is `Order`'s range, not the module's),
+    so labelling it with the exporting module named one symbol while showing
+    another. Evidence whose label contradicts its own line range is the defect
+    ADR-0016 named on the `related_tests` surface, and the product's whole claim
+    is that a reader can verify what they are shown.
+    """
+    if edge.kind is RelationKind.EXPORTS:
+        return _label(edge.target_symbol_id, symbols_by_id) or edge.target_hint or ""
+    return _label(edge.source_symbol_id, symbols_by_id)
 
 
 def _label(symbol_id: str | None, symbols_by_id: dict[str, SymbolRecord]) -> str:
