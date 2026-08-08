@@ -335,6 +335,7 @@ beside it; `-SkipE2E` opts out for a fast inner loop. Repository fixtures are
 untrusted data and are never imported, built, or executed.
 
 - `docs/operations/development-windows.md` — setup and the Phase 0 gate
+- `documentation/codeatlas-v2-working-guide.md` — one-document overview of what CodeAtlas is, how it works, scenarios, and differentiation
 - `docs/operations/development-windows-phase1.md` — CLI, API, and Windows behavior
 - `docs/operations/relations-and-graph.md` — the relation graph and traversal
 - `docs/operations/change-analysis.md` — change preflight and its limits
