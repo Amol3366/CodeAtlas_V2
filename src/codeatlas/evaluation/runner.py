@@ -62,6 +62,15 @@ class QueryPrediction(ContractModel):
     claims: list[NonEmptyText]
     abstained: bool
     duration_ms: NonNegativeDuration
+    # Did the adapter actually run this case? A case outside the adapter's
+    # declared scope is emitted as an abstention, and an abstention that was
+    # never attempted is not a wrong answer -- `engine_adapter` says in its own
+    # docstring that "not implemented" and "answered wrongly" are different
+    # facts and the baseline must not blur them. Scoring blurred them anyway,
+    # putting an unreachable ceiling on any metric containing such a case
+    # (ADR-0024). Defaults to True so an existing prediction file parses
+    # unchanged and every case in it stays scored exactly as before.
+    measured: bool = True
     # Additive and optional, so `contract_version` stays "1.0" and an existing
     # prediction file parses unchanged (the ADR-0004 precedent). No metric reads
     # it: the scored suite is computed from evidence and claims. It exists so
@@ -126,6 +135,7 @@ class RankedMetrics(ContractModel):
 
 class QueryScore(ContractModel):
     case_id: OpaqueId
+    measured: bool = True
     exact_symbol_resolved: bool | None
     symbols: RankedMetrics
     evidence: RankedMetrics
@@ -276,12 +286,13 @@ def score_query_case(
     )
     exact = (
         None
-        if not case.expected_symbols
+        if not case.expected_symbols or not prediction.measured
         else bool(prediction.ranked_symbols)
         and prediction.ranked_symbols[0] in set(case.expected_symbols)
     )
     return QueryScore(
         case_id=case.id,
+        measured=prediction.measured,
         exact_symbol_resolved=exact,
         symbols=symbol_metrics,
         evidence=evidence_metrics,
@@ -524,14 +535,14 @@ def _aggregate(
         for score, case in zip(
             query_scores, dataset.query_cases, strict=True
         )
-        if case.expected_symbols
+        if case.expected_symbols and score.measured
     ]
     query_evidence_recall = [
         score.evidence.recall
         for score, case in zip(
             query_scores, dataset.query_cases, strict=True
         )
-        if case.expected_evidence
+        if case.expected_evidence and score.measured
     ]
     change_evidence_recall = [
         score.evidence_recall
@@ -545,7 +556,7 @@ def _aggregate(
         for score, case in zip(
             query_scores, dataset.query_cases, strict=True
         )
-        if case.expected_relations
+        if case.expected_relations and score.measured
     ]
     impact_recall = [
         score.direct_impact_recall
@@ -609,8 +620,16 @@ def _aggregate(
         unsupported_claim_rate=(
             forbidden_count / claim_count if claim_count else None
         ),
+        # An unmeasured case abstained because the adapter declined to run it,
+        # not because the engine judged the evidence insufficient. Counting it
+        # as a correct abstention would credit the engine for a decision it
+        # never made.
         abstention_correctness=_mean(
-            [float(score.abstention_correct) for score in query_scores]
+            [
+                float(score.abstention_correct)
+                for score in query_scores
+                if score.measured
+            ]
         ),
         total_duration_ms=sum(
             score.duration_ms for score in query_scores

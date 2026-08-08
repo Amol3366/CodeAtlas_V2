@@ -137,7 +137,7 @@ def predict_exact_symbols(
                     case.intent not in SUPPORTED_INTENTS
                     or case.repository_fixture not in supported
                 ):
-                    predictions.append(_abstention(case))
+                    predictions.append(_abstention(case, measured=False))
                     continue
 
                 repository_id = indexed.get(case.repository_fixture)
@@ -268,7 +268,15 @@ def _ranked_symbols(case: QueryCase, response: object) -> list[str]:
     ]
 
 
-def _abstention(case: QueryCase) -> QueryPrediction:
+def _abstention(case: QueryCase, *, measured: bool = True) -> QueryPrediction:
+    """An abstention, and whether the engine actually reached the question.
+
+    `measured=False` marks a case this adapter declined to run at all -- an
+    unsupported intent, or a fixture kept out of the accuracy corpus on purpose.
+    The module docstring promises that "not implemented" and "answered wrongly"
+    stay different facts; passing that distinction to the scorer is what keeps
+    the promise (ADR-0024).
+    """
     return QueryPrediction(
         case_id=case.id,
         ranked_symbols=[],
@@ -277,6 +285,7 @@ def _abstention(case: QueryCase) -> QueryPrediction:
         claims=[],
         abstained=True,
         duration_ms=0.0,
+        measured=measured,
     )
 
 
