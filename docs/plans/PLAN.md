@@ -207,6 +207,88 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T18:30:00Z — An exact name match outranks a lexical one (ADR-0026)
+
+- Agent: Claude Code `claude-opus-5`, branch `exact-match-ranking`
+- Transition: no phase task. Post-gate. Closes the lexical retrieval thread
+  begun in ADR-0024.
+- Outcome: the second defect ADR-0025 exposed, and the reason its 0.8750
+  prediction fell short. `search_chunks` ordered by `bm25(chunk_search)` and
+  nothing else. BM25 scores by term density, so the **two-line** `features:`
+  block out-scored the `features.audit` chunk a caller asked for by name, while
+  the **three-line** `service:` block diluted and lost to its leaf.
+  **Whether a caller got the key they asked for or its parent depended on how
+  many other lines the parent happened to contain** — not a property anyone
+  could predict or should rely on.
+- Decision: promote a chunk whose `qualified_name` *is* the query, ahead of BM25
+  order. Implemented in `LexicalSearch`, not the SQL: ranking policy belongs in
+  retrieval and FTS syntax stays in the store, which is the separation
+  `search_chunks`' own docstring argues for when it refuses a column name it did
+  not choose.
+- Two bounds stated in the code rather than left implicit:
+  1. **Reorders only within the window the query already returned.** `limit` is
+     applied by SQL, so an exact match ranked below the cutoff never arrives to
+     be promoted. This is **not** a guarantee that an exact match always wins and
+     must not be described as one.
+  2. **Stable partition.** Every non-exact hit keeps its relative BM25 order, so
+     a query with no exact match returns exactly as before. Pinned by a test —
+     without it this would be a general retrieval change wearing a bug fix's
+     clothes.
+- **A documented invariant is broken on purpose.** `search_text`'s docstring
+  records that the relaxed-fallback design was chosen so "a query that finds
+  results today finds exactly the same results after this change… the property
+  to preserve if this is ever reworked". Membership is preserved; **order is
+  not**. Recorded here rather than silently amended: that note exists to make a
+  future author think before reordering, and that is what it achieved.
+- Measured:
+
+  | Metric | ADR-0025 | Now |
+  | --- | ---: | ---: |
+  | `lexical_resolution` | 0.6250 | **0.8750** (7/8) |
+  | `mean_reciprocal_rank` | 0.9429 | 0.9714 |
+  | `ndcg_at_10` | 0.8840 | 0.9051 |
+  | `exact` / `containing_evidence_rate` | 0.5647 / 0.6588 | unchanged |
+  | change-side metrics | — | unchanged |
+
+  Evidence rates not moving is the correct signature for a pure reorder: the
+  same evidence, in a better order.
+- Whole thread: `lexical_resolution` **0.3000 → 0.3750 → 0.6250 → 0.8750**, one
+  attributable cause per commit — an honest denominator (ADR-0024), extraction
+  (ADR-0025), ranking (here).
+- Files: `src/codeatlas/retrieval/lexical.py` (`_exact_first`, one call site),
+  `tests/integration/test_exact_match_ranking.py` (new, three tests),
+  `docs/adr/0026-exact-match-ranking.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-3` and `-4`, `documentation/memory.md`.
+- Contracts/migrations: none. No version constant moved by this entry;
+  `PARSER_BUNDLE_VERSION` 1.3.0 and `RESOLVER_VERSION` 1.3.0 stand from
+  ADR-0025 and ADR-0021 respectively.
+- Test-first: the promotion test written and observed failing (`features` where
+  `features.audit` was asked for) before `_exact_first` existed. The two guard
+  tests — the longer block, and a query with no exact match — passed from the
+  start and are kept: one passing case is not evidence of a rule, and the
+  no-exact-match guard is what stops this widening later.
+- Verification: `ruff` and `mypy` clean across `src tests scripts apps` (339
+  files); full `uv run pytest -q` **2117 passed, 3 skipped**;
+  `check_phase4.ps1 -SkipSync` exit 0 (captured from the command, not a pipeline
+  tail).
+- Next / open, all decisions rather than work:
+  1. **q019 — the corpus uses two naming conventions.** It expects
+     `README.Health` while extraction emits the bare `Health`; q027/q031 expect
+     a bare `Order flow` and pass. Needs a ruling on which is correct.
+     Expectations must **not** be edited to move a number (ADR-0003).
+  2. **`lexical_resolution`'s threshold**, settable once (1) is decided. On
+     eight scorable cases every value is a multiple of 0.125, so the current
+     0.90 means "8 of 8" and can express nothing else. Set it from this
+     per-case evidence rather than guessing a third time.
+  3. `relation_path_correctness` naming convention and gate target.
+  4. Whether a constructor call should record a `TESTS` edge to `__init__`.
+  5. **The packaged build under `dist/` dates from 2026-08-07** and is now two
+     version bumps behind (`RESOLVER_VERSION`, `PARSER_BUNDLE_VERSION`). Worth a
+     `scripts/build_package.ps1` run before any demo.
+- Also unmeasured, carried from ADR-0025: every nested configuration key is now
+  a chunk, and `MAX_NESTED_KEY_PATHS` is 40 per top-level key, so a large
+  configuration file adds index volume nobody has measured beyond the fixtures.
+
 ### 2026-08-09T16:00:00Z — A nested configuration key is a symbol (ADR-0025)
 
 - Agent: Claude Code `claude-opus-5`, branch `nested-config-keys`
