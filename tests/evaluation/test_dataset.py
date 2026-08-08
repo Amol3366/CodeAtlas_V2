@@ -207,3 +207,43 @@ def _minimal_dataset(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return dataset_root
+
+
+# --- Working-tree integrity ----------------------------------------------------
+
+_CORPUS_ROOTS = (
+    Path("tests/evaluation/cases"),
+    Path("tests/evaluation/semantic_cases"),
+    Path("tests/evaluation/invariant_cases"),
+)
+
+
+@pytest.mark.parametrize("root", _CORPUS_ROOTS, ids=lambda item: item.name)
+def test_every_corpus_file_has_lf_endings_in_the_working_tree(root: Path) -> None:
+    """Git normalises on read, so it cannot show you this drift.
+
+    `.gitattributes` declares `* text=auto eol=lf` precisely because the change
+    engine hashes bytes and diffs lines: a corpus file rewritten with CRLF makes
+    every line of it differ, so every symbol in it reports as changed. Because
+    `text=auto` normalises the working tree back to LF when comparing,
+    `git status` stays clean while the bytes the evaluation actually reads have
+    drifted — and a baseline measured against that drift will not reproduce on a
+    fresh clone.
+
+    That is not hypothetical. `baseline-phase-7`'s `changed_symbol_precision` was
+    0.2000 for exactly this reason: one variant file held CRLF, so all five
+    functions in it were reported changed against a corpus declaring one. The
+    correct value is 1.0000.
+    """
+    offenders = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts:
+            continue
+        data = path.read_bytes()
+        if b"\r\n" in data:
+            offenders.append(str(path))
+
+    assert offenders == [], (
+        "CRLF found in corpus files; the evaluation reads these bytes directly. "
+        "Restore them with `git checkout -- <path>` so .gitattributes applies."
+    )

@@ -417,6 +417,53 @@ development order is finished. A new phase requires an explicit user decision.
       threatened it, and was right against an author who believed the change was
       safe. It earned its keep.
 
+- [x] Phase 7 harness audit; corpus line endings (ADR-0022), 2026-08-09: the
+      audit found `changed_symbol_precision = 0.2000` was **not an engine
+      defect and not a corpus defect**. One variant file
+      (`semantic_cases/variants/.../pricing.py`) held **CRLF** in the working
+      tree while every other file in all three corpora is LF, so all 42 lines
+      differed and all five functions in it reported as changed against a case
+      declaring one. The engine was right — the change engine hashes bytes.
+
+      `.gitattributes` already prevents this (`* text=auto eol=lf`, with a
+      comment naming this exact failure) and the committed object *is* LF. The
+      file had been rewritten locally and never restored.
+      `rm` + `git checkout --` gave LF and precision **1.0000**, matching the
+      declared expectation exactly. No engine code and no expectation changed.
+
+      **The serious part: `baseline-phase-7` encoded that drift.** It is gated
+      byte-for-byte by `check_phase7.ps1`, and `--check` on a correctly
+      checked-out tree exits **5**. The tracked artifact did not reproduce on a
+      fresh clone. Regenerated; `changed_symbol_precision` now drops out of
+      `unmet_targets` in both columns, so **Phase 7 has three unmet targets, not
+      four**.
+
+      **Git cannot show you this drift**, two ways: when the working file's stat
+      still matches the index, git skips the content check and reports a
+      *completely clean tree* (the state this repo was in all session); once the
+      stat changes it reports ` M` but `git diff` is **empty**, because
+      `text=auto` normalises CRLF away when comparing. Guarded now by
+      `test_every_corpus_file_has_lf_endings_in_the_working_tree`, which reads
+      bytes and is mutation-checked.
+
+      Query-side audit results, so they are not re-derived: `exact_symbol_resolution`
+      0.2857 is a **ranking** result, not retrieval — the expected symbol is in
+      the top 10 for **11 of 14 cases** (`symbol_recall_at_10` 0.7857). Several
+      expected answers are document headings rather than code symbols, and
+      `_unmet_targets` applies **one dataset-agnostic target table** to both
+      corpora, so a 0.98 written for `EXACT_SYMBOL` lookup is applied to
+      conceptual search. One real weakness: s003 "When does a customer avoid
+      paying for delivery?" returns `OrderRepository.for_customer`, matched on
+      the word "customer" — the same family as the P7-06 stopword defect.
+      **`predict_conceptual` has none of the defects found in
+      `predict_exact_symbols`** — no fixture gate, verbatim questions by design,
+      correct projection for conceptual intent.
+
+      Process note: `check_phase7.ps1` was **not run during the five earlier
+      merges this session**, and it gates `baseline-phase-7`. It happened to
+      pass, because the corpora are disjoint — luck, not diligence. Run it when
+      touching anything `predict_conceptual` reaches.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -692,7 +739,7 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
    | --- | ---: | ---: |
    | `exact_symbol_resolution` | 0.2857 | 0.98 |
    | `valid_evidence_rate` | 0.0563 | 1.00 |
-   | `changed_symbol_precision` | 0.2000 | 0.95 |
+   | ~~`changed_symbol_precision`~~ **met** | ~~0.2000~~ **1.0000** | 0.95 |
    | `primary_evidence_recall_at_10` | 0.6667 | 0.90 |
 
    ~~**Start with `exact_symbol_resolution`, not Recall@10.**~~ **Partly

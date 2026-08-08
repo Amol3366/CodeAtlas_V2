@@ -207,6 +207,91 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T07:00:00Z — Phase 7 harness audit; a tracked baseline encoded working-tree drift (ADR-0022)
+
+- Agent: Claude Code `claude-opus-5`, branch `corpus-line-endings`
+- Transition: no phase task. Post-gate audit of the Phase 7 harness, requested
+  after four of six findings this session landed on the measuring apparatus
+  rather than the engine.
+- Scope: read-only investigation first, then one fix. `predict_conceptual` and
+  `predict_changes` had never received the scrutiny `predict_exact_symbols` got.
+- **Finding 1 (fixed here): `changed_symbol_precision = 0.2000` was neither an
+  engine defect nor a corpus defect.** The single change case `sc001` declares
+  `shipping_for`; the engine reported all five functions in `pricing.py`. The
+  variant file held **CRLF** in the working tree while every other file in all
+  three corpora is LF, so all 42 lines differed. The engine was correct — the
+  change engine hashes bytes and diffs lines.
+
+  `.gitattributes` already prevents this (`* text=auto eol=lf`, with a comment
+  naming this exact failure mode), both files carry identical attributes, and
+  the committed object **is** LF. The file had been rewritten locally and never
+  restored. `rm` + `git checkout --` produced LF and precision **1.0000**,
+  matching the declared expectation exactly.
+
+  **The serious consequence: `baseline-phase-7` encoded that drift.** It is
+  gated byte-for-byte by `check_phase7.ps1`, and `--check` on a correctly
+  checked-out tree exits **5 (stale)**. The tracked artifact did not reproduce
+  on a fresh clone. Regenerated: `changed_symbol_precision` 0.2000 → 1.0000 in
+  both columns and out of `unmet_targets` in both, so **Phase 7 has three unmet
+  targets, not four**.
+
+  **Git cannot show this drift.** With the working file's stat still matching
+  the index, git skips the content comparison and reports a *completely clean
+  tree* — the state this repository was in throughout the session. Once the stat
+  changes it reports ` M`, but `git diff` is **empty**, because `text=auto`
+  normalises CRLF away when comparing. Neither view shows a byte difference, and
+  the evaluation reads bytes.
+- **Finding 2 (recorded, not fixed): `exact_symbol_resolution = 0.2857` is a
+  ranking result, not a retrieval failure.** Per-case, the expected symbol is
+  inside the top 10 for **11 of 14 cases** (`symbol_recall_at_10` 0.7857); only
+  s001, s007, s013 miss entirely. The questions are deliberately fuzzy and
+  several expected answers are **document headings** rather than code symbols,
+  so top-1 spans two kinds of thing. `_unmet_targets` applies **one
+  dataset-agnostic target table** to both corpora, so a 0.98 written for
+  `EXACT_SYMBOL` lookup is applied unchanged to conceptual search. Whether that
+  corpus should be gated on `symbol_recall_at_10` and
+  `containing_evidence_rate` instead is an owner ruling — the same one
+  `valid_evidence_rate` awaits, now with two corpora's evidence behind it.
+- **Finding 3: one genuine engine weakness**, not a measurement artifact. s003
+  ("When does a customer avoid paying for delivery?") returns
+  `OrderRepository.for_customer`, matched on the word "customer" — the same
+  family as the P7-06 lexical stopword defect that was worth +0.53 recall.
+- **Finding 4: `predict_conceptual` is structurally sound.** Audited for each
+  defect found in `predict_exact_symbols` and has none: no fixture gate, the
+  question is asked verbatim by documented design, and projecting evidence
+  labels as `ranked_symbols` is correct for conceptual intent. Reported as a
+  clean result rather than padded into a finding.
+- **Finding 5 (process, about this session): `check_phase7.ps1` was not run
+  during the five earlier merges**, and it gates `baseline-phase-7`
+  byte-for-byte while `check_phase4.ps1` does not. Verified after the fact: it
+  reproduces, so nothing was broken. That was the corpora being disjoint, not
+  diligence. Run it when touching anything `predict_conceptual` reaches.
+- Guard added: `test_every_corpus_file_has_lf_endings_in_the_working_tree`
+  reads the bytes of every file in all three corpora, parameterised per corpus
+  so a failure names which one. It passed on first write, so it was
+  **mutation-checked** by rewriting the same file with CRLF — the guard fails
+  and names `semantic_cases` while `git diff` stays empty throughout.
+- Corpus: **not edited.** The fixture restore is a checkout, not a change: the
+  committed object was already LF, so the corpus diff is empty. No expectation,
+  symbol, question, or range was touched. ADR-0003 is not engaged.
+- Files: `tests/evaluation/test_dataset.py` (guard),
+  `docs/evaluation/baseline-phase-7.json` (regenerated),
+  `docs/adr/0022-corpus-line-endings.md` (new), `docs/adr/README.md`,
+  `documentation/memory.md`. No source file under `src/codeatlas/` changed.
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  `RESOLVER_VERSION` `1.3.0` — all unchanged by this entry.
+- Verification: `ruff` clean; `mypy --no-incremental src` clean on 144 files;
+  full `uv run pytest -q` **2100 passed, 3 skipped**; Phase 7 baseline `--check`
+  exit **0** after regeneration (exit 5 before); `check_phase4.ps1 -SkipSync`
+  exit 0.
+- Limitations: three Phase 7 targets remain unmet and are the subject of the
+  open ruling above, not of an engine backlog.
+- Next / open: (1) the target-table ruling — should a conceptual corpus be held
+  to `exact_symbol_resolution >= 0.98` and `valid_evidence_rate >= 1.0` at all.
+  (2) `relation_path_correctness` naming convention and gate target.
+  (3) The s003 lexical weakness. (4) Whether a constructor call should record a
+  `TESTS` edge to `__init__`.
+
 ### 2026-08-09T04:00:00Z — A method can be tested; false `test_gaps` entries removed (ADR-0021)
 
 - Agent: Claude Code `claude-opus-5`, branch `method-level-test-edges`
