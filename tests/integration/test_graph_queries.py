@@ -143,6 +143,57 @@ def test_exports_of_the_orders_module(harness: Harness) -> None:
     assert "total" in text
 
 
+def _steps(response: QueryResponse) -> set[tuple[str, str, str]]:
+    return {
+        (step.source, str(step.kind), step.target)
+        for path in response.relation_paths
+        for step in path.steps
+    }
+
+
+def test_every_graph_answer_carries_its_relations_structurally(
+    harness: Harness,
+) -> None:
+    """A relation answer must be machine-readable, not only prose.
+
+    `BoundedGraphTraversal` already computes paths for every graph query; until
+    now `_respond` discarded them for everything except `trace`. That left an
+    MCP client — a named PRD user that "needs facts it can act on rather than
+    plausible prose" — with evidence labelled by containing symbol and an
+    English sentence, and no structured way to read who calls what.
+    """
+    callers = harness.services.graph.callers(_request(harness, "total"))
+    assert ("render", "CALLS", "total") in _steps(callers)
+
+    exports = harness.services.graph.exports(_request(harness, "src.orders"))
+    assert _steps(exports) == {
+        ("src.orders", "EXPORTS", "Order"),
+        ("src.orders", "EXPORTS", "total"),
+    }
+
+    dependencies = harness.services.graph.dependencies(
+        _request(harness, "src.payments.service")
+    )
+    assert (
+        "src.payments.service",
+        "IMPORTS",
+        "IdempotencyStore",
+    ) in _steps(dependencies)
+
+
+def test_a_relation_step_cites_evidence_that_exists_in_the_response(
+    harness: Harness,
+) -> None:
+    """Every step is citable on its own, or the path is withheld entirely."""
+    response = harness.services.graph.callers(_request(harness, "total"))
+    evidence_ids = {item.evidence_id for item in response.evidence}
+
+    assert response.relation_paths
+    for path in response.relation_paths:
+        for step in path.steps:
+            assert step.evidence_id in evidence_ids
+
+
 def test_export_evidence_is_labelled_with_the_symbol_its_lines_show(
     harness: Harness,
 ) -> None:

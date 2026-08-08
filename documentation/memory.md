@@ -337,6 +337,48 @@ development order is finished. A new phase requires an explicit user decision.
       is what separated the real defect from the harness issue; run output alone
       could not.
 
+- [x] Relations in every graph answer (ADR-0020), 2026-08-08: closing the other
+      half of ADR-0018's finding #1 turned out to require a **product** change,
+      not a harness one. The answer to an outbound relation question existed
+      only as English — `Claim` has `text` but no structured subject/object, and
+      evidence labels name the containing symbol, which is the subject for an
+      outbound query. So there was nowhere in the response to read the answer
+      from. An MCP client (a named PRD user) asking "who calls X" got prose and
+      evidence and nothing machine-readable between them.
+
+      `RelationStep` already existed for exactly this, and
+      `BoundedGraphTraversal.expand` **already computed the paths for every
+      graph query** — `_respond` discarded them for everything but `trace`. The
+      fix is "stop throwing away data we already have": `include_paths` removed,
+      `relation_paths` populated always. Additive per ADR-0004;
+      `contract_version` stays `1.1`.
+
+      `exact_symbol_resolution` 0.6923 → 0.7436, and
+      **`relation_path_correctness` 0.0000 → 0.2083.** That metric had been
+      structurally incapable of being non-zero since Phase 3: ten of the twelve
+      cases with `expected_relations` got an empty list, and the harness
+      rendered a path as `" -> ".join(step.target …)` while the corpus writes
+      `"render CALLS total"`. It also has **no gate target**, so nothing caught
+      it — six baselines carried a dead number twelve corpus expectations were
+      feeding.
+
+      **The product change alone moved no metric**, measured before the harness
+      changes. That is the honest ordering: the response gained data, then the
+      harness could read it.
+
+      **0.2083 is not a good score and is not presented as one.** The residual is
+      largely naming convention — the corpus writes `orders EXPORTS Order`, the
+      engine emits `src.orders`. The corpus was **not** edited to close that
+      (ADR-0003); whether to qualify the corpus or compare suffixes is an open
+      decision.
+
+      `TRACE_FLOW` is deliberately excluded from `GRAPH_ANSWER_END`: a flow
+      answer includes its origin, a relation answer never does. Collapsing them
+      would have traded two fixed cases for several broken ones.
+
+      All three harness tests passed on first write, so each was
+      **mutation-checked** — a test never observed failing is a comment.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -647,12 +689,12 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
      with the module while citing the exported symbol's own definition) and is
      fixed. The `DEPENDENCIES` half is **not** an engine issue: for an outgoing
      query the evidence correctly cites the reference site inside the subject,
-     and the answer lives in the *claim*. What is wrong there is the evaluation
-     harness projecting `ranked_symbols` from evidence labels
-     (`[item.symbol for item in response.evidence]`) — right for inbound
-     queries where the label is the answer, wrong for outbound ones. q010 and
-     q015 still score as misses for that reason alone. **Open, and it is a
-     harness question.**
+     and the answer lives in the *claim*. ~~What is wrong there is the
+     evaluation harness projecting `ranked_symbols` from evidence labels.~~
+     **CLOSED 2026-08-08 by ADR-0020** — and it was a *product* gap, not a
+     harness one: there was nowhere in the response to read an outbound answer
+     from, because `Claim` has no structured subject/object and
+     `relation_paths` was populated only for `trace`. q010 and q015 now pass.
    - **`related_tests` does not resolve a method subject to its class-level
      edge.** The `TESTS` edge sits on `PaymentService` because the test imports
      the class and calls the method on an instance (correct per ADR-0004), so

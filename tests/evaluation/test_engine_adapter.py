@@ -156,6 +156,39 @@ def test_a_case_without_a_declared_subject_falls_back_to_its_expected_symbol() -
     assert _query_term(case) == case.expected_symbols[0]
 
 
+def test_an_outbound_relation_answer_is_read_from_the_step_not_the_label(
+    predictions: PredictionFile,
+) -> None:
+    """q010 asks what `service` imports; the answer is not `service`.
+
+    Evidence for an outbound relation cites the import statement, which lives in
+    the importing module, so the evidence label names the subject. Reading the
+    step's target is what distinguishes the answer from the question.
+    """
+    prediction = {p.case_id: p for p in predictions.query_predictions}["q010"]
+
+    assert prediction.ranked_symbols[:1] == ["IdempotencyStore"]
+    assert "src.payments.service" not in prediction.ranked_symbols
+
+
+def test_a_trace_answer_still_includes_its_origin(
+    predictions: PredictionFile,
+) -> None:
+    """The deliberate exception: a flow answer names where the flow starts."""
+    prediction = {p.case_id: p for p in predictions.query_predictions}["q003"]
+
+    assert prediction.ranked_symbols[:1] == ["PaymentService.capture"]
+
+
+def test_relation_predictions_use_the_corpus_source_kind_target_form(
+    predictions: PredictionFile,
+) -> None:
+    """Joining targets only produced strings no declared relation could equal."""
+    prediction = {p.case_id: p for p in predictions.query_predictions}["q016"]
+
+    assert "render CALLS total" in prediction.relation_paths
+
+
 def test_no_evidence_references_a_file_the_engine_did_not_index(
     predictions: PredictionFile,
 ) -> None:

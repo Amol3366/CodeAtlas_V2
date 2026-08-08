@@ -186,7 +186,6 @@ class GraphQueryService:
                 RelationKind.IMPORTS,
             ),
             noun="flow",
-            include_paths=True,
         )
 
     def _answer(
@@ -196,7 +195,6 @@ class GraphQueryService:
         direction: Direction,
         kinds: Sequence[RelationKind],
         noun: str,
-        include_paths: bool = False,
     ) -> QueryResponse:
         query = request.symbol.strip()
         if not query or len(query) > MAX_QUERY_LENGTH:
@@ -278,7 +276,6 @@ class GraphQueryService:
             result=result,
             noun=noun,
             direction=direction,
-            include_paths=include_paths,
             timing={"traverse": traverse_ms},
         )
 
@@ -292,7 +289,6 @@ class GraphQueryService:
         result: TraversalResult,
         noun: str,
         direction: Direction,
-        include_paths: bool,
         timing: dict[str, float],
     ) -> QueryResponse:
         symbols_by_id = {
@@ -340,11 +336,13 @@ class GraphQueryService:
             )
 
         claims = self._claims(root, pairs, symbols_by_id, noun, direction)
-        relation_paths = (
-            self._paths(result, built.evidence, symbols_by_id)
-            if include_paths
-            else []
-        )
+        # Every graph answer carries its relations structurally. The traversal
+        # already computes these paths for every query; only `trace` used to
+        # keep them, so `callers`, `dependencies`, `exports`, and
+        # `related_tests` returned prose and evidence with no machine-readable
+        # statement of what relates to what. Additive per ADR-0004 — the field
+        # has always existed and clients that ignore it are unaffected.
+        relation_paths = self._paths(result, built.evidence, symbols_by_id)
 
         return QueryResponse(
             request_id=request.request_id,

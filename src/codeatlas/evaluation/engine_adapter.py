@@ -63,6 +63,26 @@ GRAPH_INTENTS: dict[str, str] = {
     "RELATED_TESTS": "related_tests",
     "TRACE_FLOW": "trace",
 }
+# Which end of a relation step is the *answer* to each relation intent.
+#
+# Evidence cites a reference site, so its label names the symbol containing that
+# line — which is the answer for an inbound question ("who calls this": the
+# caller holds the call site) and the subject for an outbound one ("what does
+# this import": the import statement is in the importer). Projecting evidence
+# labels as the answer therefore scored outbound questions against their own
+# subject. The relation steps carry `source` and `kind` and `target`
+# structurally, so the answer can be read rather than inferred.
+#
+# `TRACE_FLOW` is deliberately absent. A flow answer *includes* its origin — the
+# corpus expects `PaymentService.capture` back when tracing from it — whereas a
+# relation answer never does. Those are different questions, so trace keeps the
+# evidence projection.
+GRAPH_ANSWER_END: dict[str, str] = {
+    "CALLERS": "source",
+    "RELATED_TESTS": "source",
+    "DEPENDENCIES": "target",
+    "EXPORTS": "target",
+}
 # Phase 2 adds lexical retrieval, so documents and configuration keys can now be
 # answered. Everything still unimplemented abstains rather than guessing.
 LEXICAL_INTENTS = ("CONFIG_LOOKUP", "DOCUMENT_LOOKUP")
@@ -191,9 +211,7 @@ def _answer(
     duration_ms = (time.perf_counter() - started) * 1000 if record_timings else 0.0
     return QueryPrediction(
         case_id=case.id,
-        ranked_symbols=[
-            item.symbol for item in response.evidence if item.symbol is not None
-        ],
+        ranked_symbols=_ranked_symbols(case, response),
         ranked_evidence=[
             EvidencePrediction(
                 evidence_id=item.evidence_id,
@@ -207,14 +225,44 @@ def _answer(
             )
             for item in response.evidence
         ],
+        # One string per *step*, in the corpus's "SOURCE KIND TARGET" form. The
+        # previous projection joined targets only ("total -> Order"), which no
+        # declared relation could ever equal, so `relation_path_correctness`
+        # was a guaranteed zero rather than a measurement.
         relation_paths=[
-            " -> ".join(step.target for step in path.steps)
+            f"{step.source} {step.kind} {step.target}"
             for path in response.relation_paths
+            for step in path.steps
         ],
         claims=[claim.text for claim in response.answer.claims],
         abstained=not response.evidence,
         duration_ms=duration_ms,
     )
+
+
+def _ranked_symbols(case: QueryCase, response: object) -> list[str]:
+    """The symbols the engine offers as the answer, in rank order.
+
+    For a relation intent the answer is one end of each relation step; see
+    `GRAPH_ANSWER_END` for which end and why trace is excluded. Everything else
+    reads evidence labels, where the label already names the answer.
+    """
+    end = GRAPH_ANSWER_END.get(case.intent)
+    if end is not None:
+        named = [
+            getattr(step, end)
+            for path in response.relation_paths  # type: ignore[attr-defined]
+            for step in path.steps
+        ]
+        # A relation answer never names its own subject, but an engine that
+        # returned no usable steps must not silently fall back to evidence
+        # labels: that is the projection this function exists to replace.
+        return list(dict.fromkeys(item for item in named if item))
+    return [
+        item.symbol
+        for item in response.evidence  # type: ignore[attr-defined]
+        if item.symbol is not None
+    ]
 
 
 def _abstention(case: QueryCase) -> QueryPrediction:
@@ -445,9 +493,7 @@ def _answer_conceptually(
     duration_ms = (time.perf_counter() - started) * 1000 if record_timings else 0.0
     return QueryPrediction(
         case_id=case.id,
-        ranked_symbols=[
-            item.symbol for item in response.evidence if item.symbol is not None
-        ],
+        ranked_symbols=_ranked_symbols(case, response),
         ranked_evidence=[
             EvidencePrediction(
                 evidence_id=item.evidence_id,
@@ -458,9 +504,14 @@ def _answer_conceptually(
             )
             for item in response.evidence
         ],
+        # One string per *step*, in the corpus's "SOURCE KIND TARGET" form. The
+        # previous projection joined targets only ("total -> Order"), which no
+        # declared relation could ever equal, so `relation_path_correctness`
+        # was a guaranteed zero rather than a measurement.
         relation_paths=[
-            " -> ".join(step.target for step in path.steps)
+            f"{step.source} {step.kind} {step.target}"
             for path in response.relation_paths
+            for step in path.steps
         ],
         claims=[claim.text for claim in response.answer.claims],
         abstained=not response.evidence,
