@@ -682,3 +682,96 @@ def test_a_strict_edge_is_not_replaced_by_a_helper_edge(tmp_path: Path) -> None:
     )
     assert len(edges) == 1
     assert edges[0].derivation is Derivation.HIGH_CONFIDENCE_HEURISTIC
+
+
+# --- Method-level TESTS derivation ---------------------------------------------
+
+
+_METHOD_REPO = {
+    "service.py": (
+        "class PaymentService:\n"
+        "    def capture(self, key):\n"
+        "        return key\n"
+        "\n"
+        "    def refund(self, key):\n"
+        "        return key\n"
+    ),
+    "test_service.py": (
+        "from service import PaymentService\n"
+        "\n"
+        "def test_capture():\n"
+        "    service = PaymentService()\n"
+        "    assert service.capture('k') == 'k'\n"
+    ),
+}
+
+
+def test_a_resolved_call_to_a_method_produces_a_tests_edge(tmp_path: Path) -> None:
+    """A method is never imported, so import-and-call could never reach one.
+
+    The rule is satisfied at the right granularity: the *class* is imported and
+    the *method* is called, and the resolver has already resolved that call to
+    the exact symbol. Before this, no method anywhere could carry a `TESTS`
+    edge.
+    """
+    root = _build_repo(tmp_path, "method_repo", dict(_METHOD_REPO))
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness,
+        snapshot_id,
+        relations,
+        source_hint="test_capture",
+        target_hint="capture",
+    )
+    assert len(edges) == 1
+    assert edges[0].derivation is Derivation.STATIC_RESOLVED
+    assert edges[0].resolution is ResolutionState.RESOLVED
+
+
+def test_an_uncalled_method_of_an_imported_class_gets_no_edge(
+    tmp_path: Path,
+) -> None:
+    """Importing the class must not vouch for every method it owns.
+
+    `refund` is never called. Emitting an edge for it would turn one import
+    into blanket coverage of the whole class, which is the promotion this
+    product exists to refuse.
+    """
+    root = _build_repo(tmp_path, "uncalled_repo", dict(_METHOD_REPO))
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness,
+        snapshot_id,
+        relations,
+        source_hint="test_capture",
+        target_hint="refund",
+    )
+    assert edges == ()
+
+
+def test_a_locally_defined_test_double_is_not_reported_as_tested(
+    tmp_path: Path,
+) -> None:
+    """The owner must be imported: a fake defined in the test file is not."""
+    root = _build_repo(
+        tmp_path,
+        "double_repo",
+        {
+            "test_double.py": (
+                "class FakeStore:\n"
+                "    def claim(self, key):\n"
+                "        return key\n"
+                "\n"
+                "def test_it():\n"
+                "    assert FakeStore().claim('k') == 'k'\n"
+            ),
+        },
+    )
+    harness, snapshot_id, relations = _index(tmp_path, root)
+
+    edges = _tests_edges(
+        harness, snapshot_id, relations, source_hint="test_it", target_hint="claim"
+    )
+    assert edges == ()

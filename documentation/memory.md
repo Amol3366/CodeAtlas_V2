@@ -379,6 +379,44 @@ development order is finished. A new phase requires an explicit user decision.
       All three harness tests passed on first write, so each was
       **mutation-checked** — a test never observed failing is a comment.
 
+- [x] Method-level TESTS edges (ADR-0021), 2026-08-09: `_derive_test_edges`
+      checked the import against the *target symbol*, and **a method is never
+      imported** — you import the class and call the method. So no method
+      anywhere could carry a `TESTS` edge, which in Python/TS is most of the
+      code. Three surfaces were wrong; only the first was on the backlog:
+      `related_tests(method)` returned nothing, **`test_gaps` reported every
+      changed method as untested** (verified by running the real engine:
+      `PaymentService.capture` was listed as a gap while a test calls it
+      directly), and `CALLED_NOT_IMPORTED` claimed the call "may resolve to a
+      different symbol" when `_Adjacency.build` drops everything not `RESOLVED`,
+      so every edge behind that reason is resolved by construction.
+
+      The stored `CALLS test → PaymentService.capture` edge was `static_resolved`
+      — **above** `high_confidence_heuristic` on the ladder. CodeAtlas was
+      accepting the weaker signal as coverage and rejecting the stronger one.
+
+      Fixed at extraction time (`static_resolved`), `_QUALIFYING_COVERAGE`
+      widened to `{static_resolved, high_confidence_heuristic}`, reason text
+      corrected. `RESOLVER_VERSION` 1.2.0 → **1.3.0**; existing snapshots are
+      stale until re-indexed and `change_analysis.py` already refuses a stale
+      resolver rather than mixing derivations. `exact_symbol_resolution`
+      0.7436 → 0.7692, `relation_path_correctness` 0.2083 → 0.2917,
+      `abstention_correctness` 0.8500 → 0.8750. Gate exit 0, 2097 passed.
+
+      **The ADR-0016 invariant corpus caught a real over-reach in my first
+      implementation**, and this is the thing to remember. Accepting any owner
+      included *modules*, so `import orders` + `orders.Order()` qualified — one
+      module import vouching for every symbol inside it, which would have closed
+      the two gaps ADR-0016 exists to keep open. The corpus failed with
+      "i001: Order was expected to remain a gap but was not reported". The rule
+      now requires the owner to be a **CLASS** and the target a **METHOD**. The
+      tracked invariant artifact is byte-for-byte unchanged, which is the
+      evidence that coverage widened without the invariant weakening.
+
+      That corpus was written four weeks earlier, fired on the first change that
+      threatened it, and was right against an author who believed the change was
+      safe. It earned its keep.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -695,11 +733,12 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
      harness one: there was nowhere in the response to read an outbound answer
      from, because `Claim` has no structured subject/object and
      `relation_paths` was populated only for `trace`. q010 and q015 now pass.
-   - **`related_tests` does not resolve a method subject to its class-level
-     edge.** The `TESTS` edge sits on `PaymentService` because the test imports
-     the class and calls the method on an instance (correct per ADR-0004), so
-     `related_tests("PaymentService.capture")` returns nothing. Do **not** fix
-     by moving the edge; that breaks ADR-0004's import-and-call rule.
+   - ~~**`related_tests` does not resolve a method subject to its class-level
+     edge.**~~ **CLOSED 2026-08-09 by ADR-0021**, and it was far larger than
+     `related_tests`: no method anywhere could carry a `TESTS` edge, so
+     `test_gaps` reported every changed method as untested. The edge was not
+     moved — import-and-call is applied one level down (imported class, resolved
+     call to its method).
 
    **Read every number here against the corpus size: 14 query cases and 1 change
    case.** `changed_symbol_precision = 0.20` is computed from that single change

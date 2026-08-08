@@ -448,6 +448,49 @@ def test_a_changed_symbol_with_an_inbound_tests_edge_is_not_a_gap() -> None:
     assert "total" not in result.test_gaps
 
 
+def test_a_resolved_tests_edge_closes_a_gap_like_the_heuristic_one() -> None:
+    """A method edge rests on a resolved call, which is the *stronger* signal.
+
+    `static_resolved` sits above `high_confidence_heuristic` on the derivation
+    ladder, so accepting the heuristic edge as coverage while rejecting this one
+    would have the gate trust the weaker of the two.
+    """
+    graph = _side(
+        {"capture": SymbolKind.METHOD, "test_capture": SymbolKind.TEST},
+        [
+            _relation(
+                "test_capture",
+                "capture",
+                RelationKind.TESTS,
+                derivation=Derivation.STATIC_RESOLVED,
+            )
+        ],
+    )
+
+    result = analyze_impact([_change("capture")], base=graph, target=graph)
+
+    assert "capture" not in result.test_gaps
+
+
+def test_a_weak_tests_edge_still_leaves_the_gap_open() -> None:
+    """ADR-0016's rule is unchanged: a weak edge explains a gap, never closes it."""
+    graph = _side(
+        {"capture": SymbolKind.METHOD, "test_capture": SymbolKind.TEST},
+        [
+            _relation(
+                "test_capture",
+                "capture",
+                RelationKind.TESTS,
+                derivation=Derivation.LOW_CONFIDENCE_HEURISTIC,
+            )
+        ],
+    )
+
+    result = analyze_impact([_change("capture")], base=graph, target=graph)
+
+    assert "capture" in result.test_gaps
+
+
 def test_a_changed_test_is_never_its_own_coverage_gap() -> None:
     graph = _side({"test_total": SymbolKind.TEST}, [])
 
@@ -849,3 +892,42 @@ def test_a_change_naming_no_known_symbol_yields_no_paths() -> None:
     result = analyze_impact([_change("nowhere")], base=graph, target=graph)
 
     assert _paths(result) == set()
+
+
+def test_the_called_not_imported_reason_does_not_claim_misresolution() -> None:
+    """Every edge reaching this reason is resolved, so ambiguity cannot be claimed.
+
+    `_Adjacency.build` drops anything whose `resolution` is not `RESOLVED`, so
+    the `calls` list behind `CALLED_NOT_IMPORTED` is resolved by construction.
+    The old wording — "the call may resolve to a different symbol" — asserted a
+    doubt the stored edge had already settled, which is a claim its own evidence
+    contradicts.
+    """
+    graph = _side(
+        {"orders.Order": SymbolKind.CLASS, "test_orders.test_total": SymbolKind.TEST},
+        [
+            _relation(
+                "test_orders.test_total",
+                "orders.Order",
+                RelationKind.CALLS,
+                derivation=Derivation.STATIC_RESOLVED,
+            )
+        ],
+        file_ids={"test_orders.test_total": "file_test"},
+        test_file_ids=frozenset({"file_test"}),
+    )
+
+    result = analyze_impact(
+        [_change("orders.Order", symbol_kind=SymbolKind.CLASS)],
+        base=graph,
+        target=graph,
+    )
+
+    reason = next(
+        item
+        for item in result.test_gap_reasons
+        if item.qualified_name == "orders.Order"
+    )
+    assert reason.reason is GapReasonCode.CALLED_NOT_IMPORTED
+    assert "may resolve to a different symbol" not in reason.explanation
+    assert reason.evidence_ids
