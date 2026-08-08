@@ -91,3 +91,62 @@ What the measurement includes and excludes:
 
 The tracked baseline artifacts exclude timings entirely so `--check`
 reproduces byte-for-byte on any machine.
+
+## Correction, 2026-08-08 — the query-side numbers in this file moved (ADR-0017)
+
+The gate table above is the record of the 2026-07-27 approval and is
+deliberately unedited. This section records that four of the query-side numbers
+in `baseline-phase-4` have since changed, and why that is a measurement
+correction rather than an engine change.
+
+`predict_exact_symbols` gated whole cases out of the measurement by repository
+fixture, and a gated case scores `False` rather than being excluded — so it
+counted as a miss the engine never had a chance to make. The gate had been
+frozen since Phase 1 while the engine gained TypeScript (Phase 3) and Git
+(Phase 4), so 16 of 39 scored query cases were never run.
+
+| Metric | Gate record (2026-07-27) | Corrected (2026-08-08) |
+| --- | ---: | ---: |
+| Exact symbol resolution | 0.3846 | 0.6154 |
+| Primary evidence Recall@10 | 0.5556 | 0.6508 |
+| Valid / exact evidence rate | 0.6610 | 0.6618 |
+| Containing evidence rate | 0.7458 | 0.7353 |
+
+**Every change-side metric is unchanged** — changed-symbol precision 0.9375,
+changed-symbol recall 1.0000, direct-impact recall 1.0000, finding precision
+1.0000, unsupported-claim rate 0.0000. The Phase 4 gate was approved on the
+change-side numbers, and none of them moved, so the approval stands unaffected.
+
+The claim above that "query-only metrics (`exact_symbol_resolution`) are
+identical between the two reports" still holds: Phase 3 and Phase 4 both now
+report 0.6154, and that cross-check is what confirms the correction changed
+accounting rather than behavior.
+
+Full rationale, including why `baseline-phase-1` and `baseline-phase-2` were
+deliberately **not** regenerated, is in `docs/adr/0017-evaluation-fixture-gate-correction.md`.
+
+## Correction, 2026-08-08 (second) — graph cases now declare their subject (ADR-0018)
+
+The correction above was incomplete. `_query_term` also fed
+`expected_symbols[0]` to the engine as the *subject* of a graph query, but for a
+relation query `expected_symbols` is the answer and the subject is not in it.
+Six cases now declare `query_subject`.
+
+| Metric | ADR-0017 | ADR-0018 |
+| --- | ---: | ---: |
+| Exact symbol resolution | 0.6154 | 0.6667 |
+| Primary evidence Recall@10 | 0.6508 | 0.6984 |
+| Valid / exact evidence rate | 0.6618 | 0.6400 |
+| Containing evidence rate | 0.7353 | 0.7067 |
+
+**Recall rose and evidence-span precision fell, for the same reason.** Asking
+the correct subject returns more evidence — the supporting relation edges — and
+per ADR-0003 a call-site line rarely equals a gold range describing a
+definition, so the additional items enlarge the denominator without matching
+spans exactly. Any claim quoting one of these two movements must quote the
+other.
+
+Change-side metrics are again unchanged, so the Phase 4 gate approval remains
+unaffected. ADR-0018 also records the two findings this exposed and deliberately
+did not fix: module-scoped graph queries ranking the module's own symbol first,
+and `related_tests` not resolving a method subject to its class-level edge.

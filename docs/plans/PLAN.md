@@ -207,6 +207,183 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T21:00:00Z — Graph cases declare their subject; ADR-0017's remaining-gap claim corrected (ADR-0018)
+
+- Agent: Claude Code `claude-opus-5`, branch `evaluation-fixture-gate-correction`
+- Transition: no phase task. Post-gate follow-on from the entry below, taken as
+  its declared "next / open" item.
+- Outcome: the item below was recorded as "TS/JS graph intents abstain — a
+  genuine capability question rather than a harness one". **That was wrong on
+  both counts.** `_query_term` fed `expected_symbols[0]` as the *subject* of a
+  graph query, but for a relation query `expected_symbols` is the **answer** and
+  the subject is not in it: "Who calls `total`?" expects `render` and is about
+  `total`, so the harness asked who calls `render` — a different question — and
+  scored the engine's correct answer to it as a miss. Three of the six affected
+  cases are Python (q005, q007, q010); the language split was coincidence. The
+  engine answers `callers`, `dependencies`, `exports`, and `related_tests` on
+  these fixtures when asked about the right subject, proven by probing
+  `GraphQueryService` directly.
+- Decision (user approved both): `QueryCase` gains an optional `query_subject`
+  — absent means `expected_symbols[0]`, so all 40 existing cases stay valid
+  unchanged — and the module-symbol ranking question is deferred to its own
+  slice rather than bundled into a measurement correction.
+- Corpus: six cases declare the field (q005, q007, q010, q015, q016, q017).
+  Additive only: no expectation re-labelled, no case reworded, no symbol added
+  to or removed from an expected set. ADR-0003 holds. Inserted textually to
+  preserve the file's existing formatting — a six-line diff rather than a
+  whole-file reformat.
+- **The declared subject is the one the question asks, not the one the engine
+  answers.** q007 asks "Which test covers capture?", so its subject is
+  `PaymentService.capture` even though only `PaymentService` returns evidence.
+  Declaring the class would have made the case pass by tuning the corpus to
+  current behaviour — precisely what ADR-0003 forbids — so **q007 still fails**,
+  now as a precise finding rather than a shrug.
+- Measured effect:
+
+  | Metric | ADR-0017 | ADR-0018 | Δ |
+  | --- | ---: | ---: | ---: |
+  | `exact_symbol_resolution` | 0.6154 | 0.6667 | +0.0513 |
+  | `primary_evidence_recall_at_10` | 0.6508 | 0.6984 | +0.0476 |
+  | `valid_evidence_rate` / `exact_evidence_rate` | 0.6618 | 0.6400 | **−0.0218** |
+  | `containing_evidence_rate` | 0.7353 | 0.7067 | **−0.0286** |
+  | change-side metrics | — | — | 0.0000 |
+
+  **Recall rose and evidence-span precision fell for the same reason** — the
+  correct subject returns more evidence (the supporting edges), and per ADR-0003
+  a call-site line rarely equals a gold definition range, so the extra items
+  enlarge the denominator without matching spans exactly. Quoting either
+  movement without the other misrepresents the change.
+- Files: `src/codeatlas/evaluation/dataset.py` (optional field),
+  `src/codeatlas/evaluation/engine_adapter.py` (`_query_term`),
+  `tests/evaluation/cases/queries.json` (six declarations),
+  `tests/evaluation/test_engine_adapter.py` (three guards),
+  `docs/adr/0018-graph-query-subject.md` (new), `docs/adr/README.md`,
+  `docs/adr/0017-…md` (a "Corrected by" pointer in the header only — the body is
+  left as written, since rewriting an accepted record is not a correction),
+  regenerated `baseline-phase-3` and `baseline-phase-4`,
+  `docs/evaluation/phase-4-baseline-environment.md`, `documentation/memory.md`.
+- Contracts/migrations: none. Dataset `contract_version` stays `1.0` (the field
+  is optional and additive), `contract_version` `1.1`, `SCHEMA_VERSION` `14`.
+- Test-first: three guards written and observed failing (3 failed, 10 passed)
+  before the model field existed, then passing (13 passed).
+- Verification: `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  exited **0** — 2084 passed, 3 skipped; ruff clean; mypy clean on 337 files;
+  dataset valid (6/40/24); Phase 0, Phase 3, Phase 4 baselines reproduce;
+  ADR-0016 invariants pass.
+- Limitations: **target still unmet, 0.6667 against 0.98.** The Phase 7 semantic
+  corpus is untouched — `predict_conceptual` has no fixture gate and no graph
+  intents.
+- Next / open, both deliberately deferred so this baseline stays attributable:
+  1. **Module-scoped graph queries rank the module's own symbol first.**
+     `dependencies(module)` / `exports(module)` return `src.client`,
+     `src.orders`, `src.payments.service` at rank 1 ahead of the relations
+     asked for; q015's rank-2 *is* the expected `total`, and q017 returns
+     `src.orders` twice where `Order` and `total` belong. A
+     `GraphQueryService` contract question. Largest remaining identified
+     contributor to the gap.
+  2. **`related_tests` does not resolve a method subject to its class-level
+     edge.** Do not fix by moving the edge — that breaks ADR-0004's
+     import-and-call rule.
+- Process note: three consecutive investigations have now found the measuring
+  apparatus at fault rather than the engine (`exact_symbol_resolution`,
+  `valid_evidence_rate`, this one). The harness has had materially less scrutiny
+  than the code it measures. Probe the service directly before calling anything
+  an engine gap — the claim corrected here was written from run output without
+  doing so.
+
+### 2026-08-08T19:30:00Z — The evaluation fixture gate was stale; two live baselines regenerated (ADR-0017)
+
+- Agent: Claude Code `claude-opus-5`, branch `main`
+- Transition: no phase task. Post-gate correction, taken from the
+  `documentation/memory.md` "Next Up" candidate 1
+  (`exact_symbol_resolution` 0.98 target unmet).
+- Outcome: **The largest open metric gap was a harness defect, not an engine
+  defect.** `SUPPORTED_FIXTURES` (`src/codeatlas/evaluation/engine_adapter.py`)
+  gates whole query cases out of the measurement by repository fixture. A gated
+  case is answered by `_abstention()`, and `exact_symbol_resolved` is `None`
+  only when a case has *no* expected symbols (`runner.py:270`) — so a gated case
+  with expected symbols scores `False` and lands in the denominator as a miss,
+  indistinguishable from a wrong answer. The tuple was introduced in `b2ea98e`
+  (the Phase 1 commit) and never revisited, while `SUPPORTED_INTENTS` directly
+  above it *was* maintained and carries comments recording its Phase 2 and
+  Phase 3 widenings. Consequence: 16 of 39 scored query cases never reached the
+  engine — `tsjs_app` excluded though TS/JS parsing shipped in Phase 3, and
+  `git_changes` though Git shipped in Phase 4. Nine of the twelve
+  previously-excluded scored cases resolve their expected symbol top-1 on the
+  first attempt.
+- Decision (user chose regeneration over a parallel artifact): widen
+  `SUPPORTED_FIXTURES` to every corpus fixture except `malicious_unsupported`,
+  which stays out deliberately — it carries prompt-injection text, and what the
+  engine should return for hostile input is a security question the accuracy
+  corpus must not answer by side effect.
+- Measured effect on `tests/evaluation/cases` (40 query, 24 change):
+
+  | Metric | Before | After | Δ |
+  | --- | ---: | ---: | ---: |
+  | `exact_symbol_resolution` | 0.3846 | 0.6154 | +0.2308 |
+  | `mean_reciprocal_rank` | 0.3846 | 0.6154 | +0.2308 |
+  | `abstention_correctness` | 0.5250 | 0.7500 | +0.2250 |
+  | `symbol_recall_at_10` | 0.3718 | 0.5897 | +0.2179 |
+  | `primary_evidence_recall_at_10` | 0.5556 | 0.6508 | +0.0952 |
+  | `changed_symbol_precision` | 0.9375 | 0.9375 | 0.0000 |
+  | `changed_symbol_recall` / `direct_impact_recall` / `finding_precision` | 1.0000 | 1.0000 | 0.0000 |
+
+  The `abstention_correctness` movement is the serious one: the harness was
+  recording incorrect abstentions, so the baseline reported CodeAtlas declining
+  to answer questions it answers correctly. For a product whose central claim is
+  that abstention is deliberate and trustworthy, that misrepresented the feature
+  the product exists for.
+- Baselines: `baseline-phase-3` and `baseline-phase-4` (`.json` and `.md`)
+  regenerated — both are re-checked byte-for-byte by `check_phase4.ps1` and so
+  are assertions about the *current* engine. Both returned exit 5 (stale) before
+  regeneration and exit 0 after, which is the byte-for-byte check doing its job.
+  **`baseline-phase-1` and `baseline-phase-2` were deliberately NOT
+  regenerated**: `check_phase1.ps1` and `check_phase2.ps1` are marked SUPERSEDED
+  and state that re-running them exits 5 by design, because those artifacts
+  record what the Phase 1 and Phase 2 engines did. Regenerating them would
+  overwrite the record those gates were approved on, which
+  `documentation/rules.md` forbids. The initial framing of this task said
+  "regenerate Phase 1–4"; that was corrected to 3–4 before any file was written.
+- Corpus: **not edited.** ADR-0003's rule holds — no case added, removed, or
+  reworded. The numbers moved because the harness stopped discarding answers.
+- Files: `src/codeatlas/evaluation/engine_adapter.py` (constant + rationale
+  comment), `tests/evaluation/test_engine_adapter.py` (two new guards),
+  `docs/adr/0017-evaluation-fixture-gate-correction.md` (new),
+  `docs/adr/README.md` (indexed 0017 — **and 0016, which had never been
+  indexed**), `docs/evaluation/baseline-phase-3.{json,md}`,
+  `docs/evaluation/baseline-phase-4.{json,md}`,
+  `docs/evaluation/phase-4-baseline-environment.md` (appended a dated
+  correction; the 2026-07-27 gate table left unedited),
+  `documentation/memory.md`.
+- Contracts/migrations: none. `contract_version` stays `1.1`, `SCHEMA_VERSION`
+  stays `14`. No source outside `evaluation/` changed.
+- Test-first: both guards were written and observed failing (5 failed, 5 passed)
+  before the constant was touched, then passing (10 passed) after.
+  `test_unsupported_intents_abstain_rather_than_guess` builds its expectation by
+  reading `SUPPORTED_FIXTURES`, so it passed for four phases against a stale
+  value — the replacement,
+  `test_every_corpus_fixture_is_measured_unless_deliberately_unsupported`,
+  derives from the corpus instead, so a fixture added later forces a decision.
+- Verification: `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  exited **0** — 2081 passed, 3 skipped; ruff clean; mypy clean on 337 source
+  files; dataset valid (6 fixtures / 40 queries / 24 changes); Phase 0 null,
+  Phase 3, and Phase 4 baselines all reproduce byte-for-byte; ADR-0016
+  invariants pass. The three skips are the pre-existing
+  `semantic-local`-installed environment assertions.
+- Limitations: **the target is still unmet — 0.6154 against 0.98.** This is a
+  measurement correction and closes no capability gap; it must not be cited as
+  though it did. The Phase 7 semantic corpus is unaffected — `predict_conceptual`
+  has no fixture gate — so its 0.2857 is a separate question, and on a corpus of
+  14 verbatim conceptual questions a 0.98 top-1 target is a target problem
+  before an engine problem, the same conclusion already recorded for
+  `valid_evidence_rate`. Not committed; left in the working tree for review.
+- Next / open: the real engine gap the fixture gate was hiding — **TS/JS graph
+  intents abstain.** `q015` `DEPENDENCIES`, `q016` `CALLERS`, `q017` `EXPORTS`,
+  all on `tsjs_app`, return `<abstained>` while TS/JS symbol resolution works.
+  That is now the largest identified contributor to the remaining main-corpus
+  gap. Deliberately not fixed here so the moved baseline stays attributable to
+  one cause.
+
 ### 2026-08-08T16:00:00Z — `related_tests` no longer asserts coverage it cannot show
 
 - Agent: Claude Code, branch `related-tests-derivation-prose`

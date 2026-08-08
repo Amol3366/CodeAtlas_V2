@@ -238,6 +238,75 @@ development order is finished. A new phase requires an explicit user decision.
       not touched regardless of this outcome. See ADR-0016 and
       `docs/evaluation/test-mapping-2026-08-07.md` for the full record.
 
+- [x] Evaluation fixture gate corrected (ADR-0017), 2026-08-08: the
+      `exact_symbol_resolution` investigation this file listed as candidate 1
+      found a **harness defect, not an engine defect.**
+      `SUPPORTED_FIXTURES` in `evaluation/engine_adapter.py` was written in the
+      Phase 1 commit (`b2ea98e`) and never revisited, so `tsjs_app` (TypeScript,
+      Phase 3) and `git_changes` (Git, Phase 4) were gated out of the
+      measurement. A gated case is answered with `_abstention` and scores
+      **`False`, not `None`** — `exact_symbol_resolved` is `None` only when a
+      case has no expected symbols — so 16 of 39 scored query cases counted as
+      misses the engine never saw. Widening the tuple moved
+      `exact_symbol_resolution` 0.3846 → 0.6154, `abstention_correctness`
+      0.5250 → 0.7500, `mean_reciprocal_rank` 0.3846 → 0.6154, and
+      Recall@10 0.5556 → 0.6508. Every change-side metric is unchanged, so the
+      Phase 4 gate approval is unaffected. `baseline-phase-3` and
+      `baseline-phase-4` were regenerated; **`baseline-phase-1` and
+      `-2` deliberately were not** — their gate scripts are marked SUPERSEDED
+      and document that re-running them exits 5 by design, so regenerating them
+      would overwrite the record those gates were approved on. The corpus was
+      not edited (ADR-0003 holds). Full gate green: 2081 passed, 3 skipped,
+      ruff clean, mypy clean on 337 files, all baselines reproduce, exit 0.
+
+      **The target is still unmet — 0.6154 against 0.98.** This corrected a
+      measurement error; it did not close the gap, and it must not be cited as
+      though it did.
+
+      Two things worth remembering. **A test that derives its expectation from
+      the constant it tests cannot detect that the constant is wrong** —
+      `test_unsupported_intents_abstain_rather_than_guess` builds its
+      expectation by reading `SUPPORTED_FIXTURES`, so it passed for four phases
+      against a stale value. The replacement guard derives from the *corpus*
+      instead. And the constant directly above it, `SUPPORTED_INTENTS`, *was*
+      maintained, with comments recording its Phase 2 and Phase 3 widenings —
+      one gate tracked the engine and its neighbour did not, while both fed the
+      same scoring path.
+
+- [x] Graph cases declare their subject (ADR-0018), 2026-08-08: follow-on from
+      ADR-0017, and it **corrects a claim ADR-0017 made.** `_query_term` fed
+      `expected_symbols[0]` as the thing being asked about, but for a graph
+      query `expected_symbols` is the *answer* and the subject is not in it —
+      "Who calls `total`?" expects `render` and is about `total`, so the harness
+      asked who calls `render` and scored the correct answer to that different
+      question as a miss. `QueryCase` gained an optional `query_subject`
+      (absent = `expected_symbols[0]`, so all 40 cases stayed valid); six cases
+      declare it. `exact_symbol_resolution` 0.6154 → 0.6667, Recall@10
+      0.6508 → 0.6984. Gate green: 2084 passed, 3 skipped, exit 0.
+
+      **Evidence precision fell while recall rose** — exact/valid
+      0.6618 → 0.6400, containing 0.7353 → 0.7067 — because the correct subject
+      returns more evidence (the supporting edges) and per ADR-0003 a call-site
+      line rarely equals a gold definition range. Quoting either number alone
+      misrepresents the change.
+
+      **ADR-0017 was wrong** to call the remainder a TypeScript capability gap:
+      three of the six affected cases are Python, and the engine answers all of
+      them when asked properly. ADR-0017's body is left as written with a
+      pointer to ADR-0018, which carries the correction.
+
+      **q007 deliberately still fails.** Its honest subject is
+      `PaymentService.capture`; declaring `PaymentService` instead would have
+      made it pass by tuning the corpus to current engine behaviour, which is
+      what ADR-0003 forbids. It is now a precise finding instead of a shrug.
+
+      **Three consecutive investigations have found the measuring apparatus at
+      fault rather than the engine** (`exact_symbol_resolution`,
+      `valid_evidence_rate`, this). The harness has had far less scrutiny than
+      the code it measures, and it is the only thing between a reader and a
+      false account of the product. Probe the service directly before calling
+      anything an engine gap.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -516,10 +585,44 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
    | `changed_symbol_precision` | 0.2000 | 0.95 |
    | `primary_evidence_recall_at_10` | 0.6667 | 0.90 |
 
-   **Start with `exact_symbol_resolution`, not Recall@10.** The previous version
-   of this entry named Recall@10 alone and sent a session at the mildest of the
-   four. `exact_symbol_resolution` at 0.2857 against a 0.98 target is the
-   largest and most specific gap on the board.
+   ~~**Start with `exact_symbol_resolution`, not Recall@10.**~~ **Partly
+   resolved 2026-08-08 — see ADR-0017, and read the two corpora separately.**
+
+   The table above is the **semantic corpus** (`tests/evaluation/semantic_cases`,
+   14 cases, all `CONCEPTUAL`, run through `predict_conceptual`).
+   `predict_conceptual` has **no fixture gate**, so ADR-0017 does not move these
+   numbers. But on that corpus `exact_symbol_resolution` is top-1 precision on
+   14 deliberately fuzzy natural-language questions, asked verbatim by design,
+   scored against a 0.98 target built for exact symbol lookup. That is a
+   **target problem before an engine problem** — the same conclusion already
+   reached for `valid_evidence_rate` below, and it needs the same owner ruling.
+
+   On the **main corpus** (`tests/evaluation/cases`, 40 cases,
+   `predict_exact_symbols`) the same metric was 0.3846 and is now 0.6154,
+   because the fixture gate had been discarding 16 of 39 cases. Still short of
+   0.98.
+
+   ~~**The real engine gap the harness was hiding: TS/JS graph intents
+   abstain.**~~ **Wrong — corrected 2026-08-08 by ADR-0018.** Not TS/JS-specific
+   (three of six affected cases are Python: q005, q007, q010) and not a
+   capability gap (the engine answers all of them when asked about the right
+   subject). Main-corpus `exact_symbol_resolution` is now **0.6667**.
+
+   Two real findings survive from that investigation, both deferred on purpose
+   so a measurement correction stays attributable:
+
+   - **Module-scoped graph queries rank the module's own symbol first.**
+     `dependencies(module)` / `exports(module)` return `src.client`,
+     `src.orders`, `src.payments.service` at rank 1, ahead of what they depend
+     on or export; q015's rank-2 *is* the expected `total`, and q017 returns
+     `src.orders` twice where `Order` and `total` should be. A
+     `GraphQueryService` contract question, not an evaluation one — and the
+     largest remaining identified contributor.
+   - **`related_tests` does not resolve a method subject to its class-level
+     edge.** The `TESTS` edge sits on `PaymentService` because the test imports
+     the class and calls the method on an instance (correct per ADR-0004), so
+     `related_tests("PaymentService.capture")` returns nothing. Do **not** fix
+     by moving the edge; that breaks ADR-0004's import-and-call rule.
 
    **Read every number here against the corpus size: 14 query cases and 1 change
    case.** `changed_symbol_precision = 0.20` is computed from that single change

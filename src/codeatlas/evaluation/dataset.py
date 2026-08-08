@@ -66,6 +66,14 @@ class QueryCase(ContractModel):
     question: NonEmptyText
     intent: NonEmptyText
     expected_abstention: bool
+    # What the question is *about*, when that differs from what it expects back.
+    # `expected_symbols` is the answer, and for a graph query the subject is not
+    # in it: "Who calls total?" expects `render` and is about `total`. Absent
+    # means the subject is `expected_symbols[0]`, which is true for every exact,
+    # lexical, and self-referential case. Optional so the 40 existing cases stay
+    # valid unchanged; declaring it is additive, never a re-labelling of an
+    # expectation (ADR-0003).
+    query_subject: NonEmptyText | None = None
     expected_symbols: list[NonEmptyText]
     expected_relations: list[NonEmptyText]
     expected_evidence: list[EvidenceExpectation]
