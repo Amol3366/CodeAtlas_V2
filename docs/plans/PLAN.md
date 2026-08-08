@@ -207,6 +207,104 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T16:00:00Z — A nested configuration key is a symbol (ADR-0025)
+
+- Agent: Claude Code `claude-opus-5`, branch `nested-config-keys`
+- Transition: no phase task. Post-gate. **Step two of two** in the lexical
+  retrieval work; step one (ADR-0024) is merged and pushed.
+- Outcome: the actual defect behind four of five `lexical_resolution` failures.
+  `_nested_paths` has always computed `service.port`, `features.audit`,
+  `scripts.test`, `server.host`. `_config_symbols` joined them into the
+  `container` display string — which feeds retrieval text — and emitted a
+  `CONFIG_KEY` symbol for the **top-level key only**. A nested key was therefore
+  searchable *prose* but not an addressable *symbol*: nothing could cite it, and
+  search returned the parent because the parent was all there was. Confirmed by
+  probing the index directly, which listed only
+  `features, name, private, scripts, server, service`.
+- Third instance this week of one shape: **data already computed, then not
+  surfaced as the thing a caller needs.** ADR-0020 discarded `relation_paths`
+  the traversal had already built; ADR-0019 labelled evidence with the wrong end
+  of its edge; this flattened nested keys into a summary.
+- Decision: emit a `CONFIG_KEY` per nested path across the JSON, TOML and YAML
+  collectors, each citing **its own line**, located by matching the leaf name as
+  a key inside its parent's block. A config lookup that cannot point at the
+  assignment line is barely better than returning the parent.
+- Two honesty constraints, both pinned by tests:
+  1. **A failed line match is not invented.** JSON/TOML paths come from a parsed
+     structure carrying no line information, so this is a heuristic. A leaf whose
+     line cannot be found keeps its **parent's range** — still true, merely less
+     precise — rather than a guessed position.
+  2. **Sibling leaves cannot collapse onto one citation.** Claimed lines are
+     skipped, so `service.port` and `admin.port` cite lines 2 and 4. Two
+     citations on one line would show a reader a position that does not support
+     one of the claims.
+- `PARSER_BUNDLE_VERSION` 1.2.1 → **1.3.0**. Existing snapshots are stale until
+  re-indexed; `indexing.py` already refuses a stale parser bundle rather than
+  mixing extractions. This is the **second** version bump today —
+  `RESOLVER_VERSION` went 1.2.0 → 1.3.0 in ADR-0021 — so anyone with an existing
+  index needs a re-index for both reasons.
+- Measured:
+
+  | Metric | Before | After |
+  | --- | ---: | ---: |
+  | `lexical_resolution` | 0.3750 | **0.6250** (5/8) |
+  | `symbol_recall_at_10` | 0.7714 | 0.8857 |
+  | `mean_reciprocal_rank` | 0.8571 | 0.9429 |
+  | `ndcg_at_10` | 0.7908 | 0.8840 |
+  | `exact_evidence_rate` / `valid_evidence_rate` | 0.6316 | **0.5647** |
+  | `containing_evidence_rate` | 0.6974 | **0.6588** |
+  | change-side metrics | — | unchanged |
+
+  **The evidence rates fell and that is the honest cost**: more symbols means
+  more evidence items whose spans do not match the corpus's gold ranges exactly
+  (the ADR-0018 trade). Recall and span precision must be quoted together.
+- **The predicted 0.8750 was not reached, and the prediction was wrong for an
+  instructive reason: there are two defects, not one.** q021 (`features.audit`)
+  and q022 (`scripts.test`) still fail on **ranking** — an exact qualified-name
+  match loses to its own parent when the parent's block is short enough to score
+  higher on term density:
+
+  ```
+  search 'features.audit' -> ['features', 'features.audit', ...]   parent first
+  search 'service.port'   -> ['service.port', 'service', ...]      leaf first
+  ```
+
+  The symbols exist; this was verified against the index. It is a retrieval
+  defect, deliberately left for its own slice so the two causes stay
+  attributable.
+- Files: `src/codeatlas/parsing/document_parser.py` (`_config_symbols`,
+  new `_leaf_line`), `src/codeatlas/parsing/registry.py` (version),
+  `tests/unit/test_nested_config_keys.py` (new, six tests),
+  `tests/unit/test_document_chunking.py` (two updated),
+  `docs/adr/0025-nested-configuration-keys.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-3` and `-4`, `documentation/memory.md`.
+- Test-first: all six new tests written and observed failing (5 failed, 1
+  passed — the "parent is still addressable" guard passed from the start and is
+  kept, because nesting must *add* symbols without removing the one that worked).
+- Two chunking tests were **updated, not weakened**: they asserted the exact
+  chunk set was top-level keys *and nothing else*, which this record
+  deliberately makes false. Strict equality is kept with the nested entries
+  added, and they now also assert each leaf's line.
+- Verification: `ruff` and `mypy` clean across `src tests scripts apps` (338
+  files); full `uv run pytest -q` **2114 passed, 3 skipped**;
+  `check_phase4.ps1 -SkipSync` exit 0 (captured from the command, not a pipeline
+  tail).
+- Limitations: **index volume is unmeasured.** Every nested key is now also a
+  chunk — which is what makes leaves findable — and `MAX_NESTED_KEY_PATHS` is 40
+  per top-level key, so a large configuration file adds real volume. Nothing
+  bigger than the fixtures has been tried.
+- Next / open: (1) **the ranking defect above** — an exact qualified-name match
+  should outrank a merely-lexical one. Note it breaks a documented invariant on
+  purpose: `search_text`'s docstring records that the relaxed-fallback design
+  was chosen so "a query that finds results today finds exactly the same results
+  after this change", which is why it needs its own record. (2) The
+  `lexical_resolution` threshold, now settable from real per-case evidence.
+  (3) q019: the corpus expects `README.Health` while extraction emits the bare
+  `Health`, and q027/q031 expect a bare `Order flow` and pass — a corpus
+  inconsistency needing a ruling, **not** an edit to expectations (ADR-0003).
+  (4) The packaged build under `dist/` dates from 2026-08-07 and is now two
+  version bumps behind.
+
 ### 2026-08-09T13:00:00Z — A case the adapter never ran is not a wrong answer (ADR-0024)
 
 - Agent: Claude Code `claude-opus-5`, branch `unmeasured-is-not-wrong`

@@ -561,6 +561,51 @@ development order is finished. A new phase requires an explicit user decision.
       to a value the metric can take — after the nested-key work, from real
       per-case evidence rather than guessed a second time.
 
+- [x] Nested configuration keys are symbols (ADR-0025), 2026-08-09: step two of
+      the lexical work, and **the actual defect**. `_nested_paths` has always
+      computed `service.port`, `features.audit`, `scripts.test`, `server.host`;
+      `_config_symbols` joined them into the `container` display string and
+      emitted a symbol for the **top-level key only**. So a nested key was
+      searchable *prose* but not an addressable *symbol* — nothing could cite
+      it, and search returned the parent because the parent was all there was.
+
+      Third instance this week of the same shape: **data already computed, then
+      not surfaced as the thing a caller needs** (ADR-0020 discarded
+      `relation_paths`, ADR-0019 labelled evidence with the wrong end).
+
+      Each leaf now cites **its own line**, found by matching the leaf name
+      inside its parent's block. That is a text match, not a parse position —
+      JSON/TOML paths come from a parsed structure with no line info — so a leaf
+      whose line cannot be found keeps its **parent's range** rather than a
+      guessed one, and sibling leaves skip already-claimed lines so
+      `service.port` and `admin.port` cannot collapse onto one citation. Both
+      pinned by tests. `PARSER_BUNDLE_VERSION` 1.2.1 → **1.3.0**; snapshots need
+      re-indexing.
+
+      `lexical_resolution` 0.3750 → **0.6250**, `symbol_recall_at_10`
+      0.7714 → 0.8857, MRR 0.8571 → 0.9429. **Evidence rates fell** —
+      exact/valid 0.6316 → 0.5647, containing 0.6974 → 0.6588 — because more
+      symbols means more evidence items whose spans do not match gold ranges
+      exactly (the ADR-0018 trade). Quote them together or not at all.
+
+      **It did not reach the predicted 0.8750, and that prediction was wrong for
+      an instructive reason: there are two defects, not one.** q021/q022 still
+      fail on **ranking** — an exact qualified-name match loses to its own
+      parent when the parent's block is short enough to score higher on term
+      density (`'features.audit'` → `['features', 'features.audit', ...]`).
+      Verified directly against the index: the symbols exist. Deliberately not
+      fixed here, and it touches a documented invariant — `search_text`'s
+      docstring records that the relaxed-fallback design was chosen so "a query
+      that finds results today finds exactly the same results", which promoting
+      exact matches breaks on purpose.
+
+      Watch: every nested key is also a **chunk**, which is what makes leaves
+      findable, but `MAX_NESTED_KEY_PATHS` is 40 per top-level key — a large
+      config adds real index volume, unmeasured beyond the fixtures. Two
+      chunking tests were updated (strict equality kept, nested entries and leaf
+      lines added) because this record deliberately makes their "and nothing
+      else" assertion false.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.

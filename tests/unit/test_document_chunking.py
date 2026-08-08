@@ -132,8 +132,13 @@ def test_json_top_level_keys_become_chunks() -> None:
     content = b'{"name": "demo", "scripts": {"build": "vite build"}}\n'
     by_key = _by_name(_chunk_document(content, "package.json", "json"))
 
-    assert set(by_key) == {"name", "scripts"}
+    # A nested key is its own chunk as well as being summarised into its
+    # parent's retrieval text (ADR-0025): the summary makes the parent findable,
+    # the chunk makes the leaf citable. Equality rather than a subset, so a
+    # future change that quietly stops emitting one of these fails here.
+    assert set(by_key) == {"name", "scripts", "scripts.build"}
     assert by_key["scripts"].role is ChunkRole.CONFIG_KEY
+    assert by_key["scripts.build"].role is ChunkRole.CONFIG_KEY
     assert "scripts.build" in by_key["scripts"].retrieval_text
 
 
@@ -141,9 +146,17 @@ def test_yaml_top_level_keys_are_scanned_by_line() -> None:
     content = b"version: 1\nservices:\n  api:\n    image: demo\n"
     by_key = _by_name(_chunk_document(content, "config/app.yaml", "yaml"))
 
-    assert set(by_key) == {"version", "services"}
+    assert set(by_key) == {
+        "version",
+        "services",
+        "services.api",
+        "services.api.image",
+    }
     assert by_key["services"].start_line == 2
     assert by_key["services"].end_line == 4
+    # Each leaf cites the line that writes it, not its parent's block.
+    assert by_key["services.api"].start_line == 3
+    assert by_key["services.api.image"].start_line == 4
 
 
 def test_malformed_json_yields_a_diagnostic_not_an_exception() -> None:

@@ -27,7 +27,7 @@ from codeatlas.domain.symbols import SymbolRecord
 # declaration as context, and repeated anonymous type members are position
 # disambiguated. This prevents unrelated inline object/type properties with the
 # same name from colliding inside one snapshot.
-PARSER_BUNDLE_VERSION: str = "1.2.1"
+PARSER_BUNDLE_VERSION: str = "1.3.0"
 
 
 @dataclass(frozen=True)
