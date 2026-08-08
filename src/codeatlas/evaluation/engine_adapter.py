@@ -36,6 +36,7 @@ from codeatlas.contracts import (
 from codeatlas.conversations.pipeline import AnswerPipeline, AnswerRequest
 from codeatlas.domain.errors import CodeAtlasError
 from codeatlas.evaluation.dataset import (
+    LEXICAL_INTENTS,
     ChangeCase,
     Dataset,
     QueryCase,
@@ -84,8 +85,10 @@ GRAPH_ANSWER_END: dict[str, str] = {
     "EXPORTS": "target",
 }
 # Phase 2 adds lexical retrieval, so documents and configuration keys can now be
-# answered. Everything still unimplemented abstains rather than guessing.
-LEXICAL_INTENTS = ("CONFIG_LOOKUP", "DOCUMENT_LOOKUP")
+# answered. Everything still unimplemented abstains rather than guessing. The
+# set itself lives in `dataset.py` with the rest of the corpus vocabulary, so
+# the adapter and the metric that scores it cannot disagree about which intents
+# are lexical (ADR-0023).
 SUPPORTED_INTENTS = (SUPPORTED_INTENT, *LEXICAL_INTENTS, *GRAPH_INTENTS)
 # Every corpus fixture except the deliberately hostile one. This list is a
 # measurement gate, not a capability flag: a fixture missing here has its cases

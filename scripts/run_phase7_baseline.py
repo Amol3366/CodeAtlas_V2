@@ -49,7 +49,12 @@ _COMPARED = (
     ("primary_evidence_recall_at_10", "Primary evidence Recall@10", True),
     ("exact_evidence_rate", "Exact evidence rate", True),
     ("containing_evidence_rate", "Containing evidence rate", True),
+    # Top-1 does not apply to a conceptual corpus (ADR-0023), so it reports
+    # "not applicable" here. `symbol_recall_at_10` is the honest equivalent
+    # for these questions -- did the right answer surface at all -- and is
+    # kept beside it so the uplift record has a symbol-side number.
     ("exact_symbol_resolution", "Exact symbol resolution", True),
+    ("symbol_recall_at_10", "Symbol Recall@10", True),
     ("abstention_correctness", "Abstention correctness", True),
     ("unsupported_claim_rate", "Unsupported claim rate", False),
 )

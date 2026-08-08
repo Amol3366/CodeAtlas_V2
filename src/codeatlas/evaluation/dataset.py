@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 
 from pydantic import Field, ValidationError, model_validator
 
@@ -121,6 +121,36 @@ class ChangeCase(ContractModel):
     )
 
 
+# The corpus intent vocabulary, grouped by what a correct answer *is*.
+#
+# A symbol-shaped question has one right symbol, so top-1 is the honest measure.
+# A lexical question ("which config key sets the port") is answered by matching
+# text, and scoring it as a top-1 *symbol* result asks a different question than
+# the one posed. Keeping the two apart is why `exact_symbol_resolution` and
+# `lexical_resolution` are separate metrics (ADR-0023).
+#
+# Defined here, in the corpus contract, so the adapter and the runner cannot
+# hold two definitions that drift apart.
+SYMBOL_INTENTS: Final[frozenset[str]] = frozenset(
+    {
+        "EXACT_SYMBOL",
+        "CALLERS",
+        "DEPENDENCIES",
+        "EXPORTS",
+        "RELATED_TESTS",
+        "TRACE_FLOW",
+    }
+)
+LEXICAL_INTENTS: Final[frozenset[str]] = frozenset(
+    {"CONFIG_LOOKUP", "DOCUMENT_LOOKUP"}
+)
+
+# Which gate table a corpus is measured by. `retrieval` is the default so every
+# existing manifest stays valid unchanged; the conceptual corpus declares its
+# own, because top-1 and exact-span rules describe an instrument it is not.
+TargetProfile = Literal["retrieval", "conceptual"]
+
+
 class DatasetManifest(ContractModel):
     contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
     fixtures_root: RepositoryRelativePath
@@ -130,6 +160,7 @@ class DatasetManifest(ContractModel):
     change_cases_file: RepositoryRelativePath
     expected_query_count: Annotated[int, Field(ge=1)]
     expected_change_count: Annotated[int, Field(ge=1)]
+    target_profile: TargetProfile = "retrieval"
 
 
 class QueryCaseFile(ContractModel):
@@ -144,6 +175,7 @@ class ChangeCaseFile(ContractModel):
 
 class Dataset(ContractModel):
     contract_version: Literal["1.0"] = DATASET_CONTRACT_VERSION
+    target_profile: TargetProfile = "retrieval"
     fixtures_root: Path
     fixtures: list[FixtureDescriptor]
     query_cases: list[QueryCase]
@@ -229,6 +261,7 @@ def load_dataset(dataset_root: Path) -> Dataset:
             for case in change_file.cases
         ]
         return Dataset(
+            target_profile=manifest.target_profile,
             fixtures_root=fixtures_root,
             fixtures=manifest.fixtures,
             query_cases=queries,

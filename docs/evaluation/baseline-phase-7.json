@@ -16,14 +16,19 @@
       "semantic": 0.056338028169014086
     },
     "exact_symbol_resolution": {
-      "delta": 0.07142857142857142,
-      "deterministic": 0.21428571428571427,
-      "semantic": 0.2857142857142857
+      "delta": null,
+      "deterministic": null,
+      "semantic": null
     },
     "primary_evidence_recall_at_10": {
       "delta": 0.06666666666666665,
       "deterministic": 0.6,
       "semantic": 0.6666666666666666
+    },
+    "symbol_recall_at_10": {
+      "delta": 0.0714285714285714,
+      "deterministic": 0.7142857142857143,
+      "semantic": 0.7857142857142857
     },
     "unsupported_claim_rate": {
       "delta": 0.0,
@@ -50,8 +55,9 @@
       "containing_evidence_rate": 0.12781954887218044,
       "direct_impact_recall": 1.0,
       "exact_evidence_rate": 0.07518796992481203,
-      "exact_symbol_resolution": 0.21428571428571427,
+      "exact_symbol_resolution": null,
       "finding_precision": 1.0,
+      "lexical_resolution": null,
       "mean_reciprocal_rank": 0.37142857142857144,
       "ndcg_at_10": 0.4556525483537704,
       "primary_evidence_recall_at_10": 0.6,
@@ -63,9 +69,8 @@
     },
     "targets_met": false,
     "unmet_targets": [
-      "exact_symbol_resolution",
       "primary_evidence_recall_at_10",
-      "valid_evidence_rate"
+      "symbol_recall_at_10"
     ]
   },
   "semantic": {
@@ -82,8 +87,9 @@
       "containing_evidence_rate": 0.107981220657277,
       "direct_impact_recall": 1.0,
       "exact_evidence_rate": 0.056338028169014086,
-      "exact_symbol_resolution": 0.2857142857142857,
+      "exact_symbol_resolution": null,
       "finding_precision": 1.0,
+      "lexical_resolution": null,
       "mean_reciprocal_rank": 0.4428571428571429,
       "ndcg_at_10": 0.5270811197823418,
       "primary_evidence_recall_at_10": 0.6666666666666666,
@@ -95,9 +101,8 @@
     },
     "targets_met": false,
     "unmet_targets": [
-      "exact_symbol_resolution",
       "primary_evidence_recall_at_10",
-      "valid_evidence_rate"
+      "symbol_recall_at_10"
     ]
   }
 }

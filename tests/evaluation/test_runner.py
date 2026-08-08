@@ -6,9 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from codeatlas.evaluation.dataset import load_dataset
+from codeatlas.evaluation.dataset import (
+    LEXICAL_INTENTS,
+    SYMBOL_INTENTS,
+    load_dataset,
+)
 from codeatlas.evaluation.runner import (
     ChangePrediction,
+    EvaluationReport,
     EvidencePrediction,
     FindingPrediction,
     PredictionFile,
@@ -404,3 +409,73 @@ def test_prediction_file_round_trips_versioned_json() -> None:
         "query_predictions": [],
         "change_predictions": [],
     }
+
+
+# --- Target profiles and metric scope (ADR-0023) --------------------------------
+
+
+def _report(dataset_root: Path) -> EvaluationReport:
+    dataset = load_dataset(dataset_root)
+    predictions = PredictionFile(
+        implementation_status="implemented",
+        query_predictions=[],
+        change_predictions=[],
+    )
+    return evaluate_predictions(dataset, predictions)
+
+
+def test_exact_symbol_resolution_covers_only_symbol_shaped_intents() -> None:
+    """The metric's name and its 0.98 target describe symbol resolution.
+
+    Scoring "which config key matches this text" as a top-1 *symbol* result
+    blends two different questions into one number, so a regression in exact
+    lookup can hide behind a gain in document lookup.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+    scored = [
+        case
+        for case in dataset.query_cases
+        if case.intent in SYMBOL_INTENTS and case.expected_symbols
+    ]
+    lexical = [
+        case
+        for case in dataset.query_cases
+        if case.intent in LEXICAL_INTENTS and case.expected_symbols
+    ]
+
+    assert scored, "the corpus must contain symbol-shaped cases"
+    assert lexical, "the corpus must contain lexical cases"
+    assert not (SYMBOL_INTENTS & LEXICAL_INTENTS), "an intent belongs to one group"
+
+
+def test_lexical_resolution_is_reported_and_gated() -> None:
+    """Scoping the symbol metric must not leave lexical intents unmeasured."""
+    report = _report(DATASET_ROOT)
+
+    assert report.metrics.lexical_resolution is not None
+    assert "lexical_resolution" in report.unmet_targets
+
+
+def test_the_conceptual_profile_drops_targets_it_cannot_measure() -> None:
+    """A corpus of fuzzy questions is not held to top-1 or exact-span rules."""
+    report = _report(Path("tests/evaluation/semantic_cases"))
+
+    assert "exact_symbol_resolution" not in report.unmet_targets
+    assert "lexical_resolution" not in report.unmet_targets
+    assert "symbol_recall_at_10" in report.unmet_targets
+
+
+def test_the_evidence_gate_reads_containing_rather_than_exact_spans() -> None:
+    """ADR-0003: a call site rarely equals a gold range describing a definition.
+
+    The threshold stays 1.0 — "all evidence must be valid" is unchanged. Only
+    what *valid* means is corrected, so nothing was quietly relaxed.
+    """
+    report = _report(DATASET_ROOT)
+
+    assert "containing_evidence_rate" in report.unmet_targets
+    assert "valid_evidence_rate" not in report.unmet_targets
+    # Still reported, because the gap between the two rates is the measurement.
+    # (Both are None here: an empty prediction file predicts no evidence at all.
+    # What matters is that the report still carries the field.)
+    assert "exact_evidence_rate" in report.metrics.model_dump()
