@@ -207,6 +207,93 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T13:00:00Z — A case the adapter never ran is not a wrong answer (ADR-0024)
+
+- Agent: Claude Code `claude-opus-5`, branch `unmeasured-is-not-wrong`
+- Transition: no phase task. Post-gate. **Step one of two** in the lexical
+  retrieval work; the parser change is deliberately not in this entry.
+- Outcome: `engine_adapter`'s module docstring has promised since Phase 1 that
+  "'not implemented' and 'answered wrongly' are different facts and the baseline
+  must not blur them". The adapter kept that promise. **The scorer broke it** —
+  a case the adapter declined to run was emitted as an abstention, and
+  `score_query_case` recorded `exact_symbol_resolved=False`, landing it in the
+  denominator as a wrong answer.
+- Why it mattered now: ADR-0017 fixed half of this by widening
+  `SUPPORTED_FIXTURES`, but `malicious_unsupported` is excluded **on purpose**
+  (prompt-injection text; what the engine should return for hostile input is a
+  security question the accuracy corpus must not answer by side effect). Its
+  cases kept scoring as misses, so `lexical_resolution` had **two of ten cases
+  that could never pass — a 0.80 ceiling under a 0.90 gate.** No engine could
+  clear it. That threshold was set in ADR-0023 hours earlier by the same author
+  and recorded as provisional; the lesson is not the number, but that a metric
+  containing structurally unpassable cases cannot be reasoned about at all.
+- Decision: `QueryPrediction.measured: bool = True` carries the distinction;
+  the adapter sets it `False` for an unsupported intent or a deliberately
+  excluded fixture. Unmeasured cases leave every accuracy aggregate. The default
+  keeps existing prediction files parsing unchanged and scored exactly as before.
+- **`abstention_correctness` excludes them too, which *reduces* available
+  credit.** An unmeasured case abstained because the adapter declined to run it,
+  not because the engine judged its evidence insufficient; q040
+  (`expected_abstention: true`, on `malicious_unsupported`) had been scoring as
+  a correct abstention and no longer does.
+- A test pins the other side: **an engine abstention is still a miss.** The
+  distinction only helps if it bites both ways — excluding genuine abstentions
+  would let any metric improve by refusing to answer.
+- Measured:
+
+  | Metric | Before | After |
+  | --- | ---: | ---: |
+  | `lexical_resolution` | 0.3000 | **0.3750** (3/8) |
+  | `symbol_recall_at_10` | 0.6923 | 0.7714 |
+  | `mean_reciprocal_rank` | 0.7692 | 0.8571 |
+  | `ndcg_at_10` | 0.7097 | 0.7908 |
+  | `primary_evidence_recall_at_10` | 0.6984 | 0.7458 |
+  | `relation_path_correctness` | 0.2917 | 0.3182 |
+  | `abstention_correctness` | 0.8750 | 0.9714 |
+  | `exact_symbol_resolution` | 1.0000 | 1.0000 (all its cases were measured) |
+
+  **No engine behaviour changed.** Numbers rose because cases the engine was
+  never shown stopped counting against it. Quoting this as an improvement in
+  CodeAtlas would be wrong.
+- Sequencing, deliberate: the actual lexical defect is that nested configuration
+  keys (`service.port`, `features.audit`, `scripts.test`, `server.host`) are
+  computed by `_nested_paths` and then flattened into the `container` display
+  string, so they never become addressable `CONFIG_KEY` symbols — a config
+  lookup can only return the parent key, which is what all four `docs_config`
+  misses are. Fixing that moves `lexical_resolution` again, and it must be
+  measured against an honest denominator or the two causes are inseparable.
+- Files: `src/codeatlas/evaluation/runner.py` (field, scoring, six aggregate
+  filters), `src/codeatlas/evaluation/engine_adapter.py` (`_abstention` takes
+  `measured`), `tests/evaluation/test_runner.py` (three tests),
+  `docs/adr/0024-unmeasured-is-not-wrong.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-3` and `-4`, `documentation/memory.md`.
+- Baselines: only `-3` and `-4` moved. `baseline-phase-7` is unchanged
+  (`predict_conceptual` has no fixture gate, so no unmeasured cases) and the
+  Phase 0 null baseline is unchanged (its metrics are fixed at zero by
+  construction). `-1` and `-2` untouched as always — frozen history.
+- Contracts/migrations: none. Dataset contract `1.0`; `contract_version` `1.1`;
+  `SCHEMA_VERSION` `14`; `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION`
+  untouched by this entry.
+- Test-first: all three tests written and observed failing before the field
+  existed.
+- Next: the nested configuration key extraction. Design decision already taken —
+  cite the nested key's **own line**, located by a bounded search within the
+  parent's block, rather than citing the parent block; a config lookup that
+  cannot point at the assignment line is barely better than returning the
+  parent. For JSON and TOML the paths come from a parsed structure carrying no
+  line information, so that lookup is a heuristic and the emitted symbol must be
+  labelled accordingly, with a test pinning the duplicate-leaf-name case. Needs
+  `PARSER_BUNDLE_VERSION` 1.2.1 → 1.3.0 and a re-index.
+- Also open: `lexical_resolution` now has **eight** scorable cases, so every
+  value it can take is a multiple of 0.125 and a 0.90 gate means "8 of 8" and
+  nothing else. Set it from real per-case evidence once the parser work lands,
+  rather than guessing a second time. Expect the final state to be **7/8 =
+  0.8750**, with q019 remaining: the corpus expects `README.Health` while
+  extraction emits the bare `Health`, and q027/q031 expect a bare `Order flow`
+  and pass — the corpus uses two naming conventions. That is a corpus
+  inconsistency needing a ruling, **not** something to fix by editing
+  expectations (ADR-0003).
+
 ### 2026-08-09T10:00:00Z — A corpus declares which instrument measures it (ADR-0023)
 
 - Agent: Claude Code `claude-opus-5`, branch `target-profiles`

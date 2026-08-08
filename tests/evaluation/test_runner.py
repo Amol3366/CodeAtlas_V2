@@ -479,3 +479,75 @@ def test_the_evidence_gate_reads_containing_rather_than_exact_spans() -> None:
     # (Both are None here: an empty prediction file predicts no evidence at all.
     # What matters is that the report still carries the field.)
     assert "exact_evidence_rate" in report.metrics.model_dump()
+
+
+# --- Unmeasured cases are not wrong answers (ADR-0024) --------------------------
+
+
+def _prediction(case_id: str, *, measured: bool) -> QueryPrediction:
+    return QueryPrediction(
+        case_id=case_id,
+        ranked_symbols=[],
+        ranked_evidence=[],
+        relation_paths=[],
+        claims=[],
+        abstained=True,
+        duration_ms=0.0,
+        measured=measured,
+    )
+
+
+def test_a_case_the_adapter_never_ran_is_not_scored_as_a_miss() -> None:
+    """"Not implemented" and "answered wrongly" are different facts.
+
+    `engine_adapter`'s own docstring says the baseline must not blur them, and
+    the scoring blurred exactly those two: a case the adapter deliberately
+    refused to run produced an abstention that landed in the denominator as a
+    wrong answer, indistinguishable from the engine getting it wrong.
+    """
+    case = load_dataset(DATASET_ROOT).query_cases[0]
+
+    score = score_query_case(case, _prediction(case.id, measured=False))
+
+    assert score.exact_symbol_resolved is None
+
+
+def test_an_engine_abstention_is_still_a_miss() -> None:
+    """The distinction only helps if the other side of it still bites.
+
+    A case the engine *did* run and could not answer is a real miss. Excluding
+    it would let the metric improve by refusing to answer.
+    """
+    case = load_dataset(DATASET_ROOT).query_cases[0]
+
+    score = score_query_case(case, _prediction(case.id, measured=True))
+
+    assert score.exact_symbol_resolved is False
+
+
+def test_unmeasured_cases_leave_the_lexical_denominator() -> None:
+    """The two `malicious_unsupported` cases can never pass, by design.
+
+    `SUPPORTED_FIXTURES` excludes that fixture on purpose (ADR-0017), so
+    counting its cases as wrong answers put a ceiling of 0.80 on a metric
+    gated at 0.90 — a target no engine could clear.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+    predictions = PredictionFile(
+        implementation_status="implemented",
+        query_predictions=[
+            _prediction(
+                case.id,
+                measured=case.repository_fixture != "malicious_unsupported",
+            )
+            for case in dataset.query_cases
+        ],
+        change_predictions=[],
+    )
+
+    report = evaluate_predictions(dataset, predictions)
+
+    # Every measured case abstained, so the rate is 0.0 rather than None; the
+    # point is that it is computed over the measured cases only.
+    assert report.metrics.lexical_resolution == 0.0
+    assert report.metrics.abstention_correctness is not None

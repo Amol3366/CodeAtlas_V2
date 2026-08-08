@@ -518,6 +518,49 @@ development order is finished. A new phase requires an explicit user decision.
       revision. `containing_evidence_rate >= 1.0` may need to be argued down
       with evidence rather than convenience.
 
+- [x] Unmeasured is not wrong (ADR-0024), 2026-08-09: step one of the lexical
+      retrieval work. `engine_adapter`'s docstring has promised since Phase 1
+      that **"not implemented" and "answered wrongly" are different facts and
+      the baseline must not blur them**. The adapter kept that promise; the
+      **scorer broke it** — a case the adapter declined to run scored
+      `exact_symbol_resolved=False` and landed in the denominator as a wrong
+      answer.
+
+      ADR-0017 fixed half of this by widening `SUPPORTED_FIXTURES`, but
+      `malicious_unsupported` is excluded **on purpose** (prompt-injection
+      text), and its cases kept scoring as misses. So `lexical_resolution` had
+      two of ten cases that could never pass: **maximum 0.80 against the 0.90
+      gate I set hours earlier in ADR-0023.** No engine could clear it. The
+      lesson is not the number — it is that a metric containing structurally
+      unpassable cases cannot be reasoned about at all.
+
+      `QueryPrediction.measured` (default `True`, so old artifacts parse
+      unchanged) now carries the distinction, and unmeasured cases leave every
+      accuracy aggregate. **`abstention_correctness` too, which reduces credit**:
+      an unmeasured case abstained because the adapter declined to run it, not
+      because the engine judged evidence insufficient — q040 had been scoring as
+      a correct abstention and no longer does. A test pins the other side: an
+      engine abstention is **still** a miss, or the metric could be improved by
+      refusing to answer.
+
+      `lexical_resolution` 0.3000 → **0.3750** (3/8); `symbol_recall_at_10`
+      0.6923 → 0.7714; MRR 0.7692 → 0.8571; `abstention_correctness`
+      0.8750 → 0.9714; `exact_symbol_resolution` unchanged at 1.0000 (all its
+      cases were measured). **No engine behaviour changed** — numbers rose
+      because cases the engine was never shown stopped counting against it.
+
+      Done **first, deliberately**: the actual lexical defect is that nested
+      config keys (`service.port`, `features.audit`) are computed by
+      `_nested_paths` then flattened into a display string, so they never become
+      addressable symbols and a config lookup can only return the parent key.
+      Fixing that moves `lexical_resolution` again, and it must be measured
+      against an honest denominator or the two causes are inseparable.
+
+      Open: with **eight** scorable cases every value is a multiple of 0.125, so
+      a 0.90 gate means "8 of 8" and nothing else. The threshold needs setting
+      to a value the metric can take — after the nested-key work, from real
+      per-case evidence rather than guessed a second time.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
