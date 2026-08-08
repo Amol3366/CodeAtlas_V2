@@ -484,6 +484,17 @@ def _name(graph: GraphSide, symbol_id: str) -> str | None:
     return symbol.qualified_name if symbol is not None else None
 
 
+# Derivations a `TESTS` edge may carry and still count as coverage. A method
+# edge is emitted at `static_resolved` because it rests on a call the resolver
+# resolved to that exact symbol; the direct import-and-call rule emits
+# `high_confidence_heuristic`. Accepting only the latter would have the gate
+# trust the weaker of the two. Everything below stays a candidate: ADR-0016's
+# rule that a weak edge explains a gap without closing it is unchanged.
+_QUALIFYING_COVERAGE: Final[frozenset[Derivation]] = frozenset(
+    {Derivation.STATIC_RESOLVED, Derivation.HIGH_CONFIDENCE_HEURISTIC}
+)
+
+
 def _test_gaps(
     changes: Sequence[SymbolChange],
     target: GraphSide,
@@ -517,7 +528,7 @@ def _test_gaps(
             relation
             for relation in incoming
             if relation.kind is RelationKind.TESTS
-            and relation.derivation is Derivation.HIGH_CONFIDENCE_HEURISTIC
+            and relation.derivation in _QUALIFYING_COVERAGE
         ]
         if qualifying:
             continue
@@ -605,9 +616,14 @@ def _gap_reason(
         return GapReason(
             qualified_name=qualified_name,
             reason=GapReasonCode.CALLED_NOT_IMPORTED,
+            # Say only what was checked. `_Adjacency.build` drops anything not
+            # `RESOLVED`, so every edge behind this reason is resolved — the
+            # older wording ("may resolve to a different symbol") asserted a
+            # doubt the stored edge had already settled, which is a claim its
+            # own evidence contradicts.
             explanation=(
-                "A test calls this name without importing it, so the call may "
-                "resolve to a different symbol."
+                "A test calls this, but neither it nor its owner is imported "
+                "there, so import-and-call did not qualify it as coverage."
             ),
             evidence_ids=[relation.relation_id for relation in calls],
         )

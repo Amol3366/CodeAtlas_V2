@@ -58,7 +58,7 @@ _UNMENTIONABLE_KINDS: Final[frozenset[SymbolKind]] = frozenset(
     {SymbolKind.MODULE, SymbolKind.CONFIG_KEY, SymbolKind.DOCUMENT_SECTION}
 )
 
-RESOLVER_VERSION: str = "1.2.0"
+RESOLVER_VERSION: str = "1.3.0"
 
 # Tried in order for a TypeScript/JavaScript specifier that names no extension.
 _TSJS_EXTENSIONS: Final[tuple[str, ...]] = (
@@ -669,7 +669,22 @@ def _derive_test_edges(
     Both conditions are required. A test that merely mentions a name is not
     evidence that it tests it, and a file that imports something it never
     exercises has not tested it either.
+
+    A method is never imported — you import its class and call the method on an
+    instance — so requiring the *target itself* to be imported meant no method
+    anywhere could ever carry a `TESTS` edge. Import-and-call still holds; it is
+    applied at the right granularity: the owner is imported, the method is
+    called, and the resolver has already resolved that call to the exact symbol.
+    An unresolved call does not qualify, because then the name may belong to
+    something else entirely, and neither does an uncalled sibling method —
+    importing a class must not vouch for every method it owns.
     """
+    owner_of: dict[str, str] = {
+        relation.target_symbol_id: relation.source_symbol_id
+        for relation in relations
+        if relation.kind is RelationKind.CONTAINS
+        and relation.target_symbol_id is not None
+    }
     imported_by_file: dict[str, set[str]] = {}
     for relation in relations:
         if (
@@ -694,8 +709,36 @@ def _derive_test_edges(
             or source_file.classification is not FileClassification.TEST_CODE
         ):
             continue
-        if target not in imported_by_file.get(relation.file_id, set()):
+        imported = imported_by_file.get(relation.file_id, set())
+        owner = owner_of.get(target)
+        owner_symbol = index.symbols_by_id.get(owner) if owner else None
+        target_symbol = index.symbols_by_id.get(target)
+        # The owner must be a *class*, never a module. `import orders` followed
+        # by `orders.Order()` would otherwise let one module import vouch for
+        # every symbol the module contains — the blanket promotion this product
+        # refuses, and the exact shape the ADR-0016 invariant corpus is built
+        # from. A class is different in kind: importing it and calling its
+        # method is the same import-and-call evidence, named one level down.
+        via_owner = (
+            target not in imported
+            and owner is not None
+            and owner in imported
+            and owner_symbol is not None
+            and owner_symbol.kind is SymbolKind.CLASS
+            and target_symbol is not None
+            and target_symbol.kind is SymbolKind.METHOD
+            and relation.resolution is ResolutionState.RESOLVED
+        )
+        if target not in imported and not via_owner:
             continue
+        # The strength reports how the edge was actually established. A
+        # method edge rests on a call the resolver resolved to that exact
+        # symbol; the direct rule rests on an import paired with a call.
+        derivation = (
+            Derivation.STATIC_RESOLVED
+            if via_owner
+            else Derivation.HIGH_CONFIDENCE_HEURISTIC
+        )
         key = (relation.source_symbol_id, target)
         if key in seen:
             continue
@@ -714,8 +757,8 @@ def _derive_test_edges(
                 kind=RelationKind.TESTS,
                 target_hint=relation.target_hint,
                 resolution=ResolutionState.RESOLVED,
-                derivation=Derivation.HIGH_CONFIDENCE_HEURISTIC,
-                confidence=_CONFIDENCE[Derivation.HIGH_CONFIDENCE_HEURISTIC],
+                derivation=derivation,
+                confidence=_CONFIDENCE[derivation],
                 start_line=relation.start_line,
                 end_line=relation.end_line,
                 candidate_count=1,

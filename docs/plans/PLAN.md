@@ -207,6 +207,99 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T04:00:00Z — A method can be tested; false `test_gaps` entries removed (ADR-0021)
+
+- Agent: Claude Code `claude-opus-5`, branch `method-level-test-edges`
+- Transition: no phase task. Post-gate, taking ADR-0020's deferred item after
+  `relations-in-graph-answers` was merged to `main` (`e9e7fdd`).
+- Outcome: the backlog item read "`related_tests` does not resolve a method
+  subject to its class-level edge". The defect was much larger.
+  `_derive_test_edges` checked the import against the **target symbol**, and a
+  method is never imported — you import the class and call the method on an
+  instance. **No method anywhere could carry a `TESTS` edge**, which in Python
+  and TypeScript is most of the code.
+- Three surfaces, only the first known:
+  1. `related_tests(method)` returned nothing.
+  2. **`test_gaps` reported every changed method as untested.** Verified by
+     running the real `ChangeAnalysisEngine` over two directory states of the
+     `python_app` fixture: `PaymentService.capture` was listed as a gap while
+     `test_capture_uses_idempotency_store` calls it directly. This is the
+     flagship feature reporting a false gap on the most common shape of Python
+     test.
+  3. `CALLED_NOT_IMPORTED` explained "the call may resolve to a different
+     symbol", but `_Adjacency.build` drops anything not `RESOLVED`, so every
+     edge behind that reason is resolved by construction — a claim its own
+     evidence contradicts.
+- The decisive fact: the stored `CALLS test → PaymentService.capture` edge is
+  `static_resolved`, which sits **above** `high_confidence_heuristic` on the
+  derivation ladder. CodeAtlas accepted the weaker signal as coverage and
+  rejected the stronger one.
+- Decision (user approved extraction-time, `static_resolved`, all three
+  surfaces): emit `TESTS` when an imported class's method is called with a
+  resolved call; widen `_QUALIFYING_COVERAGE` to `{static_resolved,
+  high_confidence_heuristic}`; correct the reason text. Import-and-call is
+  unchanged as a principle, applied at the right granularity.
+- **`RESOLVER_VERSION` 1.2.0 → 1.3.0.** Existing snapshots are stale until
+  re-indexed; `change_analysis.py` already refuses a stale resolver version
+  rather than silently mixing derivations. This cost was accepted explicitly
+  when the approach was chosen.
+- **The ADR-0016 invariant corpus caught a real over-reach, and this is the
+  entry's most important line.** The first implementation accepted any owner,
+  which included modules, so `import orders` + `orders.Order()` qualified — one
+  module import vouching for every symbol it contains, the blanket promotion
+  this product refuses. The corpus failed immediately with `i001: Order was
+  expected to remain a gap but was not reported` and `i002: total …`. Those
+  fixtures are deliberately written that way, with a `conftest.py` comment
+  saying so. The rule now requires the owner to be a **CLASS** and the target a
+  **METHOD**: a class import is evidence about its methods, a module import is
+  not evidence about its contents. The corpus was written four weeks earlier,
+  fired on the first change that threatened it, and was right against an author
+  who believed the change was safe.
+- Measured:
+
+  | Metric | Before | After |
+  | --- | ---: | ---: |
+  | `exact_symbol_resolution` | 0.7436 | 0.7692 |
+  | `relation_path_correctness` | 0.2083 | 0.2917 |
+  | `abstention_correctness` | 0.8500 | 0.8750 |
+  | `symbol_recall_at_10` | 0.6667 | 0.6923 |
+  | `valid` / `exact_evidence_rate` | 0.6400 | 0.6316 |
+  | `containing_evidence_rate` | 0.7067 | 0.6974 |
+  | change-side metrics | — | unchanged |
+
+  The evidence rates fall for the ADR-0018 reason — more edges returned, and per
+  ADR-0003 a call site rarely equals a gold definition range — so recall and
+  span precision must be quoted together.
+- **The tracked ADR-0016 invariant artifact is byte-for-byte unchanged**, which
+  is the evidence that coverage widened without the invariant weakening.
+- Files: `src/codeatlas/extraction/resolution.py` (owner rule, derivation,
+  `RESOLVER_VERSION`), `src/codeatlas/analysis/impact.py`
+  (`_QUALIFYING_COVERAGE`, reason text),
+  `tests/integration/test_resolution.py` (three tests),
+  `tests/unit/test_impact.py` (three tests),
+  `docs/adr/0021-method-level-test-edges.md` (new), `docs/adr/README.md`,
+  `documentation/architecture.md` (the `Relation` tiering description),
+  regenerated `baseline-phase-3` and `baseline-phase-4`,
+  `documentation/memory.md`.
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`.
+  No `GapReasonCode` was added or removed; only one explanation string changed.
+- Test-first: the extraction test was written and observed failing before the
+  rule existed, as were the two impact tests. The two *guard* tests — an
+  uncalled sibling method, and a test double defined locally — passed from the
+  start and are deliberately kept: they are what stops the rule widening later.
+- Verification: `ruff` clean; `mypy --no-incremental src` clean on 144 files;
+  full `uv run pytest -q` **2097 passed, 3 skipped**; `check_phase4.ps1
+  -SkipSync` exit **0**.
+- Limitations: target still unmet, **0.7692 against 0.98**. A constructor call
+  records no edge to `__init__`, so constructors remain gaps —
+  `PaymentService.__init__` still reports one. That may well be correct (the
+  test exercises construction, not necessarily `__init__`'s body) but it has
+  been observed, not decided.
+- Next / open: (1) the `relation_path_correctness` naming convention and whether
+  it gets a gate target. (2) The Phase 7 corpus and its harness
+  (`predict_conceptual`, `predict_changes`) remain unexamined. (3) Whether a
+  constructor call should record a `TESTS` edge to `__init__`.
+
 ### 2026-08-09T01:00:00Z — Every graph answer carries its relations structurally (ADR-0020)
 
 - Agent: Claude Code `claude-opus-5`, branch `relations-in-graph-answers`

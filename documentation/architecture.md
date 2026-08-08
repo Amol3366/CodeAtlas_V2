@@ -153,9 +153,13 @@ explicit; schema is never mutated at startup.
 - `Relation` — source, target, type, **derivation class**, confidence,
   supporting evidence, snapshot membership. `TESTS` is derivation-tiered: a
   test that imports and calls the target directly is
-  `high_confidence_heuristic`; a test reaching it only through a pytest
+  `high_confidence_heuristic`; a resolved call to a method of an imported
+  class is `static_resolved` (ADR-0021 — a method is never imported, so
+  import-and-call is applied one level down, and the owner must be a class,
+  never a module); a test reaching it only through a pytest
   fixture parameter or a helper call is `low_confidence_heuristic` and still
-  citable in impact (ADR-0016). `RelationKind.CONSUMES_FIXTURE` records a
+  citable in impact (ADR-0016). Only the first two close a `test_gaps`
+  entry. `RelationKind.CONSUMES_FIXTURE` records a
   test requesting a fixture by parameter name — stored and citable, but
   excluded from impact-expansion walks; it names which fixture a test asked
   for, not what depends on what. `SymbolKind.FIXTURE` (declared since
