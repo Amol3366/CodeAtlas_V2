@@ -143,6 +143,45 @@ def test_exports_of_the_orders_module(harness: Harness) -> None:
     assert "total" in text
 
 
+def test_export_evidence_is_labelled_with_the_symbol_its_lines_show(
+    harness: Harness,
+) -> None:
+    """An evidence label must name the symbol the cited range actually contains.
+
+    An `EXPORTS` edge cites the *exported symbol's own definition* — lines 1-3
+    of `orders.ts` are `export interface Order`. Labelling that range with the
+    exporting module said one symbol while showing another, which is the defect
+    ADR-0016 named on a different surface: a reader told a fact and shown
+    evidence that cannot support it. Every other relation kind cites a reference
+    site inside the source, where the source label is correct.
+    """
+    response = harness.services.graph.exports(_request(harness, "src.orders"))
+
+    labelled = {item.symbol for item in response.evidence}
+    assert labelled == {"Order", "total"}
+
+    by_symbol = {item.symbol: item for item in response.evidence}
+    assert (by_symbol["Order"].start_line, by_symbol["Order"].end_line) == (1, 3)
+    assert (by_symbol["total"].start_line, by_symbol["total"].end_line) == (5, 7)
+
+
+def test_import_evidence_stays_labelled_with_the_importing_module(
+    harness: Harness,
+) -> None:
+    """The counterpart: an `IMPORTS` range is the import statement itself.
+
+    That line lives in the importing module, so the source label is right and
+    must not be flipped along with `EXPORTS`.
+    """
+    response = harness.services.graph.dependencies(
+        _request(harness, "src.payments.service")
+    )
+
+    first = response.evidence[0]
+    assert first.symbol == "src.payments.service"
+    assert first.start_line == 1
+
+
 def test_dependencies_include_the_resolved_import(harness: Harness) -> None:
     """q010/q015: the service module imports IdempotencyStore."""
     response = harness.services.graph.dependencies(
