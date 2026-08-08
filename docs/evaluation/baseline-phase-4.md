@@ -11,9 +11,9 @@
 | Change cases | 24 |
 | Exact symbol resolution | 1.0000 |
 | Primary evidence Recall@10 | 0.7458 |
-| Valid evidence rate | 0.6316 |
-| Exact evidence rate | 0.6316 |
-| Containing evidence rate | 0.6974 |
+| Valid evidence rate | 0.5647 |
+| Exact evidence rate | 0.5647 |
+| Containing evidence rate | 0.6588 |
 | Changed-symbol precision | 0.9375 |
 | Changed-symbol recall | 1.0000 |
 | Direct-impact recall | 1.0000 |

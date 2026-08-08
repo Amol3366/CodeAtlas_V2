@@ -553,18 +553,70 @@ def _section_symbols(
 def _config_symbols(
     request: ParseRequest, keys: Sequence[_ConfigKey]
 ) -> tuple[SymbolRecord, ...]:
-    return tuple(
-        _record(
-            request=request,
-            kind=SymbolKind.CONFIG_KEY,
-            name=key.name,
-            qualified_name=key.name,
-            container=", ".join(key.nested_paths),
-            start_line=key.start_line,
-            end_line=key.end_line,
+    """One symbol per configuration key, top-level and nested alike.
+
+    The dotted paths were already computed and then flattened into `container`
+    for retrieval text, so `service.port` was searchable prose but not an
+    addressable symbol: a config lookup could only answer `service`, and nothing
+    could cite the line that sets the port (ADR-0025).
+
+    Each nested key cites *its own line*, located by matching its leaf name
+    inside its parent's block. That is a text match, not a parse position --
+    JSON and TOML paths come from a parsed structure carrying no line
+    information -- so a leaf whose line cannot be found keeps its parent's range
+    rather than being given a guessed one.
+    """
+    lines = request.content.decode("utf-8-sig").splitlines()
+    records: list[SymbolRecord] = []
+    for key in keys:
+        records.append(
+            _record(
+                request=request,
+                kind=SymbolKind.CONFIG_KEY,
+                name=key.name,
+                qualified_name=key.name,
+                container=", ".join(key.nested_paths),
+                start_line=key.start_line,
+                end_line=key.end_line,
+            )
         )
-        for key in keys
-    )
+        # Lines already claimed by a sibling path, so two leaves sharing a name
+        # inside one block cannot collapse onto the same citation.
+        claimed: set[int] = set()
+        for path in key.nested_paths:
+            leaf = path.rsplit(".", 1)[-1]
+            line = _leaf_line(lines, leaf, key.start_line, key.end_line, claimed)
+            if line is not None:
+                claimed.add(line)
+            records.append(
+                _record(
+                    request=request,
+                    kind=SymbolKind.CONFIG_KEY,
+                    name=leaf,
+                    qualified_name=path,
+                    container=key.name,
+                    start_line=line if line is not None else key.start_line,
+                    end_line=line if line is not None else key.end_line,
+                )
+            )
+    return tuple(records)
+
+
+def _leaf_line(
+    lines: Sequence[str],
+    leaf: str,
+    start_line: int,
+    end_line: int,
+    claimed: set[int],
+) -> int | None:
+    """The line inside a block where `leaf` is written as a key, if any."""
+    pattern = re.compile(rf'^\s*"?{re.escape(leaf)}"?\s*[:=]')
+    for offset in range(start_line, min(end_line, len(lines)) + 1):
+        if offset in claimed:
+            continue
+        if pattern.match(lines[offset - 1]):
+            return offset
+    return None
 
 
 def _record(
