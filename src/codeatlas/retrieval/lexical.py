@@ -109,6 +109,7 @@ class LexicalSearchService:
                     snapshot.snapshot_id, broadened, limit
                 )
                 relaxed = bool(hits)
+        hits = _exact_first(hits, request.query)
         elapsed = (time.perf_counter() - started) * 1000
         return self._from_chunk_hits(
             request, repository, snapshot, hits, elapsed, relaxed=relaxed
@@ -362,3 +363,31 @@ def _lexical_summary(query: str, count: int, noun: str) -> str:
     if count == 0:
         return f"CodeAtlas found no {noun} matching '{query}' in the active snapshot."
     return f"Found {count} {noun} matching '{query}' by text."
+
+
+def _exact_first(
+    hits: tuple[ChunkSearchHit, ...], query: str
+) -> tuple[ChunkSearchHit, ...]:
+    """Move a chunk whose name *is* the query to the front, order else intact.
+
+    Ranking was pure BM25, which scores by term density, so a short parent block
+    out-scored the leaf a caller asked for by name: `features.audit` returned
+    `features` first while `service.port` returned its leaf -- the difference
+    being only how many other lines the parent happened to contain. Asking for a
+    name by name is the least ambiguous signal a caller can send, and it should
+    not lose to a scoring accident.
+
+    Two bounds worth stating plainly. This reorders **within the window the
+    query already returned**: `limit` is applied by SQL, so an exact match
+    ranked below the cutoff never arrives here to be promoted, and this is not a
+    guarantee that an exact match always wins. And it is a *stable partition* --
+    every non-exact hit keeps its relative BM25 order, so a query with no exact
+    match is returned exactly as before.
+    """
+    wanted = query.strip()
+    if not wanted:
+        return hits
+    exact = [hit for hit in hits if hit.qualified_name == wanted]
+    if not exact:
+        return hits
+    return (*exact, *(hit for hit in hits if hit.qualified_name != wanted))

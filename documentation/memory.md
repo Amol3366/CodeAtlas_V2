@@ -606,6 +606,44 @@ development order is finished. A new phase requires an explicit user decision.
       lines added) because this record deliberately makes their "and nothing
       else" assertion false.
 
+- [x] Exact name match outranks a lexical one (ADR-0026), 2026-08-09: the
+      second defect ADR-0025 exposed, and the reason its 0.8750 prediction fell
+      short. `search_chunks` ordered by `bm25(chunk_search)` alone, and BM25
+      scores by term density — so the **two-line** `features:` block out-scored
+      the `features.audit` chunk, while the **three-line** `service:` block
+      diluted and lost to its leaf. **Whether a caller got the key they asked
+      for or its parent depended on how many other lines the parent happened to
+      contain.**
+
+      `_exact_first` promotes a chunk whose `qualified_name` *is* the query, in
+      `LexicalSearch` rather than the SQL — ranking policy belongs in retrieval,
+      FTS syntax stays in the store. Two bounds written into the code, not left
+      implicit: it reorders **only within the window the query already
+      returned** (`limit` is applied by SQL, so an exact match below the cutoff
+      never arrives — this is *not* a guarantee that exact always wins), and it
+      is a **stable partition**, so a query with no exact match returns exactly
+      as before. A test pins the latter; without it this would be a general
+      retrieval change wearing a bug fix's clothes.
+
+      **It breaks a documented invariant on purpose.** `search_text`'s docstring
+      says the relaxed-fallback design was chosen so "a query that finds results
+      today finds exactly the same results". Membership is preserved; *order* is
+      not. Called out rather than silently amended — that note exists to make a
+      future author think before reordering, which is what happened.
+
+      `lexical_resolution` 0.6250 → **0.8750** (7/8), MRR 0.9429 → 0.9714, ndcg
+      0.8840 → 0.9051, evidence rates **unchanged** — the correct signature for
+      a pure reorder. Across the whole lexical thread: **0.3000 → 0.3750 →
+      0.6250 → 0.8750**, one attributable cause per commit.
+
+      **The last failure is not an engine defect.** q019 expects `README.Health`
+      while extraction emits bare `Health`; q027/q031 expect a bare `Order flow`
+      and pass. The corpus uses **two naming conventions** for document
+      sections. Needs a ruling; expectations must not be edited to move a number
+      (ADR-0003). The `lexical_resolution` threshold should be set after that
+      ruling — on eight cases every value is a multiple of 0.125, so the current
+      0.90 means "8 of 8" and can express nothing else.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
