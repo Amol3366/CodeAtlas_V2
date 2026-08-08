@@ -207,6 +207,94 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T01:00:00Z — Every graph answer carries its relations structurally (ADR-0020)
+
+- Agent: Claude Code `claude-opus-5`, branch `relations-in-graph-answers`
+- Transition: no phase task. Post-gate, taking ADR-0019's deferred item after
+  `export-evidence-labelling` was merged to `main` (`fc46808`).
+- Outcome: the item was recorded as a harness-projection problem. Investigating
+  how to fix it showed **it could not be fixed in the harness, because the
+  product had no answer to project.** `Claim` carries `text` but no structured
+  subject or object; evidence cites a reference site, so its label names the
+  containing symbol — the answer for an inbound question, the *subject* for an
+  outbound one. For "what does this import" there was nowhere in the response to
+  read the answer from except English prose. The PRD names an MCP agent that
+  "needs facts it can act on rather than plausible prose" as one of three target
+  users, and that user was being handed prose.
+- Root cause: `RelationStep` already existed for exactly this (`source`, `kind`,
+  `target`, `derivation`, `confidence`, `evidence_id`, each independently
+  citable), and `BoundedGraphTraversal.expand` **already computed the paths for
+  every graph query**. `_respond` discarded them unless `include_paths=True`,
+  which only `trace` passed. The fix is to stop throwing away data already
+  computed.
+- Decision (user approved the product change over the narrower harness-only
+  option): populate `relation_paths` for every graph query; remove
+  `include_paths` rather than default it, since a flag whose only remaining
+  value is `True` is a decision nobody makes. Additive per ADR-0004 — the field
+  has existed since Phase 3 and a client ignoring it is unaffected.
+- Second finding, not previously recorded anywhere: **`relation_path_correctness`
+  has been 0.0000 in every baseline since Phase 3 and was structurally incapable
+  of anything else.** Ten of the twelve cases declaring `expected_relations`
+  received an empty list, and for the other two the harness rendered a path as
+  `" -> ".join(step.target …)` — targets only — against a corpus that writes
+  `"render CALLS total"`. Those strings can never be equal. It also has **no
+  entry in `_unmet_targets`**, so nothing gated it: six baselines carried a dead
+  number that twelve declared corpus expectations were feeding.
+- Measured, in two separately-recorded stages:
+
+  | Metric | Before | After product change | After harness change |
+  | --- | ---: | ---: | ---: |
+  | `exact_symbol_resolution` | 0.6923 | 0.6923 | 0.7436 |
+  | `mean_reciprocal_rank` | 0.7051 | 0.7051 | 0.7436 |
+  | `relation_path_correctness` | 0.0000 | 0.0000 | **0.2083** |
+  | `symbol_recall_at_10` | 0.6538 | 0.6538 | 0.6667 |
+  | `ndcg_at_10` | 0.6625 | 0.6625 | 0.6841 |
+  | change-side metrics | — | — | unchanged |
+
+  **The product change alone moved nothing**, and that is the correct ordering:
+  the response gained data the evaluation could not previously read, and only
+  then could the harness read it.
+- **0.2083 is not a good score and is not presented as one.** The residual is
+  largely a naming-convention difference — the corpus writes
+  `orders EXPORTS Order` and `service IMPORTS idempotency`, the engine emits
+  qualified names (`src.orders`, `src.payments.service`, `IdempotencyStore`).
+  **The corpus was not edited to close that** (ADR-0003). Whether to qualify the
+  corpus or compare unqualified suffixes is an open decision, and so is whether
+  the metric should get a gate target at all.
+- `TRACE_FLOW` is deliberately excluded from `GRAPH_ANSWER_END`: a flow answer
+  includes its origin (the corpus expects `PaymentService.capture` back when
+  tracing from it), a relation answer never does. Collapsing them would have
+  traded two newly-correct cases for several newly-broken ones.
+- Files: `src/codeatlas/application/graph_queries.py` (`include_paths` removed),
+  `src/codeatlas/evaluation/engine_adapter.py` (`GRAPH_ANSWER_END`,
+  `_ranked_symbols`, relation-string form),
+  `tests/integration/test_graph_queries.py` (two product tests),
+  `tests/evaluation/test_engine_adapter.py` (three harness tests),
+  `docs/adr/0020-relations-in-every-graph-answer.md` (new),
+  `docs/adr/README.md`, regenerated `baseline-phase-3` and `baseline-phase-4`,
+  `documentation/memory.md`.
+- Contracts/migrations: none. `contract_version` stays `1.1`, `SCHEMA_VERSION`
+  stays `14`. The change is additive on an existing optional field.
+- Test-first: the two product tests were written and observed failing
+  (2 failed, 17 passed) before `include_paths` was removed. The three harness
+  tests passed on first write because the behaviour was already in place, so
+  each was **mutation-checked** — forcing the `GRAPH_ANSWER_END` lookup to
+  `None` fails the outbound test, adding `TRACE_FLOW` to the table fails the
+  trace test, and restoring the target-join fails the relation-form test. All
+  pass again with the source restored.
+- Verification: `uv run ruff check src tests` clean; `mypy --no-incremental src`
+  clean on 144 files; full `uv run pytest -q` **2088 passed, 3 skipped**;
+  `check_phase4.ps1 -SkipSync` exit **0** (mypy 337 files, dataset valid,
+  Phase 0/3/4 baselines reproduce, ADR-0016 invariants pass).
+- Limitations: target still unmet, **0.7436 against 0.98**.
+- Next / open: (1) `relation_path_correctness` naming convention and whether it
+  gets a gate target — an owner decision, not an engine fix. (2) `related_tests`
+  still does not resolve a method subject to its class-level edge; do **not**
+  fix by moving the edge, which breaks ADR-0004's import-and-call rule. (3) The
+  Phase 7 semantic corpus targets remain unexamined and its harness
+  (`predict_conceptual`, `predict_changes`) has had none of the scrutiny
+  `predict_exact_symbols` has now received.
+
 ### 2026-08-08T23:00:00Z — Export evidence names the symbol its lines show (ADR-0019)
 
 - Agent: Claude Code `claude-opus-5`, branch `export-evidence-labelling`
