@@ -599,9 +599,16 @@ development order is finished. A new phase requires an explicit user decision.
       that finds results today finds exactly the same results", which promoting
       exact matches breaks on purpose.
 
-      Watch: every nested key is also a **chunk**, which is what makes leaves
-      findable, but `MAX_NESTED_KEY_PATHS` is 40 per top-level key — a large
-      config adds real index volume, unmeasured beyond the fixtures. Two
+      ~~Watch: index volume unmeasured beyond the fixtures.~~ **Measured
+      2026-08-09:** on this repository (11,420 chunks) nested config keys are
+      **689 chunks = 6.03% of the index**; `config_key` chunks went ~1.5% →
+      7.5%, a 5x rise *within* that category for ~6% overall growth. Per file
+      the multiplier is larger — `apps/web/package.json` 8 symbols → 50, and
+      this project's three config files 14 → 118 (8.4x). The bound holds: 200
+      nested keys yield 41 symbols, not 201. **Modest; no further capping
+      needed.** Boundary of that claim: this is a code-heavy project where
+      symbols and documents are 87% of chunks — a config-heavy repository
+      (Kubernetes, Helm) would invert the proportions and is unmeasured. Two
       chunking tests were updated (strict equality kept, nested entries and leaf
       lines added) because this record deliberately makes their "and nothing
       else" assertion false.

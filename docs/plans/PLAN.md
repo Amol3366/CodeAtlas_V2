@@ -285,9 +285,18 @@ Every handoff entry contains:
   5. **The packaged build under `dist/` dates from 2026-08-07** and is now two
      version bumps behind (`RESOLVER_VERSION`, `PARSER_BUNDLE_VERSION`). Worth a
      `scripts/build_package.ps1` run before any demo.
-- Also unmeasured, carried from ADR-0025: every nested configuration key is now
-  a chunk, and `MAX_NESTED_KEY_PATHS` is 40 per top-level key, so a large
-  configuration file adds index volume nobody has measured beyond the fixtures.
+- ~~Also unmeasured, carried from ADR-0025: index volume.~~ **Measured
+  2026-08-09**, and it is modest. On this repository (11,420 chunks) nested
+  configuration keys are **689 chunks — 6.03% of the index**. `config_key`
+  chunks rose from roughly 1.5% to 7.5% of the total: a 5x increase *within*
+  that category, ~6% growth overall. Per file the multiplier is larger —
+  `apps/web/package.json` 8 symbols → 50; this project's three config files 14
+  top-level keys → 118 symbols (8.4x). The `MAX_NESTED_KEY_PATHS` bound holds: a
+  block with 200 nested keys yields 41 symbols, not 201. No further capping is
+  warranted. **The boundary of that conclusion, stated because it matters: this
+  is a code-heavy Python/TypeScript project where symbols and documents are 87%
+  of chunks. A configuration-heavy repository — Kubernetes manifests, Helm
+  charts — would invert these proportions and has not been measured.**
 
 ### 2026-08-09T16:00:00Z — A nested configuration key is a symbol (ADR-0025)
 

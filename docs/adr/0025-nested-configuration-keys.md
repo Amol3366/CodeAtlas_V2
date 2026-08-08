@@ -112,8 +112,22 @@ were two.
 
 **Index volume.** Every nested key is now also a chunk, which is what makes
 leaves findable, but `MAX_NESTED_KEY_PATHS` is 40 per top-level key. A large
-configuration file therefore adds real volume. This has not been measured on
-anything larger than the fixtures.
+configuration file therefore adds real volume. This had not been measured on
+anything larger than the fixtures when this record was written.
+
+> **Measured 2026-08-09.** On this repository — 11,420 chunks — nested
+> configuration keys are **689 chunks, 6.03% of the index**. `config_key` chunks
+> rose from roughly 1.5% to 7.5% of the total, a 5x increase *within* that
+> category for ~6% growth overall. Per-file the multiplier is larger:
+> `apps/web/package.json` goes from 8 symbols to 50, and this project's three
+> config files from 14 top-level keys to 118 symbols (8.4x). The bound holds — a
+> block with 200 nested keys yields 41 symbols, not 201.
+>
+> The conclusion is that the cost is modest and needs no further capping. **The
+> boundary of that claim: this is a code-heavy Python/TypeScript project, where
+> symbols and documents are 87% of chunks. A configuration-heavy repository —
+> Kubernetes manifests, Helm charts — would invert these proportions and has not
+> been measured.**
 
 **Two chunking tests were updated**, not weakened.
 `test_json_top_level_keys_become_chunks` and
