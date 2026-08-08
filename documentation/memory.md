@@ -464,6 +464,60 @@ development order is finished. A new phase requires an explicit user decision.
       pass, because the corpora are disjoint — luck, not diligence. Run it when
       touching anything `predict_conceptual` reaches.
 
+- [x] Target profiles and metric scope (ADR-0023), 2026-08-09: the ruling that
+      had been open across four sessions. `_unmet_targets` applied **one target
+      table to every dataset**, so the 14-case conceptual corpus was held to a
+      0.98 top-1 rule written for exact symbol lookup, and two of the resulting
+      "unmet targets" were carried here as engine defects for months.
+
+      Three user rulings, all implemented:
+      1. **`exact_symbol_resolution` is scoped to symbol-shaped intents**
+         (`EXACT_SYMBOL` + graph) and a new **`lexical_resolution`** gates
+         `CONFIG_LOOKUP`/`DOCUMENT_LOOKUP`. The decomposition that justified it:
+         `EXACT_SYMBOL` 15/15 and every graph intent 12/12 are **perfect**; the
+         0.7692 aggregate came entirely from lexical lookups, where "did the
+         right *symbol* rank first" asks something other than what was posed.
+      2. **A dataset declares a `target_profile`** (`retrieval` default,
+         `conceptual` for `semantic_cases`). The conceptual profile drops top-1
+         and gates `symbol_recall_at_10`.
+      3. **The evidence gate reads `containing_evidence_rate`**, threshold
+         **still 1.0** — "all evidence must be valid" is unchanged, only what
+         *valid* means is corrected (ADR-0003). Inventing a lower number would
+         have been the quiet relaxation.
+
+      Main corpus: `exact_symbol_resolution` **1.0000 (met)**,
+      `lexical_resolution` **0.3000 (new gate, fails)**. Phase 7: four unmet
+      targets → **two** (`primary_evidence_recall_at_10` 0.6667,
+      `symbol_recall_at_10` 0.7857); `exact_symbol_resolution` reports **not
+      applicable** rather than scoring zero. Gate green: 2105 passed.
+
+      **The unmet count fell and that is not the point — no engine behaviour
+      changed here.** Scoping a metric until it reads 1.0000 is how a number
+      gets gamed, which is exactly why the lexical gate is not optional: it is
+      the condition that keeps the scoping honest, and it fails today.
+
+      The intent vocabulary now lives once, in `dataset.py`, with
+      `engine_adapter` importing it and a test asserting
+      `GRAPH_INTENTS ⊆ SYMBOL_INTENTS` — two definitions of one set is how the
+      `--format pr` defect happened.
+
+      `symbol_recall_at_10` was added to the Phase 7 uplift table because
+      `exact_symbol_resolution` now reads "not applicable" there. It carries the
+      same signal, **0.7143 → 0.7857 (+0.0714)** — the identical magnitude the
+      old row reported — so the Phase 7 admission record is unchanged in
+      substance.
+
+      One test was changed, deliberately and not to make a build pass: the
+      rerank A/B asserted every delta equalled `0.0`; a not-applicable metric
+      reports `None`, which is also "not moved". It now rejects any non-zero
+      delta **and** requires at least one metric to have been compared, so it
+      cannot pass vacuously.
+
+      Provisional: `lexical_resolution >= 0.90` is the one threshold not derived
+      from an existing decision — chosen to match the recall family, open to
+      revision. `containing_evidence_rate >= 1.0` may need to be argued down
+      with evidence rather than convenience.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.

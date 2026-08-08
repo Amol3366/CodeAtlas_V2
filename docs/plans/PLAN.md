@@ -207,6 +207,106 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T10:00:00Z — A corpus declares which instrument measures it (ADR-0023)
+
+- Agent: Claude Code `claude-opus-5`, branch `target-profiles`
+- Transition: no phase task. Post-gate. Closes the target-table ruling that had
+  been recorded as open since the `valid_evidence_rate` investigation.
+- Context: `_unmet_targets` applied **one target table to every dataset**. The
+  table was written for the 40-case mixed-intent Phase 0 corpus and applied
+  unchanged to the 14-case Phase 7 conceptual corpus, whose expected answers are
+  sometimes document headings. Two of the resulting "unmet targets" were carried
+  in `documentation/memory.md` for months and read as engine defects.
+- Evidence that shaped the ruling — decomposing `exact_symbol_resolution` on the
+  main corpus:
+
+  | Intent group | Top-1 | Rate |
+  | --- | --- | ---: |
+  | `EXACT_SYMBOL` | 15/15 | 1.0000 |
+  | Graph (`CALLERS`/`DEPENDENCIES`/`EXPORTS`/`RELATED_TESTS`/`TRACE_FLOW`) | 12/12 | 1.0000 |
+  | `CONFIG_LOOKUP` | 1/6 | 0.1667 |
+  | `DOCUMENT_LOOKUP` | 2/4 | 0.5000 |
+  | `CONCEPTUAL` / `POLICY` (force-abstained by the intent gate) | 0/2 | 0.0000 |
+
+  The engine is perfect on every symbol-shaped question; the aggregate was
+  produced entirely by lexical lookups, where "did the right *symbol* rank
+  first" asks something other than what was posed.
+- Three user rulings, all implemented:
+  1. **`exact_symbol_resolution` scoped to symbol-shaped intents**, with a new
+     **`lexical_resolution`** gating `CONFIG_LOOKUP`/`DOCUMENT_LOOKUP`. Scoping
+     a metric until it reads 1.0000 is how a number gets gamed, so the lexical
+     gate is **not optional** — it is the condition that keeps the scoping
+     honest, and it **fails today at 0.3000 against 0.90**.
+  2. **A dataset declares a `target_profile`** — `retrieval` by default so every
+     existing manifest stays valid, `conceptual` for `semantic_cases`. The
+     conceptual profile drops top-1 and gates `symbol_recall_at_10`.
+  3. **The evidence gate reads `containing_evidence_rate`, threshold still
+     1.0.** "All evidence must be valid" is unchanged as a demand; only the
+     definition of *valid* is corrected per ADR-0003. Inventing a lower number
+     would have been the quiet relaxation.
+- Measured:
+
+  | Corpus / metric | Before | After |
+  | --- | ---: | ---: |
+  | main `exact_symbol_resolution` | 0.7692 / 0.98 unmet | **1.0000 / 0.98 met** |
+  | main `lexical_resolution` | — | **0.3000 / 0.90 unmet (new)** |
+  | main evidence gate | `valid_evidence_rate` 0.6316 / 1.0 | `containing_evidence_rate` 0.6974 / 1.0 |
+  | Phase 7 unmet targets | 4 | **2** |
+
+  Phase 7's remaining two are `primary_evidence_recall_at_10` (0.6667) and
+  `symbol_recall_at_10` (0.7857); `exact_symbol_resolution` reports **not
+  applicable** rather than scoring zero.
+
+  **The unmet count fell and that is not the point.** No engine behaviour
+  changed in this entry. Three numbers stopped being measured by instruments
+  built for a different question, and one new gate was added that fails.
+- One-definition rule: the intent vocabulary now lives in `dataset.py` with the
+  corpus contract, `engine_adapter` imports it, and a test asserts
+  `GRAPH_INTENTS ⊆ SYMBOL_INTENTS` and that `SUPPORTED_INTENTS` is exactly the
+  union. Two definitions of one set is how the `--format pr` defect happened.
+- Semantic uplift record preserved: `exact_symbol_resolution` now reads "not
+  applicable" in the Phase 7 comparison, so `symbol_recall_at_10` was added
+  beside it — **0.7143 → 0.7857, +0.0714**, the identical uplift magnitude the
+  old row reported. The admission record is unchanged in substance.
+- A test was changed, deliberately: the rerank A/B asserted every delta equalled
+  `0.0`, and a not-applicable metric reports `None`, which is also "not moved".
+  It now rejects any non-zero delta **and** requires at least one metric to have
+  actually been compared, so it cannot pass vacuously if everything became
+  inapplicable. This is a contract change forcing a test update, not a test
+  weakened to make a build pass.
+- Contract shape: `AggregateMetrics` gains `lexical_resolution`, defaulted to
+  `None` so an artifact written before this record still loads. Dataset contract
+  stays `1.0`; `contract_version` `1.1`; `SCHEMA_VERSION` `14`.
+- Baselines regenerated (report shape changed): `baseline-phase-0` (null),
+  `-3`, `-4`, `-7`. **`baseline-phase-1` and `-2` deliberately untouched** —
+  frozen history whose gate scripts are marked SUPERSEDED.
+- Files: `src/codeatlas/evaluation/dataset.py`,
+  `src/codeatlas/evaluation/runner.py`,
+  `src/codeatlas/evaluation/engine_adapter.py`,
+  `scripts/run_phase7_baseline.py`, `tests/evaluation/test_runner.py`,
+  `tests/evaluation/test_engine_adapter.py`,
+  `tests/evaluation/test_rerank_admission.py`,
+  `tests/evaluation/semantic_cases/dataset.json` (profile declaration only),
+  `docs/adr/0023-target-profiles.md` (new), `docs/adr/README.md`,
+  four regenerated baselines, `documentation/memory.md`.
+- Corpus: no case, expectation, question, symbol, or range changed. The only
+  corpus-directory edit is one added manifest line declaring the profile.
+- Verification: `ruff` clean on `src tests scripts`; `mypy --no-incremental src`
+  clean on 144 files; full `uv run pytest -q` **2105 passed, 3 skipped**; all
+  five tracked artifacts reproduce byte-for-byte (`baseline-phase-0`, `-3`,
+  `-4`, `-7`, ADR-0016 invariants); `check_phase4.ps1 -SkipSync` exit 0.
+- Limitations / open: **`lexical_resolution >= 0.90` is provisional** — the one
+  threshold not derived from an existing decision, chosen to match the recall
+  family rather than for the number it produces. Whether
+  `containing_evidence_rate >= 1.0` is reachable, or should be argued down with
+  evidence rather than convenience, is also open. Both are thresholds; neither
+  changes what is measured.
+- Next / open: (1) the two provisional thresholds above. (2)
+  `relation_path_correctness` naming convention and gate target. (3) The s003
+  lexical weakness (`OrderRepository.for_customer` matched on "customer") — now
+  gated by `lexical_resolution`, so it has a number attached. (4) Whether a
+  constructor call should record a `TESTS` edge to `__init__`.
+
 ### 2026-08-09T07:00:00Z — Phase 7 harness audit; a tracked baseline encoded working-tree drift (ADR-0022)
 
 - Agent: Claude Code `claude-opus-5`, branch `corpus-line-endings`

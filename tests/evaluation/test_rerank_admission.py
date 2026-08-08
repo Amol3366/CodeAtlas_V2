@@ -28,9 +28,14 @@ def test_rerank_ab_records_a_decline_against_the_semantic_baseline(
     assert exit_code == 0
     payload = json.loads(json_output.read_text(encoding="utf-8"))
     assert payload["admission"]["decision"] == "declined"
-    assert {
-        entry["delta"] for entry in payload["comparison"].values()
-    } == {0.0}
+    # The claim is "reranking moved nothing". A metric that does not apply to
+    # this corpus reports a `None` delta (ADR-0023: top-1 is not measured on a
+    # conceptual corpus), which is also "not moved" — but accepting `None`
+    # alone would let the assertion pass vacuously if every metric became
+    # inapplicable, so at least one must have actually been compared.
+    deltas = [entry["delta"] for entry in payload["comparison"].values()]
+    assert any(delta == 0.0 for delta in deltas), "nothing was compared"
+    assert not [delta for delta in deltas if delta not in (0.0, None)]
     assert "Admission decision: `declined`" in markdown_output.read_text(
         encoding="utf-8"
     )

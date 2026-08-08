@@ -6,9 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from codeatlas.evaluation.dataset import load_dataset
+from codeatlas.evaluation.dataset import LEXICAL_INTENTS, SYMBOL_INTENTS, load_dataset
 from codeatlas.evaluation.engine_adapter import (
+    GRAPH_INTENTS,
     SUPPORTED_FIXTURES,
+    SUPPORTED_INTENT,
     SUPPORTED_INTENTS,
     _query_term,
     predict_exact_symbols,
@@ -207,3 +209,17 @@ def test_predictions_declare_the_implementation_status(
 ) -> None:
     assert predictions.implementation_status == "implemented"
     assert predictions.change_predictions == []
+
+
+def test_the_adapter_and_the_corpus_agree_on_which_intents_are_which() -> None:
+    """Two definitions of the same set is how the `--format pr` defect happened.
+
+    `GRAPH_INTENTS` maps an intent to a service method, which is the adapter's
+    own concern. Which intents are *symbol-shaped* is the corpus's, and the
+    metric scoring them reads it from there. They must still describe the same
+    world.
+    """
+    assert set(GRAPH_INTENTS) <= SYMBOL_INTENTS
+    assert SUPPORTED_INTENT in SYMBOL_INTENTS
+    assert not (SYMBOL_INTENTS & LEXICAL_INTENTS)
+    assert set(SUPPORTED_INTENTS) == SYMBOL_INTENTS | LEXICAL_INTENTS
