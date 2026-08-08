@@ -235,7 +235,14 @@ def _query_term(case: QueryCase) -> str:
     Phase 1 has no natural-language intent classifier. Feeding the declared
     symbol measures resolution accuracy, which is what this phase built; it does
     not measure question understanding, which it did not.
+
+    A graph case may declare `query_subject`, because for a relation query the
+    subject is not in `expected_symbols` at all — those are the answer. Asking
+    "who calls `render`" when the case asks who calls `total` scores a correct
+    engine as wrong, which is what this field exists to stop.
     """
+    if case.query_subject is not None:
+        return case.query_subject
     if case.expected_symbols:
         return case.expected_symbols[0]
     return case.question

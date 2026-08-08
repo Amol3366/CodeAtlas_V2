@@ -207,6 +207,90 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-08T21:00:00Z — Graph cases declare their subject; ADR-0017's remaining-gap claim corrected (ADR-0018)
+
+- Agent: Claude Code `claude-opus-5`, branch `evaluation-fixture-gate-correction`
+- Transition: no phase task. Post-gate follow-on from the entry below, taken as
+  its declared "next / open" item.
+- Outcome: the item below was recorded as "TS/JS graph intents abstain — a
+  genuine capability question rather than a harness one". **That was wrong on
+  both counts.** `_query_term` fed `expected_symbols[0]` as the *subject* of a
+  graph query, but for a relation query `expected_symbols` is the **answer** and
+  the subject is not in it: "Who calls `total`?" expects `render` and is about
+  `total`, so the harness asked who calls `render` — a different question — and
+  scored the engine's correct answer to it as a miss. Three of the six affected
+  cases are Python (q005, q007, q010); the language split was coincidence. The
+  engine answers `callers`, `dependencies`, `exports`, and `related_tests` on
+  these fixtures when asked about the right subject, proven by probing
+  `GraphQueryService` directly.
+- Decision (user approved both): `QueryCase` gains an optional `query_subject`
+  — absent means `expected_symbols[0]`, so all 40 existing cases stay valid
+  unchanged — and the module-symbol ranking question is deferred to its own
+  slice rather than bundled into a measurement correction.
+- Corpus: six cases declare the field (q005, q007, q010, q015, q016, q017).
+  Additive only: no expectation re-labelled, no case reworded, no symbol added
+  to or removed from an expected set. ADR-0003 holds. Inserted textually to
+  preserve the file's existing formatting — a six-line diff rather than a
+  whole-file reformat.
+- **The declared subject is the one the question asks, not the one the engine
+  answers.** q007 asks "Which test covers capture?", so its subject is
+  `PaymentService.capture` even though only `PaymentService` returns evidence.
+  Declaring the class would have made the case pass by tuning the corpus to
+  current behaviour — precisely what ADR-0003 forbids — so **q007 still fails**,
+  now as a precise finding rather than a shrug.
+- Measured effect:
+
+  | Metric | ADR-0017 | ADR-0018 | Δ |
+  | --- | ---: | ---: | ---: |
+  | `exact_symbol_resolution` | 0.6154 | 0.6667 | +0.0513 |
+  | `primary_evidence_recall_at_10` | 0.6508 | 0.6984 | +0.0476 |
+  | `valid_evidence_rate` / `exact_evidence_rate` | 0.6618 | 0.6400 | **−0.0218** |
+  | `containing_evidence_rate` | 0.7353 | 0.7067 | **−0.0286** |
+  | change-side metrics | — | — | 0.0000 |
+
+  **Recall rose and evidence-span precision fell for the same reason** — the
+  correct subject returns more evidence (the supporting edges), and per ADR-0003
+  a call-site line rarely equals a gold definition range, so the extra items
+  enlarge the denominator without matching spans exactly. Quoting either
+  movement without the other misrepresents the change.
+- Files: `src/codeatlas/evaluation/dataset.py` (optional field),
+  `src/codeatlas/evaluation/engine_adapter.py` (`_query_term`),
+  `tests/evaluation/cases/queries.json` (six declarations),
+  `tests/evaluation/test_engine_adapter.py` (three guards),
+  `docs/adr/0018-graph-query-subject.md` (new), `docs/adr/README.md`,
+  `docs/adr/0017-…md` (a "Corrected by" pointer in the header only — the body is
+  left as written, since rewriting an accepted record is not a correction),
+  regenerated `baseline-phase-3` and `baseline-phase-4`,
+  `docs/evaluation/phase-4-baseline-environment.md`, `documentation/memory.md`.
+- Contracts/migrations: none. Dataset `contract_version` stays `1.0` (the field
+  is optional and additive), `contract_version` `1.1`, `SCHEMA_VERSION` `14`.
+- Test-first: three guards written and observed failing (3 failed, 10 passed)
+  before the model field existed, then passing (13 passed).
+- Verification: `powershell -ExecutionPolicy Bypass -File scripts/check_phase4.ps1 -SkipSync`
+  exited **0** — 2084 passed, 3 skipped; ruff clean; mypy clean on 337 files;
+  dataset valid (6/40/24); Phase 0, Phase 3, Phase 4 baselines reproduce;
+  ADR-0016 invariants pass.
+- Limitations: **target still unmet, 0.6667 against 0.98.** The Phase 7 semantic
+  corpus is untouched — `predict_conceptual` has no fixture gate and no graph
+  intents.
+- Next / open, both deliberately deferred so this baseline stays attributable:
+  1. **Module-scoped graph queries rank the module's own symbol first.**
+     `dependencies(module)` / `exports(module)` return `src.client`,
+     `src.orders`, `src.payments.service` at rank 1 ahead of the relations
+     asked for; q015's rank-2 *is* the expected `total`, and q017 returns
+     `src.orders` twice where `Order` and `total` belong. A
+     `GraphQueryService` contract question. Largest remaining identified
+     contributor to the gap.
+  2. **`related_tests` does not resolve a method subject to its class-level
+     edge.** Do not fix by moving the edge — that breaks ADR-0004's
+     import-and-call rule.
+- Process note: three consecutive investigations have now found the measuring
+  apparatus at fault rather than the engine (`exact_symbol_resolution`,
+  `valid_evidence_rate`, this one). The harness has had materially less scrutiny
+  than the code it measures. Probe the service directly before calling anything
+  an engine gap — the claim corrected here was written from run output without
+  doing so.
+
 ### 2026-08-08T19:30:00Z — The evaluation fixture gate was stale; two live baselines regenerated (ADR-0017)
 
 - Agent: Claude Code `claude-opus-5`, branch `main`

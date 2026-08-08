@@ -124,3 +124,29 @@ accounting rather than behavior.
 
 Full rationale, including why `baseline-phase-1` and `baseline-phase-2` were
 deliberately **not** regenerated, is in `docs/adr/0017-evaluation-fixture-gate-correction.md`.
+
+## Correction, 2026-08-08 (second) — graph cases now declare their subject (ADR-0018)
+
+The correction above was incomplete. `_query_term` also fed
+`expected_symbols[0]` to the engine as the *subject* of a graph query, but for a
+relation query `expected_symbols` is the answer and the subject is not in it.
+Six cases now declare `query_subject`.
+
+| Metric | ADR-0017 | ADR-0018 |
+| --- | ---: | ---: |
+| Exact symbol resolution | 0.6154 | 0.6667 |
+| Primary evidence Recall@10 | 0.6508 | 0.6984 |
+| Valid / exact evidence rate | 0.6618 | 0.6400 |
+| Containing evidence rate | 0.7353 | 0.7067 |
+
+**Recall rose and evidence-span precision fell, for the same reason.** Asking
+the correct subject returns more evidence — the supporting relation edges — and
+per ADR-0003 a call-site line rarely equals a gold range describing a
+definition, so the additional items enlarge the denominator without matching
+spans exactly. Any claim quoting one of these two movements must quote the
+other.
+
+Change-side metrics are again unchanged, so the Phase 4 gate approval remains
+unaffected. ADR-0018 also records the two findings this exposed and deliberately
+did not fix: module-scoped graph queries ranking the module's own symbol first,
+and `related_tests` not resolving a method subject to its class-level edge.

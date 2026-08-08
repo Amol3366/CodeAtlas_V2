@@ -5,6 +5,11 @@
 - Decision owners: user (chose to regenerate the tracked baselines), implementing agent (record)
 - Supersedes: none
 - Extends: ADR-0003 (evidence granularity and the "do not edit the corpus" rule)
+- **Corrected by: ADR-0018.** The consequences section below calls the remaining
+  gap a TypeScript/JavaScript capability question. That is wrong on both counts —
+  three of the six affected cases are Python, and the engine answers all of them
+  when asked about the right subject. The body is left as written; ADR-0018
+  carries the correction.
 
 ## Context
 

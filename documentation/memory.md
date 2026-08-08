@@ -273,6 +273,40 @@ development order is finished. A new phase requires an explicit user decision.
       one gate tracked the engine and its neighbour did not, while both fed the
       same scoring path.
 
+- [x] Graph cases declare their subject (ADR-0018), 2026-08-08: follow-on from
+      ADR-0017, and it **corrects a claim ADR-0017 made.** `_query_term` fed
+      `expected_symbols[0]` as the thing being asked about, but for a graph
+      query `expected_symbols` is the *answer* and the subject is not in it —
+      "Who calls `total`?" expects `render` and is about `total`, so the harness
+      asked who calls `render` and scored the correct answer to that different
+      question as a miss. `QueryCase` gained an optional `query_subject`
+      (absent = `expected_symbols[0]`, so all 40 cases stayed valid); six cases
+      declare it. `exact_symbol_resolution` 0.6154 → 0.6667, Recall@10
+      0.6508 → 0.6984. Gate green: 2084 passed, 3 skipped, exit 0.
+
+      **Evidence precision fell while recall rose** — exact/valid
+      0.6618 → 0.6400, containing 0.7353 → 0.7067 — because the correct subject
+      returns more evidence (the supporting edges) and per ADR-0003 a call-site
+      line rarely equals a gold definition range. Quoting either number alone
+      misrepresents the change.
+
+      **ADR-0017 was wrong** to call the remainder a TypeScript capability gap:
+      three of the six affected cases are Python, and the engine answers all of
+      them when asked properly. ADR-0017's body is left as written with a
+      pointer to ADR-0018, which carries the correction.
+
+      **q007 deliberately still fails.** Its honest subject is
+      `PaymentService.capture`; declaring `PaymentService` instead would have
+      made it pass by tuning the corpus to current engine behaviour, which is
+      what ADR-0003 forbids. It is now a precise finding instead of a shrug.
+
+      **Three consecutive investigations have found the measuring apparatus at
+      fault rather than the engine** (`exact_symbol_resolution`,
+      `valid_evidence_rate`, this). The harness has had far less scrutiny than
+      the code it measures, and it is the only thing between a reader and a
+      false account of the product. Probe the service directly before calling
+      anything an engine gap.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -568,12 +602,27 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
    because the fixture gate had been discarding 16 of 39 cases. Still short of
    0.98.
 
-   **The real engine gap the harness was hiding: TS/JS graph intents abstain.**
-   `q015` `DEPENDENCIES`, `q016` `CALLERS`, `q017` `EXPORTS` — all on
-   `tsjs_app` — return `<abstained>` while TS/JS *symbol* resolution works.
-   That is now the largest identified contributor to the remaining main-corpus
-   gap and is a genuine capability question. Deliberately not fixed inside
-   ADR-0017, so the moved baseline stays attributable to one cause.
+   ~~**The real engine gap the harness was hiding: TS/JS graph intents
+   abstain.**~~ **Wrong — corrected 2026-08-08 by ADR-0018.** Not TS/JS-specific
+   (three of six affected cases are Python: q005, q007, q010) and not a
+   capability gap (the engine answers all of them when asked about the right
+   subject). Main-corpus `exact_symbol_resolution` is now **0.6667**.
+
+   Two real findings survive from that investigation, both deferred on purpose
+   so a measurement correction stays attributable:
+
+   - **Module-scoped graph queries rank the module's own symbol first.**
+     `dependencies(module)` / `exports(module)` return `src.client`,
+     `src.orders`, `src.payments.service` at rank 1, ahead of what they depend
+     on or export; q015's rank-2 *is* the expected `total`, and q017 returns
+     `src.orders` twice where `Order` and `total` should be. A
+     `GraphQueryService` contract question, not an evaluation one — and the
+     largest remaining identified contributor.
+   - **`related_tests` does not resolve a method subject to its class-level
+     edge.** The `TESTS` edge sits on `PaymentService` because the test imports
+     the class and calls the method on an instance (correct per ADR-0004), so
+     `related_tests("PaymentService.capture")` returns nothing. Do **not** fix
+     by moving the edge; that breaks ADR-0004's import-and-call rule.
 
    **Read every number here against the corpus size: 14 query cases and 1 change
    case.** `changed_symbol_precision = 0.20` is computed from that single change

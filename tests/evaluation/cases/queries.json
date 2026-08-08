@@ -140,6 +140,7 @@
                       "question":  "What calls IdempotencyStore.claim?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "query_subject":  "IdempotencyStore.claim",
                       "expected_symbols":  [
                                                "PaymentService.capture",
                                                "IdempotencyStore.claim"
@@ -207,6 +208,7 @@
                       "question":  "Which test covers capture?",
                       "intent":  "RELATED_TESTS",
                       "expected_abstention":  false,
+                      "query_subject":  "PaymentService.capture",
                       "expected_symbols":  [
                                                "test_capture_uses_idempotency_store"
                                            ],
@@ -306,6 +308,7 @@
                       "question":  "What dependency does service import?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "query_subject":  "service",
                       "expected_symbols":  [
                                                "PaymentService",
                                                "IdempotencyStore"
@@ -473,6 +476,7 @@
                       "question":  "What does client import?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "query_subject":  "client",
                       "expected_symbols":  [
                                                "render",
                                                "total"
@@ -507,6 +511,7 @@
                       "question":  "Who calls total?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "query_subject":  "total",
                       "expected_symbols":  [
                                                "render",
                                                "total"
@@ -541,6 +546,7 @@
                       "question":  "What is exported from orders?",
                       "intent":  "EXPORTS",
                       "expected_abstention":  false,
+                      "query_subject":  "orders",
                       "expected_symbols":  [
                                                "Order",
                                                "total"
