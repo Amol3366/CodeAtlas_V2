@@ -160,6 +160,10 @@ def test_reranking_is_bounded_and_uses_one_structured_call(
 
     assert len(reranker.calls) == 1
     assert len(reranker.calls[0].candidates) == 2
+    # The base response matches nothing, so every evidence item here is a
+    # semantic addition and rank fusion (ADR-0028) has one channel to order.
+    # The reranker's inversion therefore survives into the final order, which
+    # is what this asserts: the bound and the single call, not fusion's rule.
     assert [item.evidence_id for item in response.evidence[:2]] == list(
         reversed([candidate.candidate_id for candidate in reranker.calls[0].candidates])
     )
@@ -190,11 +194,31 @@ def test_reranking_does_not_move_deterministic_evidence(
     )
     assert base.evidence
 
+    # Compared against the same call *without* a reranker rather than against
+    # the base response. Since ADR-0028 rank fusion reorders the whole evidence
+    # list, so asserting the deterministic prefix survives unchanged would now
+    # be testing fusion, not reranking, and would fail for a reason this test
+    # is not about. Holding fusion constant isolates the reranker, which is
+    # what the name claims and what actually needs guarding: the reranker sees
+    # only semantic additions and must never touch a deterministic item.
+    without = _fusion(fixture, reranker=None).augment(
+        base, question="where should I look first?"
+    )
     response = _fusion(fixture, reranker=RecordingReranker()).augment(
         base, question="where should I look first?"
     )
 
-    assert response.evidence[: len(base.evidence)] == base.evidence
+    deterministic_ids = {item.evidence_id for item in base.evidence}
+
+    def positions(result: QueryResponse) -> dict[str, int]:
+        return {
+            item.evidence_id: index
+            for index, item in enumerate(result.evidence)
+            if item.evidence_id in deterministic_ids
+        }
+
+    assert positions(response) == positions(without)
+    assert len(positions(response)) == len(base.evidence)
     assert response.answer.claims[: len(base.answer.claims)] == base.answer.claims
 
 

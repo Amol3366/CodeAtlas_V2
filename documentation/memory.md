@@ -725,7 +725,51 @@ development order is finished. A new phase requires an explicit user decision.
       guard test is what keeps containment from drifting into overlap, which
       would reward a citation that omits part of the answer.
 
+- [x] Both retrieval channels fused by rank (ADR-0028), 2026-08-09: the task was
+      "fix s007" and **retrieval was not what failed**. The semantic channel
+      already ranked `OrderService.cancel` **8th**; fusion put it 16th, because
+      `augment` appended candidates after every deterministic item and dropped
+      any the deterministic half had already cited. A chunk both channels found
+      kept its lexical position and gained nothing — the code's own comment said
+      "the two channels finding the same chunk is the point of fusing them" and
+      then discarded exactly that.
+
+      **Two separately-recorded engine defects were one fusion defect.** s003's
+      ranking weakness — ADR-0022's "one genuine engine weakness", blamed on
+      lexical matching of the word "customer" — was the same cause: semantic
+      ranked `shipping_for` **1st**, fusion buried it at 5th.
+
+      Fixed with reciprocal-rank fusion (`application/rank_fusion.py`), ranks
+      only and never scores, because a BM25 score and a cosine distance are not
+      comparable quantities. Recall@10 0.9333 → **1.0000**, MRR 0.4429 →
+      **0.6875**, nDCG 0.5271 → **0.7292**, symbol recall 0.7857 → 0.8571, and
+      **the evidence rates did not move** — the signature of a pure reorder.
+
+      Three things worth remembering. **A documented invariant was overturned on
+      purpose**: a test asserted the deterministic prefix survived byte-for-byte
+      because reordering it would be the semantic layer "deciding relevance,
+      which is the authority it does not have". Order is not authority, and
+      §4.3 forbids promoting a *derivation*, which fusion never touches — the
+      test now asserts that instead, and its docstring records that it used to
+      say the opposite. **My first implementation built the channel order before
+      reranking**, so fusion re-sorted the reranked items back and threw the
+      reranker's whole output away — the same "computed, then not surfaced"
+      shape as ADR-0019/0020/0025, caught by a test. And **RRF rewards coarse
+      chunks**: a whole-file chunk matches most queries, appears in both
+      channels, and gets credit for being unspecific. No granularity penalty was
+      added — that is a tuning knob needing its own evidence — but it will
+      resurface.
+
 ## In Progress
+
+~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
+ADR-0028; it enters the top 10 at rank 8. The remaining Phase 7 miss is
+`symbol_recall_at_10` 0.8571 against 0.90, whose residue is s013 and s001.
+**Neither channel retrieves `OrderStatus` directly** — both reach it only
+through the containing `models.py` chunk, which is a chunking or extraction
+question about enums and is open rather than folded into ADR-0028.
+
+Original entry, for the record:
 
 **s007 — a genuine conceptual retrieval miss.** `OrderService.cancel` is absent
 from the top 10 for "What happens to held stock if somebody changes their
