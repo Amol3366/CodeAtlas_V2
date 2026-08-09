@@ -3407,6 +3407,7 @@
               "enum": [
                 "json",
                 "markdown",
+                "pr",
                 "sarif"
               ],
               "title": "Report Format",

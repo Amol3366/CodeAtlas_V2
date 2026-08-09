@@ -10,6 +10,7 @@
     "changed_symbol_precision": 0.0,
     "changed_symbol_recall": 0.0,
     "containing_evidence_rate": null,
+    "containing_evidence_recall_at_10": 0.0,
     "direct_impact_recall": 0.0,
     "exact_evidence_rate": null,
     "exact_symbol_resolution": 0.0,
@@ -29,7 +30,7 @@
     "changed_symbol_precision",
     "changed_symbol_recall",
     "direct_impact_recall",
-    "primary_evidence_recall_at_10",
+    "containing_evidence_recall_at_10",
     "exact_symbol_resolution",
     "lexical_resolution"
   ]

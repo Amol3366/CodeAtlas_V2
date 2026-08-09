@@ -684,9 +684,56 @@ development order is finished. A new phase requires an explicit user decision.
       **A planned re-index was investigated and abandoned** — see Known Issues
       for the reason, which is the useful part of this entry.
 
+- [x] Evidence recall measured by containment (ADR-0027), 2026-08-09: the task
+      was "fix the s003 recall gap" and **the premise was wrong** — s003 already
+      scores evidence recall 1.0 and contributes nothing to Recall@10. ADR-0022
+      recorded s003 as a *ranking* weakness (finding 3) and Recall@10 as a
+      separate missed target; a later summary welded them together.
+
+      Investigating per-case found the real distribution.
+      `primary_evidence_recall_at_10` compares `snapshot:path:start:end` for
+      **exact equality**, so four of Phase 7's five misses return the right
+      evidence and score zero: s001 and s012 at **rank 1**, s008 at rank 2,
+      s013 at rank 4. s012 expects `runbook.md:3-6` and gets `3-7`. Only
+      **s007** is a genuine retrieval miss.
+
+      ADR-0003 had already ruled containment the right granularity and written
+      `_contains`; ADR-0023 moved the evidence *gate* to it and left the recall
+      metric behind — the same one-surface-missed shape as ADR-0017's
+      `SUPPORTED_FIXTURES`. Fixed by adding
+      `containing_evidence_recall_at_10` and gating on it at the unchanged 0.90,
+      **retaining** the exact-match number so none of six baselines changes
+      meaning (ADR-0003's own precedent with `valid_evidence_rate`).
+
+      Phase 7: 0.6000 → **0.8667** deterministic, 0.6667 → **0.9333** semantic.
+      **Condition 7 passes**, and the deterministic side does not — the semantic
+      layer carries the last 0.0667. Phase 3 (0.4068) and Phase 4 (0.8136) rise
+      and still miss, which is the signature of a corrected definition rather
+      than a loosened one.
+
+      **No engine behaviour changed and this must never be cited as uplift.**
+      Nothing outside `evaluation/` was touched.
+
+      Two things worth remembering. **Running `check_phase7.ps1` found its
+      rerank artifact stale for three ADRs** — still carrying the CRLF-era
+      `changed_symbol_precision` 0.2 that ADR-0022 fixed in its sibling, plus
+      ADR-0023's shape changes. Proven pre-existing by regenerating on a
+      stashed tree, and committed separately so it stayed attributable;
+      `baseline-phase-7` reproduced fine, so the staleness was specific. That is
+      ADR-0022's finding 5 recurring: **`check_phase7` gates more than
+      `check_phase4` and is the one that goes unrun.** And the "clipping"
+      guard test is what keeps containment from drifting into overlap, which
+      would reward a citation that omits part of the answer.
+
 ## In Progress
 
-**Nothing.** Verified 2026-08-07 rather than assumed.
+**s007 — a genuine conceptual retrieval miss.** `OrderService.cancel` is absent
+from the top 10 for "What happens to held stock if somebody changes their
+mind?". Deliberately left as its own slice by the user's ruling so the
+measurement correction and the retrieval fix stay attributable. Worth 0.0667 on
+`containing_evidence_recall_at_10`.
+
+~~**Nothing.** Verified 2026-08-07 rather than assumed.~~
 
 ~~**Ephemeral session mode** awaiting approval of the `AGENTS.md` §8.2
 amendment.~~ **Closed 2026-08-07.** The amendment is present in §8.2, ADR-0013

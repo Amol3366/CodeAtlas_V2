@@ -10,6 +10,11 @@
       "deterministic": 0.12781954887218044,
       "semantic": 0.107981220657277
     },
+    "containing_evidence_recall_at_10": {
+      "delta": 0.06666666666666665,
+      "deterministic": 0.8666666666666667,
+      "semantic": 0.9333333333333333
+    },
     "exact_evidence_rate": {
       "delta": -0.01884994175579794,
       "deterministic": 0.07518796992481203,
@@ -53,6 +58,7 @@
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
       "containing_evidence_rate": 0.12781954887218044,
+      "containing_evidence_recall_at_10": 0.8666666666666667,
       "direct_impact_recall": 1.0,
       "exact_evidence_rate": 0.07518796992481203,
       "exact_symbol_resolution": null,
@@ -69,7 +75,7 @@
     },
     "targets_met": false,
     "unmet_targets": [
-      "primary_evidence_recall_at_10",
+      "containing_evidence_recall_at_10",
       "symbol_recall_at_10"
     ]
   },
@@ -85,6 +91,7 @@
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
       "containing_evidence_rate": 0.107981220657277,
+      "containing_evidence_recall_at_10": 0.9333333333333333,
       "direct_impact_recall": 1.0,
       "exact_evidence_rate": 0.056338028169014086,
       "exact_symbol_resolution": null,
@@ -101,7 +108,6 @@
     },
     "targets_met": false,
     "unmet_targets": [
-      "primary_evidence_recall_at_10",
       "symbol_recall_at_10"
     ]
   }

@@ -207,6 +207,121 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T23:45:00Z — Evidence recall is measured by containment (ADR-0027)
+
+- Agent: Claude Code `claude-opus-5`, branch `containing-evidence-recall`
+- Transition: no phase task. Post-gate. Requested as "fix the s003 recall gap".
+- **The premise was wrong, and finding that out is the entry.** s003 already
+  scores evidence recall **1.0** — its expected evidence is inside the top 10 —
+  so it contributes nothing to Recall@10. ADR-0022 recorded s003 as finding 3, a
+  *ranking* weakness (`OrderRepository.for_customer` winning on the word
+  "customer"), and Recall@10 as a separate missed target. A later summary in
+  this session welded the two into one item and handed the user a task that
+  could not have worked. Fixing s003 moves MRR and top-1, not recall.
+- Root cause of the actual gap: `primary_evidence_recall_at_10` compares
+  `snapshot:path:start:end` for **exact string equality**. Per-case on Phase 7:
+
+  | Case | Expected | Result |
+  | --- | --- | --- |
+  | s001 | `inventory.py:20-28` | contained at **rank 1** |
+  | s012 | `runbook.md:3-6` | returned `3-7` at **rank 1** |
+  | s008 | `architecture.md:14-18` | returned `14-19` at rank 2 |
+  | s013 | `models.py:6-12` | contained at rank 4 |
+  | s007 | `service.py:56-69` | genuinely absent |
+
+  Four of five return the right evidence and score zero. **One** is retrieval.
+- ADR-0003 had already ruled containment correct and written `_contains`;
+  ADR-0023 moved the evidence *gate* onto it and left the recall metric behind.
+  `primary_evidence_recall_at_10` sits beside `_containing_count` and does not
+  use it — the ADR-0017 `SUPPORTED_FIXTURES`/`SUPPORTED_INTENTS` shape again.
+- Decision (user ruling, taken before any code was written): correct the metric
+  and address s007 separately, so the two causes stay attributable. Implemented
+  as **add `containing_evidence_recall_at_10`, gate on it at the unchanged
+  0.90, retain `primary_evidence_recall_at_10` unchanged** — ADR-0003's own
+  precedent when `containing_evidence_rate` joined `valid_evidence_rate`, so
+  none of six baselines changes meaning.
+- One predicate, one arithmetic: `_containment_keys` re-keys each prediction by
+  the expected range it contains and feeds the existing `ranked_metrics` and
+  `_recall`. A parallel Recall@K that disagreed on duplicates or the nDCG
+  denominator would make the two published numbers incomparable, defeating the
+  reason for publishing both.
+- Measured:
+
+  | Metric | Deterministic | Semantic |
+  | --- | ---: | ---: |
+  | `primary_evidence_recall_at_10` (retained) | 0.6000 | 0.6667 |
+  | `containing_evidence_recall_at_10` (gated) | 0.8667 | **0.9333** |
+
+  **Phase 7 condition 7 passes at 0.9333 against ≥ 0.90, and the deterministic
+  side does not** — the semantic layer carries the last 0.0667. Phase 3 (0.4068)
+  and Phase 4 (0.8136) rise and **still miss**, which is what a corrected
+  definition looks like as opposed to a loosened one.
+- **No engine behaviour changed. This must never be cited as CodeAtlas
+  improving.** Nothing outside `src/codeatlas/evaluation/` was touched. A gate
+  condition recorded as missed since 2026-07-31 now passes because the
+  instrument was corrected, not because retrieval got better.
+- **Running `check_phase7.ps1` found its rerank artifact stale for three ADRs**,
+  and it is committed separately (`0907dbf`) so this entry does not absorb it.
+  Regenerating on a **stashed tree with no other change** proved it
+  pre-existing: `changed_symbol_precision` 0.2 → 1.0 (the ADR-0022 CRLF drift,
+  fixed in `baseline-phase-7` and never propagated here),
+  `exact_symbol_resolution` 0.2857 → null and `lexical_resolution` added
+  (ADR-0023). `baseline-phase-7` reproduced on the same tree, so the staleness
+  was specific to that one artifact.
+- **A second pre-existing staleness, also committed separately (`08a3176`):**
+  `apps/web/openapi.json` and `apps/web/src/lib/api-types.gen.ts` were missing
+  `"pr"` from `report_format`, left behind by the PR-ready Markdown export on
+  2026-08-07. The backend, CLI, REST, and MCP all learned that format; the
+  generated frontend types did not, so a web caller requesting the format the
+  API accepts was a type error. Also proven pre-existing on a stashed tree.
+
+  That slice already produced this defect once — `--format pr` shipped
+  advertised in `--help` and rejected by two CLI guards — and the lesson
+  recorded then was that a capability claimed across N adapters needs a test
+  exercising N adapters. **The generated web types were an N+1 nobody counted.**
+- **Both stale artifacts are ADR-0022's finding 5 recurring: `check_phase7`
+  gates more than `check_phase4` — the web bundle, the generated types, and two
+  tracked evaluation artifacts — and it is the one that goes unrun.** Two of the
+  three failures this session had nothing to do with the change being made.
+- Files: `src/codeatlas/evaluation/runner.py` (`_containment_keys`, two score
+  fields, one aggregate field, the gate entry, one report row),
+  `scripts/run_phase7_baseline.py` (comparison row),
+  `tests/evaluation/test_containing_evidence_recall.py` (new, four tests),
+  `docs/adr/0027-containing-evidence-recall.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-0`, `-3`, `-4`, `-7` and `rerank-phase-7`,
+  `documentation/memory.md`. **`baseline-phase-1` and `-2` untouched** — frozen
+  history, gate scripts marked SUPERSEDED.
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  dataset contract `1.0`, `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION`
+  untouched.
+- Test-first: all four tests written and observed failing on a missing
+  `evidence_containing` attribute. The **clipping** guard is the one that
+  matters: it rejects a prediction omitting either end, so containment cannot
+  drift into overlap and start rewarding partial citations. A second guard pins
+  that the exact-match metric still misses the one-line case, so the retained
+  number cannot quietly change meaning.
+- Verification: `ruff check src tests scripts apps` clean; `mypy
+  --no-incremental src tests scripts apps` clean on 341 files; full `uv run
+  pytest -q` **2124 passed, 3 skipped**; `check_phase4.ps1 -SkipSync` exit 0;
+  `check_phase7.ps1 -SkipSync` exit 0 (Playwright 14 passed, 6 skipped — the
+  known Chromium skips).
+- **`check_phase7.ps1 -SkipSync` does not verify `baseline-phase-7`.** That
+  `--check` sits inside the `-Semantic` block, so the run above skipped the one
+  artifact carrying gate condition 7 — the artifact this entry changes. It was
+  run directly instead, with the identical command the gate would use, and
+  reproduces byte-for-byte (exit 0). Recorded rather than reported as "the gate
+  passed", because a green gate that skipped the relevant check is how a stale
+  artifact survives three ADRs, which is exactly what this session found twice.
+- Next / open:
+  1. **s007** — the one genuine retrieval miss, worth 0.0667. Its own slice by
+     the user's ruling.
+  2. **s003's ranking weakness** — still real, still unfixed, and now correctly
+     described as an MRR/top-1 problem rather than a recall one.
+  3. `symbol_recall_at_10` 0.7857 is Phase 7's remaining unmet target.
+  4. q019's naming ruling and `lexical_resolution`'s threshold, unchanged.
+  5. `relation_path_correctness` naming convention and gate target, unchanged.
+  6. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands, unchanged.
+
 ### 2026-08-09T21:30:00Z — Every CLI command names the database it opened
 
 - Agent: Claude Code `claude-opus-5`, branch `cli-database-path`

@@ -3,7 +3,7 @@
 - Contract version: `1.0`
 - Implementation status: `not_implemented`
 - Targets met: `false`
-- Unmet targets: changed_symbol_precision, changed_symbol_recall, direct_impact_recall, primary_evidence_recall_at_10, exact_symbol_resolution, lexical_resolution
+- Unmet targets: changed_symbol_precision, changed_symbol_recall, direct_impact_recall, containing_evidence_recall_at_10, exact_symbol_resolution, lexical_resolution
 
 | Metric | Value |
 | --- | ---: |
@@ -11,6 +11,7 @@
 | Change cases | 24 |
 | Exact symbol resolution | 0.0000 |
 | Primary evidence Recall@10 | 0.0000 |
+| Containing evidence Recall@10 | 0.0000 |
 | Valid evidence rate | not applicable |
 | Exact evidence rate | not applicable |
 | Containing evidence rate | not applicable |

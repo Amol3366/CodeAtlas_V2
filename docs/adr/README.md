@@ -49,6 +49,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 | [0025](0025-nested-configuration-keys.md) | `_nested_paths` computed `service.port` and friends and then flattened them into a display string, so a nested key was searchable prose but not an addressable symbol and a config lookup could only answer the parent; each leaf now cites the line that sets it, with a text-matched line that falls back to the parent's range rather than being guessed | none (post-gate) |
 | [0026](0026-exact-match-ranking.md) | Ranking was pure BM25, so a short parent block out-scored the leaf a caller asked for by name while a longer one did not — whether you got your key or its parent depended on the parent's length; an exact `qualified_name` match is now promoted within the returned window, as a stable partition that leaves every other query's order untouched | none (post-gate) |
 
+| [0027](0027-containing-evidence-recall.md) | `primary_evidence_recall_at_10` compared line ranges for exact equality, so a citation one line longer than the gold range scored as never found — four of Phase 7's five misses return the right evidence at ranks 1, 1, 2 and 4. ADR-0003's containment predicate now backs a `containing_evidence_recall_at_10` that takes the gate at an unchanged 0.90 threshold, with the exact-match number retained so no historical figure changes meaning. **No engine behaviour changed** | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its
