@@ -207,6 +207,83 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T10:30:00Z — A flow follows routes (ADR-0034)
+
+- Agent: Claude Code `claude-opus-5`, branch `trace-follows-routes`
+- Transition: no phase task. Post-gate. Takes `relation_path_correctness`, the
+  last metric never examined, open since ADR-0020 revived it from a structural
+  zero.
+- **The metric averages four unrelated causes**, which is why it has no gate
+  target — a threshold over four different things cannot be reasoned about, the
+  same lesson ADR-0023 recorded when one target table was applied to two corpora.
+
+  | Cause | Cases |
+  | --- | --- |
+  | A flow answer emits no path at all | q026, q032 |
+  | Lexical intents emit no relation paths | q027, q029 |
+  | Module naming (`orders` vs `src.orders`) | q010, q015, q017 |
+  | Precision penalises a second, true edge | q005 |
+  | Passing | q007, q013, q016 |
+
+- **Fixed the first only, by the user's ruling.** Neither case was a retrieval
+  failure: `loadOrder ROUTES_TO get_order` is extracted, resolved and **stored**.
+  1. **`trace` never traversed `ROUTES_TO`** — kinds were `CALLS`, `MAY_CALL`,
+     `IMPORTS`. That relation exists to model an HTTP boundary (P4-05), and a
+     flow question is the one that most needs to cross it; without it a trace
+     stops at the frontend caller and never reaches the handler.
+  2. **An answer with edges but no buildable path said nothing.** `loadOrder`
+     also calls `fetch` and `json`, which resolve to nothing, so no path could
+     be built — yet the response reported "loadOrder has 2 flow", rendered two
+     claims, cited two evidence items, and returned an **empty `relation_paths`
+     with no warning**. The ADR-0020 gap still open for unresolved targets, and
+     invisible because an empty list looks like a legitimate "no relations".
+- Decision: add `ROUTES_TO` to `trace`'s kinds; warn `RELATION_PATH_UNRESOLVED`
+  when edges were counted but some produced no path. `NO_RELATIONS_FLOW` is
+  untouched and still means "no edges at all" — collapsing the two would lose
+  the distinction Section 4.1 asks for.
+- Measured: `relation_path_correctness` **0.3182 → 0.5000**, with q026 and q032
+  at **1.0000** exactly. **No other metric moved on any baseline**, and
+  `baseline-phase-7` and `rerank-phase-7` both still reproduce byte-for-byte —
+  the correct signature for changing one intent's traversal.
+- **My first implementation was wrong and a test caught it.** It warned only
+  when *no* path could be built, which stopped firing the moment `ROUTES_TO`
+  produced one path, leaving two unrepresented edges silent again. It now
+  compares counts, because `_paths` withholds all of a path's steps when any one
+  loses its evidence, so a missing edge cannot be identified individually.
+- **Deliberately not fixed**, recorded so the remaining 0.5000 is not read as
+  engine weakness: lexical intents emit no relation paths though their edges are
+  stored (a design decision); module naming (a q019-style ruling, ADR-0031); and
+  **precision penalising truth** — q005 emits two correct edges against one
+  declared, and ADR-0020 deliberately mandates emitting every supporting edge, so
+  the metric punishes what another record requires. Precision may be the wrong
+  instrument, as exact-match was in ADR-0027.
+- **`relation_path_correctness` should not get a gate target until those are
+  settled.**
+- Files: `src/codeatlas/application/graph_queries.py` (one relation kind, one
+  warning), `tests/integration/test_trace_flow_paths.py` (new, four tests),
+  `docs/adr/0034-trace-follows-routes.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-0`, `-3`, `-4`, `documentation/memory.md`.
+  **`baseline-phase-1`/`-2` untouched**; Phase 7 artifacts unchanged.
+- Contracts/migrations: none. `contract_version` `1.1`; the warning is additive
+  per ADR-0004 and a client ignoring unknown warnings is unaffected.
+- Test-first: two tests written and observed failing. The two guards — a subject
+  with no edges still warns `NO_RELATIONS_FLOW`, and a fully resolved flow warns
+  about nothing — passed from the start and are kept: the second is what stops
+  the new warning being emitted unconditionally, which would make the first
+  meaningless.
+- Verification: `ruff` and `mypy` clean; full `uv run pytest -q` **2144 passed,
+  3 skipped** with the exit code captured from pytest; `check_phase4.ps1
+  -SkipSync` exit 0; Phase 7 baseline and rerank `--check` both exit 0.
+- Next / open:
+  1. The three unfixed `relation_path_correctness` causes above.
+  2. Grow the symbol-shaped corpus toward fifty cases (ADR-0033).
+  3. The module-granularity ruling (ADR-0030).
+  4. Phase 4's `containing_evidence_recall_at_10` 0.8305 and
+     `containing_evidence_rate` 0.6667, both unmet.
+  5. RRF's coarse-chunk bias (ADR-0028), with ADR-0030's warning attached.
+  6. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands.
+  7. Phase 4's `changed_symbol_precision` 0.9375 — structural (c020–c022).
+
 ### 2026-08-10T09:15:00Z — `exact_symbol_resolution` keeps 0.98 (ADR-0033)
 
 - Agent: Claude Code `claude-opus-5`, branch `exact-symbol-threshold`
