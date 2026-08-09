@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-07
+Last updated: 2026-08-09
 
 ## Current Phase
 
@@ -651,6 +651,39 @@ development order is finished. A new phase requires an explicit user decision.
       ruling — on eight cases every value is a multiple of 0.125, so the current
       0.90 means "8 of 8" and can express nothing else.
 
+- [x] Packaged build refreshed and both repositories deleted (2026-08-09):
+      `build_package.ps1 -SemanticLocal` took the artifact from parser 1.2.1 /
+      resolver **1.1.0** to **1.3.0 / 1.3.0**, closing the open item carried
+      since ADR-0026. `-SemanticLocal` was chosen by inspecting the outgoing
+      artifact — it carried `torch` and `lancedb`, so omitting the flag would
+      have silently dropped the semantic layer and still looked like a
+      successful rebuild.
+
+      **Verified behaviourally, because exit 0 only proves PyInstaller ran.**
+      The `python_app` fixture was indexed *with the packaged exe*: the snapshot
+      came back stamped 1.3.0/1.3.0, and
+      `tests PaymentService.capture` returned
+      `test_capture_uses_idempotency_store` at `tests/test_service.py:5`
+      `[static_resolved]` — ADR-0021 running inside the artifact, where the
+      outgoing package returned nothing. That fixture was picked because
+      ADR-0021's handoff already records it as the case verified against the
+      real engine.
+
+      **`dist/` is gitignored, so this closed nothing for anyone else.** No
+      tracked file changed; a fresh clone still has no package. Treating this as
+      repository state would be wrong.
+
+      Both registered repositories (`projects/Prelegal`,
+      `projects/curser_kanban`) were then deleted as residue at the user's
+      instruction — backup first, then `repo remove --cascade` twice, then an
+      audit showing zero rows everywhere with integrity and foreign-key checks
+      clean. `--cascade` was confirmed with the user first because the two
+      carried **22 conversations and 70 messages**: the index was regenerable,
+      the chat history was the one thing here a re-index could not rebuild.
+
+      **A planned re-index was investigated and abandoned** — see Known Issues
+      for the reason, which is the useful part of this entry.
+
 ## In Progress
 
 **Nothing.** Verified 2026-08-07 rather than assumed.
@@ -745,6 +778,30 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 ## Known Issues
 
+- **`CODEATLAS_EPHEMERAL` governs `serve` only — the CLI always writes the real
+  database** (found 2026-08-09). `_ephemeral_requested` is read at exactly one
+  call site, inside `serve` (`cli/main.py:866`). Every other command goes
+  through `_services`, which is `path = database or default_database_path()`
+  (`cli/main.py:178`). So `index`, `repo add`, `symbol`, `search`, and `impact`
+  persist to `%LOCALAPPDATA%\CodeAtlas\data\codeatlas.db` no matter what that
+  variable says, while the web application starts empty every run.
+
+  Both behaviours are as designed. The problem is that **nothing surfaces the
+  difference**, so a user running with `CODEATLAS_EPHEMERAL=1` is right about
+  `serve` and wrong about the CLI, and discovers it only by finding data that
+  "should not exist". That is exactly how this was found: two repositories
+  registered 2026-08-01 and 2026-08-03 — before ADR-0013 existed at all — were
+  still present, and ephemeral mode could never have removed them, because
+  decision 3 is that it never opens the real database. That property is what
+  makes the mode safe and is not worth trading away.
+
+  **The practical trap for an agent:** re-indexing a repository in that database
+  produces work invisible to a `serve`-based workflow — the 2026-08-05 shape,
+  where a fix lands on the artifact nobody is looking at. Check which surface
+  the user actually runs before re-indexing anything.
+
+  Whether the variable *should* cover CLI commands is an ADR-0013 amendment and
+  an open scope decision, not a config fix.
 - **The explanation A/B is no longer a gate step** (fixed 2026-08-04). It threw
   on every run since `ff08d1e` because the gate passed `--semantic-baseline` to
   a script rewritten to take `--dataset`. Removed rather than re-pointed: the

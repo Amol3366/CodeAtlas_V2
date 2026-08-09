@@ -207,6 +207,108 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T20:15:00Z — Packaged build refreshed to 1.3.0/1.3.0; both registered repositories deleted as residue
+
+- Agent: Claude Code `claude-opus-5`, branch `main` (clean before and after)
+- Transition: no phase task. Post-gate maintenance, at the user's instruction.
+  Takes open item 5 from the ADR-0026 handoff ("the packaged build under `dist/`
+  dates from 2026-08-07 and is now two version bumps behind").
+- Outcome 1 — **the package was rebuilt and is current.**
+  `scripts/build_package.ps1 -SemanticLocal`, exit 0. The `-SemanticLocal` flag
+  was chosen by inspecting the outgoing artifact rather than by default: it
+  carried `torch` and `lancedb`, so building without the flag would have
+  produced a smaller artifact silently missing the semantic layer and looked
+  like a successful rebuild.
+
+  | | Outgoing (2026-08-07) | New |
+  | --- | --- | --- |
+  | `parser_bundle_version` | 1.2.1 | **1.3.0** |
+  | `resolver_version` | 1.1.0 | **1.3.0** |
+  | tree / exe / zip | 901 MB | 1.1 GB / 83 MB / 372 MB |
+
+  All three of the script's own guards passed, including the web-asset tree
+  digest against `apps/web/dist` — the guard added after the 2026-08-05 stale
+  bundle incident. The single `Compress-Archive` retry is the documented
+  Defender scan-handle behaviour, not a fault.
+- **Verified behaviourally, not by trusting the build.** A build that exits 0
+  proves PyInstaller ran, not that the bumped code is inside the bundle. The
+  `python_app` fixture was indexed *with the packaged executable* into a
+  throwaway `--db`:
+  1. the resulting snapshot row is stamped `parser_bundle_version=1.3.0` and
+     `resolver_version=1.3.0`;
+  2. `tests <repo> PaymentService.capture` returns
+     `test_capture_uses_idempotency_store … tests/test_service.py:5`, derivation
+     `static_resolved`. That is ADR-0021 executing inside the artifact — the
+     outgoing package returned nothing for that query. Exit 4 is `EXIT_PARTIAL`
+     from the `GRAPH_TRUNCATED_DEPTH` warning: the bounded-traversal limit
+     reporting honestly, not a failure.
+
+  The fixture was chosen because it is the exact case ADR-0021's handoff records
+  as verified against the real engine, so a discriminator already existed.
+- **`dist/` is gitignored, so no tracked file changed and the open item is
+  closed only for this workstation.** A fresh clone still has no package, and
+  the next machine to build one must run the script itself. Recorded this way
+  rather than as "closed", because a reader who takes it as repository state
+  will be wrong.
+- Outcome 2 — **both registered repositories deleted at the user's instruction.**
+  `repo_fe4abc3d…` (`projects/Prelegal`) and `repo_f9dbc74a…`
+  (`projects/curser_kanban`), both `repo remove --cascade`, both exit 0.
+  A verified backup was taken first via `codeatlas backup` (8,540,160 bytes,
+  through SQLite's online backup API). Post-deletion audit: **zero rows** across
+  repositories, snapshots, files, symbols, relations, evidence, conversations,
+  messages, message_runs, change_analyses; `integrity_check ok`;
+  `foreign_key_check` clean. Both source trees present and untouched.
+
+  `--cascade` was required and was **confirmed with the user before running**,
+  because the two repositories carried **22 conversations and 70 messages** —
+  18 on Prelegal, 4 on curser_kanban. `repo_remove`'s own docstring refuses
+  without it for that reason. The index was regenerable residue; the chat
+  history was not, and was the only thing here a re-index could not rebuild.
+- **A planned re-index was abandoned after investigation, and the reason is the
+  finding of this entry.** The intent was to re-index both repositories onto
+  1.3.0. Then the user asked why those repositories existed at all, given the
+  project's fresh-storage policy. Two independent causes:
+  1. Both were registered **before ADR-0013 existed** — 2026-08-01 and
+     2026-08-03 against an ADR dated 2026-08-04 — so ephemeral mode never had a
+     chance to exclude them. It also could not have deleted them later:
+     decision 3 is that the real database is never opened in that mode, which is
+     the property making the feature safe.
+  2. **`CODEATLAS_EPHEMERAL` governs `serve` only.** `_ephemeral_requested` is
+     read at exactly one call site (`cli/main.py:866`, inside `serve`). Every
+     other command goes through `_services`, which is
+     `path = database or default_database_path()` (`cli/main.py:178`) — the real
+     database, unconditionally. So `index`, `repo add`, `symbol`, `search`, and
+     `impact` all persist while the web application does not.
+
+  Re-indexing would therefore have written to the one file this user's
+  `serve`-based workflow never opens: work whose result would be invisible in
+  the application — the same shape as the 2026-08-05 incident, where a fix was
+  applied to the artifact nobody was looking at. Deleting was the correct action
+  and re-indexing was not; the plan was wrong and was dropped rather than
+  carried out because it had been announced.
+- Files: `docs/plans/PLAN.md` (this entry), `documentation/memory.md`. No source,
+  schema, contract, migration, test, or corpus file changed. `dist/` artifacts
+  are untracked.
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  `PARSER_BUNDLE_VERSION` `1.3.0`, `RESOLVER_VERSION` `1.3.0` — all unchanged
+  **by this entry**; the package merely caught up to them.
+- Verification: `build_package.ps1 -SemanticLocal` exit 0 with all guards;
+  packaged index exit 0; version stamps asserted `1.3.0`/`1.3.0`; ADR-0021 query
+  returns the expected edge; `repo remove --cascade` exit 0 twice; post-deletion
+  row counts all zero with integrity and foreign-key checks clean. No test suite
+  was run — no tracked source changed, so there was nothing for it to regress.
+- Next / open, unchanged from the ADR-0026 entry except item 5:
+  1. q019 — the corpus uses two naming conventions. Needs a ruling.
+  2. `lexical_resolution`'s threshold, settable once (1) is decided.
+  3. `relation_path_correctness` naming convention and gate target.
+  4. Whether a constructor call should record a `TESTS` edge to `__init__`.
+  5. ~~The packaged build is two version bumps behind.~~ **Rebuilt here**, for
+     this workstation only.
+  6. **New: should `CODEATLAS_EPHEMERAL` apply to CLI commands?** Today a user
+     who believes storage is discarded each run is right about `serve` and wrong
+     about the CLI, and nothing surfaces the difference. This is an ADR-0013
+     amendment and a scope decision, deliberately **not** taken here.
+
 ### 2026-08-09T18:30:00Z — An exact name match outranks a lexical one (ADR-0026)
 
 - Agent: Claude Code `claude-opus-5`, branch `exact-match-ranking`
