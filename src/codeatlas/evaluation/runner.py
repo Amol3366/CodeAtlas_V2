@@ -721,9 +721,18 @@ def _unmet_targets(
             metrics.exact_symbol_resolution,
             0.98,
         )
-        # Provisional threshold, matching the recall family (0.90) rather than
-        # being invented for the number it produces. Currently unmet.
-        minimums["lexical_resolution"] = (metrics.lexical_resolution, 0.90)
+        # 1.0, and the value is not a tightening (ADR-0032). The metric scores
+        # eight cases -- ten declare a lexical intent, two sit on
+        # `malicious_unsupported` and are excluded by ADR-0024 -- so it can only
+        # take values that are multiples of 0.125. The provisional 0.90 it
+        # replaces already required 8/8 and tolerated zero failures, selecting
+        # exactly the same pass/fail set. Stating 1.0 says what the gate does
+        # instead of reading as though a miss were acceptable.
+        #
+        # Absolute is also the right shape here: these are deterministic
+        # lookups, and a config key or document heading either resolves or it
+        # does not.
+        minimums["lexical_resolution"] = (metrics.lexical_resolution, 1.0)
     else:
         # Top-1 is the wrong instrument for a conceptual question, so the
         # ranked measure replaces it: did the right answer surface at all.

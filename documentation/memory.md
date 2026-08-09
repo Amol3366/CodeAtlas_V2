@@ -858,6 +858,32 @@ development order is finished. A new phase requires an explicit user decision.
       safe here and is *not* a general claim that bare headings are sufficient
       identifiers.
 
+- [x] `lexical_resolution` gated at 1.0 (ADR-0032), 2026-08-10: the threshold
+      open since ADR-0023. **The metric scores eight cases** — ten declare a
+      lexical intent, `q037`/`q039` sit on `malicious_unsupported` and are
+      excluded by ADR-0024 — so it moves in steps of 0.125, and the provisional
+      **0.90 already required 8/8 with zero failures tolerated.** 0.90 and 1.0
+      selected exactly the same pass/fail set; the gate read as though a miss
+      were acceptable and never was.
+
+      Set to 1.0. **Both baselines reproduce byte-for-byte**, which is the
+      evidence this is a restatement rather than a tightening. Absolute is also
+      the right shape: a config key or document heading either resolves or it
+      does not, and Section 19.3's other deterministic targets are already
+      absolute.
+
+      Three tests pin the *reasoning*, not the constant. The important one
+      asserts that 0.90 and 1.0 still select the same set — **it fails
+      deliberately if the corpus grows**, at which point the threshold becomes a
+      real decision again instead of a spelling choice. A third rejects any
+      invented value between 0.875 and 1.0, so a future 0.95 that looks like a
+      considered relaxation and changes nothing is caught here.
+
+      **`exact_symbol_resolution` has the same illusion and is NOT fixed:** 27
+      scored cases against 0.98 requires 27/27, tolerating zero failures. It is
+      a Section 19.3 target cited in approved phase gates, so correcting it is a
+      larger decision, left open on purpose.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

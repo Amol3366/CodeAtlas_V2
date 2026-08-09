@@ -59,6 +59,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0031](0031-document-section-naming.md) | The corpus used two conventions for naming a markdown section — q019 declared `README.Health` while q027/q031 declared bare headings and extraction emits bare headings everywhere. Because `expected_symbols[0]` is **the query the harness issues**, q019 was asking for a symbol nothing can produce and the engine's correct abstention was scored as a miss. Bare heading is now the single rule; `lexical_resolution` 0.8750 → 1.0000 and `abstention_correctness` → 1.0000, from one line — the leverage ADR-0003 restrains, justified by the corpus contradicting itself rather than by the number | none (post-gate) |
 
+| [0032](0032-lexical-resolution-threshold.md) | `lexical_resolution` scores **eight** cases (two of ten are excluded by ADR-0024), so it moves in steps of 0.125 and the provisional 0.90 already required 8/8 with zero failures tolerated — arithmetically identical to 1.0 while reading as though a miss were acceptable. Set to 1.0; both baselines reproduce byte-for-byte, which is the evidence it is a restatement not a tightening. **`exact_symbol_resolution`'s 0.98 has the same illusion** — 27 cases, 27/27 required — and is left open because it is a Section 19.3 target cited in approved gates | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its
