@@ -207,6 +207,66 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T11:30:00Z — Relation endpoints use qualified names (ADR-0035)
+
+- Agent: Claude Code `claude-opus-5`, branch `relation-endpoint-naming`
+- Transition: no phase task. Post-gate. Settles the second of the four
+  `relation_path_correctness` causes ADR-0034 decomposed.
+- The corpus declared `orders EXPORTS Order`, `client IMPORTS total`,
+  `service IMPORTS idempotency` — and **none of those bare names is a symbol.**
+  The module symbols are `src.orders`, `src.client`, `src.payments.service`.
+- **Unlike q019, the corpus was internally consistent here** — it wrote every
+  module bare — which is why this needed its own ruling instead of following
+  ADR-0031 automatically. The surface shape is "corpus changed to match engine",
+  which is what ADR-0003 forbids, so the justification has to be narrower and
+  checkable: **an expectation must reference an identifier the system can
+  produce**, or it is unsatisfiable by construction, exactly as `README.Health`
+  was. The corpus already qualifies a method by its class
+  (`PaymentService.capture`); qualifying a module by its package is that same
+  rule one level up, not a new convention.
+- Rejected: emitting bare module names from the engine, which would change module
+  symbol identity product-wide to suit three strings and collapse `src.orders`
+  with `tests.orders`; and suffix comparison in the harness, which hides the
+  disagreement and would let `a.b.foo` match `c.d.foo` — a silent false pass in
+  place of a visible failure.
+- Measured: `relation_path_correctness` **0.5000 → 0.6364**. q017 0.0000 →
+  **1.0000**, q015 0.0000 → 0.5000, q010 unchanged. **No other metric moved**;
+  Phase 7 artifacts untouched, since the conceptual corpus declares no relations.
+- **q010 is deliberately half-fixed.** Its source was qualified with the rest;
+  its target was not. `from .idempotency import IdempotencyStore` — the corpus
+  claims the edge targets the **module**, the engine records the **class** the
+  statement binds, and ADR-0021's import-and-call rule depends on the engine's
+  reading. That is a modelling decision deserving its own record, not a line in
+  a naming fix, so q010 still scores 0.0000 for **one** stated reason instead of
+  two.
+- **q015 reaching only 0.5 is the part worth keeping.** Its expectation now
+  matches and precision still halves the score, because the engine also emits
+  `total REFERENCES Order` — a second, *true* edge the corpus did not declare.
+  Naming was never going to fix that; it is the ADR-0020-versus-precision
+  conflict ADR-0034 named.
+- Files: `tests/evaluation/cases/queries.json` (four endpoint strings),
+  `docs/adr/0035-relation-endpoint-naming.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-0`, `-3`, `-4`, `documentation/memory.md`.
+  **No source file changed**; `baseline-phase-1`/`-2` untouched as frozen history.
+- Contracts/migrations: none. Dataset contract `1.0`, `contract_version` `1.1`,
+  `SCHEMA_VERSION` `14`, all parser/resolver/chunker versions untouched.
+- Verification: dataset validation 40 cases `valid`; `ruff` and `mypy` clean on
+  346 files; full `uv run pytest -q` **2144 passed, 3 skipped** with the exit
+  code captured from pytest; `check_phase4.ps1 -SkipSync` exit 0.
+- Next / open:
+  1. **`relation_path_correctness` has two causes left** — q005/q015's precision
+     penalty, and q027/q029's lexical intents emitting no paths. **It still
+     should not get a gate target** until both are settled.
+  2. Whether an `IMPORTS` edge targets the module or the bound class (q010).
+  3. A dataset validator asserting every expectation names a real symbol would
+     catch this whole class, including q019. Needs the fixtures indexed.
+  4. Grow the symbol corpus toward fifty cases (ADR-0033).
+  5. The module-granularity ruling (ADR-0030).
+  6. Phase 4's `containing_evidence_recall_at_10` 0.8305 and
+     `containing_evidence_rate` 0.6667, both unmet.
+  7. RRF's coarse-chunk bias (ADR-0028); `CODEATLAS_EPHEMERAL` CLI scope;
+     Phase 4's structural `changed_symbol_precision` 0.9375.
+
 ### 2026-08-10T10:30:00Z — A flow follows routes (ADR-0034)
 
 - Agent: Claude Code `claude-opus-5`, branch `trace-follows-routes`
