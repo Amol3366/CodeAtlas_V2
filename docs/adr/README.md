@@ -67,6 +67,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0035](0035-relation-endpoint-naming.md) | The corpus declared relation endpoints as bare module names — `orders EXPORTS Order` — that **name no symbol**; the module symbols are `src.orders`, `src.client`, `src.payments.service`. Qualified, on the ADR-0031 test: an expectation must reference an identifier the system can produce. 0.5000 → 0.6364. **q010 is deliberately half-fixed** — its target is a modelling question (does `IMPORTS` point at the module or the class actually bound?), not a spelling, so it still scores 0 for one stated reason | none (post-gate) |
 
+| [0036](0036-expectations-name-real-symbols.md) | ADR-0031 and ADR-0035 each found, by hand, an expectation naming a symbol that does not exist — a failure **no metric can catch**, since a metric only scores what it is given. Now asserted in the suite against the engine's own `find_exact`. It immediately found **q024 still carrying the pre-ADR-0031 convention**, invisible because its `CONCEPTUAL` intent is unmeasured; mutation-checked by reintroducing both historical defects | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

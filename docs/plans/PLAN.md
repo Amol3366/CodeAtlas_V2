@@ -207,6 +207,69 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T13:00:00Z — Expectations must name real symbols (ADR-0036)
+
+- Agent: Claude Code `claude-opus-5`, branch `expectations-name-real-symbols`
+- Transition: no phase task. Post-gate. Builds the validator ADR-0035 recorded
+  as worth considering.
+- **ADR-0031 and ADR-0035 each found this class of defect by hand**, two days
+  apart. No metric can catch it: a metric scores what it is given, and an
+  expectation naming a thing that does not exist produces a plausible-looking
+  zero rather than an error.
+- Implemented as three assertions in the suite — every `expected_symbols` entry,
+  every `query_subject`, and both endpoints of every `expected_relations`
+  string must resolve through the engine's own `SymbolStore.find_exact`. Tests
+  rather than a `validate` subcommand, because that command checks structure
+  without indexing and giving it an indexing dependency would slow every caller.
+  Six fixtures index once per module in under three seconds.
+- **It immediately found q024 still carrying the pre-ADR-0031 convention** —
+  `README.Sample Service`, and a relation `README DOCUMENTS service.port`,
+  neither naming a symbol. I applied that ruling by searching for
+  `README.Health` specifically rather than for the convention, and missed it.
+
+  **No metric would ever have flagged it.** q024's intent is `CONCEPTUAL`, which
+  the adapter does not support, so it is `measured=False` and excluded from
+  every accuracy aggregate by ADR-0024. Corrected to `Sample Service` for both,
+  completing the approved ruling rather than making a new decision — and **no
+  baseline moved**, which is precisely why the defect survived.
+- **The rule is "resolvable", not "equals a qualified_name", and the first
+  attempt got that wrong.** `find_exact` resolves through four tiers — qualified
+  name, module-qualified name, short name, case-insensitive short name — so
+  `orders` legitimately resolves to `src.orders`. The first probe reported seven
+  failures, five of them its own fault, and also split relation strings on
+  whitespace, which mis-parses `Order flow DOCUMENTS get_order` because a
+  document heading is a symbol whose name contains a space. Using the engine's
+  own resolver keeps the rule honest as the resolver evolves.
+- Mutation-checked: reintroducing `README.Health` and `orders EXPORTS Order`
+  fails the validator, which is the evidence it catches by construction what
+  took two investigations to find by hand. A fourth test pins the resolver
+  itself so the suite cannot degrade into a validator that approves everything.
+- Does **not** check that a resolvable name is the *right* answer — that is what
+  the metrics are for — nor `expected_evidence` paths, line ranges, or the
+  change cases. Those are worth extending to and are not done here.
+- Files: `tests/evaluation/test_expectations_name_real_symbols.py` (new, four
+  tests), `tests/evaluation/cases/queries.json` (q024, two strings),
+  `docs/adr/0036-expectations-name-real-symbols.md` (new), `docs/adr/README.md`,
+  `documentation/memory.md`. **No source file changed; no baseline regenerated.**
+- Contracts/migrations: none.
+- Verification: `ruff` and `mypy` clean on 347 files; full `uv run pytest -q`
+  **2148 passed, 3 skipped** with the exit code captured from pytest; dataset
+  validation 40 cases `valid`; Phase 3 and Phase 4 baselines `--check` exit 0;
+  `check_phase4.ps1 -SkipSync` exit 0.
+- Next / open:
+  1. Extend the validator to `expected_evidence` paths and line ranges, and to
+     the change cases.
+  2. `relation_path_correctness` 0.6364 with two causes left — the
+     precision-versus-truth conflict (q005, q015) and lexical intents emitting
+     no paths (q027, q029). **Still no gate target until both are settled.**
+  3. Whether an `IMPORTS` edge targets the module or the bound class (q010).
+  4. Grow the symbol corpus toward fifty cases (ADR-0033).
+  5. The module-granularity ruling (ADR-0030).
+  6. Phase 4's `containing_evidence_recall_at_10` 0.8305 and
+     `containing_evidence_rate` 0.6667, both unmet.
+  7. RRF's coarse-chunk bias (ADR-0028); `CODEATLAS_EPHEMERAL` CLI scope;
+     Phase 4's structural `changed_symbol_precision` 0.9375.
+
 ### 2026-08-10T11:30:00Z — Relation endpoints use qualified names (ADR-0035)
 
 - Agent: Claude Code `claude-opus-5`, branch `relation-endpoint-naming`

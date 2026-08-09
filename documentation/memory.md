@@ -972,6 +972,34 @@ development order is finished. A new phase requires an explicit user decision.
       the corpus did not declare. Naming was never going to fix that — it is the
       remaining ADR-0020-versus-precision conflict.
 
+- [x] Expectations must name real symbols (ADR-0036), 2026-08-10: the validator
+      ADR-0035 suggested. ADR-0031 and ADR-0035 each found this class **by
+      hand**; no metric can catch it, because a metric only scores what it is
+      given and an expectation naming a nonexistent thing produces a
+      plausible-looking zero. Now three assertions in the suite, run against the
+      engine's own `SymbolStore.find_exact`.
+
+      **It immediately found q024 still carrying the pre-ADR-0031 convention** —
+      `README.Sample Service` and `README DOCUMENTS service.port`. I had applied
+      that ruling by searching for `README.Health` specifically rather than for
+      the convention. **No metric would ever have flagged it**: q024's intent is
+      `CONCEPTUAL`, unsupported by the adapter, so it is `measured=False` and
+      excluded from every aggregate by ADR-0024. Corrected; no baseline moved,
+      which is exactly why it survived.
+
+      **The rule is "resolvable", not "equals a qualified_name", and I got that
+      wrong first.** `find_exact` has four tiers — qualified, module-qualified,
+      short name, case-insensitive — so `orders` legitimately resolves to
+      `src.orders`. My first probe reported seven failures, five of them its own
+      fault, including splitting relation strings on whitespace which mis-parses
+      `Order flow DOCUMENTS get_order`. Using the engine's resolver also keeps
+      the rule honest as the resolver evolves.
+
+      Mutation-checked by reintroducing `README.Health` and `orders EXPORTS
+      Order`: both fail the validator. Does **not** check that a resolvable name
+      is the *right* answer — that is what the metrics are for — nor evidence
+      paths, line ranges, or change cases.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
