@@ -207,6 +207,62 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T08:30:00Z — `lexical_resolution` is gated at 1.0 (ADR-0032)
+
+- Agent: Claude Code `claude-opus-5`, branch `lexical-resolution-threshold`
+- Transition: no phase task. Post-gate. Closes the threshold ADR-0023 recorded
+  as provisional and left open since.
+- **The metric scores eight cases, and that decides everything.** Ten declare a
+  lexical intent; `q037` and `q039` sit on `malicious_unsupported` and are
+  excluded by ADR-0024. Eight cases means values are multiples of 0.125:
+
+  | Threshold | Requires | Failures tolerated |
+  | --- | --- | ---: |
+  | **0.90 (existing)** | 8/8 | **0** |
+  | 0.875 | 7/8 | 1 |
+  | 1.0 | 8/8 | 0 |
+
+  **0.90 and 1.0 selected exactly the same pass/fail set.** The gate always
+  demanded every scored case while reading as though a miss were acceptable.
+- Decision: set it to **1.0**. Absolute is also the right shape — a config key
+  or document heading either resolves or it does not, and Section 19.3's other
+  deterministic targets are already absolute, as is `containing_evidence_rate`.
+- **Evidence that this is a restatement, not a tightening: both baselines
+  reproduce byte-for-byte** (`--check` exit 0 on Phase 3 and Phase 4), and no
+  baseline file appears in the diff.
+- Three tests pin the *reasoning* rather than the constant. The load-bearing one
+  asserts 0.90 and 1.0 still select the same set, so **it fails deliberately if
+  the corpus grows** and the threshold becomes a real decision again. A third
+  rejects any value between 0.875 and 1.0, so a future `0.95` — which would look
+  like a considered relaxation and change nothing — is caught in the suite.
+- **A second instance found and deliberately not fixed:**
+  `exact_symbol_resolution` has **27 scored cases against 0.98**, requiring
+  **27/27** with zero failures tolerated. It reads like "one miss allowed" and
+  is not. That number is a Section 19.3 target cited in approved phase gates, so
+  correcting it is a larger decision than this one and is left open rather than
+  folded in. The pattern is the point: a fraction below 1.0 only means something
+  if the corpus is large enough to express it, and two of this project's
+  thresholds are not.
+- Files: `src/codeatlas/evaluation/runner.py` (one constant, one comment),
+  `tests/evaluation/test_threshold_granularity.py` (new, three tests),
+  `docs/adr/0032-lexical-resolution-threshold.md` (new), `docs/adr/README.md`,
+  `documentation/memory.md`. **No baseline, corpus, or fixture changed.**
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  `CHUNKER_VERSION` `1.1.0`, `PARSER_BUNDLE_VERSION`/`RESOLVER_VERSION` `1.3.0`.
+- Verification: `ruff` clean; `mypy --no-incremental src tests scripts apps`
+  clean on 345 files; full `uv run pytest -q` **2138 passed, 3 skipped** with
+  the exit code captured from pytest rather than a pipeline tail;
+  `check_phase4.ps1 -SkipSync` exit 0; Phase 3 and Phase 4 baselines `--check`
+  exit 0.
+- Next / open:
+  1. **`exact_symbol_resolution`'s 0.98**, above — the same illusion on a
+     Section 19.3 target.
+  2. **The module-granularity ruling** (ADR-0030).
+  3. `relation_path_correctness` naming convention and gate target.
+  4. RRF's coarse-chunk bias (ADR-0028), with ADR-0030's warning attached.
+  5. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands.
+  6. Phase 4's `changed_symbol_precision` 0.9375 — structural (c020–c022).
+
 ### 2026-08-10T07:30:00Z — A document section is named by its bare heading (ADR-0031)
 
 - Agent: Claude Code `claude-opus-5`, branch `document-section-naming`
