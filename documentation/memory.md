@@ -828,6 +828,36 @@ development order is finished. A new phase requires an explicit user decision.
       concept is documented at module level, does the module satisfy a
       conceptual question?**
 
+- [x] Document sections are named by their bare heading (ADR-0031), 2026-08-10:
+      the q019 ruling, open since ADR-0024. The corpus used **two conventions** —
+      q019 declared `README.Health` while q027/q031 declared bare headings, and
+      extraction emits bare headings everywhere (`Sample Service`, `Health`,
+      `Order flow`) with no file-stem qualification anywhere in the engine.
+
+      **`expected_symbols[0]` is the query the harness issues**, not just the
+      string it compares against (`_query_term`). So q019 was asking the engine
+      for `README.Health` — a symbol nothing can produce — and the engine's
+      correct abstention was scored as a wrong one on a case declaring
+      `expected_abstention: false`. The corpus was posing an unanswerable
+      question, the same shape as ADR-0018 and ADR-0024.
+
+      One line: `lexical_resolution` 0.8750 → **1.0000** (8/8) and out of
+      `unmet_targets`, MRR 0.9714 → 1.0000, `abstention_correctness` 0.9714 →
+      **1.0000**, nDCG 0.9051 → 0.9337, symbol recall 0.8857 → 0.9143.
+
+      **A one-line corpus edit moving five metrics is precisely the leverage
+      ADR-0003 restrains, and the size of the movement is not evidence the
+      change was right.** The justification is that the corpus contradicted
+      itself, not that the numbers improved. The test to reapply: *if the engine
+      emitted `README.Health` and the corpus said `Health`, changing the corpus
+      would be gaming.* Here the corpus disagreed with itself and with the only
+      convention the engine can produce.
+
+      Cost recorded: **bare headings are ambiguous** — two files with `## Health`
+      would both emit `Health`. This corpus has no collision, so the ruling is
+      safe here and is *not* a general claim that bare headings are sufficient
+      identifiers.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
