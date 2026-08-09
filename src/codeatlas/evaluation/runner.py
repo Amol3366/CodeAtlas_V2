@@ -139,6 +139,10 @@ class QueryScore(ContractModel):
     exact_symbol_resolved: bool | None
     symbols: RankedMetrics
     evidence: RankedMetrics
+    # ADR-0003 granularity, reported beside `evidence` rather than replacing
+    # it. `evidence` keeps requiring an exact span; this one asks whether the
+    # citation covers the answer.
+    evidence_containing: RankedMetrics
     valid_evidence_count: int = Field(ge=0)
     containing_evidence_count: int = Field(ge=0)
     predicted_evidence_count: int = Field(ge=0)
@@ -156,6 +160,10 @@ class ChangeScore(ContractModel):
     direct_impact_recall: Confidence | None
     finding_precision: Confidence
     evidence_recall: Confidence
+    # The change-side counterpart of `QueryScore.evidence_containing`. Both
+    # sides feed one aggregate, so both must use the same rule or the number
+    # would mean two things at once.
+    evidence_containing_recall: Confidence
     valid_evidence_count: int = Field(ge=0)
     containing_evidence_count: int = Field(ge=0)
     predicted_evidence_count: int = Field(ge=0)
@@ -179,6 +187,12 @@ class AggregateMetrics(ContractModel):
     mean_reciprocal_rank: MetricValue
     ndcg_at_10: MetricValue
     primary_evidence_recall_at_10: MetricValue
+    # ADR-0003 granularity applied to recall. Defaulted to `None` so an
+    # artifact written before this record still loads and is scored exactly as
+    # it was. `primary_evidence_recall_at_10` is retained and unchanged, so no
+    # historical number changes meaning -- the same treatment ADR-0003 gave
+    # `valid_evidence_rate` when `containing_evidence_rate` arrived.
+    containing_evidence_recall_at_10: MetricValue = None
     valid_evidence_rate: MetricValue
     # ADR-0003. `valid_evidence_rate` is retained and equals
     # `exact_evidence_rate`, so no historical number changes meaning. The two
@@ -271,6 +285,11 @@ def score_query_case(
     evidence_metrics = ranked_metrics(
         evidence_required, evidence_ranked, limit=10
     )
+    evidence_containing_metrics = ranked_metrics(
+        evidence_required,
+        _containment_keys(prediction.ranked_evidence, case.expected_evidence),
+        limit=10,
+    )
     valid_evidence = sum(
         item in set(evidence_required) for item in evidence_ranked
     )
@@ -296,6 +315,7 @@ def score_query_case(
         exact_symbol_resolved=exact,
         symbols=symbol_metrics,
         evidence=evidence_metrics,
+        evidence_containing=evidence_containing_metrics,
         valid_evidence_count=valid_evidence,
         containing_evidence_count=containing_evidence,
         predicted_evidence_count=len(evidence_ranked),
@@ -356,6 +376,10 @@ def score_change_case(
         evidence_recall=_recall(
             set(predicted_evidence), expected_evidence
         ),
+        evidence_containing_recall=_recall(
+            set(_containment_keys(prediction.evidence, case.expected_evidence)),
+            expected_evidence,
+        ),
         valid_evidence_count=sum(
             item in expected_evidence for item in predicted_evidence
         ),
@@ -376,6 +400,11 @@ def null_baseline(dataset: Dataset) -> EvaluationReport:
         mean_reciprocal_rank=0.0,
         ndcg_at_10=0.0,
         primary_evidence_recall_at_10=0.0,
+        # Explicitly 0.0, not the field's `None` default. The null baseline
+        # asserts "nothing is implemented, so nothing is found"; leaving this
+        # unset would say "not measured", which is a different claim and the
+        # exact distinction ADR-0024 exists to keep.
+        containing_evidence_recall_at_10=0.0,
         valid_evidence_rate=None,
         exact_evidence_rate=None,
         containing_evidence_rate=None,
@@ -419,6 +448,10 @@ def render_markdown(report: EvaluationReport) -> str:
         (
             "Primary evidence Recall@10",
             _format_metric(report.metrics.primary_evidence_recall_at_10),
+        ),
+        (
+            "Containing evidence Recall@10",
+            _format_metric(report.metrics.containing_evidence_recall_at_10),
         ),
         (
             "Valid evidence rate",
@@ -551,6 +584,20 @@ def _aggregate(
         )
         if case.expected_evidence
     ]
+    query_containing_recall = [
+        score.evidence_containing.recall
+        for score, case in zip(
+            query_scores, dataset.query_cases, strict=True
+        )
+        if case.expected_evidence and score.measured
+    ]
+    change_containing_recall = [
+        score.evidence_containing_recall
+        for score, case in zip(
+            change_scores, dataset.change_cases, strict=True
+        )
+        if case.expected_evidence
+    ]
     relation_scores = [
         score.relation_path_correctness
         for score, case in zip(
@@ -590,6 +637,9 @@ def _aggregate(
         ndcg_at_10=_mean([score.ndcg for score in symbol_scores]),
         primary_evidence_recall_at_10=_mean(
             [*query_evidence_recall, *change_evidence_recall]
+        ),
+        containing_evidence_recall_at_10=_mean(
+            [*query_containing_recall, *change_containing_recall]
         ),
         valid_evidence_rate=(
             valid_evidence / predicted_evidence
@@ -654,8 +704,15 @@ def _unmet_targets(
         "changed_symbol_precision": (metrics.changed_symbol_precision, 0.95),
         "changed_symbol_recall": (metrics.changed_symbol_recall, 0.95),
         "direct_impact_recall": (metrics.direct_impact_recall, 0.90),
-        "primary_evidence_recall_at_10": (
-            metrics.primary_evidence_recall_at_10,
+        # The threshold is unchanged at 0.90 and the demand is unchanged --
+        # "the answer's evidence must surface in the top 10". Only the
+        # definition of *surfaced* is corrected per ADR-0003: requiring an
+        # exact span gated on a granularity disagreement, not on whether the
+        # evidence was found. `primary_evidence_recall_at_10` is still
+        # reported beside it, because the gap between the two is the
+        # measurement.
+        "containing_evidence_recall_at_10": (
+            metrics.containing_evidence_recall_at_10,
             0.90,
         ),
     }
@@ -748,6 +805,36 @@ def _contains(predicted: _EvidenceLike, expected: _EvidenceLike) -> bool:
         and predicted.start_line <= expected.start_line
         and predicted.end_line >= expected.end_line
     )
+
+
+def _containment_keys(
+    predicted: Iterable[_EvidenceLike],
+    expected: Iterable[_EvidenceLike],
+) -> list[str]:
+    """Key each prediction by the expected range it contains, else by itself.
+
+    Feeding these into `ranked_metrics` and `_recall` gives containment
+    semantics with **one** definition of the ranking arithmetic. A parallel
+    Recall@K implementation that happened to disagree about ties, duplicates,
+    or the nDCG denominator would make the two evidence numbers
+    incomparable — and the gap between them is itself the measurement
+    (ADR-0003).
+
+    A prediction containing no expected range keeps its own key, so it can
+    never collide with a required one and is counted as a miss exactly as
+    before.
+    """
+    expected_items = list(expected)
+    keys: list[str] = []
+    for item in predicted:
+        match = next(
+            (target for target in expected_items if _contains(item, target)),
+            None,
+        )
+        keys.append(
+            _evidence_key(match) if match is not None else _evidence_key(item)
+        )
+    return keys
 
 
 def _containing_count(

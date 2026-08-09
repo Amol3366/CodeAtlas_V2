@@ -47,6 +47,11 @@ from codeatlas.evaluation.runner import (
 # either alone misrepresents the result.
 _COMPARED = (
     ("primary_evidence_recall_at_10", "Primary evidence Recall@10", True),
+    # The gated one since the ADR-0003 granularity correction. Reported beside
+    # the exact-match number rather than instead of it: the gap between them is
+    # how precisely CodeAtlas can point at an answer, and a comparison carrying
+    # only the gated metric would hide the cost half of the trade.
+    ("containing_evidence_recall_at_10", "Containing evidence Recall@10", True),
     ("exact_evidence_rate", "Exact evidence rate", True),
     ("containing_evidence_rate", "Containing evidence rate", True),
     # Top-1 does not apply to a conceptual corpus (ADR-0023), so it reports

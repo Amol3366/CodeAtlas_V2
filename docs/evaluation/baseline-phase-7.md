@@ -10,6 +10,7 @@ difference is whether a semantic fusion layer is attached.
 | Metric | Deterministic | Semantic | Delta |
 | --- | ---: | ---: | ---: |
 | Primary evidence Recall@10 | 0.6000 | 0.6667 | +0.0667 |
+| Containing evidence Recall@10 | 0.8667 | 0.9333 | +0.0667 |
 | Exact evidence rate | 0.0752 | 0.0563 | -0.0188 |
 | Containing evidence rate | 0.1278 | 0.1080 | -0.0198 |
 | Exact symbol resolution | not applicable | not applicable | not applicable |
