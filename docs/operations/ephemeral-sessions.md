@@ -41,6 +41,44 @@ If you pass `--db`, you get that database, ephemeral flag or not. Naming a
 database is a deliberate instruction, and silently serving a throwaway one
 instead would discard your choice without telling you.
 
+## It covers `serve`, and only `serve`
+
+**`CODEATLAS_EPHEMERAL` is read by the `serve` command. Nothing else consults
+it.** `codeatlas index`, `repo add`, `symbol`, `search`, and `impact` all open
+the real database at `%LOCALAPPDATA%\CodeAtlas\data\codeatlas.db` whatever the
+variable says.
+
+That is deliberate on both sides. A throwaway index is what you want when you
+are working *on* CodeAtlas through the browser; it is useless to a script that
+runs `codeatlas impact` and expects the repository to still be registered next
+time. What was wrong was that neither surface said which file it was using, so
+the split was invisible until someone found data that "should not exist" — which
+is how it was found on 2026-08-09, with two repositories still registered from
+before this mode existed.
+
+Every command that opens a database now names it on **stderr**:
+
+```text
+> codeatlas repo list
+Using database: C:\Users\you\AppData\Local\CodeAtlas\data\codeatlas.db
+No repositories are registered.
+```
+
+`serve` does the same when it is *not* ephemeral; when it is, it keeps its
+existing "storage is empty and will be discarded" line. Either way the mode you
+are in is readable from the first line of output.
+
+The notice goes to stderr on purpose, so `--json` stdout stays machine-readable:
+
+```text
+> codeatlas repo list --json 2>NUL
+[]
+```
+
+If you want a CLI command to use throwaway storage, pass `--db` to a path you
+control. Whether the variable *should* cover the CLI too is an open decision
+against ADR-0013, not a defect to work around.
+
 ## Opening on the repositories you care about
 
 An empty session has no repositories, so by default you would re-add yours every

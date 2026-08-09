@@ -207,6 +207,61 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-09T21:30:00Z — Every CLI command names the database it opened
+
+- Agent: Claude Code `claude-opus-5`, branch `cli-database-path`
+- Transition: no phase task. Post-gate. Takes the visibility half of open item 6
+  from the entry below; the scope half is deliberately left open.
+- Outcome: `_announce_database` prints `Using database: <path>` to **stderr**
+  from `_services`, so every command that opens a database says which one.
+  `serve` calls it in its persistent branch — the ephemeral branch has always
+  announced itself, so the mode was only ever legible from one side.
+- **This changes no behaviour, and that is the point.** `CODEATLAS_EPHEMERAL`
+  still governs `serve` only; the CLI still writes the real database. Both are
+  deliberate. What was wrong is that neither surface said which file it was
+  touching, so the split was invisible until someone found data that should not
+  exist. Changing where the data goes is an ADR-0013 amendment and remains the
+  user's decision, not a side effect of a diagnostics fix.
+- **Stderr, not stdout, and a test pins it.** Every command here takes `--json`,
+  whose contract is a machine-readable stdout; a human-readable line printed
+  into that stream would break the scripted callers the flag exists for — a
+  worse defect than the one being closed.
+- The path is resolved once and used for the announcement, the upgrade, and the
+  connection, so the path named is literally the file opened. Announcing one
+  path while opening another would reintroduce the problem being reported on.
+  A test passes a `..` segment and asserts the reported path is canonical.
+- **A latent weakness in `test_upgrade_command.py` surfaced, and the fix makes
+  it stricter rather than weaker.** Its `_run` helper concatenates stdout and
+  stderr — deliberately, so a refusal message stays testable — and three tests
+  then parsed that combined string as JSON. That only ever worked because
+  stderr happened to be empty on success. They now use a new `_run_json` that
+  reads stdout alone, which is the stronger assertion: the concatenating helper
+  could not have detected a diagnostic leaking into stdout, because it put the
+  leak and the payload into the same string. `_run` is unchanged and still used
+  by the refusal tests.
+- Files: `src/codeatlas/cli/main.py` (`_announce_database`, one call in
+  `_services`, one in `serve`), `tests/contract/test_cli_database_notice.py`
+  (new, three tests), `tests/contract/test_upgrade_command.py` (`_run_json` plus
+  three call sites), `docs/operations/ephemeral-sessions.md` (a new section
+  stating the `serve`-only scope), `documentation/memory.md`.
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  `PARSER_BUNDLE_VERSION` `1.3.0`, `RESOLVER_VERSION` `1.3.0` — none moved.
+  No REST, MCP, or `--json` payload changed; stdout is byte-identical.
+- Test-first: all three new tests written and observed failing against empty
+  stderr before `_announce_database` existed.
+- Verification: `ruff check src tests scripts apps` clean; `mypy
+  --no-incremental src` clean on 144 files; full `uv run pytest -q` **2120
+  passed, 3 skipped** (2117 before, plus the three new);
+  `check_phase4.ps1 -SkipSync` exit 0 (captured from the command).
+- **`ruff format --check` reports `cli/main.py` as unformatted and it was left
+  alone.** All seven diffs are in pre-existing code that none of this touched,
+  and 138 files across the repository are in the same state, so the formatter
+  has not been run repo-wide. Reformatting here would be the unrelated refactor
+  Section 4.5 forbids. The gate is `ruff check`, which is clean.
+- Next / open: unchanged, and item 6 below narrows to the scope question only —
+  **should `CODEATLAS_EPHEMERAL` apply to CLI commands?** Now visible rather
+  than silent, so it can be decided on evidence instead of surprise.
+
 ### 2026-08-09T20:15:00Z — Packaged build refreshed to 1.3.0/1.3.0; both registered repositories deleted as residue
 
 - Agent: Claude Code `claude-opus-5`, branch `main` (clean before and after)

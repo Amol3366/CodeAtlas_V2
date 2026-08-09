@@ -55,6 +55,24 @@ def _run(*arguments: str) -> tuple[int, str]:
     return result.exit_code, result.stdout + result.stderr
 
 
+def _run_json(*arguments: str) -> tuple[int, str]:
+    """Return the exit code and **stdout only**, for `--json` assertions.
+
+    `_run` concatenates both streams so a refusal message stays testable. That
+    is right for prose and wrong for JSON: commands now name the database they
+    opened on stderr, and folding a diagnostic line into the payload makes it
+    unparseable.
+
+    Reading stdout alone is the stricter assertion, not a relaxed one. `--json`
+    promises a machine-readable stdout, so a test that parses stdout by itself
+    fails if anything ever leaks into that stream — which the concatenating
+    helper could not detect, because it put the leak and the payload in the
+    same string.
+    """
+    result = runner.invoke(app, list(arguments))
+    return result.exit_code, result.stdout
+
+
 def _prior(tmp_path: Path) -> Path:
     target = tmp_path / "codeatlas.db"
     shutil.copy2(_FIXTURE, target)
@@ -132,7 +150,7 @@ def test_an_ordinary_command_upgrades_the_database(tmp_path: Path) -> None:
     """The packaged case: the user runs the new build and it just works."""
     database = _prior(tmp_path)
 
-    code, output = _run("repo", "list", "--db", str(database), "--json")
+    code, output = _run_json("repo", "list", "--db", str(database), "--json")
 
     assert code == EXIT_SUCCESS
     assert len(json.loads(output)) == 1
@@ -168,7 +186,7 @@ def test_doctor_reports_the_schema_it_found(tmp_path: Path) -> None:
     says that opening the database is what moved it."""
     database = _prior(tmp_path)
 
-    code, output = _run("doctor", "--db", str(database), "--json")
+    code, output = _run_json("doctor", "--db", str(database), "--json")
 
     payload = json.loads(output)
     assert payload["schema"]["found_version"] == 8
@@ -184,7 +202,7 @@ def test_doctor_on_a_current_database_reports_nothing_pending(
     with connect(database) as connection:
         apply_migrations(connection)
 
-    code, output = _run("doctor", "--db", str(database), "--json")
+    code, output = _run_json("doctor", "--db", str(database), "--json")
 
     assert code == EXIT_SUCCESS
     payload = json.loads(output)

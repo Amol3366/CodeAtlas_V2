@@ -778,18 +778,40 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 ## Known Issues
 
-- **`CODEATLAS_EPHEMERAL` governs `serve` only — the CLI always writes the real
-  database** (found 2026-08-09). `_ephemeral_requested` is read at exactly one
+- ~~**`CODEATLAS_EPHEMERAL` governs `serve` only — the CLI always writes the real
+  database.**~~ **Made visible 2026-08-09**, not changed. Every command that
+  opens a database now prints `Using database: <path>` to **stderr**, and
+  `serve` does the same in its persistent branch (its ephemeral branch already
+  announced itself, so the mode was only ever legible from one side).
+
+  Stderr is the whole design: `--json` promises a machine-readable stdout, and a
+  diagnostic line in that stream would break every scripted caller — a worse
+  defect than the one being fixed. A test parses `--json` stdout on its own to
+  pin that.
+
+  **This surfaced a latent weakness in `test_upgrade_command.py`.** Its `_run`
+  helper concatenates stdout and stderr, deliberately, so refusal messages stay
+  testable — and three tests then parsed that combined string as JSON, which
+  only ever worked because stderr happened to be empty on success. They now use
+  `_run_json`, which reads stdout alone. That is the **stricter** assertion: the
+  concatenating helper could not have detected a leak into stdout, because it
+  put the leak and the payload in the same string.
+
+  The behaviour split itself is unchanged and remains an open decision below.
+- **Whether `CODEATLAS_EPHEMERAL` should cover CLI commands is still open**
+  (raised 2026-08-09). `_ephemeral_requested` is read at exactly one
   call site, inside `serve` (`cli/main.py:866`). Every other command goes
   through `_services`, which is `path = database or default_database_path()`
   (`cli/main.py:178`). So `index`, `repo add`, `symbol`, `search`, and `impact`
   persist to `%LOCALAPPDATA%\CodeAtlas\data\codeatlas.db` no matter what that
   variable says, while the web application starts empty every run.
 
-  Both behaviours are as designed. The problem is that **nothing surfaces the
-  difference**, so a user running with `CODEATLAS_EPHEMERAL=1` is right about
-  `serve` and wrong about the CLI, and discovers it only by finding data that
-  "should not exist". That is exactly how this was found: two repositories
+  Both behaviours are as designed. The original complaint was that **nothing
+  surfaced the difference**, so a user running with `CODEATLAS_EPHEMERAL=1` was
+  right about `serve` and wrong about the CLI, and discovered it only by finding
+  data that "should not exist". **That half is now fixed** — both surfaces name
+  their database — and what remains open is only whether the variable's *scope*
+  should change. That is exactly how this was found: two repositories
   registered 2026-08-01 and 2026-08-03 — before ADR-0013 existed at all — were
   still present, and ephemeral mode could never have removed them, because
   decision 3 is that it never opens the real database. That property is what
