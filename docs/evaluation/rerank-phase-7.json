@@ -12,13 +12,13 @@
     },
     "containing_evidence_rate": {
       "delta": 0.0,
-      "reranked": 0.107981220657277,
-      "semantic": 0.107981220657277
+      "reranked": 0.11162790697674418,
+      "semantic": 0.11162790697674418
     },
     "exact_evidence_rate": {
       "delta": 0.0,
-      "reranked": 0.056338028169014086,
-      "semantic": 0.056338028169014086
+      "reranked": 0.06046511627906977,
+      "semantic": 0.06046511627906977
     },
     "exact_symbol_resolution": {
       "delta": null,
@@ -27,8 +27,8 @@
     },
     "primary_evidence_recall_at_10": {
       "delta": 0.0,
-      "reranked": 0.7333333333333333,
-      "semantic": 0.7333333333333333
+      "reranked": 0.8,
+      "semantic": 0.8
     },
     "unsupported_claim_rate": {
       "delta": 0.0,
@@ -52,26 +52,24 @@
       "abstention_correctness": 1.0,
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
-      "containing_evidence_rate": 0.107981220657277,
+      "containing_evidence_rate": 0.11162790697674418,
       "containing_evidence_recall_at_10": 1.0,
       "direct_impact_recall": 1.0,
-      "exact_evidence_rate": 0.056338028169014086,
+      "exact_evidence_rate": 0.06046511627906977,
       "exact_symbol_resolution": null,
       "finding_precision": 1.0,
       "lexical_resolution": null,
-      "mean_reciprocal_rank": 0.6875,
-      "ndcg_at_10": 0.7291610098214358,
-      "primary_evidence_recall_at_10": 0.7333333333333333,
+      "mean_reciprocal_rank": 0.6977040816326531,
+      "ndcg_at_10": 0.7529705336309596,
+      "primary_evidence_recall_at_10": 0.8,
       "relation_path_correctness": null,
-      "symbol_recall_at_10": 0.8571428571428571,
+      "symbol_recall_at_10": 0.9285714285714286,
       "total_duration_ms": 0.0,
       "unsupported_claim_rate": 0.0,
-      "valid_evidence_rate": 0.056338028169014086
+      "valid_evidence_rate": 0.06046511627906977
     },
-    "targets_met": false,
-    "unmet_targets": [
-      "symbol_recall_at_10"
-    ]
+    "targets_met": true,
+    "unmet_targets": []
   },
   "reranker": {
     "model_id": "none",
@@ -89,25 +87,23 @@
       "abstention_correctness": 1.0,
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
-      "containing_evidence_rate": 0.107981220657277,
+      "containing_evidence_rate": 0.11162790697674418,
       "containing_evidence_recall_at_10": 1.0,
       "direct_impact_recall": 1.0,
-      "exact_evidence_rate": 0.056338028169014086,
+      "exact_evidence_rate": 0.06046511627906977,
       "exact_symbol_resolution": null,
       "finding_precision": 1.0,
       "lexical_resolution": null,
-      "mean_reciprocal_rank": 0.6875,
-      "ndcg_at_10": 0.7291610098214358,
-      "primary_evidence_recall_at_10": 0.7333333333333333,
+      "mean_reciprocal_rank": 0.6977040816326531,
+      "ndcg_at_10": 0.7529705336309596,
+      "primary_evidence_recall_at_10": 0.8,
       "relation_path_correctness": null,
-      "symbol_recall_at_10": 0.8571428571428571,
+      "symbol_recall_at_10": 0.9285714285714286,
       "total_duration_ms": 0.0,
       "unsupported_claim_rate": 0.0,
-      "valid_evidence_rate": 0.056338028169014086
+      "valid_evidence_rate": 0.06046511627906977
     },
-    "targets_met": false,
-    "unmet_targets": [
-      "symbol_recall_at_10"
-    ]
+    "targets_met": true,
+    "unmet_targets": []
   }
 }

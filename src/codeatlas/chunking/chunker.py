@@ -39,7 +39,12 @@ from codeatlas.domain.repository import FileRecord
 from codeatlas.domain.symbols import SymbolRecord
 from codeatlas.parsing.registry import PARSER_BUNDLE_VERSION
 
-CHUNKER_VERSION: str = "1.0.0"
+CHUNKER_VERSION: str = "1.1.0"
+"""1.0.0 → 1.1.0 (ADR-0029): a container with no member symbols carries its
+body rather than its declaration line, so an enum's values and docstring are
+indexed. Chunk text and container identity change, which makes existing
+snapshots stale; `indexing.py` refuses a stale chunker version rather than
+mixing two chunking rules inside one snapshot."""
 
 # Character budgets. Phase 2 has no tokenizer, so characters are a declared
 # proxy at roughly four characters per token. A later phase may recalibrate
@@ -156,7 +161,14 @@ class CodeChunker:
         end_line = min(max(symbol.end_line, start_line), line_count)
         parent = _parent_name(symbol, module_name)
 
-        if symbol.kind in _CONTAINER_KINDS:
+        # A container names its members instead of repeating their bodies,
+        # because each member is chunked separately. With no members there is
+        # no such separate chunk, and the outline reduces the symbol to its
+        # declaration line — an enum indexed as `class OrderStatus(Enum):` and
+        # nothing else, with its values and docstring absent from the index
+        # entirely. A container with no members is a leaf, and leaves carry
+        # their code.
+        if symbol.kind in _CONTAINER_KINDS and members:
             return (
                 self._container(
                     request=request,

@@ -760,6 +760,50 @@ development order is finished. A new phase requires an explicit user decision.
       added — that is a tuning knob needing its own evidence — but it will
       resurface.
 
+- [x] A memberless container carries its body (ADR-0029), 2026-08-10: the
+      `OrderStatus` question ADR-0028 left open. **Extraction and chunking were
+      both correct** — the symbol exists as a `CLASS` at 6–12 and has its own
+      chunk at those lines. The chunk's *text* was the defect, in full:
+      `SYMBOL: OrderStatus / TYPE: CLASS / LINES: 6-12 / CODE: class
+      OrderStatus(Enum):`. `DRAFT`, `PLACED`, `SHIPPED`, `CANCELLED` and the
+      docstring were **absent from the index**, so no ranking change could ever
+      have retrieved it — which is why ADR-0028 moved every other case and not
+      this one.
+
+      A class chunk is an outline naming its members instead of repeating their
+      bodies, which is right because each member is chunked separately. An enum
+      has no member *symbols* — its values are assignments — so the outline
+      reduced it to a declaration line. Rule now: **a container with no members
+      is a leaf, and leaves carry their code.** One condition; the existing leaf
+      path handles size.
+
+      `CHUNKER_VERSION` **1.0.0 → 1.1.0**, its first move since Phase 2, so
+      every existing snapshot must be re-indexed.
+
+      Semantic side: `symbol_recall_at_10` 0.8571 → **0.9286**, evidence
+      Recall@10 0.7333 → 0.8000, nDCG 0.7292 → 0.7530. **Phase 7's conceptual
+      corpus now reports `targets_met: true` with no unmet targets** while the
+      deterministic side still misses two — the gap between the columns is what
+      makes it uplift rather than redefinition.
+
+      **Three cautions on that claim.** It took three changes and only two
+      changed the engine: ADR-0027 corrected the metric (**no engine change**),
+      ADR-0028 fixed fusion, ADR-0029 fixed indexing. Citing "Phase 7 meets
+      every target" without ADR-0027 overstates the engine. **The deterministic
+      side got slightly worse** — MRR 0.3714 → 0.3619, nDCG 0.4557 → 0.4476 —
+      because enum bodies match more queries; that cost is real and unoffset.
+      And **`baseline-phase-3`/`-4` are byte-for-byte unchanged**, because the
+      retrieval fixtures contain no enum: the main accuracy corpus is
+      structurally blind to this rule, the same shape ADR-0016 recorded.
+
+      Rejected: wiring the docstring instead. `SymbolRecord` has no docstring
+      field and all four `build_symbol_retrieval_text` call sites pass
+      `docstring=None`, so that `DOCSTRING:` line is unreachable today and
+      supplying it means parser, domain, schema, and a
+      `PARSER_BUNDLE_VERSION` bump. Carrying the body picks the docstring up
+      anyway. The dead parameter is left as the right seam for
+      member-carrying containers later.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

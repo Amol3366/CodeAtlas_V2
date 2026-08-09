@@ -207,6 +207,102 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T05:00:00Z — A memberless container carries its body (ADR-0029)
+
+- Agent: Claude Code `claude-opus-5`, branch `memberless-container-chunks`
+- Transition: no phase task. Post-gate. Takes the `OrderStatus` question
+  ADR-0028 recorded as open.
+- **Extraction and chunking were both correct.** `OrderStatus` is extracted as a
+  `CLASS` at lines 6–12 — exactly the expected range — and has its own chunk at
+  those lines. The chunk's *text* was the defect, in full:
+
+  ```text
+  SYMBOL: OrderStatus
+  TYPE: CLASS
+  LINES: 6-12
+  CODE:
+  class OrderStatus(Enum):
+  ```
+
+  `DRAFT`, `PLACED`, `SHIPPED`, `CANCELLED` and the docstring were **absent from
+  the index**. No ranking change could have retrieved it, which is exactly why
+  ADR-0028's fusion work moved every other case and left this one alone.
+- Cause: a class chunk is an outline naming its members rather than repeating
+  their bodies — correct, because each member is chunked separately and
+  repeating them would index the same bytes twice. **An enum has no member
+  *symbols*:** its values are assignments, so nothing extracts them and the
+  outline reduced the symbol to its declaration line.
+- Decision: **a container with no member symbols is not a container; it is a
+  leaf, and leaves carry their code.** One condition in
+  `_chunks_for_symbol`; the existing leaf path already handles oversize by
+  splitting at statement boundaries, so no new size handling was written.
+- `CHUNKER_VERSION` **1.0.0 → 1.1.0**, its first move since Phase 2. Chunk text
+  and container identity both change, so **every existing snapshot must be
+  re-indexed**; `indexing.py` refuses a stale chunker version rather than mixing
+  two chunking rules in one snapshot.
+- Measured, semantic side:
+
+  | Metric | Before | After |
+  | --- | ---: | ---: |
+  | `symbol_recall_at_10` | 0.8571 | **0.9286** |
+  | `primary_evidence_recall_at_10` | 0.7333 | **0.8000** |
+  | `ndcg_at_10` | 0.7292 | **0.7530** |
+  | `mean_reciprocal_rank` | 0.6875 | 0.6977 |
+  | `containing_evidence_recall_at_10` | 1.0000 | 1.0000 |
+
+  s013 retrieves `OrderStatus` at rank 7, from absent.
+- **Phase 7's conceptual corpus now reports `targets_met: true` with no unmet
+  targets on the semantic side, while the deterministic side still misses two**
+  (0.8667 and 0.7143). The gap between the columns is what makes this uplift
+  rather than redefinition.
+
+  **The claim needs its history attached.** Three records produced it and only
+  two changed the engine: ADR-0027 corrected the metric to ADR-0003's
+  containment granularity (**no engine change**), ADR-0028 fixed fusion, this
+  fixed indexing. Quoting "Phase 7 meets every target" without ADR-0027
+  overstates what the engine does.
+- **The cost, stated: the deterministic side got slightly worse** — MRR
+  0.3714 → 0.3619, nDCG 0.4557 → 0.4476, evidence rates 0.0752 → 0.0741 and
+  0.1278 → 0.1259. Enum bodies add text that matches more queries, diluting
+  lexical ranking. Real, and unoffset on that column.
+- **`baseline-phase-3` and `-4` are byte-for-byte unchanged**, because the
+  retrieval fixtures contain no enum and therefore no memberless container. The
+  change is surgical — and the main accuracy corpus is structurally blind to it,
+  the same shape ADR-0016 recorded when the Phase 4 corpus could not see
+  derivation-tiered edges. Coverage lives in unit tests instead.
+- Rejected: wiring the docstring instead. `SymbolRecord` has no docstring field
+  and all four `build_symbol_retrieval_text` call sites pass `docstring=None`,
+  so the builder's `DOCSTRING:` line is unreachable today; supplying it means
+  parser, domain record, storage, and a `PARSER_BUNDLE_VERSION` bump. Carrying
+  the body picks the docstring up anyway. The dead parameter is left in place as
+  the right seam for member-carrying containers later, and recorded rather than
+  removed.
+- Files: `src/codeatlas/chunking/chunker.py` (one condition, one version
+  constant), `tests/unit/test_memberless_container_chunks.py` (new, five tests),
+  `docs/adr/0029-memberless-container-chunks.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-7` and `rerank-phase-7`,
+  `documentation/memory.md`.
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION` untouched.
+- Test-first: three tests written and observed failing. The two guards — a class
+  *with* members still carries only its outline, and the chunk keeps its own
+  line range — passed from the start and are deliberately kept: the first is
+  what stops this widening into "every class repeats its members", which is the
+  duplication the outline rule exists to prevent.
+- Next / open:
+  1. **s001 is the last conceptual miss**, at rank 12. It no longer fails a
+     declared target, so it is discretionary.
+  2. **The retrieval corpus has no enum**, so it cannot see this rule at all.
+     Whether to add one is a corpus decision, not an edit to expectations
+     (ADR-0003).
+  3. RRF's coarse-chunk bias, recorded in ADR-0028 and still untuned.
+  4. q019's naming ruling and `lexical_resolution`'s threshold, unchanged.
+  5. `relation_path_correctness` naming convention and gate target, unchanged.
+  6. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands, unchanged.
+  7. **The packaged build is now three version bumps behind** — it predates
+     `RESOLVER_VERSION` 1.3.0, `PARSER_BUNDLE_VERSION` 1.3.0, and now
+     `CHUNKER_VERSION` 1.1.0.
+
 ### 2026-08-10T02:30:00Z — Both retrieval channels are fused by rank (ADR-0028)
 
 - Agent: Claude Code `claude-opus-5`, branch `rank-fusion`
