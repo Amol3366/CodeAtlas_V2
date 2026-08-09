@@ -63,6 +63,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0033](0033-exact-symbol-threshold-granularity.md) | The second instance ADR-0032 recorded: `exact_symbol_resolution` scores 27 cases against 0.98, requiring 27/27 with zero failures tolerated. **Kept at 0.98, deliberately not restated as 1.0** — unlike `lexical_resolution`'s internal provisional 0.90, this is a Section 19.3 release target that becomes expressible at ~50 cases, so restating it would tighten a product promise to match an artifact of corpus size. Documented at the constant and pinned by tests; the real fix is corpus size | none (post-gate) |
 
+| [0034](0034-trace-follows-routes.md) | `relation_path_correctness` (0.3182, no gate target) averages **four unrelated causes**, which is why no threshold could mean anything. Fixes one: `trace` never traversed `ROUTES_TO`, so a flow could not cross the HTTP boundary that relation exists to model, and an answer with edges but no buildable path returned an empty `relation_paths` with **no warning**. Now follows routes and warns `RELATION_PATH_UNRESOLVED` on a shortfall; 0.3182 → 0.5000 with no other metric moving | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

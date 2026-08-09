@@ -184,6 +184,13 @@ class GraphQueryService:
                 RelationKind.CALLS,
                 RelationKind.MAY_CALL,
                 RelationKind.IMPORTS,
+                # ADR-0034. `ROUTES_TO` exists to model an HTTP boundary
+                # (P4-05), and a flow question is the one question that most
+                # needs to cross it: without this a trace stops at the frontend
+                # caller and never reaches the handler it invokes, which is the
+                # cross-language capability the `mixed_app` fixture exists to
+                # demonstrate.
+                RelationKind.ROUTES_TO,
             ),
             noun="flow",
         )
@@ -343,6 +350,24 @@ class GraphQueryService:
         # statement of what relates to what. Additive per ADR-0004 — the field
         # has always existed and clients that ignore it are unaffected.
         relation_paths = self._paths(result, built.evidence, symbols_by_id)
+
+        # Some edge was counted and claimed but reached no path. A path needs
+        # resolved endpoints, and an edge to an unresolved target -- a browser
+        # global, a third-party callable -- has none, so this is expected and
+        # not an error.
+        #
+        # Saying so is the point (Section 4.1). The summary counts *edges* and
+        # `relation_paths` carries *paths*, so without this the two disagree
+        # silently: `loadOrder` reports three flow relations and one path, and
+        # a client reading the structured field has no way to tell that two
+        # were inexpressible rather than absent (ADR-0034).
+        #
+        # Compared by count rather than identity because a path withholds all
+        # its steps when any one loses its evidence, so an edge can vanish
+        # without being individually identifiable here.
+        pathed_steps = sum(len(path.steps) for path in relation_paths)
+        if len(result.edges) > pathed_steps:
+            warnings.append("RELATION_PATH_UNRESOLVED")
 
         return QueryResponse(
             request_id=request.request_id,

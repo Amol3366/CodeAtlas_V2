@@ -909,6 +909,40 @@ development order is finished. A new phase requires an explicit user decision.
       record stops applying. `AGENTS.md` was **not** edited. The real fix —
       growing the symbol corpus toward fifty cases — is now a recorded open item.
 
+- [x] A flow follows routes (ADR-0034), 2026-08-10: the last unexamined metric.
+      **`relation_path_correctness` 0.3182 averages four unrelated causes**,
+      which is why it never had a gate target — a threshold over four different
+      things cannot be reasoned about (the ADR-0023 lesson again).
+
+      Fixed one. Neither q026 nor q032 was a retrieval failure: the expected
+      `loadOrder ROUTES_TO get_order` edge is extracted, resolved and **stored**.
+      **`trace` never traversed `ROUTES_TO`** — its kinds were CALLS, MAY_CALL,
+      IMPORTS — so a flow question could not cross the HTTP boundary that
+      relation exists to model, which is the cross-language capability the
+      `mixed_app` fixture demonstrates. And an answer with edges but no buildable
+      path reported "loadOrder has 2 flow", rendered claims, and returned an
+      **empty `relation_paths` with no warning** — the ADR-0020 gap still open
+      for unresolved targets, invisible because an empty list looks like "no
+      relations".
+
+      0.3182 → **0.5000**; q026/q032 to 1.0000 exactly. **No other metric moved**
+      and both Phase 7 artifacts still reproduce byte-for-byte.
+
+      **My first implementation was wrong and a test caught it**: I warned only
+      when *no* path could be built, which stopped firing the moment ROUTES_TO
+      produced one — leaving two unrepresented edges silent again. It now
+      compares counts, because `_paths` withholds all of a path's steps when one
+      loses its evidence, so a missing edge cannot be named individually.
+
+      **Not fixed, and recorded so 0.5000 is not read as engine weakness:**
+      lexical intents emit no relation paths though their edges are stored
+      (q027/q029 — a design decision); module naming `orders` vs `src.orders`
+      (q010/q015/q017 — a q019-style ruling); and **precision penalising truth**
+      (q005 — the engine emits two correct edges, the corpus declares one, and
+      ADR-0020 deliberately mandates emitting every supporting edge, so this
+      metric punishes what another record requires). Precision may be the wrong
+      instrument, exactly as exact-match was in ADR-0027.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
