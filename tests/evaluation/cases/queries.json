@@ -781,11 +781,11 @@
                       "intent":  "CONCEPTUAL",
                       "expected_abstention":  false,
                       "expected_symbols":  [
-                                               "README.Sample Service",
+                                               "Sample Service",
                                                "service.port"
                                            ],
                       "expected_relations":  [
-                                                 "README DOCUMENTS service.port"
+                                                 "Sample Service DOCUMENTS service.port"
                                              ],
                       "expected_evidence":  [
                                                 {
