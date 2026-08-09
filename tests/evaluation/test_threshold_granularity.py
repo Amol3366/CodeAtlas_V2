@@ -16,22 +16,31 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from codeatlas.evaluation.dataset import LEXICAL_INTENTS, load_dataset
+from codeatlas.evaluation.dataset import (
+    LEXICAL_INTENTS,
+    SYMBOL_INTENTS,
+    load_dataset,
+)
 from codeatlas.evaluation.engine_adapter import SUPPORTED_FIXTURES
 
 DATASET_ROOT = Path("tests/evaluation/cases")
 LEXICAL_THRESHOLD = 1.0
+EXACT_SYMBOL_THRESHOLD = 0.98
 
 
-def _scored_lexical_cases() -> int:
+def _scored(intents: frozenset[str] | set[str]) -> int:
     dataset = load_dataset(DATASET_ROOT)
     return sum(
         1
         for case in dataset.query_cases
-        if case.intent in LEXICAL_INTENTS
+        if case.intent in intents
         and case.expected_symbols
         and case.repository_fixture in SUPPORTED_FIXTURES
     )
+
+
+def _scored_lexical_cases() -> int:
+    return _scored(LEXICAL_INTENTS)
 
 
 def test_the_lexical_gate_tolerates_no_failures_at_this_corpus_size() -> None:
@@ -53,6 +62,41 @@ def test_the_replaced_threshold_selected_the_same_cases() -> None:
     scored = _scored_lexical_cases()
 
     assert math.ceil(0.90 * scored - 1e-9) == math.ceil(1.0 * scored - 1e-9)
+
+
+def test_the_exact_symbol_gate_is_stricter_than_its_stated_target() -> None:
+    """Section 19.3 declares >= 98%. At 27 cases that enforces 27/27.
+
+    Kept at 0.98 rather than restated as 1.0 (ADR-0033). Unlike
+    `lexical_resolution`'s provisional 0.90, this is a release commitment that
+    becomes expressible once the corpus reaches roughly fifty cases; restating
+    it would tighten a product promise to match an artifact of corpus size.
+
+    Being stricter than the target is safe -- nothing violating 98% can pass.
+    This test exists so the discrepancy is visible rather than surprising.
+    """
+    scored = _scored(SYMBOL_INTENTS)
+    required = math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9)
+
+    assert scored == 27
+    assert required == scored, "0.98 tolerates no failures at this corpus size"
+
+
+def test_the_exact_symbol_target_becomes_meaningful_on_a_larger_corpus() -> None:
+    """The condition under which 0.98 starts expressing what it says.
+
+    Fails deliberately once the corpus is large enough for 0.98 and 1.0 to
+    differ -- at which point the gate stops being stricter than its target and
+    ADR-0033's reasoning no longer needs stating.
+    """
+    scored = _scored(SYMBOL_INTENTS)
+
+    assert math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9) == math.ceil(
+        1.0 * scored - 1e-9
+    ), "0.98 and 1.0 have separated; revisit ADR-0033"
+
+    fifty = 50
+    assert math.ceil(EXACT_SYMBOL_THRESHOLD * fifty - 1e-9) < fifty
 
 
 def test_a_lower_threshold_would_have_to_be_a_multiple_of_the_case_size() -> None:
