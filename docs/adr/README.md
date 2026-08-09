@@ -61,6 +61,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0032](0032-lexical-resolution-threshold.md) | `lexical_resolution` scores **eight** cases (two of ten are excluded by ADR-0024), so it moves in steps of 0.125 and the provisional 0.90 already required 8/8 with zero failures tolerated — arithmetically identical to 1.0 while reading as though a miss were acceptable. Set to 1.0; both baselines reproduce byte-for-byte, which is the evidence it is a restatement not a tightening. **`exact_symbol_resolution`'s 0.98 has the same illusion** — 27 cases, 27/27 required — and is left open because it is a Section 19.3 target cited in approved gates | none (post-gate) |
 
+| [0033](0033-exact-symbol-threshold-granularity.md) | The second instance ADR-0032 recorded: `exact_symbol_resolution` scores 27 cases against 0.98, requiring 27/27 with zero failures tolerated. **Kept at 0.98, deliberately not restated as 1.0** — unlike `lexical_resolution`'s internal provisional 0.90, this is a Section 19.3 release target that becomes expressible at ~50 cases, so restating it would tighten a product promise to match an artifact of corpus size. Documented at the constant and pinned by tests; the real fix is corpus size | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

@@ -717,6 +717,23 @@ def _unmet_targets(
         ),
     }
     if profile == "retrieval":
+        # `AGENTS.md` Section 19.3's declared product target, kept verbatim.
+        #
+        # **At this corpus size it enforces 27/27 and tolerates no failures**,
+        # because 27 scored symbol-shaped cases can only produce 1.0000,
+        # 0.9630, 0.9259, ... and 0.98 falls between the first two. The gate is
+        # therefore stricter than the number reads (ADR-0033).
+        #
+        # That is deliberate, and the number is **not** changed to 1.0 the way
+        # `lexical_resolution` was. 0.90 there was an internal provisional value
+        # with no product meaning; 0.98 is a release commitment that becomes
+        # expressible the moment the corpus reaches ~50 cases. Restating it as
+        # 1.0 would tighten a product promise to match an artifact of corpus
+        # size, and amending Section 19.3 to follow would edit the release
+        # authority to suit the instrument.
+        #
+        # Being stricter than the target is safe: nothing violating 98% can
+        # pass. The limitation is corpus size, and the fix is more cases.
         minimums["exact_symbol_resolution"] = (
             metrics.exact_symbol_resolution,
             0.98,

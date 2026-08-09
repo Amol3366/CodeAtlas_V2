@@ -884,6 +884,31 @@ development order is finished. A new phase requires an explicit user decision.
       a Section 19.3 target cited in approved phase gates, so correcting it is a
       larger decision, left open on purpose.
 
+- [x] `exact_symbol_resolution` keeps 0.98 (ADR-0033), 2026-08-10: the second
+      granularity illusion ADR-0032 recorded. 27 scored cases against 0.98
+      requires **27/27 with zero failures tolerated**, because 27 cases produce
+      only 1.0000, 0.9630, 0.9259 … and 0.98 falls between the first two.
+
+      **Deliberately NOT restated as 1.0, and the difference from ADR-0032 is
+      the point.** `lexical_resolution`'s 0.90 was an internal provisional value
+      with no product meaning, so restating it cost nothing. **0.98 is a
+      declared release target in `AGENTS.md` §19.3**, cited in approved phase
+      gates, and it becomes expressible at ~50 cases (where it tolerates one
+      miss). Setting the gate to 1.0 would either make the implementation
+      quietly disagree with the contract — what ADR-0013 refused — or force
+      amending §19.3 to 100%, which tightens a *product promise* to match an
+      artifact of corpus size.
+
+      **The number is not wrong; the corpus is too small to express it.** Being
+      stricter than the target is safe — nothing violating 98% can pass. The
+      defect was that the strictness was undocumented.
+
+      Documented at the constant, pinned by two tests. One asserts 0.98
+      tolerates no failures at 27 cases; the other **fails deliberately once the
+      corpus grows enough for 0.98 and 1.0 to separate**, at which point the
+      record stops applying. `AGENTS.md` was **not** edited. The real fix —
+      growing the symbol corpus toward fifty cases — is now a recorded open item.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

@@ -207,6 +207,55 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T09:15:00Z — `exact_symbol_resolution` keeps 0.98 (ADR-0033)
+
+- Agent: Claude Code `claude-opus-5`, branch `exact-symbol-threshold`
+- Transition: no phase task. Post-gate. Takes the second granularity illusion
+  ADR-0032 recorded and deliberately left open.
+- Arithmetic: **27 scored symbol-shaped cases against 0.98 requires 27/27 and
+  tolerates zero failures.** 27 cases produce only 1.0000, 0.9630, 0.9259, …
+  and 0.98 falls between the first two. Both baselines measure 1.0000, so the
+  gate passes either way.
+- **Decision: keep 0.98. This is deliberately not what ADR-0032 did to
+  `lexical_resolution`, and the difference is the record's substance.**
+  - `lexical_resolution`'s 0.90 was an **internal provisional value** invented
+    in ADR-0023 with no product meaning; restating it as 1.0 cost nothing.
+  - `exact_symbol_resolution`'s 0.98 is a **declared release target** in
+    `AGENTS.md` Section 19.3, cited in approved phase gates, and it becomes
+    expressible at roughly fifty cases — where it tolerates one miss.
+- Two alternatives rejected for one reason. Setting the gate to 1.0 while
+  Section 19.3 says 98% makes the implementation **quietly disagree with the
+  contract**, which ADR-0013 explicitly refused. Amending Section 19.3 to 100%
+  instead **tightens a product promise to match an artifact of corpus size** —
+  the instrument dictating to the authority it exists to measure.
+- **The number is not wrong; the corpus is too small to express it.** Being
+  stricter than the declared target is safe: nothing violating 98% can pass a
+  27/27 gate. The defect was that the strictness was undocumented, so a reader
+  met a number that misdescribed the behaviour.
+- Files: `src/codeatlas/evaluation/runner.py` (comment only, **the constant is
+  unchanged**), `tests/evaluation/test_threshold_granularity.py` (two tests
+  added, one helper generalised), `docs/adr/0033-exact-symbol-threshold-granularity.md`
+  (new), `docs/adr/README.md`, `documentation/memory.md`.
+  **`AGENTS.md` was not edited.**
+- Contracts/migrations: none. No threshold, metric, baseline, corpus, or version
+  constant changed, so nothing was regenerated and no number moved.
+- Verification: `ruff` and `mypy` clean; full `uv run pytest -q` with the exit
+  code captured from pytest; `check_phase4.ps1 -SkipSync` exit 0. Both
+  baselines untouched and therefore still reproducing.
+- Next / open:
+  1. **Grow the symbol-shaped corpus toward fifty cases**, which is what would
+     make Section 19.3's 98% mean what it says. Now a recorded item rather than
+     an implicit one.
+  2. **The module-granularity ruling** (ADR-0030).
+  3. `relation_path_correctness` 0.3182, with no gate target — the last
+     genuinely unexamined metric.
+  4. Phase 4's `containing_evidence_recall_at_10` 0.8305 and
+     `containing_evidence_rate` 0.6667, both unmet; ADR-0023 already flags
+     whether the latter's 1.0 is reachable as an open question.
+  5. RRF's coarse-chunk bias (ADR-0028), with ADR-0030's warning attached.
+  6. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands.
+  7. Phase 4's `changed_symbol_precision` 0.9375 — structural (c020–c022).
+
 ### 2026-08-10T08:30:00Z — `lexical_resolution` is gated at 1.0 (ADR-0032)
 
 - Agent: Claude Code `claude-opus-5`, branch `lexical-resolution-threshold`
