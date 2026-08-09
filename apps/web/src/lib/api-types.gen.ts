@@ -2071,7 +2071,7 @@ export interface operations {
     get_report_v1_change_analysis__analysis_id__report_get: {
         parameters: {
             query?: {
-                report_format?: "json" | "markdown" | "sarif";
+                report_format?: "json" | "markdown" | "pr" | "sarif";
             };
             header?: never;
             path: {
