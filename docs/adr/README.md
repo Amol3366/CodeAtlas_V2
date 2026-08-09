@@ -57,6 +57,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0030](0030-conceptual-answers-at-module-granularity.md) | s001's last miss is not a defect: the module docstring "Keeping two customers from being sold the same unit" paraphrases the question, so both channels rank the module first and are right to, while the corpus declares the method that implements it. **Nothing is changed** — the coarse-chunk penalty that would promote the method also demotes the chunk currently providing the rank-1 containment hit, so it trades an evidence hit for a symbol hit and needs corpus-wide measurement, not one case | none (post-gate) |
 
+| [0031](0031-document-section-naming.md) | The corpus used two conventions for naming a markdown section — q019 declared `README.Health` while q027/q031 declared bare headings and extraction emits bare headings everywhere. Because `expected_symbols[0]` is **the query the harness issues**, q019 was asking for a symbol nothing can produce and the engine's correct abstention was scored as a miss. Bare heading is now the single rule; `lexical_resolution` 0.8750 → 1.0000 and `abstention_correctness` → 1.0000, from one line — the leverage ADR-0003 restrains, justified by the corpus contradicting itself rather than by the number | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

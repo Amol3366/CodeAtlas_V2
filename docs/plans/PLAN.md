@@ -207,6 +207,76 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T07:30:00Z — A document section is named by its bare heading (ADR-0031)
+
+- Agent: Claude Code `claude-opus-5`, branch `document-section-naming`
+- Transition: no phase task. Post-gate. Closes the q019 ruling open since
+  ADR-0024, on the user's decision that the bare name is correct.
+- The corpus used **two conventions for the same kind of thing**: q019 declared
+  `README.Health`, q027 and q031 declared bare headings. Extraction emits bare
+  headings everywhere — `Sample Service`, `Health`, `Order flow` — and no
+  file-stem qualification exists anywhere in the engine, so `README.Health`
+  named a symbol the system cannot produce.
+- **The mechanism is what makes this more than a mislabelled expectation.**
+  `expected_symbols[0]` is not only the string the scorer compares against; it
+  is **the query the harness issues** (`_query_term` returns `query_subject`
+  when present and `expected_symbols[0]` otherwise). q019 asked the engine to
+  find `README.Health`, nothing resolved it, the engine abstained — **correct
+  behaviour on an impossible query** — and that abstention was scored as wrong
+  on a case declaring `expected_abstention: false`. The corpus was posing an
+  unanswerable question and recording the refusal as a defect: the ADR-0018 and
+  ADR-0024 shape again.
+- Decision: bare heading is the single rule. **One line** of
+  `tests/evaluation/cases/queries.json`; no fixture, question, intent, evidence
+  range, or forbidden claim touched, and no engine code changed.
+- Measured, on both live baselines:
+
+  | Metric | Before | After |
+  | --- | ---: | ---: |
+  | `lexical_resolution` | 0.8750 | **1.0000** (8/8) |
+  | `mean_reciprocal_rank` | 0.9714 | **1.0000** |
+  | `abstention_correctness` | 0.9714 | **1.0000** |
+  | `ndcg_at_10` | 0.9051 | 0.9337 |
+  | `symbol_recall_at_10` | 0.8857 | 0.9143 |
+
+  `lexical_resolution` leaves `unmet_targets` on `baseline-phase-3` and `-4`.
+- **A one-line corpus edit moving five metrics is exactly the leverage ADR-0003
+  exists to restrain, and the magnitude is not evidence the change was right.**
+  It is explained by the edit changing the engine's *input* rather than the
+  comparison string. `abstention_correctness` reaching 1.0000 is the clearest
+  proof: no abstention logic changed, the engine merely stopped being asked for
+  a symbol that cannot exist.
+
+  The test recorded for reuse: *if the engine emitted `README.Health` and the
+  corpus declared `Health`, changing the corpus would be gaming.* Here the
+  corpus contradicted **itself**, and the ruling adopts the convention already
+  used by two of its three cases and by the engine.
+- Cost stated: **bare headings are ambiguous.** Two files with a `## Health`
+  heading would both emit `Health`. This corpus has no collision, so the ruling
+  is safe here and is **not** a general claim that bare headings suffice as
+  identifiers; a repository with repeated headings would need qualification
+  built as a real extraction rule for every document, not for one case.
+- Files: `tests/evaluation/cases/queries.json` (one line),
+  `docs/adr/0031-document-section-naming.md` (new), `docs/adr/README.md`,
+  regenerated `baseline-phase-0`, `-3`, `-4`, `documentation/memory.md`.
+  **`baseline-phase-1` and `-2` untouched** — frozen history.
+  `baseline-phase-7` unaffected: a different dataset with no such case.
+- Contracts/migrations: none. Dataset contract `1.0`, `contract_version` `1.1`,
+  `SCHEMA_VERSION` `14`, `CHUNKER_VERSION` `1.1.0`, `PARSER_BUNDLE_VERSION` and
+  `RESOLVER_VERSION` `1.3.0` — all untouched.
+- Verification: dataset validation reports 40 query cases and `valid`; `ruff`
+  and `mypy` clean; full `uv run pytest -q` exit code captured from pytest;
+  `check_phase4.ps1 -SkipSync` exit 0.
+- Next / open, now shorter:
+  1. **`lexical_resolution`'s threshold is less urgent but unanswered.** At 8/8
+     it reads 1.0000 and the provisional 0.90 passes, but with eight scorable
+     cases every value is a multiple of 0.125, so 0.90 still means "8 of 8".
+  2. **The module-granularity ruling** (ADR-0030), still open.
+  3. `relation_path_correctness` naming convention and gate target.
+  4. RRF's coarse-chunk bias (ADR-0028), with ADR-0030's warning attached.
+  5. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands.
+  6. Phase 4's `changed_symbol_precision` 0.9375 remains structural (c020–c022).
+
 ### 2026-08-10T06:30:00Z — s001 is a granularity disagreement; nothing changed (ADR-0030)
 
 - Agent: Claude Code `claude-opus-5`, branch `s001-granularity`

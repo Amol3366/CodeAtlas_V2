@@ -616,7 +616,7 @@
                       "intent":  "DOCUMENT_LOOKUP",
                       "expected_abstention":  false,
                       "expected_symbols":  [
-                                               "README.Health"
+                                               "Health"
                                            ],
                       "expected_relations":  [
 
