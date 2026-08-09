@@ -314,7 +314,7 @@
                                                "IdempotencyStore"
                                            ],
                       "expected_relations":  [
-                                                 "service IMPORTS idempotency"
+                                                 "src.payments.service IMPORTS idempotency"
                                              ],
                       "expected_evidence":  [
                                                 {
@@ -482,7 +482,7 @@
                                                "total"
                                            ],
                       "expected_relations":  [
-                                                 "client IMPORTS total"
+                                                 "src.client IMPORTS total"
                                              ],
                       "expected_evidence":  [
                                                 {
@@ -552,8 +552,8 @@
                                                "total"
                                            ],
                       "expected_relations":  [
-                                                 "orders EXPORTS Order",
-                                                 "orders EXPORTS total"
+                                                 "src.orders EXPORTS Order",
+                                                 "src.orders EXPORTS total"
                                              ],
                       "expected_evidence":  [
                                                 {

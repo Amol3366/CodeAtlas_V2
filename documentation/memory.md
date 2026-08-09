@@ -943,6 +943,35 @@ development order is finished. A new phase requires an explicit user decision.
       metric punishes what another record requires). Precision may be the wrong
       instrument, exactly as exact-match was in ADR-0027.
 
+- [x] Relation endpoints use qualified names (ADR-0035), 2026-08-10: the second
+      of the four `relation_path_correctness` causes ADR-0034 decomposed. The
+      corpus declared `orders EXPORTS Order`, `client IMPORTS total`,
+      `service IMPORTS idempotency` — and **none of those bare names is a
+      symbol.** The module symbols are `src.orders`, `src.client`,
+      `src.payments.service`.
+
+      Unlike q019 the corpus was **internally consistent** (it wrote every
+      module bare), which is why this needed its own ruling rather than
+      following ADR-0031 automatically. What makes the edit legitimate is
+      narrower and checkable: **an expectation must reference an identifier the
+      system can produce**, or it is unsatisfiable by construction. The corpus
+      already qualifies a method by its class (`PaymentService.capture`);
+      qualifying a module by its package is the same rule one level up.
+
+      0.5000 → **0.6364**; q017 to 1.0000, q015 to 0.5000. No other metric moved.
+
+      **q010 is deliberately half-fixed.** Its source was qualified; its target
+      was not. `from .idempotency import IdempotencyStore` — the corpus claims
+      the edge targets the **module**, the engine records the **class** actually
+      bound, and ADR-0021's import-and-call rule depends on the engine's
+      reading. That is a modelling question, not a spelling, so q010 still
+      scores 0 for one stated reason instead of two.
+
+      **q015 reaching only 0.5 is the lesson**: its expectation now matches and
+      precision still halves it, because the engine emits a second *true* edge
+      the corpus did not declare. Naming was never going to fix that — it is the
+      remaining ADR-0020-versus-precision conflict.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

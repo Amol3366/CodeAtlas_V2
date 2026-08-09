@@ -65,6 +65,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0034](0034-trace-follows-routes.md) | `relation_path_correctness` (0.3182, no gate target) averages **four unrelated causes**, which is why no threshold could mean anything. Fixes one: `trace` never traversed `ROUTES_TO`, so a flow could not cross the HTTP boundary that relation exists to model, and an answer with edges but no buildable path returned an empty `relation_paths` with **no warning**. Now follows routes and warns `RELATION_PATH_UNRESOLVED` on a shortfall; 0.3182 → 0.5000 with no other metric moving | none (post-gate) |
 
+| [0035](0035-relation-endpoint-naming.md) | The corpus declared relation endpoints as bare module names — `orders EXPORTS Order` — that **name no symbol**; the module symbols are `src.orders`, `src.client`, `src.payments.service`. Qualified, on the ADR-0031 test: an expectation must reference an identifier the system can produce. 0.5000 → 0.6364. **q010 is deliberately half-fixed** — its target is a modelling question (does `IMPORTS` point at the module or the class actually bound?), not a spelling, so it still scores 0 for one stated reason | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its
