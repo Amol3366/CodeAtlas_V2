@@ -53,6 +53,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0028](0028-rank-fusion.md) | Fusion appended semantic candidates after all deterministic evidence and dropped any already cited, so a chunk both channels found kept its lexical position — the semantic channel ranked s007's answer 8th and s003's 1st while the fused answer buried them at 16th and 5th, and **two separately-recorded engine defects turned out to be one fusion defect**. Reciprocal-rank fusion over both channels, ranks only and never scores; Recall@10 1.0000 and MRR 0.4429 → 0.6875 with evidence rates unchanged, the signature of a pure reorder | none (post-gate) |
 
+| [0029](0029-memberless-container-chunks.md) | A class chunk is an outline naming its members, which is right until the class has no member *symbols* — an enum's values are assignments, so `OrderStatus` was indexed as `class OrderStatus(Enum):` and nothing else, with `DRAFT`/`PLACED`/`SHIPPED`/`CANCELLED` and its docstring absent from the index entirely. A container with no members is a leaf and carries its body; `CHUNKER_VERSION` 1.0.0 → 1.1.0, its first move since Phase 2, so every snapshot must be re-indexed | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its
