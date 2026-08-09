@@ -206,12 +206,24 @@ def test_semantic_evidence_is_labelled_a_candidate(fixture: Fixture) -> None:
     assert all(item.derivation is Derivation.SEMANTIC_CANDIDATE for item in added)
 
 
-def test_deterministic_evidence_keeps_its_place_and_its_derivation(
+def test_deterministic_evidence_survives_fusion_unchanged(
     fixture: Fixture,
 ) -> None:
-    """Appended, not merged. A semantic hit that reordered the deterministic
-    answer would be deciding relevance, which is the authority it does not
-    have."""
+    """Every deterministic item is still present, and still deterministic.
+
+    **This test used to assert the deterministic evidence kept its exact
+    positions**, with a docstring arguing that reordering it would be the
+    semantic layer "deciding relevance, which is the authority it does not
+    have". ADR-0028 overturns that on measured evidence: the semantic channel
+    ranked the right answer 8th for s007 and 1st for s003 while the appended
+    order buried them at 16th and 5th, and Recall@10 and MRR both paid for it.
+
+    The principle it was protecting is kept and is what this asserts now.
+    Section 4.3 forbids a model score *promoting a candidate to deterministic
+    evidence*. Order is not derivation: an item carried to a new position is
+    the same object with the same label, and the ladder still decides what may
+    support a finding. Nothing here may weaken to allow a derivation change.
+    """
     _opt_in(fixture)
     provider = KeywordProvider()
     _embed(fixture, provider)
@@ -220,8 +232,14 @@ def test_deterministic_evidence_keeps_its_place_and_its_derivation(
         fixture.deterministic, question="how does capture work"
     )
 
-    prefix = augmented.evidence[: len(fixture.deterministic.evidence)]
-    assert prefix == fixture.deterministic.evidence
+    before = {item.evidence_id: item for item in fixture.deterministic.evidence}
+    after = {item.evidence_id: item for item in augmented.evidence}
+
+    assert set(before) <= set(after), "fusion dropped deterministic evidence"
+    for evidence_id, original in before.items():
+        assert after[evidence_id] == original, (
+            "a deterministic evidence object was altered, not merely reordered"
+        )
 
 
 def test_semantic_claims_are_labelled_and_cite_their_evidence(

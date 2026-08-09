@@ -207,6 +207,101 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T02:30:00Z — Both retrieval channels are fused by rank (ADR-0028)
+
+- Agent: Claude Code `claude-opus-5`, branch `rank-fusion`
+- Transition: no phase task. Post-gate. Takes the s007 miss ADR-0027 left open,
+  by the user's ruling that it be its own slice.
+- **Retrieval was not what failed.** The semantic channel already ranked
+  `OrderService.cancel` **8th** for s007; the fused response put it 16th.
+  `augment` appended candidates after every deterministic item and dropped any
+  the deterministic half had already cited, so a chunk both channels found kept
+  its lexical position and gained nothing. Its own comment said "the two
+  channels finding the same chunk is the point of fusing them" and then
+  discarded exactly that.
+- **Two separately-recorded engine defects were one fusion defect.** s003's
+  ranking weakness — ADR-0022 finding 3, "one genuine engine weakness", blamed
+  on lexical matching of the word "customer", and the thing this session was
+  originally asked to fix — had the same cause: semantic ranked `shipping_for`
+  **1st**, fusion buried it at 5th.
+- Decision (user ruling, after asking to see the regressions first): reciprocal-
+  rank fusion over both channels, `1/(k+rank)`, `k=60`, in a pure
+  `application/rank_fusion.py` with its own unit tests. Ranks only, never
+  scores — a BM25 score and a cosine distance are not comparable quantities and
+  combining them would invent a number that means nothing.
+- Measured, semantic side:
+
+  | Metric | Before | After |
+  | --- | ---: | ---: |
+  | `containing_evidence_recall_at_10` | 0.9333 | **1.0000** |
+  | `symbol_recall_at_10` | 0.7857 | **0.8571** |
+  | `mean_reciprocal_rank` | 0.4429 | **0.6875** |
+  | `ndcg_at_10` | 0.5271 | **0.7292** |
+  | `exact` / `containing_evidence_rate` | — | **unchanged** |
+
+  **Evidence rates not moving is the correct signature for a pure reorder** —
+  the same evidence, in a better order. Contrast ADR-0025, where recall rose and
+  span precision fell because the evidence set itself changed.
+- Costs, examined *before* the decision rather than found after: s004's
+  `tax_for` is first in both channels and stays found, but the whole-file
+  `pricing.py` chunk now sorts above it; s013 goes 4 → 7 because the semantic
+  channel never finds `OrderStatus` and dilutes a working lexical result.
+  Neither costs recall — both stay inside the top 10.
+- **A documented invariant was overturned on purpose.**
+  `test_deterministic_evidence_keeps_its_place_and_its_derivation` asserted the
+  deterministic prefix survived byte-for-byte, arguing that reordering would be
+  the semantic layer "deciding relevance, which is the authority it does not
+  have". Rejected: **order is not authority.** §4.3 forbids promoting a
+  *derivation*, which fusion never touches — every evidence object is carried
+  across unchanged and only its position moves. The test now asserts that, and
+  its docstring records that it used to say the opposite.
+- **A defect in the first implementation, caught by a test and worth recording:**
+  the channel order was built from the raw candidates, *before* reranking, so
+  fusion re-sorted the reranked items back into their original order and threw
+  the reranker's entire output away. Fusion now runs after reranking. That is
+  the same "data computed, then not surfaced" shape as ADR-0019, ADR-0020, and
+  ADR-0025 — this time in code I had just written.
+- Scope bound: `_fuse` runs only for `SEMANTIC_INTENTS`, so exact-symbol
+  lookups, graph traversal, and change analysis are never reordered.
+- Files: `src/codeatlas/application/rank_fusion.py` (new),
+  `src/codeatlas/application/semantic_fusion.py`,
+  `tests/unit/test_rank_fusion.py` (new, six tests),
+  `tests/integration/test_semantic_fusion.py` (one test rewritten),
+  `tests/integration/test_semantic_reranking.py` (one test isolated from
+  fusion, one comment), `docs/adr/0028-rank-fusion.md` (new),
+  `docs/adr/README.md`, regenerated `baseline-phase-7` and `rerank-phase-7`,
+  `documentation/memory.md`.
+- **`rerank-phase-7` was regenerated and this time the staleness is mine** —
+  unlike the ADR-0027 entry, where it was pre-existing and committed separately.
+  The artifact records the semantic run's metrics, which this change moves. The
+  new values appear identically on its `semantic` and `reranked` sides, so
+  **every delta is still 0.0 across five compared metrics and the ADR-0009
+  decline stands**: reranking still improves nothing over the admitted semantic
+  baseline. `test_rerank_admission` passes, including its guard that at least
+  one metric was actually compared, so it cannot pass vacuously.
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION` untouched.
+- Test-first: the six `fuse_ranks` tests were written and observed failing on a
+  missing module. The `k` constant is pinned by a test rather than a comment,
+  because its value *is* the behaviour: near zero, whichever channel ranked an
+  item first would win outright and fusing would be pointless.
+- Verification: `ruff check src tests scripts apps` clean; `mypy
+  --no-incremental src tests scripts apps` clean on 343 files; full `uv run
+  pytest -q` **2130 passed, 3 skipped**; `check_phase4.ps1 -SkipSync` exit 0;
+  `check_phase7.ps1 -SkipSync` exit 0; `baseline-phase-7 --check` run directly
+  (it sits inside `check_phase7`'s `-Semantic` block) and reproduces.
+- Next / open:
+  1. **`symbol_recall_at_10` 0.8571 against 0.90** — Phase 7's only remaining
+     unmet target. Residue is s013 and s001.
+  2. **Neither channel retrieves `OrderStatus` directly**; both reach it only
+     through the containing `models.py` chunk. A chunking/extraction question
+     about enums, deliberately not folded in here.
+  3. **RRF rewards coarse chunks.** A granularity penalty was not added — a
+     tuning knob needs its own evidence — but it will resurface.
+  4. q019's naming ruling and `lexical_resolution`'s threshold, unchanged.
+  5. `relation_path_correctness` naming convention and gate target, unchanged.
+  6. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands, unchanged.
+
 ### 2026-08-09T23:45:00Z — Evidence recall is measured by containment (ADR-0027)
 
 - Agent: Claude Code `claude-opus-5`, branch `containing-evidence-recall`

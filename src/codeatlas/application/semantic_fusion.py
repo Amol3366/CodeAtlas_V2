@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 from codeatlas.application.evidence import EvidenceBuilder, EvidenceCandidate
+from codeatlas.application.rank_fusion import fuse_ranks
 from codeatlas.application.semantic_status import SemanticStatusService
 from codeatlas.contracts import (
     Answer,
@@ -149,12 +150,17 @@ class SemanticFusionService:
             ],
         )
 
+        candidate_order = [
+            (item.file_path, item.start_line, item.end_line)
+            for item in outcome.evidence
+        ]
+
         added_evidence = [
             item
             for item in outcome.evidence
             if (item.file_path, item.start_line, item.end_line) not in already_cited
         ]
-        if not added_evidence:
+        if not added_evidence and not (already_cited & set(candidate_order)):
             return self._with_warnings(response, result.warnings + outcome.warnings)
 
         rerank_warnings: tuple[str, ...] = ()
@@ -162,6 +168,27 @@ class SemanticFusionService:
         added_evidence, rerank_warnings, rerank_timing = self._rerank(
             response, question=question, evidence=added_evidence
         )
+
+        # The semantic channel's final order, built *after* reranking so the
+        # reranker's opinion reaches fusion. Computing this from the raw
+        # candidates would have let fusion re-sort the reranked items back into
+        # their original order -- the reranker's whole output discarded by the
+        # step after it.
+        #
+        # Regions the deterministic half already cited keep their exact
+        # position: they were never offered to the reranker, and they are the
+        # reason this list exists. They are still cited once, in the evidence
+        # list built below, but their *rank* counts here, because a chunk both
+        # channels found is the strongest signal either produces and dropping
+        # that agreement was the defect ADR-0028 fixes.
+        reranked = iter(
+            (item.file_path, item.start_line, item.end_line)
+            for item in added_evidence
+        )
+        semantic_order = [
+            region if region in already_cited else next(reranked, region)
+            for region in candidate_order
+        ]
 
         # Claim IDs continue the deterministic sequence rather than restarting.
         # Citations reference claims by ID, so a collision would silently
@@ -185,13 +212,35 @@ class SemanticFusionService:
         if SEMANTIC_LIMITATION not in limitations:
             limitations.append(SEMANTIC_LIMITATION)
 
+        # One order over both channels, by rank. Each evidence object is carried
+        # across unchanged -- only its position moves -- so a deterministic item
+        # stays deterministic and a candidate stays a candidate wherever it
+        # lands. Section 4.3 forbids a model score promoting a candidate to
+        # deterministic evidence; it does not require the answer to present a
+        # worse-matching citation first.
+        combined = [*response.evidence, *added_evidence]
+        by_region = {
+            (item.file_path, item.start_line, item.end_line): item
+            for item in combined
+        }
+        fused_regions = fuse_ranks(
+            [
+                (item.file_path, item.start_line, item.end_line)
+                for item in response.evidence
+            ],
+            semantic_order,
+        )
+        fused_evidence = [
+            by_region[region] for region in fused_regions if region in by_region
+        ]
+
         return response.model_copy(
             update={
                 "answer": Answer(
                     summary=response.answer.summary,
                     claims=[*response.answer.claims, *claims],
                 ),
-                "evidence": [*response.evidence, *added_evidence],
+                "evidence": fused_evidence,
                 "warnings": _merged(
                     response.warnings,
                     result.warnings + outcome.warnings + rerank_warnings,

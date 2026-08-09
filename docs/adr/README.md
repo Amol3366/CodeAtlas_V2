@@ -51,6 +51,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0027](0027-containing-evidence-recall.md) | `primary_evidence_recall_at_10` compared line ranges for exact equality, so a citation one line longer than the gold range scored as never found — four of Phase 7's five misses return the right evidence at ranks 1, 1, 2 and 4. ADR-0003's containment predicate now backs a `containing_evidence_recall_at_10` that takes the gate at an unchanged 0.90 threshold, with the exact-match number retained so no historical figure changes meaning. **No engine behaviour changed** | none (post-gate) |
 
+| [0028](0028-rank-fusion.md) | Fusion appended semantic candidates after all deterministic evidence and dropped any already cited, so a chunk both channels found kept its lexical position — the semantic channel ranked s007's answer 8th and s003's 1st while the fused answer buried them at 16th and 5th, and **two separately-recorded engine defects turned out to be one fusion defect**. Reciprocal-rank fusion over both channels, ranks only and never scores; Recall@10 1.0000 and MRR 0.4429 → 0.6875 with evidence rates unchanged, the signature of a pure reorder | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

@@ -11,9 +11,9 @@
       "semantic": 0.107981220657277
     },
     "containing_evidence_recall_at_10": {
-      "delta": 0.06666666666666665,
+      "delta": 0.1333333333333333,
       "deterministic": 0.8666666666666667,
-      "semantic": 0.9333333333333333
+      "semantic": 1.0
     },
     "exact_evidence_rate": {
       "delta": -0.01884994175579794,
@@ -26,14 +26,14 @@
       "semantic": null
     },
     "primary_evidence_recall_at_10": {
-      "delta": 0.06666666666666665,
+      "delta": 0.1333333333333333,
       "deterministic": 0.6,
-      "semantic": 0.6666666666666666
+      "semantic": 0.7333333333333333
     },
     "symbol_recall_at_10": {
-      "delta": 0.0714285714285714,
+      "delta": 0.1428571428571428,
       "deterministic": 0.7142857142857143,
-      "semantic": 0.7857142857142857
+      "semantic": 0.8571428571428571
     },
     "unsupported_claim_rate": {
       "delta": 0.0,
@@ -91,17 +91,17 @@
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
       "containing_evidence_rate": 0.107981220657277,
-      "containing_evidence_recall_at_10": 0.9333333333333333,
+      "containing_evidence_recall_at_10": 1.0,
       "direct_impact_recall": 1.0,
       "exact_evidence_rate": 0.056338028169014086,
       "exact_symbol_resolution": null,
       "finding_precision": 1.0,
       "lexical_resolution": null,
-      "mean_reciprocal_rank": 0.4428571428571429,
-      "ndcg_at_10": 0.5270811197823418,
-      "primary_evidence_recall_at_10": 0.6666666666666666,
+      "mean_reciprocal_rank": 0.6875,
+      "ndcg_at_10": 0.7291610098214358,
+      "primary_evidence_recall_at_10": 0.7333333333333333,
       "relation_path_correctness": null,
-      "symbol_recall_at_10": 0.7857142857142857,
+      "symbol_recall_at_10": 0.8571428571428571,
       "total_duration_ms": 0.0,
       "unsupported_claim_rate": 0.0,
       "valid_evidence_rate": 0.056338028169014086

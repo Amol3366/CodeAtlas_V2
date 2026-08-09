@@ -11,7 +11,7 @@ The reranked column applies the only implemented P7-10 reranker, `NoReranker`, w
 
 | Metric | Semantic | Reranked | Delta |
 | --- | ---: | ---: | ---: |
-| Primary evidence Recall@10 | 0.6667 | 0.6667 | +0.0000 |
+| Primary evidence Recall@10 | 0.7333 | 0.7333 | +0.0000 |
 | Exact evidence rate | 0.0563 | 0.0563 | +0.0000 |
 | Containing evidence rate | 0.1080 | 0.1080 | +0.0000 |
 | Exact symbol resolution | not applicable | not applicable | not applicable |
