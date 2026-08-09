@@ -166,6 +166,24 @@ JsonOption = Annotated[
 ]
 
 
+def _announce_database(path: Path) -> None:
+    """Say which database file this run opened.
+
+    `CODEATLAS_EPHEMERAL` governs `serve` only: every command reaching
+    `_services` resolves `default_database_path()` and writes the real database
+    whatever that variable says. Both behaviours are deliberate, but nothing
+    used to state which file was in play, so a user running ephemeral sessions
+    was right about the web application and wrong about the CLI — and found out
+    only by discovering data that should not exist. Stating the path is the fix;
+    changing where the data goes would be a scope decision (ADR-0013).
+
+    Diagnostic output belongs on stderr. Every command here takes `--json`, and
+    stdout is that flag's machine-readable contract — a human-readable line
+    printed into it would break the scripted callers the flag exists for.
+    """
+    typer.echo(f"Using database: {path}", err=True)
+
+
 @contextmanager
 def _services(database: Path | None) -> Iterator[ApplicationServices]:
     """Open the database, upgrade it if needed, and build the services.
@@ -175,7 +193,11 @@ def _services(database: Path | None) -> Iterator[ApplicationServices]:
     it checkpoints first, and `codeatlas upgrade` reports the same thing
     deliberately for anyone who wants to look before it happens.
     """
-    path = database or default_database_path()
+    # Resolved once and used for everything below, so the path announced is
+    # literally the file opened. Announcing one path and opening another would
+    # reintroduce the problem this reports on.
+    path = (database or default_database_path()).resolve()
+    _announce_database(path)
     upgrade_database(path)
     with connect(path) as connection:
         # The vector store is passed for the same reason the API passes one:
@@ -887,6 +909,11 @@ def serve(
     if session_directory is not None:
         typer.echo("Ephemeral session: storage is empty and will be discarded.")
         _bootstrap_ephemeral_session(resolved)
+    else:
+        # The ephemeral branch has always announced itself; the persistent one
+        # never did, so the mode a user is in was only ever visible from one
+        # side. Naming the file makes both states legible from the same place.
+        _announce_database(resolved)
 
     application = create_app(resolved, web_assets=assets)
     url = f"http://{host}:{port}"
