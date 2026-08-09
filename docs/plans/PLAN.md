@@ -207,6 +207,66 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T06:30:00Z — s001 is a granularity disagreement; nothing changed (ADR-0030)
+
+- Agent: Claude Code `claude-opus-5`, branch `s001-granularity`
+- Transition: no phase task. Post-gate. Takes the last conceptual miss ADR-0029
+  left open, and **closes it by deciding not to act.**
+- Finding: no defect. The relaxed query is `"stop" OR "two" OR "shoppers" OR
+  "buying" OR "last" OR "one" OR "something"`. The **module** chunk
+  `src.orders.inventory` matches on `two` — its docstring is *"Keeping two
+  customers from being sold the same unit"*, which paraphrases the question.
+  `InventoryLedger.reserve` matches **nothing**: its docstring is about holding
+  units and negative reservations. The lexical channel is correct to omit it;
+  the semantic channel ranks it 12th; both channels rank the module first and
+  **are right to**. The engine returns the chunk that best answers the question
+  as asked, and the corpus declares the method that implements it.
+- **The metric tension is the reusable part.**
+
+  | Metric | s001 today |
+  | --- | --- |
+  | `containing_evidence_recall_at_10` | **satisfied at rank 1** — module `1-36` contains the expected `20-28` |
+  | `symbol_recall_at_10` | missed — the method is 12th by name |
+
+  The obvious lever is the coarse-chunk penalty ADR-0028 recorded as untuned and
+  predicted would resurface. Applied here it **demotes the very chunk providing
+  the rank-1 containment hit**, so it trades an evidence hit for a symbol hit —
+  the ADR-0018/0025 trade appearing in ranking policy rather than extraction. A
+  change with that shape must be measured corpus-wide, not fitted to one case.
+- Decision: **change nothing.** The corpus is not edited (ADR-0003), the ranker
+  is not tuned to one case, and `symbol_recall_at_10` is 0.9286 against 0.90
+  with Phase 7 reporting `targets_met: true` — so this is discretionary polish
+  and spending ranking risk on it is a poor trade.
+- Open ruling left behind, the same shape as q019: **when a question is
+  conceptual and the concept is documented at module level, does the module
+  satisfy it?** If yes, s001's expectation is under-specified and the corpus
+  should say so as a declared expectation, not as an edit that moves a number.
+  If no, the engine must prefer implementing symbols over documenting
+  containers for conceptual intent — a ranking change needing its own record.
+- Files: `docs/adr/0030-conceptual-answers-at-module-granularity.md` (new),
+  `docs/adr/README.md`, `documentation/memory.md`, this entry. **No source,
+  corpus, contract, schema, migration, or baseline file changed.**
+- Contracts/migrations: none. `contract_version` `1.1`, `SCHEMA_VERSION` `14`,
+  `CHUNKER_VERSION` `1.1.0`, `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION`
+  `1.3.0` — all untouched.
+- Verification: documentation only, so no suite was run and none was needed —
+  `git diff --stat` shows no file outside `docs/` and `documentation/`. Every
+  metric is unchanged because nothing was changed; the baselines from the
+  ADR-0029 entry stand as measured there.
+- Next / open:
+  1. **The module-granularity ruling above**, and **q019's naming ruling** —
+     the same class of question, both needing the corpus owner.
+  2. **RRF's coarse-chunk bias** (ADR-0028), now with a concrete case attached
+     and a warning that the naive penalty regresses containment on it.
+  3. `lexical_resolution`'s threshold, unchanged.
+  4. `relation_path_correctness` naming convention and gate target, unchanged.
+  5. Whether `CODEATLAS_EPHEMERAL` should cover CLI commands, unchanged.
+  6. ~~The packaged build is three version bumps behind.~~ **Rebuilt and
+     verified 2026-08-10** — the packaged executable stamps `chunker_version`
+     1.1.0 with parser and resolver 1.3.0, and indexes `OrderStatus` with its
+     values and docstring, which the previous artifact could not. Local to this
+     workstation; `dist/` is gitignored.
+
 ### 2026-08-10T05:00:00Z — A memberless container carries its body (ADR-0029)
 
 - Agent: Claude Code `claude-opus-5`, branch `memberless-container-chunks`

@@ -55,6 +55,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0029](0029-memberless-container-chunks.md) | A class chunk is an outline naming its members, which is right until the class has no member *symbols* — an enum's values are assignments, so `OrderStatus` was indexed as `class OrderStatus(Enum):` and nothing else, with `DRAFT`/`PLACED`/`SHIPPED`/`CANCELLED` and its docstring absent from the index entirely. A container with no members is a leaf and carries its body; `CHUNKER_VERSION` 1.0.0 → 1.1.0, its first move since Phase 2, so every snapshot must be re-indexed | none (post-gate) |
 
+| [0030](0030-conceptual-answers-at-module-granularity.md) | s001's last miss is not a defect: the module docstring "Keeping two customers from being sold the same unit" paraphrases the question, so both channels rank the module first and are right to, while the corpus declares the method that implements it. **Nothing is changed** — the coarse-chunk penalty that would promote the method also demotes the chunk currently providing the rank-1 containment hit, so it trades an evidence hit for a symbol hit and needs corpus-wide measurement, not one case | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

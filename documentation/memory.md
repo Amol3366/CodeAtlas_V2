@@ -804,6 +804,30 @@ development order is finished. A new phase requires an explicit user decision.
       anyway. The dead parameter is left as the right seam for
       member-carrying containers later.
 
+- [x] s001 investigated and **deliberately not fixed** (ADR-0030), 2026-08-10:
+      the last conceptual miss is a granularity disagreement, not a defect. The
+      relaxed query is `"stop" OR "two" OR "shoppers" OR "buying" OR "last" OR
+      "one" OR "something"`; the **module** chunk matches on `two` because its
+      docstring is *"Keeping two customers from being sold the same unit"*,
+      which paraphrases the question, while `InventoryLedger.reserve` matches
+      **nothing** — its docstring talks about holding units and negative
+      reservations. Both channels rank the module first and are right to. The
+      corpus declares the method that implements the concept.
+
+      **The metric tension is the part to remember.**
+      `containing_evidence_recall_at_10` is already satisfied **at rank 1**,
+      because the module chunk `1-36` contains the expected `20-28`;
+      `symbol_recall_at_10` misses because the method is 12th by name. The
+      obvious lever — ADR-0028's untuned coarse-chunk penalty — would demote the
+      very chunk providing that rank-1 containment hit. **Fixing the symbol
+      number risks the evidence number**, the ADR-0018/0025 trade appearing in
+      ranking policy. It needs corpus-wide measurement, not one case.
+
+      Nothing fails: `symbol_recall_at_10` 0.9286 against 0.90, Phase 7
+      `targets_met: true`. Open ruling left behind, same shape as q019: **when a
+      concept is documented at module level, does the module satisfy a
+      conceptual question?**
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
