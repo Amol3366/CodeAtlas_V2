@@ -18,6 +18,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# -SkipWeb does not skip a section. It *stops the script* -- "backend checks
+# only, then stop" -- and the -Package and -Perf blocks sit below that exit, so
+# combining them discarded the work those flags asked for while still exiting
+# 0. Found in check_phase7.ps1 on 2026-08-10 and present here for the same
+# reason; the Phase 6 gate evidence is unaffected, because it was recorded from
+# `-Package -Perf` without -SkipWeb.
+#
+# Checked before any work, so a releaser is told in a second rather than after
+# the suite. Guarded by tests/unit/test_gate_flag_combinations.py.
+if ($SkipWeb -and ($Package -or $Perf)) {
+    throw "-SkipWeb stops after the backend checks, so it cannot be combined with -Package or -Perf: that work comes later and would be skipped silently. Drop -SkipWeb, or drop the flag whose work you do not need."
+}
+
 function Invoke-Checked {
     param(
         [Parameter(Mandatory = $true)]

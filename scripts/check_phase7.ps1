@@ -25,6 +25,23 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# -SkipWeb does not skip a section. It *stops the script* -- it means "backend
+# checks only, then stop" -- and the -Semantic, -Package and -Perf blocks all
+# sit below that exit. Combining them silently discarded the work those flags
+# asked for while still exiting 0, which is how `release-validation.md` step 3
+# returned green having measured nothing.
+#
+# Refused rather than reordered, because "backend only, then stop" is a useful
+# mode and the flags genuinely conflict. Refusing is also what this script
+# already does for the performance step, which declines to substitute a
+# deterministic number when the semantic package is missing.
+#
+# Checked here, before any work, so a releaser is told in a second rather than
+# after the suite. Guarded by tests/unit/test_gate_flag_combinations.py.
+if ($SkipWeb -and ($Semantic -or $Package -or $Perf)) {
+    throw "-SkipWeb stops after the backend checks, so it cannot be combined with -Semantic, -Package, or -Perf: that work comes later and would be skipped silently. Drop -SkipWeb, or drop the flag whose work you do not need."
+}
+
 function Invoke-Checked {
     param(
         [Parameter(Mandatory = $true)]
