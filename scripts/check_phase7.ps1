@@ -217,10 +217,17 @@ if ($Semantic) {
 
 if ($Package) {
     Write-Output "==> Packaged build"
-    $packageArgs = @("-SkipWebBuild")
+    # A **hashtable** splat, not an array one. Array splatting passes elements
+    # positionally, and every parameter of `build_package.ps1` is a [switch] --
+    # which is never positional -- so the array form failed to bind and this
+    # step could never run. `check_phase6.ps1` passes the switch literally and
+    # works; this regressed when the flags became conditional.
+    $packageArgs = @{ SkipWebBuild = $true }
     if ($Semantic) {
-        $packageArgs += "-SemanticLocal"
-        $packageArgs += "-SkipZip"
+        $packageArgs.SemanticLocal = $true
+        # Compressing the semantic tree exceeded the automation timeout here;
+        # the measured artifact is the onedir folder (release-validation.md).
+        $packageArgs.SkipZip = $true
     }
     & (Join-Path $PSScriptRoot "build_package.ps1") @packageArgs
     if ($LASTEXITCODE -ne 0) {
