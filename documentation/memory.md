@@ -1083,6 +1083,74 @@ of a status list is how they drift, which is the `--format pr` and
       review step caught it before any code was written, which is the argument
       for that step existing.
 
+- [x] **Package rebuilt and release validation run (2026-08-10)** — the same
+      day as the closeout, and it found more than it fixed.
+
+      **The rebuild's stated premise was wrong and the rebuild was still
+      right.** The request was "rebuild with the new resolver"; `RESOLVER_VERSION`
+      had not moved, and probing the *outgoing* artifact showed it already
+      matched source on all three versions (parser 1.3.0 / chunker 1.1.0 /
+      resolver 1.3.0), read from a database that binary itself wrote. But
+      **ADR-0037 carries no version stamp**, so a version comparison says
+      "current" while a real product fix is missing. *A version-only staleness
+      check cannot see an unversioned fix* — that is the reusable part.
+
+      Verified behaviourally, because exit 0 only proves PyInstaller ran: a
+      controlled experiment against the new binary with a guaranteed-live child
+      process. Correct start time → run left alone; wrong start time → run
+      stranded. **The control mattered as much as the treatment** — without it,
+      "failed" could have meant recovery strands everything.
+
+      **`docs/operations/release-validation.md` had never been executed end to
+      end, and three of its steps were broken.** In order of nastiness:
+
+      1. **Step 3 returned 0 having measured nothing.** It combined `-SkipWeb`
+         with `-Perf`, and `-SkipWeb` *exits the script* (it means "backend
+         only, then stop"), never reaching the perf block. A green run that
+         measured nothing is worse than a red one.
+      2. **`check_phase7.ps1 -Package` could never bind its arguments.**
+         PowerShell **array** splatting passes elements *positionally*, and a
+         `[switch]` is never positional, so every argument failed to bind.
+         Hashtable splatting passes named parameters and works. It regressed
+         when the flags became conditional; `check_phase6.ps1` passes the
+         switch literally and works. The confusable case, deliberately allowed:
+         `Invoke-Checked` array-splats into `uv`, and splatting into a **native
+         executable** is correct because no parameter binder is involved.
+         Guarded by `tests/unit/test_gate_script_invocations.py`.
+      3. **Step 4 told a releaser to run two gates designed to fail.**
+         `check_phase1/2.ps1` are marked `# SUPERSEDED` on line 1 and their
+         baselines are frozen history ADR-0017 deliberately never regenerated,
+         so they always report "baseline artifacts are stale".
+
+      **The lesson is not the three defects. A validation checklist is itself
+      untested code** — and this one documented what each step "proves" while
+      two steps could not do what they claimed.
+
+      **CRLF in tracked artifacts, twice.** `measure_phase7_perf.py` used
+      `write_text` without `newline=""`, which emits CRLF on Windows into a
+      *byte-gated* artifact — ADR-0022's exact mode. Fixed at the writer.
+      `baseline-phase-6.json` had been sitting CRLF in the working tree with
+      **git reporting a clean tree**, found only because the release run wrote a
+      second CRLF file and I checked its neighbours. Restored by ADR-0022's own
+      remedy (`rm` + `git checkout --`); no tracked evaluation artifact carries
+      CRLF now.
+
+      **Two corrections to my own claims.** I reported the package tree as
+      "0.98 GB" — that was **GiB**; `package_tree_size_bytes` is 1,052,540,446 =
+      **1.05 GB**, so the register's long-standing figure was right and mine was
+      mislabelled. And the closeout **missed two Phase 7 artifacts**
+      (`baseline-phase-7`, `rerank-phase-7`, which cascades from it) that needed
+      ADR-0038's new key, because the closeout's `check_phase7` run did not pass
+      `-Semantic` and so skipped the step gating them. I quoted that exact
+      lesson — *"`check_phase7` gates more than `check_phase4` and is the one
+      that goes unrun"* — in the same handoff where I committed it.
+
+      Perf on the 2026-08-10 semantic artifact: refresh p95 **1.560 s**
+      (target 2.0), preflight p95 **3.174 s** (target 10.0), coverage 1.0, tree
+      1.05 GB. Both targets met. **Slower than the 2026-07-30 figures**
+      (0.975 / 2.298) on a heavily loaded machine; the regression is stated
+      rather than explained away, and was not investigated.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
@@ -1249,6 +1317,22 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   full-suite load on Windows with `sqlite3.OperationalError: disk I/O error` —
   a genuinely killed process can leave its SQLite handle briefly held. Passed
   4/4 in isolation and on the next full run. Not investigated further.
+
+  **Seen again 2026-08-10** and worth recording as a pattern, not an incident.
+  Running seven gate scripts back to back (seven full suites) had phases 0–3
+  abort mid-run — three of them with exit **-1**, a killed process, and with
+  **no `FAILED` line anywhere**, because the run was cut off rather than
+  failing. All four passed individually afterwards. *Progress dots that stop
+  with no failure summary mean a terminated process, not a broken test* — read
+  the whole log before believing a gate result, and re-run in isolation before
+  calling it a regression.
+
+- **No guard covers a flag combination that silently skips what it claims to
+  run** (raised 2026-08-10). `tests/unit/test_gate_script_invocations.py` now
+  catches the array-splat class of gate defect, but the nastier one found the
+  same day — `-SkipWeb -Perf` exiting before the measurement and returning 0 —
+  has nothing watching it. Given this project's history of green runs that
+  measured nothing, this is a real gap rather than a tidy-up.
 
 Carried into gate approvals as declared work rather than dropped:
 
