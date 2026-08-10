@@ -34,11 +34,30 @@ foreach ($n in 0, 3, 4, 5, 6) {
 }
 
 # 5. Install, upgrade, and uninstall, by hand, once.
+#    Capture the user PATH BEFORE installing -- the reversal is the thing being
+#    checked, and you cannot check it against a baseline you did not keep.
+#    [Environment]::GetEnvironmentVariable("Path","User") > path-before.txt
 powershell -ExecutionPolicy Bypass -File scripts/install_windows.ps1
 codeatlas doctor
 codeatlas serve --web --open
 powershell -ExecutionPolicy Bypass -File scripts/install_windows.ps1 -Uninstall
+#    Then diff: Compare-Object (baseline) (current). Zero differences or it
+#    did not reverse cleanly.
 ```
+
+**Step 5 was run for the first time on 2026-08-10 and passed.** Install exit 0
+(one PATH entry added, 16 → 17); `codeatlas` resolved from a fresh shell to
+`%LOCALAPPDATA%\CodeAtlas\app\codeatlas.exe`; `doctor` exit 0 reporting schema
+14 up to date; `serve --web` returned `200` from `/v1/repositories` and `200`
+from `/` with `Cache-Control: no-store, max-age=0, must-revalidate`, and was
+**refused off-loopback on a real socket**; uninstall exit 0. The user PATH
+compared **byte-identical to the pre-install baseline, zero differences**, the
+app directory was gone, and `codeatlas.db` was untouched.
+
+Two deviations from the literal commands, neither affecting what is proven:
+port 8123 rather than 8000, so the probe could not collide with a running
+server; and `serve --web` without `--open`, because the browser launch adds no
+verification that probing `/` and `/v1` does not already give.
 
 The exact source command `uv run codeatlas serve --web --open` was also probed
 on 2026-08-04 after the Settings polish. The running server returned 200 from
@@ -58,7 +77,7 @@ recorded separately from the release check.
 | Packaged security suite | Loopback-only binding *measured on a socket*, no CORS headers, the error envelope intact, traversal refused, and no developer material in the bundle | A property that holds in the source tree and not in the artifact. That gap is exactly where a packaging defect lives |
 | `-Perf` | Refresh and preflight p95 against the semantic-local artifact, plus cold start, archive size, and semantic coverage after cold index | A deterministic-only performance number being mistaken for "embeddings enabled" |
 | Earlier gates | Phases 0–6 still behave as their gates recorded | A semantic change that quietly moved older behavior |
-| Manual install round trip | The install script's two changes and their two reversals, on a real user PATH | The one thing no test asserts, because asserting it means editing the developer's environment |
+| Manual install round trip | The install script's two changes and their two reversals, on a real user PATH — **verified 2026-08-10, PATH restored with zero differences against a captured baseline** | The one thing no test asserts, because asserting it means editing the developer's environment. It went unrun until 2026-08-10, so ADR-0007 decision 6's "reverses exactly those two" was an assertion, not a measurement |
 
 ## The performance numbers, and how to read them
 

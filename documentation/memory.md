@@ -1151,6 +1151,41 @@ of a status list is how they drift, which is the `--format pr` and
       (0.975 / 2.298) on a heavily loaded machine; the regression is stated
       rather than explained away, and was not investigated.
 
+- [x] **Release validation completed end to end, step 5 included (2026-08-10)**
+      — after the gate fixes above, the whole sequence was re-run and every
+      step exited 0: deterministic gate + package, semantic gate + semantic
+      package, packaged performance, and the earlier gates (0, 3, 4, 5, 6 —
+      1 and 2 excluded as frozen by design).
+
+      Perf on the final artifact, unloaded: refresh p95 **0.799 s**, preflight
+      p95 **2.243 s**, cold start 1.060 s, coverage 1.0. These supersede the
+      1.560 / 3.174 taken earlier the same day while builds and gates ran
+      concurrently. **Both met their targets and the difference is load, not
+      the product** — nothing changed between them. The artifact also wrote
+      with zero CRLF, which is the first confirmation the
+      `measure_phase7_perf.py` fix works in a real run.
+
+      **Step 5 — the manual install round trip — had never been run.** It is
+      the one step no test asserts, because asserting it means editing the
+      developer's environment. It passed: one PATH entry added (16 → 17),
+      `codeatlas` resolving from a fresh shell, `doctor` exit 0 at schema 14,
+      `serve --web` answering 200 on both `/v1/repositories` and `/` with the
+      `no-store` shell headers and **refused off-loopback on a real socket**,
+      then uninstall exit 0.
+
+      **The reusable part is the method, not the result.** The claim being
+      checked is ADR-0007 decision 6 — that the installer "reverses exactly"
+      its two changes — and that cannot be checked without a baseline captured
+      *before* installing. Recording the user PATH first and running
+      `Compare-Object` after gave **zero differences**; the app directory was
+      gone and `codeatlas.db` untouched. Until 2026-08-10 that decision was an
+      assertion rather than a measurement, and an installer nobody has watched
+      uninstall is one users are right to distrust.
+
+      Deviations, both harmless and stated rather than hidden: port 8123 so the
+      probe could not collide with a running server, and no `--open`, because
+      launching a browser proves nothing that probing `/` and `/v1` does not.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

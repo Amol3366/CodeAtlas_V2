@@ -236,6 +236,54 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-10T21:00:00Z — Release validation passes end to end, step 5 included
+
+- Agent: Claude Code `claude-opus-5`, branch `main`
+- Transition: no phase task. Post-gate. Closes the release-validation work
+  opened earlier the same day.
+- **All five steps of `docs/operations/release-validation.md` exit 0**, the
+  first time the document has run end to end with every step doing what it
+  claims. Steps 1–4 with the frozen dependency sync included, since `uv.lock`
+  integrity is part of what these gates prove and earlier iterations had
+  skipped it.
+- **Step 5 had never been run.** It is the step no automated test asserts,
+  because asserting it means editing the developer's environment, and it is
+  the only check of ADR-0007 decision 6 — that the installer "reverses exactly"
+  its two changes. Until today that was an assertion, not a measurement.
+
+  Result: install exit 0 (one PATH entry added, 16 → 17, copied to
+  `%LOCALAPPDATA%\CodeAtlas\app`); `codeatlas` resolved from a fresh shell to
+  the installed exe; `doctor` exit 0 at schema 14; `serve --web` returned 200
+  from `/v1/repositories` and 200 from `/` with
+  `Cache-Control: no-store, max-age=0, must-revalidate`, and was **refused
+  off-loopback on a real socket**; uninstall exit 0; the user PATH compared
+  **zero differences** against a baseline captured before installing; the app
+  directory was removed and `codeatlas.db` untouched.
+
+  **The method is the point and is now written into the document**: the
+  reversal cannot be checked without capturing the PATH *first*. A run that
+  installs, uninstalls, and then eyeballs the PATH proves nothing.
+- Deviations, stated rather than hidden: port 8123 so the probe could not
+  collide with a running server, and `serve --web` without `--open` — the
+  browser launch adds no verification that probing `/` and `/v1` does not.
+- Performance on the final semantic artifact, unloaded: refresh p95 **0.799 s**
+  (target 2.0), preflight p95 **2.243 s** (target 10.0), cold start 1.060 s,
+  coverage 1.0. Supersedes the 1.560 / 3.174 measured earlier the same day
+  under concurrent builds. **Both met their targets; the difference is machine
+  load and no product change lies between them.** The artifact also wrote with
+  zero CRLF, confirming the `measure_phase7_perf.py` fix in a real run.
+- Files: `docs/operations/release-validation.md` (step 5 recorded, the
+  baseline-capture method added to the commands, the proof table corrected),
+  `documentation/memory.md`, `docs/evaluation/baseline-phase-7-perf.json`
+  (committed earlier), and this entry.
+- Contracts/migrations: none. No source file changed by this entry.
+- Next: **nothing assigned.** The Deferred Register above is unchanged and
+  remains the authoritative list. Note for whoever resumes: **grow the
+  evaluation corpus before adding features, not after** — ADR-0016 and
+  ADR-0029 both record the corpus being structurally blind to the feature
+  being added, and at 27 symbol cases a 0.98 target silently means 27/27
+  (ADR-0033).
+
 ### 2026-08-10T18:00:00Z — Project closeout: four items settled, the rest dispositioned
 
 - Agent: Claude Code `claude-opus-5`. Branches `closeout-pid-reuse`,
