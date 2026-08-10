@@ -1046,6 +1046,34 @@ of a status list is how they drift, which is the `--format pr` and
       and `repo add` would be invisible to `index`. Two mutation-checked tests
       now pin both sides, so the ruling is enforced rather than merely written.
 
+      **Pushed and branches cleaned (2026-08-10).** `main` pushed to
+      `origin/main` at `8ebdf4c`, 11 commits, no push-protection block this
+      time. The five `closeout-*` branches were then deleted with `-d` (the
+      safe form, which refuses anything unmerged), and `backup-before-rewrite`
+      with `-D`. `git branch` now shows `main` alone.
+
+      **The measured fact that made the backup safe to delete, recorded
+      because nobody knew it before and it is not recoverable now.** That
+      branch was the last reference to the pre-rewrite objects from the
+      2026-08-06 secret-scanner incident — 104 commits, local only, on no
+      remote. Comparing its tip against its *counterpart* commit in `main`
+      (same message and timestamp, `67c7b84`) rather than against `main`'s
+      head — which is four days of features ahead and produces a 144-file
+      diff that means nothing — showed the entire rewrite changed **exactly
+      one line in one file**: the Slack placeholder in
+      `tests/security/test_secret_redaction.py`, split from a single literal
+      into a concatenation so the scanner would not match it. Everything else
+      was byte-identical with different hashes.
+
+      So the only content the backup uniquely held was the string that caused
+      the problem. Tip was `854bea6`, recorded here in case a reflog entry
+      outlives this note.
+
+      **The reusable part is the comparison, not the outcome.** "Is this
+      branch's content already in main?" is not answered by diffing against
+      `main`'s head once `main` has moved on. Find the counterpart commit
+      first, or the diff will show progress and read like loss.
+
       **Two process notes worth keeping.** My own mutation-check script
       reintroduced the **ADR-0022 CRLF hazard** — Python's `open(p,'w')` writes
       CRLF on Windows, and `git` warned on commit. Fixed by ADR-0022's own
@@ -1476,10 +1504,12 @@ No other assigned work. Candidates, in the order they'd most likely be picked up
 
 2. **Decide on code signing** — a purchasing decision, not an engineering one.
    Until then the packaged executable is unsigned and SmartScreen warns.
-3. **Consider deleting the five stale local branches** whose content is in
+3. ~~**Consider deleting the five stale local branches** whose content is in
    `main` but which point at pre-rewrite commit objects, so `git branch`
    stops implying unmerged work. `backup-before-rewrite` can go with them once
-   the rewrite is trusted.
+   the rewrite is trusted.~~ **CLOSED 2026-08-10.** `git branch` now shows
+   `main` alone. See the branch-cleanup entry under Completed for the measured
+   fact that made `backup-before-rewrite` safe to delete.
 
 Closed since this list was written:
 
