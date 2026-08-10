@@ -73,6 +73,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0038](0038-relation-path-recall.md) | `relation_path_correctness` scored **precision**, so every true edge the engine emitted that the corpus did not declare lowered it — and **ADR-0020 requires emitting every supporting edge.** The measurement punished the engine for obeying an accepted decision. ADR-0034 and ADR-0035 each named the symptom (q005, q015 capped at 0.5) without naming the instrument. `relation_path_recall` added beside it at 0.6364 → 0.7273, precision retained so no baseline changes meaning. **Deliberately ungated** — two of ADR-0034's four causes are still open. The fifth instance of the apparatus, not the engine, being wrong | none (post-gate) |
 
+| [0039](0039-imports-targets-the-bound-symbol.md) | The modelling question ADR-0035 deliberately left half-fixed: does `IMPORTS` target the module or the class the statement binds? **The class** — `from x import Y` binds `Y`, and ADR-0021's import-and-call rule requires a *class* owner precisely so `import orders` cannot vouch for every symbol inside it. The decisive fact was that **q010 contradicted itself**: its `expected_symbols` already named `IdempotencyStore` while its relation string said `idempotency`. Correctness 0.6364 → 0.7273, recall 0.7273 → 0.8182, nothing else moved. One of ADR-0034's four causes now remains | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its
