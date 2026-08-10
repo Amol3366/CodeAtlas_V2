@@ -69,6 +69,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0036](0036-expectations-name-real-symbols.md) | ADR-0031 and ADR-0035 each found, by hand, an expectation naming a symbol that does not exist — a failure **no metric can catch**, since a metric only scores what it is given. Now asserted in the suite against the engine's own `find_exact`. It immediately found **q024 still carrying the pre-ADR-0031 convention**, invisible because its `CONCEPTUAL` intent is unmeasured; mutation-checked by reintroducing both historical defects | none (post-gate) |
 
+| [0037](0037-pid-reuse-detection.md) | A pid is a slot the OS reassigns, not an owner — so a dead run whose pid was reissued looked alive and blocked its repository from reindexing **permanently**, an item declared open at the Phase 6 gate and carried through Phase 7. The stamp now records the owner's process *start time* too. The stated blocker ("no portable source without a new dependency") was half right and the wrong half kept it open twelve days: there is no portable source, but `GetProcessTimes` sits beside the `OpenProcess` this module already calls, and Windows is the supported environment. `None` reads as alive, and a stamp without the key keeps the behaviour it was written under | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

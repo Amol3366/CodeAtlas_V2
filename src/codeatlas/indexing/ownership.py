@@ -22,12 +22,17 @@ recoverable. That is the honest reading — nobody is claiming it — and it is
 what lets a database written by an older version, before ownership existed, be
 healed on upgrade rather than staying blocked forever.
 
-**Known limitation: pid reuse.** If the operating system reassigns a dead
-owner's pid before CodeAtlas next starts, its run looks alive and is left
-alone. The failure is visible rather than silent — ``codeatlas doctor`` reports
-the blocking run and the pid it belongs to — but it is not detected
-automatically. Closing it needs the owner's process start time, which has no
-portable source without a new dependency.
+**Pid reuse is detected where the platform can answer.** A pid identifies a
+slot, not a process, and the operating system reassigns it. The owner stamp
+therefore also records the owner's *start time*, and a pid whose live process
+started at a different moment is a reused slot whose real owner is gone —
+recoverable, not protected. ``GetProcessTimes`` answers this on Windows and
+``/proc/<pid>/stat`` on Linux, both reachable through facilities this module
+already uses and neither needing a new dependency. macOS has no such source
+and keeps the pid-only behaviour, as does any stamp written before
+``started_at`` existed. Every unanswerable case leaves the run alone, because
+guessing "dead" costs data while guessing "alive" costs only a delayed
+cleanup.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ from __future__ import annotations
 import os
 import sys
 import uuid
+from pathlib import Path
 from typing import Any
 
 # Regenerated on every import, and therefore once per process. Two processes
@@ -49,8 +55,17 @@ _ERROR_ACCESS_DENIED = 5
 
 
 def current_owner() -> dict[str, Any]:
-    """The owner stamp to record on a run this process is starting."""
-    return {"pid": os.getpid(), "token": PROCESS_TOKEN}
+    """The owner stamp to record on a run this process is starting.
+
+    ``started_at`` is omitted rather than stored as ``None`` when the platform
+    cannot answer, so the stamp is shaped exactly as it was before this key
+    existed and any reader parses it unchanged.
+    """
+    stamp: dict[str, Any] = {"pid": os.getpid(), "token": PROCESS_TOKEN}
+    started_at = process_start_time(os.getpid())
+    if started_at is not None:
+        stamp["started_at"] = started_at
+    return stamp
 
 
 def owner_is_live(owner: Any) -> bool:
@@ -70,7 +85,23 @@ def owner_is_live(owner: Any) -> bool:
     pid = owner.get("pid")
     if not isinstance(pid, int):
         return False
-    return process_is_alive(pid)
+    if not process_is_alive(pid):
+        return False
+
+    # The pid exists. Whether it is the *same process* is a second question,
+    # and only a stamp carrying a start time can answer it. A stamp without one
+    # predates this check and keeps the behaviour it was written under.
+    stamped = owner.get("started_at")
+    if not isinstance(stamped, int):
+        return True
+
+    observed = process_start_time(pid)
+    if observed is None:
+        # Unknown, not dead. Guessing "dead" here would let one process heal
+        # another's in-flight index — the corruption this module prevents.
+        return True
+
+    return observed == stamped
 
 
 def process_is_alive(pid: int) -> bool:
@@ -98,6 +129,89 @@ def _posix_process_is_alive(pid: int) -> bool:
     except OSError:
         return True
     return True
+
+
+def process_start_time(pid: int) -> int | None:
+    """An opaque value identifying a process *instance*, not a pid slot.
+
+    A pid is reused. A pid together with the moment that process started is
+    not, for any interval that matters here. Returns ``None`` when the
+    platform or the handle cannot answer, which callers must read as
+    "unknown" and never as "dead" — see `owner_is_live`.
+
+    The value is comparable only against another reading from the same
+    platform, which is all `owner_is_live` ever does with it. It is not a
+    wall-clock time and must not be rendered as one.
+    """
+    if pid <= 0:
+        return None
+    if sys.platform == "win32":
+        return _windows_process_start_time(pid)
+    if sys.platform.startswith("linux"):
+        return _linux_process_start_time(pid)
+    # macOS has no source for this without a new dependency, and Section 5
+    # does not name it as a supported environment. `None` keeps the
+    # pre-existing pid-only behaviour rather than guessing.
+    return None
+
+
+def _linux_process_start_time(pid: int) -> int | None:
+    """Field 22 of ``/proc/<pid>/stat``, in clock ticks since boot.
+
+    Parsed from the last ``)`` rather than by splitting the whole line: field
+    2 is the executable name in parentheses and may itself contain spaces and
+    parentheses, so a naive split mis-indexes every field after it.
+    """
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    _, _, rest = raw.rpartition(")")
+    fields = rest.split()
+    # `rest` begins at field 3, so field 22 is index 19.
+    if len(fields) < 20:
+        return None
+    try:
+        return int(fields[19])
+    except ValueError:
+        return None
+
+
+def _windows_process_start_time(pid: int) -> int | None:
+    """The process creation ``FILETIME``, as one comparable integer.
+
+    100-nanosecond intervals since 1601-01-01. Two processes sharing a pid
+    cannot share this value unless they started within the same 100 ns, which
+    the OS does not do — it does not reissue a pid that fast.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    handle = kernel32.OpenProcess(
+        _PROCESS_QUERY_LIMITED_INFORMATION, False, pid
+    )
+    if not handle:
+        return None
+
+    try:
+        creation = wintypes.FILETIME()
+        exit_time = wintypes.FILETIME()
+        kernel_time = wintypes.FILETIME()
+        user_time = wintypes.FILETIME()
+        ok = kernel32.GetProcessTimes(
+            handle,
+            ctypes.byref(creation),
+            ctypes.byref(exit_time),
+            ctypes.byref(kernel_time),
+            ctypes.byref(user_time),
+        )
+        if not ok:
+            return None
+        return (creation.dwHighDateTime << 32) | creation.dwLowDateTime
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def _windows_process_is_alive(pid: int) -> bool:
