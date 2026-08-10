@@ -1,4 +1,4 @@
-# 1CodeAtlas V2 Working Guide
+# CodeAtlas V2 Working Guide
 
 Status: current orientation document as of 2026-08-07
 
