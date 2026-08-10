@@ -33,7 +33,12 @@ from codeatlas.application.container import ApplicationServices, build_services
 from codeatlas.application.indexing import IndexResult
 from codeatlas.application.registration import RegisterRepositoryRequest
 from codeatlas.domain.snapshot import SnapshotState
-from codeatlas.indexing.ownership import PROCESS_TOKEN, process_is_alive
+from codeatlas.indexing.ownership import (
+    PROCESS_TOKEN,
+    owner_is_live,
+    process_is_alive,
+    process_start_time,
+)
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
@@ -156,12 +161,24 @@ def test_recovery_fails_the_stranded_job_row(
 
 
 def _claim(
-    connection: sqlite3.Connection, job_id: str, pid: int, token: str
+    connection: sqlite3.Connection,
+    job_id: str,
+    pid: int,
+    token: str,
+    started_at: int | None = None,
 ) -> None:
-    """Stamp a job with an owner, as `IndexJobStore.start` does."""
+    """Stamp a job with an owner, as `IndexJobStore.start` does.
+
+    `started_at` is omitted from the stamp when `None`, which is exactly what
+    `current_owner` does on a platform that cannot report a start time — and
+    what every stamp written before ADR-0037 looks like.
+    """
+    owner: dict[str, object] = {"pid": pid, "token": token}
+    if started_at is not None:
+        owner["started_at"] = started_at
     connection.execute(
         "UPDATE index_jobs SET diagnostics = ? WHERE job_id = ?",
-        (json.dumps({"owner": {"pid": pid, "token": token}}), job_id),
+        (json.dumps({"owner": owner}), job_id),
     )
     connection.commit()
 
@@ -221,6 +238,95 @@ def test_recovery_strands_a_job_whose_owner_is_gone(
     report = harness.services.recovery.recover_interrupted()
 
     assert "job_dead" in report.failed_job_ids
+
+
+def test_a_reused_pid_does_not_keep_a_dead_owner_alive() -> None:
+    """The failure `ownership.py` has declared open since Phase 6.
+
+    The OS reassigns a dead owner's pid, liveness says "alive", and the
+    repository stays blocked from reindexing forever. A start time
+    distinguishes a process *instance* from a pid, which is only a slot.
+
+    Asserted against `owner_is_live` directly rather than through recovery,
+    because the recovery-level version cannot be written honestly: it would
+    need a live process whose pid matches a dead stamp, which is the very
+    coincidence this prevents and cannot be arranged on demand.
+    """
+    owner = {
+        "pid": os.getpid(),
+        "token": "token-of-a-dead-process",
+        # A valid FILETIME (1601-01-01) that no live process can hold.
+        "started_at": 1,
+    }
+
+    assert owner_is_live(owner) is False
+
+
+def test_a_matching_start_time_still_reports_the_owner_alive() -> None:
+    """The conservative direction is preserved: a real owner is left alone.
+
+    Without this, the implementation could be "return False whenever a start
+    time is present", which satisfies the test above and corrupts a live
+    index.
+    """
+    owner = {
+        "pid": os.getpid(),
+        "token": "token-of-another-process",
+        "started_at": process_start_time(os.getpid()),
+    }
+
+    assert owner_is_live(owner) is True
+
+
+def test_a_stamp_without_a_start_time_keeps_the_old_behaviour() -> None:
+    """A database written by an earlier build must not change meaning.
+
+    Those stamps carry no `started_at` and one cannot be inferred, so the
+    rule stays pid-only for them — what they were written under.
+    """
+    owner = {"pid": os.getpid(), "token": "token-of-another-process"}
+
+    assert owner_is_live(owner) is True
+
+
+def test_an_unreadable_start_time_does_not_strand_a_live_run() -> None:
+    """`None` means unknown, and unknown must read as alive.
+
+    Treating it as "dead" would let one process heal another's in-flight
+    index, which is the corruption this module exists to prevent.
+    """
+    owner = {
+        "pid": os.getpid(),
+        "token": "token-of-another-process",
+        "started_at": None,
+    }
+
+    assert owner_is_live(owner) is True
+
+
+def test_recovery_strands_a_run_whose_owner_s_pid_was_reused(
+    harness: Harness, sample_repo: Path
+) -> None:
+    """The same rule, proven where a user actually feels it.
+
+    A stamp carrying a live pid with the wrong start time is a reused slot.
+    Before this, `recover_interrupted` left the job alone and the repository
+    could never reindex.
+    """
+    repository_id = _register(harness, sample_repo)
+    harness.services.indexing.index(repository_id)
+    _kill_mid_index(harness.connection, repository_id, job_id="job_reused")
+    _claim(
+        harness.connection,
+        "job_reused",
+        os.getpid(),
+        "token-of-a-dead-process",
+        started_at=1,
+    )
+
+    report = harness.services.recovery.recover_interrupted()
+
+    assert "job_reused" in report.failed_job_ids
 
 
 def test_an_unclaimed_job_is_stranded(
