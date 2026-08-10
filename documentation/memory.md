@@ -1217,6 +1217,42 @@ needed — comparing the two built bundles answered it. The unused half of
 `docs/superpowers/specs/2026-08-04-ephemeral-session-and-stale-shell-design.md`
 is superseded.
 
+## Open Defect — nested config keys report false changes (2026-08-11)
+
+**Reported by the user from a real preflight run and reproduced.** Changing one
+line of `pyproject.toml` produces **8 `CONFIG_VALUE_CHANGED` findings, 7 of
+them false.**
+
+**This is an ADR-0025 regression, two days old, in the core product wedge.**
+That record made nested config keys addressable symbols — right for search, and
+it moved `lexical_resolution` 0.3750 → 0.6250. But a leaf whose own line cannot
+be located **keeps its parent's range** (a deliberate choice, so a leaf is never
+given a guessed line). Change detection hashes content over that range, so every
+such leaf hashes the *whole parent block* — and any edit inside the block marks
+all of them modified.
+
+ADR-0025 anticipated the wrong risk. It measured **index volume** (6% growth,
+judged modest) and never asked what a parent-range fallback does to **change
+detection**. The retrieval side was measured; the change side was not, and the
+change side is the product's whole wedge.
+
+**The fix is not a filter.** Suppressing children of a changed parent would hide
+genuinely changed nested keys. The leaf needs a hash of *its own value*, which
+means the parser carrying real per-leaf content rather than a line range —
+a `PARSER_BUNDLE_VERSION` bump and a re-index of every snapshot.
+
+**What was NOT reproduced: literal duplicates.** The user saw two identical
+`project changed` entries; the JSON contains eight *distinct* titles and no
+repeat. So the engine does not duplicate, and the duplicate *rendering* is
+unexplained — plausibly the web Preflight screen, which is where they saw it.
+**Do not fix the rendering before reproducing it**; the identical evidence spans
+above are enough to make distinct findings look duplicated to a reader, and that
+may be the whole story.
+
+Reproduction: a temp git repo with this project's own `pyproject.toml`, one
+`version` line changed, indexed and analysed through the CLI. Roughly two
+minutes to redo.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
