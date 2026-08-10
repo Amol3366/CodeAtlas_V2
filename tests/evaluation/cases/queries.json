@@ -314,7 +314,7 @@
                                                "IdempotencyStore"
                                            ],
                       "expected_relations":  [
-                                                 "src.payments.service IMPORTS idempotency"
+                                                 "src.payments.service IMPORTS IdempotencyStore"
                                              ],
                       "expected_evidence":  [
                                                 {
