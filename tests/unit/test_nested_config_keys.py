@@ -97,3 +97,64 @@ def test_a_leaf_whose_line_cannot_be_found_falls_back_to_its_parent() -> None:
     assert "deep.a.b" in keys
     start, end = keys["deep.a.b"]
     assert start <= 2 <= end
+
+
+def _hashes(content: bytes, path: str, language: str) -> dict[str, str]:
+    result = DocumentParser().parse(_request(content, path, language))
+    return {
+        symbol.qualified_name: symbol.content_hash
+        for symbol in result.symbols
+        if symbol.kind is SymbolKind.CONFIG_KEY
+    }
+
+
+def test_an_unchanged_nested_key_keeps_its_hash_when_a_sibling_changes() -> None:
+    """The ADR-0025 regression: one edit reported eight keys as changed.
+
+    A leaf whose own line cannot be located keeps its *parent's* range so the
+    citation is never invented. Hashing the content of that range means the
+    leaf hashes the whole parent block -- so any edit anywhere inside the block
+    marks every such leaf modified. Changing one line of this project's
+    `pyproject.toml` produced 8 CONFIG_VALUE_CHANGED findings, 7 of them false.
+
+    The range is for *citation*. The hash must identify the leaf's own value.
+    """
+    before = (
+        b'[project]\nversion = "0.1.0"\n\n'
+        b'[project.scripts]\nrun = "app:main"\n'
+    )
+    after = (
+        b'[project]\nversion = "9.9.9"\n\n'
+        b'[project.scripts]\nrun = "app:main"\n'
+    )
+
+    old = _hashes(before, "pyproject.toml", "toml")
+    new = _hashes(after, "pyproject.toml", "toml")
+
+    assert old["project.version"] != new["project.version"], (
+        "the key that actually changed must change"
+    )
+    # `project.scripts` is the case that breaks: it is a TOML table header,
+    # `[project.scripts]`, which `_leaf_line`'s `key =` pattern cannot match,
+    # so it falls back to the parent range and hashes the whole block.
+    # `project.scripts.run` is deliberately NOT the assertion here -- `run`
+    # resolves to its own line, so it was never affected and asserting on it
+    # passes without testing anything.
+    assert old["project.scripts"] == new["project.scripts"], (
+        "an untouched nested key must not report as changed"
+    )
+
+
+def test_two_leaves_with_equal_values_under_one_parent_stay_distinct() -> None:
+    """Hashing the value must not collapse two different keys into one.
+
+    `a` and `b` hold the same value here. If the hash were the bare value they
+    would share a content hash, and a rename or a move between them would be
+    invisible to change detection -- trading one false-negative class for
+    another.
+    """
+    content = b'{\n  "deep": {"a": 1, "b": 1}\n}\n'
+
+    hashes = _hashes(content, "deep.json", "json")
+
+    assert hashes["deep.a"] != hashes["deep.b"]

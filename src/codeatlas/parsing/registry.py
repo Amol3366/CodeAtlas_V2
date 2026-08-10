@@ -27,7 +27,14 @@ from codeatlas.domain.symbols import SymbolRecord
 # declaration as context, and repeated anonymous type members are position
 # disambiguated. This prevents unrelated inline object/type properties with the
 # same name from colliding inside one snapshot.
-PARSER_BUNDLE_VERSION: str = "1.3.0"
+# 1.4.0: a nested configuration key hashes its own value rather than the line
+# range it cites. ADR-0025 gave a leaf whose line could not be located its
+# parent's range so a citation was never invented, and hashing that range made
+# the leaf hash the whole parent block -- so one `version` edit in a
+# `pyproject.toml` reported eight keys changed, seven of them falsely. The
+# range still cites; the hash now identifies. Symbol identity moves, so every
+# snapshot is stale until re-indexed.
+PARSER_BUNDLE_VERSION: str = "1.4.0"
 
 
 @dataclass(frozen=True)

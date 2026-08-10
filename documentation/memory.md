@@ -1217,7 +1217,34 @@ needed — comparing the two built bundles answered it. The unused half of
 `docs/superpowers/specs/2026-08-04-ephemeral-session-and-stale-shell-design.md`
 is superseded.
 
-## Open Defect — nested config keys report false changes (2026-08-11)
+## Nested config keys reported false changes — FIXED (ADR-0041, 2026-08-11)
+
+**Fixed the same day it was reported.** A configuration key now hashes its own
+value rather than the line range it cites: parsed value for JSON and TOML,
+subtree text for YAML, with the path folded into the hashed string so two keys
+holding equal values stay distinct. The reproduction went **8 findings (7
+false) → 2**. `PARSER_BUNDLE_VERSION` 1.3.0 → **1.4.0**, so every snapshot is
+stale until re-indexed. Gate green: 2181 passed, `check_phase4` exit 0.
+
+**Three things worth keeping.**
+
+**A test passed for the wrong reason and I nearly shipped it.** My first
+sibling assertion used `project.scripts.run` — and `run` resolves to its own
+line, so it was never affected by the bug and the test passed against the
+broken code. The key that actually inherits is the TOML table header
+`project.scripts`, which `_leaf_line`'s `key =` pattern cannot match. Caught
+only because the *other* new test failed and I checked why this one hadn't.
+
+**Every tracked baseline reproduced byte-for-byte, and that is a limitation,
+not a reassurance** — the corpus has no change case over a nested config key,
+so it cannot see this defect at all. Same blind spot ADR-0016 and ADR-0029
+recorded. The unit tests are the only coverage.
+
+**YAML compares subtree text, not values**, because Phase 2 declined a YAML
+parser. Re-indenting a block without changing a value will report that key as
+changed. Recorded rather than hidden.
+
+Original diagnosis, kept because the reasoning is the reusable part:
 
 **Reported by the user from a real preflight run and reproduced.** Changing one
 line of `pyproject.toml` produces **8 `CONFIG_VALUE_CHANGED` findings, 7 of

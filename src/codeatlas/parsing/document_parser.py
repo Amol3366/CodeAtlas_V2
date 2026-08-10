@@ -22,7 +22,7 @@ import json
 import re
 import tomllib
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from codeatlas.contracts import RelationKind, SymbolKind
@@ -298,6 +298,18 @@ class _ConfigKey:
     start_line: int
     end_line: int
     nested_paths: tuple[str, ...]
+    # What each nested path's *own* content is, keyed by path.
+    #
+    # A leaf whose line cannot be located keeps its parent's range so a
+    # citation is never invented -- but hashing that range made the leaf hash
+    # the whole parent block, so any edit anywhere inside marked every such key
+    # modified. One `version` edit in this project's `pyproject.toml` produced
+    # eight CONFIG_VALUE_CHANGED findings, seven false.
+    #
+    # The range is for citation. This is for identity. A container's content is
+    # its subtree, a scalar's is its value, so a sibling that did not change
+    # does not hash differently.
+    nested_content: Mapping[str, str] = field(default_factory=dict)
 
 
 def _configuration_keys(
@@ -350,6 +362,7 @@ def _json_keys(
                 start_line=start,
                 end_line=_block_end(starts, index, start, last_line),
                 nested_paths=_nested_paths(name, document[name]),
+                nested_content=_nested_content(name, document[name]),
             )
             for index, (name, start) in enumerate(starts)
         ),
@@ -390,6 +403,7 @@ def _toml_keys(
                 start_line=start,
                 end_line=_block_end(starts, index, start, last_line),
                 nested_paths=_nested_paths(name, document[name]),
+                nested_content=_nested_content(name, document[name]),
             )
             for index, (name, start) in enumerate(starts)
         ),
@@ -449,6 +463,9 @@ def _yaml_keys(
                 nested_paths=_yaml_nested_paths(
                     name, lines[line_number : max(end_line, line_number)]
                 ),
+                nested_content=_yaml_nested_content(
+                    name, lines[line_number : max(end_line, line_number)]
+                ),
             )
         )
     return tuple(keys), ()
@@ -486,6 +503,84 @@ def _yaml_nested_paths(prefix: str, body: Sequence[str]) -> tuple[str, ...]:
         if len(paths) >= MAX_NESTED_KEY_PATHS:
             break
     return tuple(paths)
+
+
+def _yaml_nested_content(prefix: str, body: Sequence[str]) -> dict[str, str]:
+    """Each YAML path's own subtree text, keyed by path.
+
+    YAML is scanned by indentation rather than parsed into values, so unlike
+    JSON and TOML there is no object to render. The equivalent of "this key's
+    own value" is the block beneath it: every following line indented deeper
+    than the key itself, stopping where the indentation returns.
+
+    That gives a container the same property the parsed formats get -- editing
+    one branch does not change a sibling's identity -- without introducing a
+    YAML value parser, which would be a far larger change than the defect
+    warrants.
+    """
+    entries: list[tuple[int, str, int]] = []
+    stack: list[tuple[int, str]] = []
+
+    for index, line in enumerate(body):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "-")):
+            continue
+        match = _YAML_KEY.match(stripped)
+        if match is None:
+            continue
+        indent = len(line) - len(line.lstrip())
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        parent = stack[-1][1] if stack else prefix
+        path = f"{parent}.{match.group('key')}"
+        stack.append((indent, path))
+        entries.append((indent, path, index))
+
+    content: dict[str, str] = {}
+    for position, (indent, path, index) in enumerate(entries):
+        end = len(body)
+        for later_indent, _, later_index in entries[position + 1 :]:
+            if later_indent <= indent:
+                end = later_index
+                break
+        subtree = "\n".join(line.rstrip() for line in body[index:end])
+        # Path included for the same reason as the parsed formats: two keys
+        # with identical subtrees must not share one identity.
+        content.setdefault(path, f"{path}={subtree}")
+    return content
+
+
+def _nested_content(prefix: str, value: Any) -> dict[str, str]:
+    """Each nested path's own value, canonically rendered, keyed by path.
+
+    Pairs with `_nested_paths` and covers exactly the same paths. The rendering
+    is JSON with sorted keys so that dictionary ordering cannot make an
+    unchanged key look changed; a value JSON cannot represent (a TOML datetime,
+    say) falls back to `repr`, which is stable for the types `tomllib` returns.
+
+    The path is included in the hashed string so two keys holding equal values
+    stay distinct -- otherwise `{"a": 1, "b": 1}` would give `a` and `b` one
+    identity, and a change moving a value between them would be invisible.
+    """
+    content: dict[str, str] = {}
+
+    def render(node: Any) -> str:
+        try:
+            return json.dumps(node, sort_keys=True, default=repr)
+        except (TypeError, ValueError):
+            return repr(node)
+
+    def walk(current: str, node: Any, depth: int) -> None:
+        if len(content) >= MAX_NESTED_KEY_PATHS or depth > 6:
+            return
+        if isinstance(node, Mapping):
+            for name, child in node.items():
+                path = f"{current}.{name}"
+                content[path] = f"{path}={render(child)}"
+                walk(path, child, depth + 1)
+
+    walk(prefix, value, 0)
+    return content
 
 
 def _nested_paths(prefix: str, value: Any) -> tuple[str, ...]:
@@ -597,6 +692,7 @@ def _config_symbols(
                     container=key.name,
                     start_line=line if line is not None else key.start_line,
                     end_line=line if line is not None else key.end_line,
+                    content=key.nested_content.get(path),
                 )
             )
     return tuple(records)
@@ -628,15 +724,27 @@ def _record(
     container: str,
     start_line: int,
     end_line: int,
+    content: str | None = None,
 ) -> SymbolRecord:
     """Build one document symbol.
 
     ``module_path`` carries the structural context a document has instead of a
     module: a heading ancestry, or the dotted nested keys under a configuration
     key. The chunker reads it back rather than re-deriving structure.
+
+    ``content`` overrides what the hash is taken over. The line range says
+    *where to look*; the hash says *what this is*. They are the same text for
+    almost every symbol, but a nested configuration key whose own line cannot
+    be located keeps its parent's range so the citation is never invented --
+    and hashing that range made it hash the whole parent block, so any edit
+    inside marked every such key modified.
     """
     lines = request.content.decode("utf-8-sig").splitlines()
-    body = "\n".join(lines[start_line - 1 : end_line])
+    body = (
+        content
+        if content is not None
+        else "\n".join(lines[start_line - 1 : end_line])
+    )
     logical = symbol_id(
         request.repository_id, request.relative_path, qualified_name, kind.value
     )
