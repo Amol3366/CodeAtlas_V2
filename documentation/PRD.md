@@ -101,12 +101,23 @@ release authority; the list above is the human summary of it.
 
 ## Current Status
 
-Phases 0–7 are complete with user-approved gates. Three targets were accepted
-as missed at their gates and remain open rather than being quietly dropped:
-changed-symbol precision 0.9375 (structural, explained in
-`docs/evaluation/phase-4-baseline-environment.md`), primary evidence Recall@10
-0.6667 against a ≥0.90 target, and a packaged tree of 1.05 GB when the semantic
-extras are installed. See `phases.md` for the full carried-forward list.
+Phases 0–7 are complete with user-approved gates, and the project was **closed
+out on 2026-08-10**: the four remaining substantial items were settled
+(ADR-0037 to ADR-0040) and every other open item was dispositioned as closed or
+deferred with a stated reason.
+
+**The single authoritative list of what remains is the Deferred Register in
+`docs/plans/PLAN.md`.** It is deliberately not restated here — two copies of a
+status list is how they drift.
+
+Of the three targets accepted as missed at their gates: changed-symbol
+precision 0.9375 is closed as structural (c020–c022 split one physical diff
+into three cases that count each other's symbols against them; explained in
+`docs/evaluation/phase-4-baseline-environment.md`), the 1.05 GB packaged tree
+was accepted at the Phase 7 activation gate, and primary evidence Recall@10 has
+since **passed** under the containment-based metric ADR-0027 introduced —
+though that was a corrected definition and **no engine change**, so it must
+never be cited as uplift.
 
 Post-gate work since then has improved usability without changing the evidence
 contract: the Settings page has a professional provider layout, known warning

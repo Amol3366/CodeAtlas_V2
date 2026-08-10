@@ -222,6 +222,17 @@ reopened tasks:
 
 ## Still Open
 
+> **Closed out 2026-08-10. The authoritative list is the Deferred Register in
+> `docs/plans/PLAN.md`**, where every item is closed or deferred with a stated
+> reason and a named trigger. Four were settled that day: pid-reuse detection
+> (ADR-0037), relation-path scoring (ADR-0038), the `IMPORTS` modelling
+> question (ADR-0039), and the ephemeral CLI scope (ADR-0040).
+>
+> The list below is the **historical record of what was carried into
+> approvals** and is deliberately left as written. Read the register for
+> current status; where the two disagree, the register wins and this is the
+> bug.
+
 Carried into approvals as declared work, with no later phase to absorb them:
 
 1. **The packaged executable is unsigned** — SmartScreen warns on first run.

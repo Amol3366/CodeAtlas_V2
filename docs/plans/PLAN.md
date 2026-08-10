@@ -49,14 +49,43 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active phase    | none - Phases 0-7 are all `complete`; Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Active task     | none - CodeAtlas V2 working guide added 2026-08-07 as post-gate documentation; awaiting user instruction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Task status     | `complete` - Phase 7 stays approved. Everything since is post-gate work, not a reopened phase task. `SCHEMA_VERSION` is now **14** (migration `0014`); `contract_version` remains `1.1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Active phase    | **none - closed.** Phases 0-7 are all `complete`. Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed; that condition has since been met under a corrected metric (ADR-0027), and the correction must be cited with it |
+| Active task     | **none - closed.** The 2026-08-10 closeout settled the four remaining substantial items (ADR-0037 to ADR-0040) and dispositioned every other open item in the Deferred Register below. **This project has a terminal state; it is not an open tail.** |
+| Task status     | `complete` - Phase 7 stays approved. Everything since is post-gate work, not a reopened phase task. `SCHEMA_VERSION` is **14** (migration `0014`); `contract_version` remains `1.1` |
 | Agent           | Claude Code `claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Started UTC     | 2026-08-06T20:30:00Z (CodeAtlas V2 working guide; all earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Git state       | Branch `main`; pre-existing local modification observed in `tests/contract/test_settings_api.py` before this documentation task. This task added `documentation/codeatlas-v2-working-guide.md` and updated `README.md`, `documentation/memory.md`, plus this handoff; no source, schema, contract, migration, or generated artifact was changed |
+| Started UTC     | 2026-08-10T08:00:00Z (project closeout; all earlier work is in the handoff log) |
+| Git state       | Branch `main`, clean at closeout. Five branches merged: `closeout-pid-reuse`, `closeout-relation-path-recall`, `closeout-imports-target`, `closeout-ephemeral-scope`, `closeout-terminal-state`. Changed: `indexing/ownership.py`, `evaluation/runner.py`, one CLI docstring, one corpus endpoint. No schema, contract, migration, or generated artifact changed |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished. A new phase requires an explicit user decision |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision**, and the Deferred Register names what each candidate would cost |
+
+## Deferred Register
+
+Recorded 2026-08-10 at the project closeout. **This section is the terminal
+state of the open tail.** Before it existed, this file said "awaiting user
+instruction" while carrying a seven-item list that had stayed seven items long
+for three days as items were closed daily — an open project with no end
+condition.
+
+Every item below is closed, or deferred with a stated reason and a named
+trigger that reopens it. **Nothing here is silently dropped.** An item leaving
+this register requires the same evidence as any other task: a handoff entry
+with verification.
+
+| Item | Disposition | Reopens when |
+| --- | --- | --- |
+| Pid-reuse detection in crash recovery | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called | — |
+| `relation_path_correctness` measured precision | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning | — |
+| q010: does `IMPORTS` target the module or the bound class? | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols` | — |
+| `CODEATLAS_EPHEMERAL` CLI scope | **CLOSED** — ADR-0040, won't-fix with reasoning. A CLI command exits immediately, so a session database would make every invocation an island | — |
+| Phase 4 `changed_symbol_precision` 0.9375 vs ≥0.95 | **CLOSED as structural.** c020–c022 split one physical diff into three single-symbol cases that count each other's symbols against them; the other 21 score 1.0. Fully explained in `docs/evaluation/phase-4-baseline-environment.md` | Never — the corpus is not edited to move a number (ADR-0003) |
+| Unsigned packaged executable | **DEFERRED — not an engineering task.** SmartScreen warns on first run. Needs a purchased code-signing certificate | A certificate is purchased |
+| **Six** Playwright tests skipped on Chromium, across **five** spec files | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all six, so coverage is not lost. **Counted from the gate run on 2026-08-10, not copied forward:** `onboarding-to-citation`, `preflight`, `restart-persistence`, `settings`, and `stream-reconnection` ×2. Every other document still says "five tests, four spec files" — the figure has now understated itself **twice**, and was already corrected once on 2026-08-07 for the same reason | The upstream bug is fixed |
+| Packaged semantic tree 1.05 GB | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted | A deterministic-only second artifact is wanted |
+| Grow the symbol corpus toward 50 cases | **DEFERRED — multi-day.** 13+ cases, each needing gold ranges. Nothing is *wrong* today: ADR-0033 records that 0.98 is inexpressible at 27 cases and is documented at the constant | Someone commits the days |
+| `relation_path_recall` has no gate target | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023) | That design decision is settled |
+| RRF coarse-chunk bias | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit | The module-granularity ruling lands |
+| Phase 4 `containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect** | Someone investigates per-case |
+| ADR-0030 module-granularity ruling | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90 | The user rules |
 
 ### Phase 7 Task Board
 
@@ -206,6 +235,126 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-10T18:00:00Z — Project closeout: four items settled, the rest dispositioned
+
+- Agent: Claude Code `claude-opus-5`. Branches `closeout-pid-reuse`,
+  `closeout-relation-path-recall`, `closeout-imports-target`,
+  `closeout-ephemeral-scope`, `closeout-terminal-state`, each merged to `main`
+  with `--no-ff` so every slice stays attributable.
+- Transition: no phase task. Post-gate. **This entry gives the project a
+  terminal state.** Before it, this file said "awaiting user instruction" while
+  carrying a seven-item open tail that had stayed seven items long for three
+  days as items were closed daily — an open project with no end condition. The
+  new **Deferred Register** above closes or defers every item with a stated
+  reason and a named reopening trigger.
+- Plan: `docs/superpowers/plans/2026-08-10-project-closeout.md`, written before
+  execution and corrected during it (see limitations).
+
+**ADR-0037 — pid-reuse detection.** The only closed item a *user* of the
+packaged build experiences: a reassigned pid left a repository permanently
+blocked from reindexing, with `codeatlas doctor` making it visible but not
+automatic. Open since the Phase 6 gate (2026-07-29) on a stated blocker —
+"needs the owner's process start time, which has no portable source without a
+new dependency" — that was **half right, and the wrong half kept it open for
+twelve days**. There is no *portable* source. But Section 5 names Windows as
+the primary supported environment, and `GetProcessTimes` is in `kernel32`
+beside the `OpenProcess` this very module already called through `ctypes`;
+Linux has `/proc/<pid>/stat`. The owner stamp now records a start time,
+`None` reads as alive, and a stamp written without the key keeps the behaviour
+it was written under.
+
+**ADR-0038 — relation paths scored by recall.** `relation_path_correctness`
+used `_precision`, so every true edge the engine emitted that the corpus did
+not declare lowered it — and **ADR-0020 mandates emitting every supporting
+edge**. The measurement penalised the engine for obeying an accepted decision.
+ADR-0034 and ADR-0035 each recorded the symptom (q005 and q015 capped at 0.5)
+without naming the instrument. Recall added beside precision, which is
+retained so none of six baselines changes meaning; **deliberately ungated**
+while one of ADR-0034's causes is still open. 0.6364 → 0.7273. **No engine
+change; nothing outside `evaluation/` touched.**
+
+**ADR-0039 — `IMPORTS` targets the bound symbol.** The modelling question
+ADR-0035 deliberately left half-fixed, ruled by the user. The decisive fact was
+not in ADR-0035's framing: **q010 contradicted itself**, its `expected_symbols`
+already naming `IdempotencyStore` while its relation string said
+`idempotency`. That moves it from ADR-0035's territory (unsatisfiable
+expectation) into ADR-0031's (self-contradicting expectation), a stronger and
+more checkable justification. Correctness 0.6364 → 0.7273, recall
+0.7273 → 0.8182, **no other metric moved** — the signature a one-endpoint
+corpus edit should have.
+
+**ADR-0040 — ephemeral scope is the server.** Ruled won't-fix by the user, with
+the reasoning recorded because the item had been carried as an open question
+and "the current behaviour is correct" deserves a record as much as a change
+does. Ephemeral means storage discarded on process exit; a CLI command exits
+immediately, so every invocation would get its own empty database and the
+`repo add` that registered a repository would be invisible to the `index` that
+followed it. **No behaviour change**; two mutation-checked tests now pin both
+sides so the ruling is enforced rather than merely written down.
+
+- Files: `src/codeatlas/indexing/ownership.py`,
+  `src/codeatlas/evaluation/runner.py`, `src/codeatlas/cli/main.py` (docstring
+  only), `tests/integration/test_crash_reporting.py`,
+  `tests/evaluation/test_runner.py`,
+  `tests/end_to_end/test_ephemeral_session_isolation.py`,
+  `tests/evaluation/cases/queries.json` (one endpoint),
+  `docs/adr/0037`–`0040` (new), `docs/adr/README.md`,
+  `docs/operations/ephemeral-sessions.md`, regenerated `baseline-phase-0`,
+  `-3`, `-4`, plus this file and the `documentation/` set.
+  **`baseline-phase-1` and `-2` deliberately untouched** as frozen history.
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`, dataset contract `1.0`; `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`,
+  and `CHUNKER_VERSION` all unchanged, so **no snapshot is made stale by this
+  work**. No new dependency; `uv.lock` and `pnpm-lock.yaml` untouched.
+- Verification, exit codes read from the tools rather than inferred:
+  `uv run ruff check src tests scripts apps` clean; `uv run mypy
+  --no-incremental src tests scripts apps` clean on 347 files; full
+  `uv run pytest -q` **2155 passed, 3 skipped**; `check_phase4.ps1 -SkipSync`
+  exit 0 twice (after Task 2 and after Task 3), including all three live
+  baselines reproducing byte-for-byte and the ADR-0016 invariants;
+  `check_phase7.ps1 -SkipSync` exit 0 — run last, deliberately, because it
+  gates more than `check_phase4` and is historically the one that goes unrun
+  (ADR-0022 finding 5, recurring in ADR-0027).
+- Mutation checks, each observed failing: forcing the ownership comparison to
+  `True` fails both pid-reuse tests; forcing it to `False` fails the
+  live-owner test; routing `_services` through `_ephemeral_requested` fails
+  the CLI-scope test, with captured stderr showing a session path as evidence
+  the mutation took effect.
+- Limitations and corrections made during execution:
+  1. **The plan named a test file that does not exist** —
+     `tests/evaluation/test_runner_metrics.py` — and invented `_query_case` /
+     `_query_prediction` helpers. The real file is
+     `tests/evaluation/test_runner.py` and its convention is to load a real
+     corpus case. Caught by the executing-plans review step **before any code
+     was written**, and the plan was corrected in place with the correction
+     recorded in it.
+  2. **The mutation-check script reintroduced the ADR-0022 CRLF hazard.**
+     Python's `open(p,'w')` writes CRLF on Windows; `git` warned on commit.
+     Fixed by ADR-0022's own prescription (`rm` + `git checkout --`), verified
+     by byte count, and avoided afterwards with `newline=''`.
+  3. **No Markdown report row was added** for either relation metric. Neither
+     ever had one, and surfacing a metric in the human report should follow it
+     earning a gate target, not precede it.
+  4. **Incidental, recorded not fixed:** the engine emits duplicate relation
+     paths (`src.client IMPORTS total` twice in q015). Scoring compares sets so
+     no metric is affected, but a machine-readable list handed to an MCP client
+     should probably not repeat itself. A product question, not a measurement
+     one.
+  5. **The Chromium skip count was wrong everywhere and is now measured.** Every
+     document said "five tests across four spec files"; the gate run counted
+     **six across five** — `preflight` had joined since. The figure was already
+     corrected once on 2026-08-07 for exactly this reason, so it has now
+     understated itself twice. Only the Deferred Register carries the measured
+     number; the older statements are left as the historical record they are.
+     **A count copied forward is not evidence.**
+- Next: **nothing is assigned.** The Deferred Register names every candidate
+  and what each would cost. The nearest three, in the order they would most
+  likely be picked up: settle whether lexical intents should emit relation
+  paths (the last ADR-0034 cause, and what `relation_path_recall` needs before
+  it can be gated); investigate Phase 4's two evidence rates **per case**,
+  where the prior from five prior investigations is that the instrument is
+  wrong again; and the ADR-0030 module-granularity ruling, which is the user's.
 
 ### 2026-08-10T13:00:00Z — Expectations must name real symbols (ADR-0036)
 
