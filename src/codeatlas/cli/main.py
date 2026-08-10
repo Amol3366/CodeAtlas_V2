@@ -769,7 +769,20 @@ _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 
 def _ephemeral_requested(*, flag: bool) -> bool:
-    """Whether this run should use a throwaway session database."""
+    """Whether this run should use a throwaway session database.
+
+    Read at exactly one call site, inside `serve`, and **that scope is the
+    decision** (ADR-0040) rather than an oversight anyone should widen.
+    Ephemeral means storage discarded when the process exits; a CLI command
+    exits at once, so every invocation would get its own empty database and
+    the `repo add` that registered a repository would be invisible to the
+    `index` that followed it. The mode is only coherent for a long-lived
+    process.
+
+    The half of this that *was* a defect — nothing saying which database was
+    in play — is fixed separately by `_announce_database`, and both surfaces
+    now name their file.
+    """
     if flag:
         return True
     raw = os.environ.get(_EPHEMERAL_VARIABLE)
