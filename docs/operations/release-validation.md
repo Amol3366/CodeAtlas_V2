@@ -20,10 +20,16 @@ powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -Package
 powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -Semantic -Package
 
 # 3. The Section 19.3 performance targets with embeddings enabled.
-powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync -SkipWeb -SkipE2E -Perf
+#    NOT `-SkipWeb`: that flag exits the script early (it means "backend only,
+#    then stop"), so combining it with -Perf returns 0 having measured nothing.
+powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync -Perf
 
-# 4. The earlier gates, unchanged.
-foreach ($n in 0..6) {
+# 4. The earlier gates. Phases 1 and 2 are EXCLUDED on purpose -- both scripts
+#    are marked SUPERSEDED on line 1, and their baselines are frozen history
+#    that ADR-0017 deliberately did not regenerate, so they always report
+#    "baseline artifacts are stale" and exit non-zero. Running them is not a
+#    check, it is a false alarm.
+foreach ($n in 0, 3, 4, 5, 6) {
     powershell -ExecutionPolicy Bypass -File "scripts/check_phase$n.ps1" -SkipSync
 }
 
@@ -68,13 +74,19 @@ packaging/performance gate is not satisfied in that environment.
 These are stated at the gate rather than in a footnote, because a green run
 should not hide them.
 
-1. **Four conversation-route browser tests are skipped on Chromium**, whose
-   renderer crashes navigating to `/conversations/{id}`. A browser defect, not
-   application code; Firefox proves all seven.
-2. **Recovery does not detect pid reuse.** If a dead run's pid is reassigned
-   before the next start, that repository stays blocked from reindexing.
-   `codeatlas doctor` names the run and its pid, so it is visible rather than
-   silent, but it is not automatic.
+1. **Six browser tests are skipped on Chromium, across five spec files** —
+   `onboarding-to-citation`, `preflight`, `restart-persistence`, `settings`,
+   and `stream-reconnection` (×2). A browser defect, not application code;
+   Firefox runs every one of them.
+
+   *Counted from a gate run on 2026-08-10.* This said "four … on
+   `/conversations/{id}`" and had already been corrected once, on 2026-08-07,
+   for understating itself. **Count it from the run, do not copy it forward.**
+2. ~~**Recovery does not detect pid reuse.**~~ **CLOSED 2026-08-10 by
+   ADR-0037.** The owner stamp now records the owner's process start time, so a
+   reassigned pid no longer keeps a dead run's repository blocked. Verified
+   against the packaged binary with a live child process: correct start time →
+   run left alone, wrong start time → run stranded.
 3. **The executable is unsigned**, so SmartScreen warns on first run. Signing
    needs a certificate, which is a purchasing decision rather than an
    engineering one.
@@ -86,6 +98,27 @@ should not hide them.
    or the package was built without `-SemanticLocal`, the Phase 7 perf script
    reports a blocked measurement rather than falling back to deterministic
    numbers.
+
+5. **Two tracked artifacts hold CRLF in the working tree**:
+   `baseline-phase-7-perf.json` (fixed 2026-08-10 — `measure_phase7_perf.py`
+   used `write_text` without `newline=""`, so Python emitted CRLF on Windows
+   into a *byte-gated* artifact) and **`baseline-phase-6.json`, which still
+   does and was left alone.** Per ADR-0022 the remedy is `rm` + `git checkout
+   --`, not a rewrite. It is not currently failing a gate, which is exactly why
+   ADR-0022 warns about it: git reports a clean tree while the working file and
+   the committed object disagree.
+
+6. **The gate scripts themselves were unvalidated until 2026-08-10.** Three
+   defects were found by running this document end to end for the first time:
+   `check_phase7.ps1 -Package` could never bind its arguments (array splatting
+   into an all-`[switch]` script — fixed, and guarded by
+   `tests/unit/test_gate_script_invocations.py`); step 3 combined `-SkipWeb`
+   with `-Perf` and returned 0 having measured nothing; step 4 looped over
+   gates 1 and 2, which are frozen by design and always fail.
+
+   The lesson is not the three defects. It is that **a validation checklist is
+   itself untested code**, and this one had two steps that could not do what
+   they claimed while the document described what each "proves".
 
 A prior qualification stood here until 2026-07-29 — a server that stopped
 answering under sustained change analysis, first misdiagnosed as a memory-fault

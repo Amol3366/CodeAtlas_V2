@@ -373,8 +373,16 @@ def _maybe_write(path: Path | None, payload: dict[str, Any]) -> None:
     if path is None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
+    # `newline=""` writes the "\n" through untranslated. Without it Python
+    # emits CRLF on Windows, and this artifact is *tracked* and gated by a
+    # byte comparison -- so the working tree would disagree with the committed
+    # object that `.gitattributes` normalised, and `--check` would fail on a
+    # fresh clone while passing here. That is ADR-0022 exactly, which cost a
+    # session to diagnose the first time.
     path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="",
     )
 
 
