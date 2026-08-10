@@ -76,8 +76,15 @@ The notice goes to stderr on purpose, so `--json` stdout stays machine-readable:
 ```
 
 If you want a CLI command to use throwaway storage, pass `--db` to a path you
-control. Whether the variable *should* cover the CLI too is an open decision
-against ADR-0013, not a defect to work around.
+control.
+
+**This scope is settled (ADR-0040), not an oversight.** Ephemeral means storage
+discarded when the process exits, and a CLI command exits immediately — so
+every invocation would get its own empty database, and the `repo add` that
+registered a repository would be invisible to the `index` that followed it,
+because they are different processes. The whole documented CLI workflow would
+stop working. The mode is only coherent for a long-lived process, which is
+`serve`.
 
 ## Opening on the repositories you care about
 

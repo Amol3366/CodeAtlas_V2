@@ -75,6 +75,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0039](0039-imports-targets-the-bound-symbol.md) | The modelling question ADR-0035 deliberately left half-fixed: does `IMPORTS` target the module or the class the statement binds? **The class** — `from x import Y` binds `Y`, and ADR-0021's import-and-call rule requires a *class* owner precisely so `import orders` cannot vouch for every symbol inside it. The decisive fact was that **q010 contradicted itself**: its `expected_symbols` already named `IdempotencyStore` while its relation string said `idempotency`. Correctness 0.6364 → 0.7273, recall 0.7273 → 0.8182, nothing else moved. One of ADR-0034's four causes now remains | none (post-gate) |
 
+| [0040](0040-ephemeral-scope-is-the-server.md) | The scope question carried since 2026-08-09, closed as **won't-fix with the reasoning recorded**. Ephemeral means storage discarded on process exit and a CLI command exits at once, so every invocation would get its own empty database — the `repo add` that registered a repository invisible to the `index` that followed it, and the documented CLI workflow structurally impossible. The half that *was* a defect (nothing saying which database was in play) was already fixed. No behaviour change; two mutation-checked tests now pin both sides of the boundary | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its

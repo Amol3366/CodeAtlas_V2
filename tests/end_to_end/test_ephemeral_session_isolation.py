@@ -16,7 +16,11 @@ from codeatlas.application.ephemeral_bootstrap import (
     index_repositories,
     register_repositories,
 )
-from codeatlas.cli.main import _resolve_serve_database
+from codeatlas.cli.main import (
+    _ephemeral_requested,
+    _resolve_serve_database,
+    _services,
+)
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.upgrade import upgrade_database
 
@@ -66,6 +70,55 @@ def test_a_session_directory_holds_its_own_vectors(
     # The vector directory is derived from the database's parent, so a fresh
     # session directory is what makes embeddings fresh too. If this ever stops
     # being true, the mode silently reuses another run's vectors.
+    resolved, session = _resolve_serve_database(database=None, ephemeral=True)
+
+    assert session is not None
+    assert resolved.parent == session
+
+
+# --- ADR-0040: ephemeral scope is the server, deliberately -----------------
+
+
+def test_a_cli_command_ignores_the_ephemeral_variable(
+    fake_local_app_data: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-0040: `CODEATLAS_EPHEMERAL` governs `serve` and nothing else.
+
+    A CLI process exits immediately, so a session database would be created
+    empty, used for one command, and destroyed -- and the `repo add` that
+    registered a repository would be invisible to the `index` that followed
+    it, because they are different processes. The mode is only coherent for a
+    long-lived one.
+
+    This asserts the *decision*, not an implementation detail. If a future
+    change makes the CLI ephemeral, this test must be deleted deliberately
+    alongside ADR-0040, not quietly adjusted.
+    """
+    real = tmp_path / "real" / "codeatlas.db"
+    real.parent.mkdir(parents=True)
+    monkeypatch.setattr(
+        "codeatlas.cli.main.default_database_path", lambda: real
+    )
+    monkeypatch.setenv("CODEATLAS_EPHEMERAL", "1")
+
+    # The variable *is* set and *is* readable -- the point is that the CLI
+    # path does not consult it, not that it went missing.
+    assert _ephemeral_requested(flag=False) is True
+
+    with _services(None) as services:
+        assert services.repositories.list_all() == ()
+
+    assert real.exists(), "the CLI opened the real database, not a session one"
+
+
+def test_serve_still_honours_the_ephemeral_variable(
+    fake_local_app_data: Path,
+) -> None:
+    """The other side of the same boundary.
+
+    Without this, ADR-0040 could be "satisfied" by the variable ceasing to
+    work anywhere, which is a different decision entirely.
+    """
     resolved, session = _resolve_serve_database(database=None, ephemeral=True)
 
     assert session is not None
