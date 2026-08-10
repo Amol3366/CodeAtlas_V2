@@ -4,12 +4,19 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-09
+Last updated: 2026-08-10
 
 ## Current Phase
 
-**None.** Phases 0–7 are all `complete` with user-approved gates. The Section 20
-development order is finished. A new phase requires an explicit user decision.
+**None, and the project is closed out.** Phases 0–7 are all `complete` with
+user-approved gates, the Section 20 development order is finished, and the
+2026-08-10 closeout gave the open tail a terminal state. A new phase requires
+an explicit user decision.
+
+**The open-item list lives in one place: the Deferred Register in
+`docs/plans/PLAN.md`.** Do not restate it here or in `phases.md` — two copies
+of a status list is how they drift, which is the `--format pr` and
+`_SEVERITY_ORDER` lesson applied to documentation.
 
 ## Completed
 
@@ -999,6 +1006,54 @@ development order is finished. A new phase requires an explicit user decision.
       Order`: both fail the validator. Does **not** check that a resolvable name
       is the *right* answer — that is what the metrics are for — nor evidence
       paths, line ranges, or change cases.
+
+- [x] **Project closeout (2026-08-10)** — four substantial items settled and
+      every remaining one dispositioned. Plan:
+      `docs/superpowers/plans/2026-08-10-project-closeout.md`.
+
+      **ADR-0037, pid-reuse detection.** The only closed item a *user* of the
+      packaged build feels: a reassigned pid left a repository permanently
+      blocked from reindexing. It had been open since the Phase 6 gate on a
+      stated blocker — "no portable source without a new dependency" — that
+      was **half right, and the wrong half kept it open twelve days.** There
+      is no *portable* source; `GetProcessTimes` sits in `kernel32` beside the
+      `OpenProcess` this very module already called through `ctypes`. Scoping
+      a requirement to "portable" when the product is Windows-first is the
+      reusable mistake here. Mutation-checked both directions.
+
+      **ADR-0038, relation paths scored by recall.** `relation_path_correctness`
+      used precision, so every true edge the engine emitted that the corpus did
+      not declare lowered it — and **ADR-0020 requires emitting every supporting
+      edge.** The measurement punished obedience to an accepted decision.
+      ADR-0034 and ADR-0035 each described the symptom (q005, q015 capped at
+      0.5) without naming the instrument. This is the **fifth** time an
+      investigation found the apparatus at fault rather than the engine
+      (0017, 0018, 0024, 0027, 0038). 0.6364 precision → 0.7273 recall,
+      precision retained, **deliberately ungated**.
+
+      **ADR-0039, `IMPORTS` targets the bound symbol.** The modelling question
+      ADR-0035 deliberately left half-fixed. The decisive fact was not in its
+      framing: **q010 contradicted itself**, already naming `IdempotencyStore`
+      in `expected_symbols` while its relation string said `idempotency`. That
+      moves it from ADR-0035's territory to ADR-0031's — an expectation that
+      disagrees with itself, which is a stronger justification. Both relation
+      metrics +0.0909, nothing else moved.
+
+      **ADR-0040, ephemeral scope is the server.** Closed as won't-fix *with
+      reasoning*, and recorded because "we looked and the current behaviour is
+      correct" deserves a record as much as a change does. A CLI command exits
+      immediately, so a session database would make every invocation an island
+      and `repo add` would be invisible to `index`. Two mutation-checked tests
+      now pin both sides, so the ruling is enforced rather than merely written.
+
+      **Two process notes worth keeping.** My own mutation-check script
+      reintroduced the **ADR-0022 CRLF hazard** — Python's `open(p,'w')` writes
+      CRLF on Windows, and `git` warned on commit. Fixed by ADR-0022's own
+      prescription (`rm` + `git checkout --`) and avoided afterwards with
+      `newline=''`. And the plan I wrote named a test file that does not exist
+      (`test_runner_metrics.py`) with helpers I invented; the executing-plans
+      review step caught it before any code was written, which is the argument
+      for that step existing.
 
 ## In Progress
 

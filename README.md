@@ -349,7 +349,7 @@ untrusted data and are never imported, built, or executed.
 - `docs/operations/end-to-end-tests.md` — the Playwright harness and what each suite proves
 - `docs/operations/semantic-search.md` — semantic providers, coverage, migrations, and admission state
 - `docs/operations/answer-generation.md` — optional written explanations, the models, and every failure message
-- `docs/adr/README.md` — the eight accepted architecture decisions
+- `docs/adr/README.md` — the accepted architecture decisions and their rationale
 - `docs/evaluation/phase-4-baseline-environment.md` — how to read the baseline and performance numbers
 - `docs/evaluation/phase-6-baseline-environment.md` — packaged performance and fixed release defects
 - `docs/evaluation/phase-7-baseline-environment.md` — semantic uplift measurement and its limits
