@@ -147,6 +147,12 @@ class QueryScore(ContractModel):
     containing_evidence_count: int = Field(ge=0)
     predicted_evidence_count: int = Field(ge=0)
     relation_path_correctness: Confidence
+    # ADR-0038. Precision penalises the engine for emitting a true edge the
+    # corpus did not declare -- which ADR-0020 *requires* it to do. Recall asks
+    # the question the corpus can actually answer: did every declared relation
+    # appear? The precision number is retained unchanged so no tracked baseline
+    # changes meaning, the treatment ADR-0003 gave `valid_evidence_rate`.
+    relation_path_recall: Confidence = 0.0
     forbidden_claim_count: int = Field(ge=0)
     claim_count: int = Field(ge=0)
     abstention_correct: bool
@@ -201,6 +207,10 @@ class AggregateMetrics(ContractModel):
     exact_evidence_rate: MetricValue
     containing_evidence_rate: MetricValue
     relation_path_correctness: MetricValue
+    # ADR-0038. Defaulted to `None` so an artifact written before this record
+    # still loads and is scored exactly as it was, the same treatment
+    # `containing_evidence_recall_at_10` got from ADR-0027.
+    relation_path_recall: MetricValue = None
     changed_symbol_precision: MetricValue
     changed_symbol_recall: MetricValue
     direct_impact_recall: MetricValue
@@ -299,6 +309,7 @@ def score_query_case(
     expected_relations = set(case.expected_relations)
     predicted_relations = set(prediction.relation_paths)
     relation_correctness = _precision(predicted_relations, expected_relations)
+    relation_recall = _recall(predicted_relations, expected_relations)
     forbidden_count = sum(
         contains_forbidden_claim(claim, case.forbidden_claims)
         for claim in prediction.claims
@@ -320,6 +331,7 @@ def score_query_case(
         containing_evidence_count=containing_evidence,
         predicted_evidence_count=len(evidence_ranked),
         relation_path_correctness=relation_correctness,
+        relation_path_recall=relation_recall,
         forbidden_claim_count=forbidden_count,
         claim_count=len(prediction.claims),
         abstention_correct=prediction.abstained == case.expected_abstention,
@@ -409,6 +421,11 @@ def null_baseline(dataset: Dataset) -> EvaluationReport:
         exact_evidence_rate=None,
         containing_evidence_rate=None,
         relation_path_correctness=0.0,
+        # Explicitly 0.0, not the field's `None` default, for the reason the
+        # `containing_evidence_recall_at_10` comment above gives: the null
+        # baseline asserts "nothing is implemented, so nothing is found", and
+        # leaving it unset would say "not measured" -- a different claim.
+        relation_path_recall=0.0,
         changed_symbol_precision=0.0,
         changed_symbol_recall=0.0,
         direct_impact_recall=0.0,
@@ -605,6 +622,13 @@ def _aggregate(
         )
         if case.expected_relations and score.measured
     ]
+    relation_recall_scores = [
+        score.relation_path_recall
+        for score, case in zip(
+            query_scores, dataset.query_cases, strict=True
+        )
+        if case.expected_relations and score.measured
+    ]
     impact_recall = [
         score.direct_impact_recall
         for score in change_scores
@@ -657,6 +681,7 @@ def _aggregate(
             else None
         ),
         relation_path_correctness=_mean(relation_scores),
+        relation_path_recall=_mean(relation_recall_scores),
         changed_symbol_precision=_mean(
             [score.changed_symbol_precision for score in change_scores]
         ),

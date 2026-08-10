@@ -9,6 +9,7 @@ import pytest
 from codeatlas.evaluation.dataset import (
     LEXICAL_INTENTS,
     SYMBOL_INTENTS,
+    QueryCase,
     load_dataset,
 )
 from codeatlas.evaluation.runner import (
@@ -551,3 +552,69 @@ def test_unmeasured_cases_leave_the_lexical_denominator() -> None:
     # point is that it is computed over the measured cases only.
     assert report.metrics.lexical_resolution == 0.0
     assert report.metrics.abstention_correctness is not None
+
+
+# --- ADR-0038: relation paths are scored by recall, not precision ----------
+
+
+def _relation_case(case_id: str) -> QueryCase:
+    """The real corpus case with this id.
+
+    Real rather than synthetic on purpose: q015 is the actual shape this
+    metric gets wrong, so a stand-in would prove less.
+    """
+    for case in load_dataset(DATASET_ROOT).query_cases:
+        if case.id == case_id:
+            return case
+    raise AssertionError(f"no such case: {case_id}")
+
+
+def _relation_prediction(
+    case_id: str, relation_paths: list[str]
+) -> QueryPrediction:
+    return QueryPrediction(
+        case_id=case_id,
+        ranked_symbols=[],
+        ranked_evidence=[],
+        relation_paths=relation_paths,
+        claims=[],
+        abstained=False,
+        duration_ms=1.0,
+    )
+
+
+def test_an_extra_true_relation_does_not_reduce_recall() -> None:
+    """ADR-0020 requires every supporting edge; recall must not punish that.
+
+    q015 is the real case: it declares `src.client IMPORTS total`, and the
+    engine also emits `total REFERENCES Order` -- true, undeclared, and
+    mandated. Precision halves for that. Recall must not.
+
+    Both numbers are asserted, because the precision figure is retained
+    deliberately and a change to it would silently move six baselines.
+    """
+    case = _relation_case("q015")
+    prediction = _relation_prediction(
+        "q015",
+        ["src.client IMPORTS total", "total REFERENCES Order"],
+    )
+
+    score = score_query_case(case, prediction)
+
+    assert score.relation_path_recall == 1.0
+    assert score.relation_path_correctness == 0.5
+
+
+def test_a_missing_relation_still_reduces_recall() -> None:
+    """Recall must not be a metric that can only go up.
+
+    q017 declares two exports. Predicting one is half the answer, and a
+    metric that scored that 1.0 would be measuring nothing.
+    """
+    case = _relation_case("q017")
+    prediction = _relation_prediction("q017", ["src.orders EXPORTS Order"])
+
+    score = score_query_case(case, prediction)
+
+    assert score.relation_path_recall == 0.5
+    assert score.relation_path_correctness == 1.0

@@ -71,6 +71,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0037](0037-pid-reuse-detection.md) | A pid is a slot the OS reassigns, not an owner — so a dead run whose pid was reissued looked alive and blocked its repository from reindexing **permanently**, an item declared open at the Phase 6 gate and carried through Phase 7. The stamp now records the owner's process *start time* too. The stated blocker ("no portable source without a new dependency") was half right and the wrong half kept it open twelve days: there is no portable source, but `GetProcessTimes` sits beside the `OpenProcess` this module already calls, and Windows is the supported environment. `None` reads as alive, and a stamp without the key keeps the behaviour it was written under | none (post-gate) |
 
+| [0038](0038-relation-path-recall.md) | `relation_path_correctness` scored **precision**, so every true edge the engine emitted that the corpus did not declare lowered it — and **ADR-0020 requires emitting every supporting edge.** The measurement punished the engine for obeying an accepted decision. ADR-0034 and ADR-0035 each named the symptom (q005, q015 capped at 0.5) without naming the instrument. `relation_path_recall` added beside it at 0.6364 → 0.7273, precision retained so no baseline changes meaning. **Deliberately ungated** — two of ADR-0034's four causes are still open. The fifth instance of the apparatus, not the engine, being wrong | none (post-gate) |
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its
