@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-10
+Last updated: 2026-08-11
 
 ## Current Phase
 
@@ -1279,6 +1279,47 @@ may be the whole story.
 Reproduction: a temp git repo with this project's own `pyproject.toml`, one
 `version` line changed, indexed and analysed through the CLI. Roughly two
 minutes to redo.
+
+- [x] **Duplicate and false preflight findings (ADR-0042), 2026-08-11.** The
+      user's second duplicate report, and **the register's guess that it "may be
+      a UI issue" was wrong.** `FindingsList.tsx` files each finding into exactly
+      one severity group; the engine emitted them.
+
+      **`symbol_diff` matched on `(kind, qualified_name)` with no file in the
+      key.** A config key name in *N* files was an *N*-versus-*N* match, not
+      one-to-one, so it fell to the ambiguous branch and reported every
+      occurrence deleted *and* added. On a **clean working tree with
+      byte-identical bytes** (`od -c`, so not ADR-0022 line endings) that was
+      **4 findings for a repository nobody had edited**; on this repository,
+      1592 findings with five identical `cases changed`. The user's "twice" and
+      "four times" was the number of files sharing that key name.
+
+      Second cause: every ancestor restated its descendant's edit, the subtree
+      residue ADR-0041 recorded. Folding on **line ranges reaches only the
+      top-level key**, because ADR-0041 gave intermediates their own one-line
+      ranges — so containment for a config key is its **dotted path**, with the
+      trailing dot load-bearing (`service.apikey` is not inside `service.api`).
+
+      Clean tree **4 → 0**; one nested edit **4 → 1**; the `pyproject.toml`
+      bump **8 → (ADR-0041) 2 → 1**. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so
+      **every snapshot must be re-indexed**. No schema or contract change.
+
+      **The corpus was hiding the reported bug all along.** c012 had emitted two
+      `CONFIG_VALUE_CHANGED` findings for one edit since Phase 4, and c014 two
+      `PACKAGE_SCRIPT_CHANGED`. No metric could see it: `expected_findings` is a
+      **set of codes**, and a set cannot count. Third instance of the
+      ADR-0016 / ADR-0029 lesson. Whether it should be a multiset is open.
+
+      Preflight "being deleted" on navigation was never data loss: the report is
+      persisted and cached with `staleTime: Infinity`, but its id lived **only
+      in the URL** while the sidebar link was hard-coded to the launcher. Now
+      remembered per repository in localStorage.
+
+      **Two process notes.** A `git checkout --` used to undo a mutation check
+      reverted the fix with it — ADR-0022's lesson about that command cutting
+      wider than intended, in a new place; do the revert from a copy. And
+      `npx prettier` is **not** a tool of this project (ESLint is the gate);
+      running it reported "issues" in correctly formatted files.
 
 ## Decisions Made
 

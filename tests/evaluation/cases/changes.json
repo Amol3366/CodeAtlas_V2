@@ -500,7 +500,7 @@
                                                 {
                                                     "file_path":  "config/settings.yaml",
                                                     "symbol":  "service.port",
-                                                    "start_line":  1,
+                                                    "start_line":  3,
                                                     "end_line":  3,
                                                     "evidence_id":  "c012-e1",
                                                     "snapshot_id":  "docs-v1"
@@ -586,8 +586,8 @@
                                                 {
                                                     "file_path":  "package.json",
                                                     "symbol":  "scripts.test",
-                                                    "start_line":  4,
-                                                    "end_line":  6,
+                                                    "start_line":  5,
+                                                    "end_line":  5,
                                                     "evidence_id":  "c014-e1",
                                                     "snapshot_id":  "docs-v1"
                                                 }

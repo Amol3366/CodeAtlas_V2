@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { useActiveRepository } from "../app/context";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { Skeleton } from "../components/Skeleton";
 import { AnalysisSummary } from "../features/change-analysis/AnalysisSummary";
@@ -8,6 +10,10 @@ import { FindingsList } from "../features/change-analysis/FindingsList";
 import { ImpactList } from "../features/change-analysis/ImpactList";
 import { ReportNotes } from "../features/change-analysis/ReportNotes";
 import { TestGaps } from "../features/change-analysis/TestGaps";
+import {
+  forgetAnalysis,
+  lastAnalysisId,
+} from "../features/change-analysis/lastAnalysis";
 import { evidenceById, useAnalysis } from "../features/change-analysis/useAnalysis";
 
 /**
@@ -24,6 +30,17 @@ import { evidenceById, useAnalysis } from "../features/change-analysis/useAnalys
 export function PreflightAnalysisRoute() {
   const { analysisId } = useParams();
   const analysis = useAnalysis(analysisId);
+  const { repositoryId } = useActiveRepository();
+  const failed = analysis.isError;
+
+  // A pointer to a record that no longer resolves — deleted with its
+  // repository, or removed by the retention sweep — must not keep sending the
+  // sidebar to a dead id. Dropping it returns the link to the launcher.
+  useEffect(() => {
+    if (!failed) return;
+    if (lastAnalysisId(repositoryId) !== analysisId) return;
+    forgetAnalysis(repositoryId);
+  }, [failed, repositoryId, analysisId]);
 
   if (analysis.isPending) {
     return (
@@ -53,6 +70,11 @@ export function PreflightAnalysisRoute() {
 
   return (
     <div className="mx-auto max-w-[var(--measure)] p-[var(--space-8)]">
+      <p className="mb-[var(--space-3)] text-sm">
+        <Link to="/preflight" className="underline">
+          Run a new preflight
+        </Link>
+      </p>
       <AnalysisSummary report={report} />
 
       <section aria-labelledby="findings" className="mt-[var(--space-6)]">

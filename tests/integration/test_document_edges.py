@@ -227,7 +227,15 @@ def test_a_document_documents_the_code_that_owns_the_same_route(
 def test_a_document_documents_a_config_key_when_every_segment_is_named(
     docs_config: Harness,
 ) -> None:
-    assert ("Sample Service", "service") in _resolved(
+    """The edge targets the key the section actually names (ADR-0042).
+
+    It used to target the top-level container while its `target_hint` said
+    `service.port`, because the dotted paths were only summarized on the
+    container. ADR-0025 made the leaf an addressable symbol, so the edge can
+    now name what it always meant -- the same correction ADR-0039 made for
+    `IMPORTS`.
+    """
+    assert ("Sample Service", "service.port") in _resolved(
         docs_config, RelationKind.DOCUMENTS
     )
 

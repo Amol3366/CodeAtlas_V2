@@ -58,7 +58,7 @@ _UNMENTIONABLE_KINDS: Final[frozenset[SymbolKind]] = frozenset(
     {SymbolKind.MODULE, SymbolKind.CONFIG_KEY, SymbolKind.DOCUMENT_SECTION}
 )
 
-RESOLVER_VERSION: str = "1.3.0"
+RESOLVER_VERSION: str = "1.4.0"
 
 # Tried in order for a TypeScript/JavaScript specifier that names no extension.
 _TSJS_EXTENSIONS: Final[tuple[str, ...]] = (
@@ -585,6 +585,16 @@ def _derive_config_edges(
             reference.target_hint.lower(), (reference.file_id, reference.start_line)
         )
 
+    # The dotted paths are summarized on the *container*, but ADR-0025 made each
+    # of them an addressable symbol of its own. The edge targets that leaf where
+    # it exists (ADR-0042): pointing at the container while `target_hint` said
+    # `service.port` meant impact from the documented key could only be reached
+    # through the parent, and folding the parent away lost the link entirely.
+    leaves: dict[tuple[str, str], SymbolRecord] = {}
+    for candidate in index.symbols_by_id.values():
+        if candidate.kind is SymbolKind.CONFIG_KEY:
+            leaves.setdefault((candidate.file_id, candidate.qualified_name), candidate)
+
     edges: list[RelationRecord] = []
     for section_id, words in words_by_section.items():
         section = index.symbols_by_id.get(section_id)
@@ -597,7 +607,8 @@ def _derive_config_edges(
                 segments = path.lower().split(".")
                 if len(segments) < 2 or any(part not in words for part in segments):
                     continue
-                key = (section_id, symbol.symbol_id)
+                target = leaves.get((symbol.file_id, path), symbol)
+                key = (section_id, target.symbol_id)
                 if key in seen:
                     continue
                 seen.add(key)
@@ -605,7 +616,7 @@ def _derive_config_edges(
                 edges.append(
                     _derived_edge(
                         source_symbol_id=section_id,
-                        target=symbol,
+                        target=target,
                         file_id=file_id,
                         target_hint=path,
                         start_line=line,
