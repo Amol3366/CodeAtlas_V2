@@ -12,9 +12,9 @@
 | Exact symbol resolution | 1.0000 |
 | Primary evidence Recall@10 | 0.7627 |
 | Containing evidence Recall@10 | 0.8305 |
-| Valid evidence rate | 0.5632 |
-| Exact evidence rate | 0.5632 |
-| Containing evidence rate | 0.6667 |
+| Valid evidence rate | 0.5765 |
+| Exact evidence rate | 0.5765 |
+| Containing evidence rate | 0.6824 |
 | Changed-symbol precision | 0.9375 |
 | Changed-symbol recall | 1.0000 |
 | Direct-impact recall | 1.0000 |

@@ -648,3 +648,248 @@ def test_keyword_only_marker_is_not_a_parameter() -> None:
         )
         is SignatureChangeClass.ONLY_OPTIONAL_PARAMETERS_ADDED
     )
+
+
+# --- Same-name keys in different files pair within their file (ADR-0042) ---
+
+
+def test_identical_key_in_two_files_reports_nothing() -> None:
+    """A key name shared by two files is not ambiguous, and an unchanged
+    repository must produce no change at all.
+
+    Matching on `(kind, qualified_name)` alone made two files declaring
+    `cases` a two-versus-two match, which fell to the ambiguous branch and
+    reported both as deleted *and* both as added -- on byte-identical content.
+    """
+    paths = {"file_a.json": "a.json", "file_b.json": "b.json"}
+    symbols = (
+        _record("sym_a", SymbolKind.CONFIG_KEY, "cases", file_id="file_a.json"),
+        _record("sym_b", SymbolKind.CONFIG_KEY, "cases", file_id="file_b.json"),
+    )
+
+    changes = compute_symbol_changes(
+        SymbolDiffInput(symbols=symbols, relations=(), file_paths=paths),
+        SymbolDiffInput(symbols=symbols, relations=(), file_paths=paths),
+    )
+
+    assert changes == ()
+
+
+def test_shared_key_name_reports_only_the_file_that_changed() -> None:
+    """One edit is one change, even when the key name is not unique."""
+    paths = {"file_a.json": "a.json", "file_b.json": "b.json"}
+    base = (
+        _record("sym_a", SymbolKind.CONFIG_KEY, "port", file_id="file_a.json"),
+        _record("sym_b", SymbolKind.CONFIG_KEY, "port", file_id="file_b.json"),
+    )
+    target = (
+        _record(
+            "sym_a",
+            SymbolKind.CONFIG_KEY,
+            "port",
+            file_id="file_a.json",
+            content_hash="changed",
+        ),
+        _record("sym_b", SymbolKind.CONFIG_KEY, "port", file_id="file_b.json"),
+    )
+
+    changes = compute_symbol_changes(
+        SymbolDiffInput(symbols=base, relations=(), file_paths=paths),
+        SymbolDiffInput(symbols=target, relations=(), file_paths=paths),
+    )
+
+    assert len(changes) == 1
+    assert changes[0].change_kind is ChangeKind.MODIFIED
+    assert changes[0].file_path == "a.json"
+
+
+def test_cross_file_move_still_detected_when_name_is_unique() -> None:
+    """The move rule is unchanged: a name on exactly one side of each file,
+    with no same-file partner, is still carried across as a move."""
+    paths = {"file_a.json": "a.json", "file_b.json": "b.json"}
+    base = (_record("sym_a", SymbolKind.CONFIG_KEY, "port", file_id="file_a.json"),)
+    target = (_record("sym_b", SymbolKind.CONFIG_KEY, "port", file_id="file_b.json"),)
+
+    changes = compute_symbol_changes(
+        SymbolDiffInput(symbols=base, relations=(), file_paths=paths),
+        SymbolDiffInput(symbols=target, relations=(), file_paths=paths),
+    )
+
+    assert len(changes) == 1
+    assert changes[0].change_kind is ChangeKind.MOVED
+
+
+def test_config_ancestor_folds_into_the_leaf_that_changed() -> None:
+    """One edit is one change, for a config key as much as for a class.
+
+    A mapping key's value *is* its subtree, so editing `service.api.http.port`
+    also moves the hash of `service.api.http`, `service.api` and `service`.
+    Reporting all four restates one edit four times, each entry looking like a
+    duplicate of the last.
+    """
+    paths = {"file_config.yaml": "config.yaml"}
+    ancestors = ("service", "service.api", "service.api.http")
+    leaf = "service.api.http.port"
+
+    def side(hash_of_leaf: str) -> tuple[SymbolRecord, ...]:
+        records = [
+            _record(
+                f"sym_{name}",
+                SymbolKind.CONFIG_KEY,
+                name,
+                file_id="file_config.yaml",
+                start_line=1,
+                end_line=9,
+                content_hash=f"outer-{hash_of_leaf}",
+            )
+            for name in ancestors
+        ]
+        records.append(
+            _record(
+                "sym_leaf",
+                SymbolKind.CONFIG_KEY,
+                leaf,
+                file_id="file_config.yaml",
+                start_line=4,
+                end_line=4,
+                content_hash=hash_of_leaf,
+            )
+        )
+        return tuple(records)
+
+    changes = compute_symbol_changes(
+        SymbolDiffInput(symbols=side("h1"), relations=(), file_paths=paths),
+        SymbolDiffInput(symbols=side("h2"), relations=(), file_paths=paths),
+    )
+
+    assert [c.qualified_name for c in changes] == [leaf]
+
+
+def test_config_key_still_reports_when_it_alone_changed() -> None:
+    """Folding must not swallow a container that changed on its own."""
+    paths = {"file_config.yaml": "config.yaml"}
+    base = (
+        _record(
+            "sym_service",
+            SymbolKind.CONFIG_KEY,
+            "service",
+            file_id="file_config.yaml",
+            start_line=1,
+            end_line=9,
+            content_hash="h1",
+        ),
+    )
+    target = (
+        _record(
+            "sym_service",
+            SymbolKind.CONFIG_KEY,
+            "service",
+            file_id="file_config.yaml",
+            start_line=1,
+            end_line=9,
+            content_hash="h2",
+        ),
+    )
+
+    changes = compute_symbol_changes(
+        SymbolDiffInput(symbols=base, relations=(), file_paths=paths),
+        SymbolDiffInput(symbols=target, relations=(), file_paths=paths),
+    )
+
+    assert [c.qualified_name for c in changes] == ["service"]
+
+
+def test_intermediate_config_keys_fold_on_their_dotted_path() -> None:
+    """Containment for a config key is its dotted path, not its line range.
+
+    ADR-0041 gave every nested key its own line, so `service.api` and
+    `service.api.http` are one-line ranges that do not contain the leaf's line.
+    Only the top-level key still spanned the block, so line containment folded
+    that one and left the intermediates restating the same edit.
+    """
+    paths = {"file_config.yaml": "config.yaml"}
+
+    def side(leaf_hash: str) -> tuple[SymbolRecord, ...]:
+        return (
+            _record(
+                "sym_service",
+                SymbolKind.CONFIG_KEY,
+                "service",
+                file_id="file_config.yaml",
+                start_line=1,
+                end_line=5,
+                content_hash=f"a-{leaf_hash}",
+            ),
+            _record(
+                "sym_api",
+                SymbolKind.CONFIG_KEY,
+                "service.api",
+                file_id="file_config.yaml",
+                start_line=2,
+                end_line=2,
+                content_hash=f"b-{leaf_hash}",
+            ),
+            _record(
+                "sym_http",
+                SymbolKind.CONFIG_KEY,
+                "service.api.http",
+                file_id="file_config.yaml",
+                start_line=3,
+                end_line=3,
+                content_hash=f"c-{leaf_hash}",
+            ),
+            _record(
+                "sym_port",
+                SymbolKind.CONFIG_KEY,
+                "service.api.http.port",
+                file_id="file_config.yaml",
+                start_line=4,
+                end_line=4,
+                content_hash=leaf_hash,
+            ),
+        )
+
+    changes = compute_symbol_changes(
+        SymbolDiffInput(symbols=side("h1"), relations=(), file_paths=paths),
+        SymbolDiffInput(symbols=side("h2"), relations=(), file_paths=paths),
+    )
+
+    assert [c.qualified_name for c in changes] == ["service.api.http.port"]
+
+
+def test_a_sibling_config_key_is_not_folded_by_a_prefix_that_only_looks_alike()\
+        -> None:
+    """`service.apikey` is not inside `service.api`: the boundary is the dot."""
+    paths = {"file_config.yaml": "config.yaml"}
+
+    def side(suffix: str) -> tuple[SymbolRecord, ...]:
+        return (
+            _record(
+                "sym_api",
+                SymbolKind.CONFIG_KEY,
+                "service.api",
+                file_id="file_config.yaml",
+                start_line=2,
+                end_line=2,
+                content_hash=f"api-{suffix}",
+            ),
+            _record(
+                "sym_apikey",
+                SymbolKind.CONFIG_KEY,
+                "service.apikey",
+                file_id="file_config.yaml",
+                start_line=3,
+                end_line=3,
+                content_hash=f"apikey-{suffix}",
+            ),
+        )
+
+    changes = compute_symbol_changes(
+        SymbolDiffInput(symbols=side("1"), relations=(), file_paths=paths),
+        SymbolDiffInput(symbols=side("2"), relations=(), file_paths=paths),
+    )
+
+    assert sorted(c.qualified_name for c in changes) == [
+        "service.api",
+        "service.apikey",
+    ]

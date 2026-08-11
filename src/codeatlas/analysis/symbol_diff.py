@@ -1,9 +1,11 @@
 """Symbol-level diff between two states.
 
-Symbols are matched by ``(kind, qualified_name)``. A unique cross-file match is a
-move; a non-unique match is left as delete plus add so the engine never emits an
-ungrounded move. Content-unchanged symbols are still reported when their resolved
-edge set differs.
+Symbols are matched by ``(kind, qualified_name)``, and occurrences sharing a
+file are paired before anything cross-file is considered (ADR-0042): a key name
+common to several config files is not ambiguous within any one of them. A unique
+cross-file match that survives that pairing is a move; a non-unique match is left
+as delete plus add so the engine never emits an ungrounded move.
+Content-unchanged symbols are still reported when their resolved edge set differs.
 
 One edit is one change. A member's text lives inside its container's range, so
 every member edit also moves the container's hash; reporting both would
@@ -27,9 +29,12 @@ from codeatlas.domain.change import SignatureChangeClass, SymbolChange
 from codeatlas.domain.relations import MENTION_HINT, ROUTE_HINT, RelationRecord
 from codeatlas.domain.symbols import SymbolRecord
 
-# Containers whose members are code: reported through their members.
+# Containers reported through their members rather than in their own right.
+# A class qualifies because a method's text lives inside it; a configuration
+# key qualifies because a mapping key's value *is* its subtree, so editing one
+# leaf moves the hash of every ancestor above it (ADR-0042).
 _CODE_CONTAINER_KINDS: Final[frozenset[SymbolKind]] = frozenset(
-    {SymbolKind.CLASS}
+    {SymbolKind.CLASS, SymbolKind.CONFIG_KEY}
 )
 
 # Containers whose members are shape: they absorb their members' changes.
@@ -190,6 +195,37 @@ def _classify_key(
     if len(target_symbols) == 0:
         return tuple(_deleted(symbol, base.file_paths) for symbol in base_symbols)
 
+    # A name shared by several files is not ambiguous within any one of them.
+    # Pairing same-file occurrences first is what stops `cases` in five config
+    # files from being a five-versus-five match: that fell straight to the
+    # ambiguous branch below and reported all ten as delete plus add, on
+    # byte-identical content, for a repository nobody had edited.
+    paired, base_symbols, target_symbols = _pair_within_files(
+        key, base_symbols, target_symbols, base, target, context
+    )
+    if not base_symbols and not target_symbols:
+        return paired
+    if not base_symbols:
+        return paired + tuple(
+            _added(symbol, target.file_paths) for symbol in target_symbols
+        )
+    if not target_symbols:
+        return paired + tuple(
+            _deleted(symbol, base.file_paths) for symbol in base_symbols
+        )
+    # What is left after same-file pairing can still be a move: exactly one
+    # occurrence on each side, in different files, is the unique cross-file
+    # match this module has always carried across.
+    if len(base_symbols) == 1 and len(target_symbols) == 1:
+        return paired + _classify_one_to_one(
+            key,
+            base_symbols[0],
+            target_symbols[0],
+            base,
+            target,
+            context,
+        )
+
     # Non-unique match: report every base symbol as deleted and every target
     # symbol as added, with a single limitation explaining the ambiguity.
     limitations.append(
@@ -200,6 +236,54 @@ def _classify_key(
     deleted = tuple(_deleted(symbol, base.file_paths) for symbol in base_symbols)
     added = tuple(_added(symbol, target.file_paths) for symbol in target_symbols)
     return deleted + added
+
+
+def _pair_within_files(
+    key: tuple[SymbolKind, str],
+    base_symbols: tuple[SymbolRecord, ...],
+    target_symbols: tuple[SymbolRecord, ...],
+    base: SymbolDiffInput,
+    target: SymbolDiffInput,
+    context: _DependencyContext,
+) -> tuple[
+    tuple[SymbolChange, ...], tuple[SymbolRecord, ...], tuple[SymbolRecord, ...]
+]:
+    """Match occurrences that share a file, and return what is left over.
+
+    Only a file holding exactly one occurrence on each side pairs here. Two
+    occurrences of one name inside a single file are genuinely ambiguous, and
+    guessing between them would be the ungrounded move this module refuses to
+    emit -- so they fall through to the caller untouched.
+
+    Pairing is by file *path*, not file id: an id is not stable across the two
+    state views, and comparing ids would pair nothing.
+    """
+    base_by_path: dict[str, list[SymbolRecord]] = defaultdict(list)
+    for symbol in base_symbols:
+        base_by_path[base.file_paths.get(symbol.file_id, symbol.file_id)].append(symbol)
+    target_by_path: dict[str, list[SymbolRecord]] = defaultdict(list)
+    for symbol in target_symbols:
+        target_by_path[
+            target.file_paths.get(symbol.file_id, symbol.file_id)
+        ].append(symbol)
+
+    paired: list[SymbolChange] = []
+    matched: set[int] = set()
+    for path in sorted(set(base_by_path) & set(target_by_path)):
+        mine, theirs = base_by_path[path], target_by_path[path]
+        if len(mine) != 1 or len(theirs) != 1:
+            continue
+        paired.extend(
+            _classify_one_to_one(key, mine[0], theirs[0], base, target, context)
+        )
+        matched.add(id(mine[0]))
+        matched.add(id(theirs[0]))
+
+    return (
+        tuple(paired),
+        tuple(s for s in base_symbols if id(s) not in matched),
+        tuple(s for s in target_symbols if id(s) not in matched),
+    )
 
 
 def _classify_one_to_one(
@@ -508,12 +592,35 @@ def _fold_nested_changes(
             and (
                 _contains_on("target", change, other)
                 or _contains_on("base", change, other)
+                or _encloses_key(change, other)
             )
             for other in kept
         )
 
     kept = [change for change in kept if not shadowed_container(change)]
     return tuple(kept)
+
+
+def _encloses_key(outer: SymbolChange, inner: SymbolChange) -> bool:
+    """Whether one configuration key contains another, by dotted path.
+
+    Line ranges cannot answer this. ADR-0041 gave every nested key its own
+    line, so `service.api` and `service.api.http` are single-line ranges that do
+    not contain the leaf below them -- only the top-level key still spans its
+    block. The dotted path states the nesting exactly and does not depend on
+    that line heuristic succeeding.
+
+    The trailing dot is the whole point: `service.apikey` is a sibling of
+    `service.api`, not a child of it.
+    """
+    if (
+        outer.symbol_kind is not SymbolKind.CONFIG_KEY
+        or inner.symbol_kind is not SymbolKind.CONFIG_KEY
+    ):
+        return False
+    if outer.file_path != inner.file_path:
+        return False
+    return inner.qualified_name.startswith(f"{outer.qualified_name}.")
 
 
 def _contains_on(

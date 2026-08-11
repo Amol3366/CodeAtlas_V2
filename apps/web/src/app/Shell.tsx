@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
+import { lastAnalysisId } from "../features/change-analysis/lastAnalysis";
 import { Sidebar } from "../features/conversations/Sidebar";
 import { EvidenceDrawer } from "../features/evidence/EvidenceDrawer";
 import { ThemeToggle } from "../features/settings/ThemeToggle";
@@ -59,6 +60,13 @@ export function Shell() {
     writeStoredActiveRepository(null);
   }, [repositories.data, repositoryOverride]);
 
+  // Read on every render rather than held in state: the launcher writes it on
+  // another route, and a stale copy here would send the link to the previous
+  // analysis after a newer one was run.
+  const storedAnalysisId = lastAnalysisId(repositoryId);
+  const preflightTarget =
+    storedAnalysisId === null ? "/preflight" : `/preflight/${storedAnalysisId}`;
+
   return (
     <ActiveRepositoryContext.Provider
       value={{ repositoryId, setRepositoryId }}
@@ -94,8 +102,11 @@ export function Shell() {
                 >
                   Repositories
                 </NavLink>
+                {/* Resolves to the analysis this repository last ran, so
+                    leaving the screen and coming back does not look like the
+                    report was discarded. With none yet, it is the launcher. */}
                 <NavLink
-                  to="/preflight"
+                  to={preflightTarget}
                   className="rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-xs text-text-muted hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-medium"
                 >
                   Preflight

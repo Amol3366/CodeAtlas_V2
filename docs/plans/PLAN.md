@@ -79,13 +79,14 @@ with verification.
 | `CODEATLAS_EPHEMERAL` CLI scope | **CLOSED** — ADR-0040, won't-fix with reasoning. A CLI command exits immediately, so a session database would make every invocation an island | — |
 | Phase 4 `changed_symbol_precision` 0.9375 vs ≥0.95 | **CLOSED as structural.** c020–c022 split one physical diff into three single-symbol cases that count each other's symbols against them; the other 21 score 1.0. Fully explained in `docs/evaluation/phase-4-baseline-environment.md` | Never — the corpus is not edited to move a number (ADR-0003) |
 | Unsigned packaged executable | **DEFERRED — not an engineering task.** SmartScreen warns on first run. Needs a purchased code-signing certificate | A certificate is purchased |
-| **Six** Playwright tests skipped on Chromium, across **five** spec files | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all six, so coverage is not lost. **Counted from the gate run on 2026-08-10, not copied forward:** `onboarding-to-citation`, `preflight`, `restart-persistence`, `settings`, and `stream-reconnection` ×2. Every other document still says "five tests, four spec files" — the figure has now understated itself **twice**, and was already corrected once on 2026-08-07 for the same reason | The upstream bug is fixed |
+| **Seven** Playwright tests skipped on Chromium, across **five** spec files | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all seven, so coverage is not lost. **Counted from the gate run on 2026-08-11, not copied forward:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings`, and `stream-reconnection` ×2. The seventh is ADR-0042's navigation test, which is skipped for the same reason as the reload test beside it. The figure understated itself twice before (corrected 2026-08-07 and 2026-08-10); it is re-counted here rather than incremented | The upstream bug is fixed |
 | Packaged semantic tree 1.05 GB | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted | A deterministic-only second artifact is wanted |
 | Grow the symbol corpus toward 50 cases | **DEFERRED — multi-day.** 13+ cases, each needing gold ranges. Nothing is *wrong* today: ADR-0033 records that 0.98 is inexpressible at 27 cases and is documented at the constant | Someone commits the days |
 | `relation_path_recall` has no gate target | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023) | That design decision is settled |
 | RRF coarse-chunk bias | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit | The module-granularity ruling lands |
 | Phase 4 `containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect** | Someone investigates per-case |
 | ADR-0030 module-granularity ruling | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90 | The user rules |
+| **Duplicate findings, and false findings on a clean tree** | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically | — |
 | **Nested config keys report false changes (ADR-0025 regression)** | **CLOSED 2026-08-11 — ADR-0041.** A key now hashes its own value rather than the line range it cites; the reproduction went from 8 findings (7 false) to 2. `PARSER_BUNDLE_VERSION` 1.3.0 → 1.4.0, so **every snapshot must be re-indexed**. Two residues recorded there: YAML compares subtree *text*, so re-indenting a block reports a change; and every tracked baseline reproduced byte-for-byte, which means **the corpus cannot see this defect** — the unit tests are the only coverage. Original diagnosis follows | — |
 | ~~Nested config keys, original entry~~ | **OPEN — a real defect in the core wedge, reported by the user 2026-08-11 and reproduced.** Changing **one line** of `pyproject.toml` (`version`) yields **8 `CONFIG_VALUE_CHANGED` findings, 7 false**: `project`, `project.optional-dependencies`, `…semantic-local`, `…semantic-openai`, `project.scripts`, `…codeatlas`, `…codeatlas-mcp`, plus the one true `project.version`. **Cause:** ADR-0025 made nested keys addressable symbols, and a leaf whose own line cannot be located keeps its **parent's range** — so its content hash is the whole parent block, and any change inside that block marks every nested key modified. They also render with identical spans, which is what reads on screen as duplicated findings. **The engine does not emit literal duplicates** — the JSON findings are distinct — so a separately-reported duplicate *rendering* in the web Preflight screen is unreproduced and may be a UI issue | Next session. Fixing it means giving a leaf a real hash of its own value rather than inheriting the parent block's, which is a `PARSER_BUNDLE_VERSION` bump and a re-index |
 
@@ -237,6 +238,103 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-11T14:00:00Z — Duplicate and false preflight findings (ADR-0042)
+
+- Agent: Claude Code `claude-opus-5`, branch `preflight-duplicate-findings`
+- Transition: no phase task. Post-gate. Two user-reported defects, both fixed.
+- **Reported by the user from a real run**: findings shown twice under `medium`,
+  four times under `low`, more further down, none under `high`; and preflight
+  appearing to be discarded when leaving the screen.
+- **The register's standing guess was wrong and is now corrected.** It carried
+  this as *"a separately-reported duplicate rendering in the web Preflight
+  screen is unreproduced and may be a UI issue."* `FindingsList.tsx` files each
+  finding into exactly one severity group. The engine emitted them.
+
+**Defect 1 — cross-file matching invented findings.** `symbol_diff` grouped by
+`(kind, qualified_name)` with no file in the key, so a configuration key name
+occurring in *N* files was an *N*-versus-*N* match, which is not one-to-one and
+fell to the ambiguous branch: every base symbol deleted, every target symbol
+added, `2N` changes for a name nobody touched. Reproduced with a **clean working
+tree**, `git status` empty, blob bytes byte-identical to the worktree (`od -c`,
+so not ADR-0022's line endings): **4 findings, all false.** On this repository,
+1592 findings including five identical `cases changed`. The user's "twice" and
+"four times" is how many files share that key name.
+
+**Defect 2 — every ancestor restated its descendant's edit.** One edit to
+`service.api.http.port` reported all four levels. ADR-0041 fixed the leaf side
+and recorded this subtree residue; this is that residue. Folding on line ranges
+alone reaches only the top-level key, because ADR-0041 gave intermediates their
+own single-line ranges — so containment for a config key is its **dotted path**.
+
+**Found while fixing it:** a derived `DOCUMENTS` edge targeted the top-level
+container while its own `target_hint` said `service.port`. Folding the container
+away lost the documentation link, which is how it surfaced. Retargeted to the
+key it names — ADR-0039's `IMPORTS` correction, one kind across.
+
+- Measured: clean tree **4 findings → 0**; one nested edit **4 → 1**; the
+  one-line `pyproject.toml` version bump **8 → (ADR-0041) 2 → 1**.
+- Phase 4 baseline moved in one direction: `containing_evidence_rate`
+  0.6667 → **0.6824**, `exact_evidence_rate`/`valid_evidence_rate`
+  0.5632 → **0.5765**, `finding_precision` **1.0000** unchanged. The two
+  recall metrics did not move. Phase 0 and Phase 3 baselines reproduce
+  byte-for-byte.
+- **Two corpus expectations were corrected on the user's ruling**, with the
+  ADR-0039-shaped justification rather than "the number improved": c012 declared
+  `symbol: "service.port"` with `start_line: 1, end_line: 3` — the range of
+  `service` — and c014 gave `scripts.test` the range of `scripts`. Both name one
+  symbol and give another's range, written before ADR-0025 made the leaf
+  addressable. Corrected to `3-3` and `5-5`; three lines, no reformatting.
+- **The corpus was hiding the reported bug.** Before this change c012 emitted
+  **two** `CONFIG_VALUE_CHANGED` findings for one edit and c014 two
+  `PACKAGE_SCRIPT_CHANGED`. No metric ever saw it: `expected_findings` is a
+  **set of codes**, and a set cannot count. Third instance of the ADR-0016 /
+  ADR-0029 lesson that the corpus is blind to the defect being fixed. Whether
+  it should be a multiset is left open — it touches all 24 cases.
+
+**Defect 3 — preflight looked discarded on navigation.** Nothing was ever lost:
+the report is persisted and `useAnalysis` caches it with `staleTime: Infinity`.
+The id lived **only in the URL** and the sidebar link was hard-coded to
+`/preflight`, the launcher. The last analysis is now remembered per repository
+(`features/change-analysis/lastAnalysis.ts`, localStorage, same convention as
+the active repository), the sidebar link resolves to it, the analysis screen
+offers "Run a new preflight", and a pointer whose analysis no longer resolves is
+dropped rather than left pointing at a dead id.
+
+- Files: `src/codeatlas/analysis/symbol_diff.py`,
+  `src/codeatlas/extraction/resolution.py`, `tests/unit/test_symbol_diff.py`
+  (+6 tests), `tests/integration/test_document_edges.py`,
+  `tests/evaluation/cases/changes.json` (3 lines),
+  `docs/evaluation/baseline-phase-4.{json,md}`,
+  `apps/web/src/features/change-analysis/lastAnalysis.ts` (new, +7 tests),
+  `apps/web/src/app/Shell.tsx`, `apps/web/src/routes/PreflightRoute.tsx`,
+  `apps/web/src/routes/PreflightAnalysisRoute.tsx`,
+  `apps/web/e2e/preflight.spec.ts` (+1 test),
+  `docs/adr/0042-a-symbol-pairs-within-its-file.md` (new), `docs/adr/README.md`,
+  `documentation/memory.md`.
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`, `PARSER_BUNDLE_VERSION` `1.4.0` unchanged. **`RESOLVER_VERSION`
+  1.3.0 → 1.4.0: every snapshot must be re-indexed.** No new dependency.
+- Verification, exit codes read from the tools: tests written first and observed
+  failing (`assert 4 == 1`, and the two-versus-two case reporting four changes);
+  `uv run pytest -q` **2188 passed, 3 skipped**; `ruff` clean; `mypy` clean on
+  349 files; `check_phase4.ps1 -SkipSync` exit 0 including all three live
+  baselines; `check_phase7.ps1 -SkipSync` exit 0 with 14 passed, 6 skipped on
+  Chromium; `npx tsc --noEmit` clean; `npm run lint` clean; `vitest run` **201
+  passed**; Playwright `preflight` on Firefox **2 passed**.
+- Mutation checks, each observed failing: forcing the same-file pairing guard to
+  `continue` fails both cross-file tests; forcing the stored-analysis lookup to
+  `null` fails the new navigation test while the reload test still passes.
+- Limitations: a `Finding` still carries no subject or file path, so two
+  *legitimate* findings sharing a code and title render identically and collide
+  on `FindingsList`'s React key. Recorded as ADR-0042 follow-up 1. YAML still
+  compares subtree text, so re-indenting reports a change (ADR-0041). One
+  process error worth recording: a `git checkout --` used to undo a mutation
+  reverted the fix with it, and had to be reapplied — the ADR-0022 lesson about
+  `git checkout --` cutting wider than intended, in a new place.
+- Next: **nothing assigned.** The nearest follow-up is carrying the subject onto
+  the `Finding` contract, which is additive and makes a real same-named pair
+  legible.
 
 ### 2026-08-10T21:00:00Z — Release validation passes end to end, step 5 included
 
