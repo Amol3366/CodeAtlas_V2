@@ -1412,10 +1412,16 @@ minutes to redo.
       the register.** A real preflight over 7 edited files returned **526
       findings, 524 `SYMBOL_DELETED` at high**, naming Markdown sections of
       `PLAN.md` and this file that exist in **both** states. No matching
-      `SYMBOL_ADDED`, so not ADR-0042's shape. One title reads
-      `2026-07-25T15:15:00Z � P0-SETUP started` — **a decode step is corrupting
-      an em dash**, which would make a section name unequal to its own twin.
-      Start there, not at the pairing logic. Also worth carrying: that run took
+      `SYMBOL_ADDED`, so not ADR-0042's shape.
+
+      **I published a cause I had not verified, and it was wrong.** The report
+      said a decode step was corrupting an em dash, from a title that printed as
+      `2026-07-25T15:15:00Z � P0-SETUP started`. That was **my terminal**: the
+      JSON on disk holds `—` intact, with no U+FFFD and no cp1252 `0x97`. The
+      retraction is the lesson — a wrong cause in the register costs the next
+      reader more than the bug, because they follow it. What the numbers
+      actually say is that **505 sections produced 524 deletions**, so nothing
+      paired at all. Also worth carrying: that run took
       **over 15 minutes** on this repository, which the docs already explain —
       the engine parses **both full states** every time, O(repository) not
       O(change).
