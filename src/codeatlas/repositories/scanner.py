@@ -26,6 +26,34 @@ from codeatlas.repositories.ignore_rules import IgnoreRules
 _BINARY_SNIFF_BYTES = 8192
 
 
+def is_binary_content(content: bytes) -> bool:
+    """Whether the opening bytes sniff as binary.
+
+    Public because the Git-blob comparison view must reach the same verdict
+    (ADR-0044). Two implementations of "is this binary" would put a tracked
+    binary on one side of a comparison and not the other, which is the defect
+    that record exists to fix.
+    """
+    return b"\x00" in content[:_BINARY_SNIFF_BYTES]
+
+
+def decode_text(content: bytes) -> str | None:
+    """Decode as UTF-8, tolerating a BOM; `None` when it is not text at all.
+
+    The second half of "would the scanner index this?", and a separate test
+    from the sniff: Latin-1 prose carries no NUL and still cannot be parsed.
+    The scanner needs the decoded text anyway, so sharing this function with the
+    comparison view costs the indexing path nothing -- which is the reason it
+    returns the text rather than a boolean.
+    """
+    for encoding in ("utf-8", "utf-8-sig"):
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return None
+
+
 @dataclass(frozen=True)
 class SkippedFile:
     """One entry excluded from the snapshot, with the reason it was excluded."""
@@ -199,14 +227,11 @@ class RepositoryScanner:
             skipped.append(SkippedFile(relative, "BINARY"))
             return None
 
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            try:
-                text = content.decode("utf-8-sig")
-            except UnicodeDecodeError:
-                skipped.append(SkippedFile(relative, "BINARY"))
-                return None
+        decoded = decode_text(content)
+        if decoded is None:
+            skipped.append(SkippedFile(relative, "BINARY"))
+            return None
+        text = decoded
 
         classification, language = classify(relative)
         return FileRecord(
@@ -222,7 +247,7 @@ class RepositoryScanner:
 
     @staticmethod
     def _is_binary(content: bytes) -> bool:
-        return b"\x00" in content[:_BINARY_SNIFF_BYTES]
+        return is_binary_content(content)
 
     @staticmethod
     def _count_lines(text: str) -> int:

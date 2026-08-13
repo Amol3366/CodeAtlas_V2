@@ -251,3 +251,20 @@ instead of two subprocesses per file.
   by unit and integration tests only.
 - Rename detection needs a unique moved symbol or hash equality; a rewritten
   file that keeps no symbol identity is a delete plus an add.
+- **A file that is tracked by Git but excluded from indexing is invisible to
+  preflight** — it can be added or deleted without a finding (ADR-0044). Both
+  sides of a comparison now list only what a scan would index, because a file
+  that is excluded has no symbols and no evidence to cite, and reporting on it
+  would mean reporting something no answer could support. Before that record
+  such a file was in the base and not the target, which is indistinguishable
+  from a deletion: an unmodified checkout of this project reported 26
+  `SYMBOL_DELETED` findings at **high** severity. A reviewer who cares about
+  committed build output must look at Git.
+- **A tracked file larger than `max_file_bytes` (2 MB) fails the analysis
+  outright**, rather than being skipped the way the directory scan skips it.
+  One committed 3 MB CSV therefore makes a repository impossible to preflight.
+  This is open and recorded in the Deferred Register; today's behaviour is
+  pinned by a test so it cannot change silently while the ruling is pending.
+- Line endings are normalized on both sides, so a change that is *only* line
+  endings reports nothing (ADR-0043). Intentional, and the same answer Git
+  gives under `text=auto`.
