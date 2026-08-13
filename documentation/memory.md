@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
 
 ## Current Phase
 
@@ -1451,6 +1451,43 @@ minutes to redo.
       assertion over a corpus that cannot exercise it is not coverage** — which
       is the argument for growing the corpus, now made five times by five
       different defects.
+
+- [x] **Corpus growth started: findings can count, and a document insertion is
+      measured (WS-0, WS-1 Tasks 1-2), 2026-08-14.** First execution against
+      `docs/superpowers/plans/2026-08-14-post-closeout-program.md`, which gave
+      the remaining work six workstreams and two named decision gates instead of
+      a recurring "what's next".
+
+      **`expected_findings` was a set of codes, and a set cannot count** - the
+      reason c012 emitted a duplicate finding from Phase 4 until 2026-08-11 with
+      no metric seeing it. `finding_count_correct` now compares multisets, with
+      the aggregate reported beside `finding_precision` and ungated. It catches
+      nothing today (1.0); it would have caught c012 on the first run.
+
+      **c025 inserts a document section** so the section below shifts without
+      changing - the shape behind the 496 false deletions. The plan's premise
+      that no case edits a document was **wrong** (c013 does); the real gap was
+      insertion and removal.
+
+      **The transferable number: adding one corpus case touched nine hardcoded
+      counts across five files**, found over three full-suite runs. Next time,
+      find them in one pass. Two traps worth remembering: the findings `ROWS`
+      table is indexed **positionally** by two tests, so a new row goes last;
+      and the manifest's `expected_change_count` correctly refuses a silent
+      addition.
+
+      **A gate can lie about its own result.** `check_phase7.ps1` prints
+      "verification completed" and exits with whatever the last native command
+      left - no explicit `exit 0`. I read that line as success several times
+      today without capturing `$?`. The suites inside did pass, but the claim
+      was inferred, and **a release gate whose log and exit code can disagree is
+      a defect**. Also: `.test-tmp` residue fails the next gate, which with
+      three concurrency collisions makes four void runs in two days.
+
+      **My own expectation was the wrong one, twice today** - the evidence range
+      (a section runs to the next heading, so 5-8 not 5-7) and the claim that no
+      document case existed. Both corrected on reasoning rather than on a number
+      moving, which is the ADR-0003 line.
 
 ## Decisions Made
 

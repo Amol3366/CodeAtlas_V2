@@ -87,6 +87,8 @@ with verification.
 | Phase 4 `containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect** | Someone investigates per-case |
 | **A tracked file that matches an ignore default is reported deleted** | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means | — |
 | ~~Editing a large Markdown file reports hundreds of its sections as deleted~~ | **CLOSED 2026-08-13 — not a defect. The engine was right and the measurement was wrong**, which is the **sixth** consecutive investigation of this shape to end that way (ADR-0017, 0018, 0024, 0027, 0038). The 12-minute analysis ran over a **live working tree while the same session rewrote `PLAN.md`** with `Path.write_text`, which truncates before it writes; the read landed in that window and saw an empty file. Proven by exact reproduction: an empty target yields **496 `SYMBOL_DELETED`** against the artifact's **496** for that file, a truncated one yields 491+1, and the real edited bytes yield **2 findings and zero deletions**. Eliminated on the way, and they should stay eliminated: text decoding (the mojibake was the terminal — the JSON holds `—` intact), symbol pairing with matching *and* mismatched `file_id`s, parse divergence (both views: 497 symbols, same ids, zero diagnostics), scale (50/200/497 sections all correct), and the real `GitBlobStateView`-vs-`DirectoryStateView` pairing. Three regression tests kept in `tests/unit/test_document_section_diff.py`, one of which pins the truncation shape so the next wall of deletions is diagnosable in a single run. Full account: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` | — |
+| **`check_phase7.ps1` can exit non-zero while reporting success** | **OPEN — a defect in a release gate.** The script ends with `Write-Output "Phase 7 verification completed."` and no explicit `exit 0`, so the process exit code is whatever the last native command left. A human reading the log and a CI system reading the exit code can therefore disagree. Found 2026-08-14 after several runs this session were reported green from the log line rather than from `$?`; the underlying suites did pass, but the claim was inferred | Someone adds `exit 0` and a test that the gate's exit code matches its verdict |
+| **`.test-tmp` residue and concurrency void gate runs** | **OPEN — four occurrences in two days.** Two pytest invocations at once collide with `FileExistsError`; running `check_phase7` immediately after `check_phase4` fails at Tests on leftover state. Every occurrence produced a *void* run that looks like a failure, and one of them was briefly mistaken for a real one. The rule "never run two gates concurrently" is written in the program plan's Global Constraints and keeps being broken | A lockfile around `.test-tmp` plus clean-on-start makes it unbreakable |
 | **Preflight takes >15 minutes on a 664-file repository** | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time** | Someone measures it properly, or a user reports it |
 | **An oversized tracked file fails the whole comparison** | **OPEN — found while fixing ADR-0044, deliberately not folded into it.** Not a disagreement but a **refusal**: `GitDiffAdapter.archive` raises `ScanLimitExceededError` when any tracked file exceeds `max_file_bytes`, so a single committed 3 MB CSV makes a repository impossible to preflight — while the directory scan skips the same file with a `TOO_LARGE` warning. The fourth of ADR-0044's four exclusion mechanisms, and the only one not aligned. Turning a declared error path into a silent skip is its own ruling, so today's behaviour is **pinned by a test** rather than changed. Nothing in this repository triggers it, which is exactly why it went unnoticed | The user rules whether an oversized tracked file is skipped like the scanner does, or keeps refusing |
 | ADR-0030 module-granularity ruling | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90 | The user rules |
@@ -242,6 +244,92 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-14T17:00:00Z — WS-0 and the first two corpus tasks
+
+- Agent: Claude Code `claude-opus-5`, branches `corpus-findings-can-count` and
+  `corpus-document-section-case`, both merged `--no-ff` to `main`.
+- Transition: no phase task. Post-gate. First execution against
+  `docs/superpowers/plans/2026-08-14-post-closeout-program.md`, which replaces
+  "what's next" with six workstreams and two named decision gates.
+- **Stopping point is clean.** `main` is pushed at `06bcff2`, working tree
+  empty, no branch left behind, nothing half-applied.
+
+**WS-0 — housekeeping.** Four merged branches deleted, so `git branch` is
+`main` alone again. The preflight runtime observation is now a register row: it
+had been noticed twice on 2026-08-13 and written down neither time.
+
+**WS-1 Task 1 — a repeated finding is now visible.** `expected_findings` was
+compared as a *set* of codes, and a set cannot count; that is why c012 emitted
+two `CONFIG_VALUE_CHANGED` findings for one edit from Phase 4 until 2026-08-11
+with no metric seeing it. `ChangeScore.finding_count_correct` compares
+multisets; `AggregateMetrics.finding_count_correctness` reports it **beside**
+`finding_precision`, never replacing it (ADR-0038's pattern), and is
+**deliberately ungated** because the corpus declares codes rather than counts.
+Baselines gained one line each: phase-0 `null`, phase-3 `0.0` (that engine
+emitted no findings at all), phase-4 `1.0`. **It catches nothing today** — its
+value is that it would have scored c012 at 0 on the first run.
+
+**WS-1 Task 2 — a document-section insertion case (c025).** The plan's premise
+was wrong and the record should say so: c013 already edits a document. The real
+gap was narrower — no case *inserts or removes* a section, which is the
+operation that shifts every heading below it. c025 inserts `## Metrics` in the
+middle so `## Health` shifts without its text changing; the expectation (one
+added section, no modifications, no deletions) was declared first and the
+engine agreed.
+
+- **Adding one case touched nine hardcoded counts across five files**, found
+  over three separate full-suite runs: `expected_change_count`, the findings
+  rule table, the impact case table, and six assertions naming 24. The manifest
+  count **correctly refused a silent addition**. The new `Row` is appended
+  **last on purpose** — two tests index `ROWS` positionally, so a row inserted
+  mid-table silently retargets them.
+- **My declared evidence range was wrong, the engine's was right**: a section
+  runs to the next heading, so `Metrics` is 5-8, not 5-7 — the same rule c013's
+  5-7 follows at end-of-file. Corrected on that reasoning, not because a number
+  improved (ADR-0003).
+- Mutation-checked by making the target identical to the base; the **dataset
+  validator rejected the corpus outright** (`evidence line range exceeds
+  README.md: 8 > 7`), louder than designed. Restored from a file copy.
+- **Baselines moved for arithmetic, not engine reasons, and must not be quoted
+  as improvement:** phase-4 `containing_evidence_rate` 0.6824 → 0.6860 and
+  `primary_evidence_recall_at_10` 0.7627 → 0.7667 because c025 scores
+  perfectly; phase-3's two recall metrics *fell*, because that engine had no
+  change assurance to answer it with.
+
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`; `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`, `CHUNKER_VERSION` all
+  unchanged, so **no snapshot is stale**. No new dependency. Corpus is now 25
+  change cases and 40 query cases.
+- Verification, exit codes read from the process: `uv run pytest -q` **2205
+  passed, 3 skipped**; `ruff` clean; `mypy --no-incremental` clean on 350
+  files; `check_phase4.ps1 -SkipSync` exit 0; `check_phase7.ps1 -SkipSync`
+  exit 0.
+
+**Three process findings, all worth more than the tasks:**
+
+1. **`check_phase7.ps1` prints "Phase 7 verification completed" and then exits
+   with whatever the last native command left** — there is no explicit
+   `exit 0`. Earlier today I read that line as success several times without
+   capturing `$?`. The suites and baselines inside those runs did pass, but the
+   *exit-code* claim was inferred. **A release gate whose log and exit code can
+   disagree is a defect**, and a one-line `exit 0` fixes it. Recorded in the
+   register.
+2. **`.test-tmp` residue fails the next gate.** Running `check_phase7`
+   immediately after `check_phase4` failed at Tests with no concurrency
+   involved. Together with three void runs earlier from genuine concurrency,
+   that is four in two days. A lockfile plus a clean-on-start would convert a
+   rule that keeps being broken into one that cannot be.
+3. **One unexplained intermittent**: a `check_phase7` run exited 1 while
+   printing every step as passing, and did not reproduce on either a clean
+   `main` or a re-run with the same changes. **Left unattributed rather than
+   guessed at.** If it recurs, chase it before trusting a green.
+
+- Next: **WS-1 Task 3** (four blind-spot change cases: nested config, duplicate
+  name across files, tracked-but-ignored/binary, CRLF). Revised estimate **half
+  a day, not an hour** — see the count-coupling above. Start by finding every
+  count assertion in one pass rather than three:
+  `grep -rnE "(^|[^0-9])(24|25)([^0-9]|$)" tests/ --include=*.py | grep -iE "change|case"`.
 
 ### 2026-08-13T14:30:00Z — The document-section deletions were the measurement, not the engine
 

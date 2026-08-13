@@ -50,13 +50,68 @@ Both are product questions. Neither has a technically-correct answer, and each d
 | **WS-5** | Module granularity + RRF bias | 1–2 days | **Gate B** | The lever needs corpus-wide measurement, which WS-1 improves |
 | **WS-6** | Lexical intents and relation paths | ½–1 day | — | Last of ADR-0034's four causes; gates `relation_path_recall` |
 
+## Progress — updated 2026-08-14 (resume here)
+
+| Item | State |
+| --- | --- |
+| WS-0 | **done** — `5f255b8`, `860c726` |
+| WS-1 Task 1 (`expected_findings` counts) | **done** — `fc7af34`, merged `7f834c0` |
+| WS-1 Task 2 (document-section case c025) | **done** — `f28a300`, merged `06bcff2` |
+| WS-1 Task 3 (four blind-spot cases) | **next** |
+| WS-1 Tasks 4–5, WS-2 … WS-6 | not started |
+
+`main` is at `06bcff2`, pushed, working tree clean, no branch outstanding. The
+corpus is **25 change cases / 40 query cases**.
+
+### What Task 2 changed about the plan
+
+**Adding one change case is a six-file edit, not a two-file one.** It touched
+**nine** hardcoded counts across five files, found over *three* separate
+full-suite runs. Task 3's four cases are therefore **half a day, not an hour**.
+
+Before starting 3a, find every count in one pass instead of three:
+
+```bash
+grep -rnE "(^|[^0-9])(24|25)([^0-9]|$)" tests/ --include=*.py | grep -iE "change|case"
+```
+
+Per case, the full checklist:
+
+1. variant tree (`base/` + `target/` overlays under `cases/variants/<fixture>/<slug>/`)
+2. the case in `cases/changes.json` — **insert surgically**; a `json.dumps`
+   rewrite reformats all 2030 lines
+3. `expected_change_count` in `cases/dataset.json`
+4. a `Row` in `tests/unit/test_findings.py` — **appended last**, because two
+   tests index `ROWS` positionally
+5. a `Case` in `tests/unit/test_impact_cases.py` (plus its fixture symbol map)
+6. regenerate `baseline-phase-0`, `-3`, `-4`; **never** `-1` or `-2`
+
+### Two fixes worth doing before Task 3
+
+Both are small, both address things that cost time today, and neither is
+required:
+
+- **`exit 0` at the end of `check_phase7.ps1`.** It prints "verification
+  completed" and exits with whatever the last native command left, so its log
+  and its exit code can disagree — which is how several runs today were read as
+  green without `$?` being captured.
+- **A lockfile around `.test-tmp`, plus clean-on-start.** Four void runs in two
+  days: three from concurrent pytest, one from residue left by the previous
+  gate. Task 3 is four more cycles of that exact shape.
+
+### Still open from today, unattributed
+
+One `check_phase7` run exited 1 while printing every step as passing, and did
+not reproduce on a clean `main` or on a re-run with the same changes. **Not
+diagnosed, not guessed at.** If it recurs, chase it before trusting a green.
+
 **WS-1 first among the substantial ones**, because WS-4 and WS-5 are both measurements and measuring against a corpus this thin is what produced five instrument-not-engine findings.
 
 ---
 
 ## WS-0: Housekeeping
 
-- [ ] **Delete four merged branches**
+- [x] **Delete four merged branches** — done 2026-08-14
 
 ```bash
 git branch -d document-sections-not-deleted line-endings-are-not-a-change \
@@ -65,7 +120,7 @@ git branch -d document-sections-not-deleted line-endings-are-not-a-change \
 
 All are fully merged into `main`; `-d` (not `-D`) refuses if that is ever untrue. The 2026-08-10 closeout pruned merged branches for the same reason: `git branch` should not imply unmerged work.
 
-- [ ] **Record the preflight performance observation in the Deferred Register**
+- [x] **Record the preflight performance observation in the Deferred Register** — done 2026-08-14
 
 Mentioned twice on 2026-08-13 and never written down. Row to add:
 
@@ -73,7 +128,7 @@ Mentioned twice on 2026-08-13 and never written down. Row to add:
 | **Preflight takes >15 minutes on a 664-file repository** | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes | Someone measures it properly, or a user reports it |
 ```
 
-- [ ] **Commit**
+- [x] **Commit** — `860c726`
 
 ```bash
 git add docs/plans/PLAN.md
@@ -106,12 +161,12 @@ git commit -m "docs: record the preflight runtime observation on a real reposito
 - Modify: `tests/evaluation/cases/changes.json` (24 cases)
 - Test: `tests/evaluation/test_dataset.py`, `tests/evaluation/test_change_adapter.py`
 
-- [ ] **Step 1: Write the failing test** — a case declaring one `CONFIG_VALUE_CHANGED` against an engine emitting two must **fail**, where today it passes.
-- [ ] **Step 2: Run it, watch it pass wrongly** (today's behaviour), confirming the gap is real before changing the model.
-- [ ] **Step 3: Extend `ChangeCase`.** It is a `ContractModel` with `extra="forbid"`, so a case cannot carry a new shape until the model does — this exact constraint blocked the ADR-0016 corpus work and sent it to a second surface instead. Prefer a backward-compatible representation (a list retaining duplicates) over a new field, so the 24 existing cases need no edit beyond those that were genuinely wrong.
-- [ ] **Step 4: Run the dataset validator.** `uv run python -m codeatlas.evaluation.cli validate --dataset tests/evaluation/cases` must report `status: valid`, 24 change cases.
-- [ ] **Step 5: Regenerate `baseline-phase-4`** and state in the handoff which metrics moved and why. If none moved, say that too — it means no current case has a duplicate, which is information.
-- [ ] **Step 6: Commit.**
+- [x] **Step 1: Write the failing test** — a case declaring one `CONFIG_VALUE_CHANGED` against an engine emitting two must **fail**, where today it passes.
+- [x] **Step 2: Run it, watch it pass wrongly** (today's behaviour), confirming the gap is real before changing the model.
+- [x] **Step 3: Extend `ChangeCase`.** It is a `ContractModel` with `extra="forbid"`, so a case cannot carry a new shape until the model does — this exact constraint blocked the ADR-0016 corpus work and sent it to a second surface instead. Prefer a backward-compatible representation (a list retaining duplicates) over a new field, so the 24 existing cases need no edit beyond those that were genuinely wrong.
+- [x] **Step 4: Run the dataset validator.** `uv run python -m codeatlas.evaluation.cli validate --dataset tests/evaluation/cases` must report `status: valid`, 24 change cases.
+- [x] **Step 5: Regenerate `baseline-phase-4`** and state in the handoff which metrics moved and why. If none moved, say that too — it means no current case has a duplicate, which is information.
+- [x] **Step 6: Commit.**
 
 ### Task 2: A document change case
 
@@ -119,10 +174,10 @@ The gap that let the 2026-08-13 false report go unnoticed for a day: **no change
 
 **Files:** `tests/evaluation/cases/variants/docs_config/…` (a new variant tree), `tests/evaluation/cases/changes.json`
 
-- [ ] **Step 1:** Add a variant that inserts one section into an existing document and edits the body of another.
-- [ ] **Step 2:** Declare `expected_changed_symbols` naming the inserted section (added) and the edited one (modified), and **no deletions**. Use bare headings — ADR-0031 is the single naming rule and ADR-0036 asserts expectations name symbols the engine can produce.
-- [ ] **Step 3:** Run `uv run pytest tests/evaluation -q`; the ADR-0036 validator must accept every new expectation.
-- [ ] **Step 4:** Regenerate the baseline, record movement, commit.
+- [x] **Step 1:** Add a variant that inserts one section into an existing document and edits the body of another.
+- [x] **Step 2:** Declare `expected_changed_symbols` naming the inserted section (added) and the edited one (modified), and **no deletions**. Use bare headings — ADR-0031 is the single naming rule and ADR-0036 asserts expectations name symbols the engine can produce.
+- [x] **Step 3:** Run `uv run pytest tests/evaluation -q`; the ADR-0036 validator must accept every new expectation.
+- [x] **Step 4:** Regenerate the baseline, record movement, commit.
 
 ### Task 3: Change cases for the four blind spots
 
