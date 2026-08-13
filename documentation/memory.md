@@ -1421,7 +1421,25 @@ minutes to redo.
       retraction is the lesson — a wrong cause in the register costs the next
       reader more than the bug, because they follow it. What the numbers
       actually say is that **505 sections produced 524 deletions**, so nothing
-      paired at all. Also worth carrying: that run took
+      paired at all.
+
+      **Resolved the same day: the engine was right and the measurement was
+      wrong.** The 12-minute analysis ran over a **live working tree while this
+      session was rewriting `PLAN.md`** with `Path.write_text`, which truncates
+      before it writes. The read landed in that window and saw an empty file.
+      An empty target *should* report every section deleted. Proven by exact
+      reproduction — empty target: **496 deletions**, against **496** in the
+      artifact; truncated mid-write: 491+1; the real edited bytes: **2 findings,
+      zero deletions**.
+
+      **This is the sixth consecutive investigation of this shape to find the
+      instrument at fault rather than the engine** (ADR-0017, 0018, 0024, 0027,
+      0038). The plan predicted that from base rate and made Task 3's
+      deliverable *a written cause rather than a patch* — which is the only
+      reason no fix was applied to code that was already correct. Two lessons
+      worth more than the finding: **do not edit the tree you are measuring**,
+      and **a wall of deletions with no additions means the target was not there
+      to be read**, not that pairing broke. Three tests now pin all of it. Also worth carrying: that run took
       **over 15 minutes** on this repository, which the docs already explain —
       the engine parses **both full states** every time, O(repository) not
       O(change).

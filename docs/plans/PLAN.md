@@ -86,7 +86,7 @@ with verification.
 | RRF coarse-chunk bias | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit | The module-granularity ruling lands |
 | Phase 4 `containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect** | Someone investigates per-case |
 | **A tracked file that matches an ignore default is reported deleted** | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means | — |
-| **Editing a large Markdown file reports hundreds of its sections as deleted** | **OPEN — found 2026-08-13 while verifying ADR-0044 on a real preflight, and the largest live number in this register.** Editing 7 files (2 of them big Markdown documents) produced **526 findings: 524 `SYMBOL_DELETED` at high severity**, `overall_risk` `high`. The named sections **still exist** in both states — `1. main reconciled; PR #1 merged`, `Accept-then-stream approved (ADR-0008)`, and ~500 more from this file's own handoff log. There are **no matching `SYMBOL_ADDED` findings**, so it is not the ambiguous-pairing shape ADR-0042 fixed. **A cause published in the first report was wrong and is retracted here:** the mojibake in `2026-07-25T15:15:00Z � P0-SETUP started` was **the reporting terminal, not the product**. The JSON on disk holds `—` intact, with no U+FFFD and no cp1252 `0x97` anywhere in the file. That lead is dead; do not follow it. What the numbers say instead: the two edited Markdown files hold **505 sections** between them against **524 deletions**, so this is *nothing pairing at all*, not a few names mismatching. Both views also parse an identical `PLAN.md` to the same 497 symbols with zero diagnostics, so it is not a parse failure either. **Not caused by ADR-0044** — the file is neither ignored nor binary, so no filter that record adds can reach it. Unverified whether it predates ADR-0042 | Someone reproduces it in-process on a two-heading Markdown file — see `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` |
+| ~~Editing a large Markdown file reports hundreds of its sections as deleted~~ | **CLOSED 2026-08-13 — not a defect. The engine was right and the measurement was wrong**, which is the **sixth** consecutive investigation of this shape to end that way (ADR-0017, 0018, 0024, 0027, 0038). The 12-minute analysis ran over a **live working tree while the same session rewrote `PLAN.md`** with `Path.write_text`, which truncates before it writes; the read landed in that window and saw an empty file. Proven by exact reproduction: an empty target yields **496 `SYMBOL_DELETED`** against the artifact's **496** for that file, a truncated one yields 491+1, and the real edited bytes yield **2 findings and zero deletions**. Eliminated on the way, and they should stay eliminated: text decoding (the mojibake was the terminal — the JSON holds `—` intact), symbol pairing with matching *and* mismatched `file_id`s, parse divergence (both views: 497 symbols, same ids, zero diagnostics), scale (50/200/497 sections all correct), and the real `GitBlobStateView`-vs-`DirectoryStateView` pairing. Three regression tests kept in `tests/unit/test_document_section_diff.py`, one of which pins the truncation shape so the next wall of deletions is diagnosable in a single run. Full account: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` | — |
 | **An oversized tracked file fails the whole comparison** | **OPEN — found while fixing ADR-0044, deliberately not folded into it.** Not a disagreement but a **refusal**: `GitDiffAdapter.archive` raises `ScanLimitExceededError` when any tracked file exceeds `max_file_bytes`, so a single committed 3 MB CSV makes a repository impossible to preflight — while the directory scan skips the same file with a `TOO_LARGE` warning. The fourth of ADR-0044's four exclusion mechanisms, and the only one not aligned. Turning a declared error path into a silent skip is its own ruling, so today's behaviour is **pinned by a test** rather than changed. Nothing in this repository triggers it, which is exactly why it went unnoticed | The user rules whether an oversized tracked file is skipped like the scanner does, or keeps refusing |
 | ADR-0030 module-granularity ruling | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90 | The user rules |
 | **Duplicate findings, and false findings on a clean tree** | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically | — |
@@ -241,6 +241,84 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-13T14:30:00Z — The document-section deletions were the measurement, not the engine
+
+- Agent: Claude Code `claude-opus-5`, branch `document-sections-not-deleted`
+- Transition: no phase task. Post-gate. Closes the register item opened earlier
+  the same day, **as not a defect**.
+- Plan: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md`,
+  written before execution and carrying the cause it found.
+- **First, a retraction.** The item was reported with a cause I had not
+  verified: "a decode step is corrupting the em dash," inferred from a title
+  that printed as `2026-07-25T15:15:00Z ? P0-SETUP started`. **That was the
+  reporting terminal.** The JSON on disk holds `—` intact, with no U+FFFD and
+  no cp1252 `0x97` anywhere in the file. A wrong cause in the register is worse
+  than the bug, because the next reader follows it; corrected in its own commit
+  before any other work.
+
+**The cause: the analysis read a working tree that was being rewritten.** It ran
+for twelve minutes while this session edited `PLAN.md`, `memory.md`, and
+`test_state_views.py` with scripts using `Path.write_text`, which **truncates
+before it writes**. The read of `PLAN.md` landed in that window and saw an empty
+file. An empty target *should* report every section deleted — that is what an
+empty file means.
+
+Proven by exact reproduction rather than by argument:
+
+| Target state at read time | Result |
+| --- | --- |
+| Empty (0 bytes) | **496 `SYMBOL_DELETED`** |
+| Truncated mid-write (5 KB of 699 KB) | 491 `SYMBOL_DELETED` + 1 `DOCUMENT_CHANGED` |
+| The real edited bytes | **2 `DOCUMENT_CHANGED`, 0 deletions** |
+
+The artifact contains **496** deletions for `PLAN.md` out of 497 sections. An
+exact match is not a coincidence.
+
+- Eliminated on the way, in this order, and each should stay eliminated:
+  text decoding; symbol pairing at `compute_symbol_changes` with matching **and**
+  mismatched `file_id`s; parse divergence (both views produce 497 symbols, same
+  ids, same names, zero diagnostics); scale (50, 200, 497 sections all correct);
+  the production `GitBlobStateView`-vs-`DirectoryStateView` pairing in a real Git
+  repository; and the real `PLAN.md` before/after bytes.
+- **Sixth consecutive investigation of this shape to find the instrument at
+  fault rather than the engine** (ADR-0017, 0018, 0024, 0027, 0038). The plan
+  predicted it from base rate and made Task 3's deliverable **a written cause
+  rather than a patch**, which is the only reason no "fix" was applied to code
+  that was already correct. A plan that only accommodates the bug being real
+  produces exactly that mistake.
+- **No ADR**, because nothing about the product's behaviour was decided or
+  changed. **No engine change; no source file was modified by this work.**
+- Files: `tests/unit/test_document_section_diff.py` (new, 3 tests),
+  `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md`
+  (new), `docs/operations/change-analysis.md` (the limitation),
+  `docs/plans/PLAN.md`, `documentation/memory.md`.
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`, and all three of `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`,
+  `CHUNKER_VERSION` unchanged, so **no snapshot is made stale**. No new
+  dependency.
+- Verification, exit codes read from the tools: `uv run pytest -q` **2201
+  passed, 3 skipped**; `ruff` clean; `mypy --no-incremental` clean on 350 files;
+  `check_phase4.ps1 -SkipSync` exit 0 with all three baselines reproducing
+  byte-for-byte; `check_phase7.ps1 -SkipSync` exit 0, 15 passed and 7 skipped on
+  Chromium. Gates run **one at a time** — they share `.test-tmp` and a
+  concurrent pytest collides with `FileExistsError`, which cost a void gate run
+  earlier today.
+- The three kept tests are not redundant: nothing else in the suite asserts that
+  editing a Markdown document preserves its untouched sections, and **the
+  evaluation corpus has no change case over a document at all**. One test pins
+  the truncation shape deliberately, so the next person who sees a wall of
+  deletions can tell it apart from a pairing defect in one run.
+- **The baselines not moving is not reassurance here.** No engine changed, so
+  they could not move — but the corpus also could not have caught either this
+  false report or a genuine regression in document diffing, because it contains
+  no such case. Sixth item of evidence for growing it.
+- Limitations: preflight over a live working tree is inherently non-atomic and
+  no defence is planned — Git behaves the same way. Recorded in
+  `docs/operations/change-analysis.md` with the signature to recognise
+  (deletions equal to a file's whole symbol count, with no additions).
+- Next: **nothing assigned.** The register's open items are the two rulings
+  (oversized tracked files; ADR-0030 module granularity) and the corpus work.
 
 ### 2026-08-13T11:00:00Z — Preflight sees only what it would index (ADR-0044)
 
