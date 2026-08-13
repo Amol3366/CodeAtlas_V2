@@ -618,3 +618,77 @@ def test_a_missing_relation_still_reduces_recall() -> None:
 
     assert score.relation_path_recall == 0.5
     assert score.relation_path_correctness == 1.0
+
+
+def test_a_repeated_finding_code_is_visible_to_the_score() -> None:
+    """`expected_findings` was a set of codes, and a set cannot count.
+
+    That is why c012 emitted two `CONFIG_VALUE_CHANGED` findings for one edit
+    from Phase 4 until 2026-08-11 with no metric ever seeing it, and c014 two
+    `PACKAGE_SCRIPT_CHANGED`. A case declaring one finding must be able to fail
+    against an engine emitting two, or every duplicate-finding defect is
+    invisible by construction.
+    """
+    case = load_dataset(DATASET_ROOT).change_cases[0]
+    evidence = EvidencePrediction(
+        evidence_id="predicted-1",
+        snapshot_id="python-v1",
+        file_path="src/payments/service.py",
+        start_line=7,
+        end_line=11,
+    )
+    prediction = ChangePrediction(
+        case_id="c001",
+        changed_symbols=["PaymentService.capture"],
+        impact_paths=[],
+        findings=[
+            FindingPrediction(
+                code="PUBLIC_BEHAVIOR_CHANGED", evidence_ids=["predicted-1"]
+            ),
+            FindingPrediction(
+                code="PUBLIC_BEHAVIOR_CHANGED", evidence_ids=["predicted-1"]
+            ),
+        ],
+        evidence=[evidence],
+        claims=[],
+        duration_ms=2.0,
+    )
+
+    score = score_change_case(case, prediction)
+
+    assert score.finding_count_correct is False
+
+
+def test_a_single_expected_finding_matched_once_counts_as_correct() -> None:
+    """The guard on the test above.
+
+    A metric that always reported `False` would satisfy the duplicate test on
+    its own. This is the half that fails if the multiset comparison is wrong in
+    the other direction.
+    """
+    case = load_dataset(DATASET_ROOT).change_cases[0]
+    prediction = ChangePrediction(
+        case_id="c001",
+        changed_symbols=["PaymentService.capture"],
+        impact_paths=[],
+        findings=[
+            FindingPrediction(
+                code="PUBLIC_BEHAVIOR_CHANGED", evidence_ids=["predicted-1"]
+            )
+        ],
+        evidence=[
+            EvidencePrediction(
+                evidence_id="predicted-1",
+                snapshot_id="python-v1",
+                file_path="src/payments/service.py",
+                start_line=7,
+                end_line=11,
+            )
+        ],
+        claims=[],
+        duration_ms=2.0,
+    )
+
+    score = score_change_case(case, prediction)
+
+    assert score.finding_count_correct is True

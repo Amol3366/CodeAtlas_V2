@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import unicodedata
+from collections import Counter
 from collections.abc import Iterable
 from typing import Literal, Protocol
 
@@ -170,6 +171,14 @@ class ChangeScore(ContractModel):
     # sides feed one aggregate, so both must use the same rule or the number
     # would mean two things at once.
     evidence_containing_recall: Confidence
+    # Whether the engine emitted the *same number* of each finding code the
+    # case declares, not merely the same set. `expected_findings` was compared
+    # as a set, and a set cannot count -- which is why c012 emitted two
+    # `CONFIG_VALUE_CHANGED` findings for one edit from Phase 4 until
+    # 2026-08-11 with no metric ever seeing it (ADR-0042). Reported beside
+    # `finding_precision` rather than replacing it, so no existing number
+    # changes meaning (the ADR-0038 pattern).
+    finding_count_correct: bool
     valid_evidence_count: int = Field(ge=0)
     containing_evidence_count: int = Field(ge=0)
     predicted_evidence_count: int = Field(ge=0)
@@ -215,6 +224,13 @@ class AggregateMetrics(ContractModel):
     changed_symbol_recall: MetricValue
     direct_impact_recall: MetricValue
     finding_precision: MetricValue
+    # The fraction of change cases where every finding code was emitted the
+    # number of times the case declares. Defaulted to None and reported
+    # beside `finding_precision`, never replacing it, so no tracked baseline
+    # changes meaning (ADR-0038's pattern). Ungated for now: the corpus
+    # declares codes, not counts, so a low number today measures the corpus
+    # rather than the engine.
+    finding_count_correctness: MetricValue = None
     unsupported_claim_rate: MetricValue
     abstention_correctness: MetricValue
     total_duration_ms: float = Field(ge=0.0)
@@ -359,14 +375,19 @@ def score_change_case(
         for item in prediction.evidence
     }
     predicted_evidence = list(predicted_evidence_by_id.values())
-    supported_findings = {
+    supported_finding_codes = [
         finding.code
         for finding in prediction.findings
         if all(
             predicted_evidence_by_id[evidence_id] in expected_evidence
             for evidence_id in finding.evidence_ids
         )
-    }
+    ]
+    supported_findings = set(supported_finding_codes)
+    # Multiset, so a repeated code is a different answer from a single one.
+    finding_count_correct = Counter(supported_finding_codes) == Counter(
+        case.expected_findings
+    )
     forbidden_count = sum(
         contains_forbidden_claim(claim, case.forbidden_claims)
         for claim in prediction.claims
@@ -385,6 +406,7 @@ def score_change_case(
         finding_precision=_precision(
             supported_findings, expected_findings
         ),
+        finding_count_correct=finding_count_correct,
         evidence_recall=_recall(
             set(predicted_evidence), expected_evidence
         ),
@@ -691,6 +713,12 @@ def _aggregate(
         direct_impact_recall=_mean(impact_recall),
         finding_precision=_mean(
             [score.finding_precision for score in change_scores]
+        ),
+        finding_count_correctness=_mean(
+            [
+                1.0 if score.finding_count_correct else 0.0
+                for score in change_scores
+            ]
         ),
         unsupported_claim_rate=(
             forbidden_count / claim_count if claim_count else None

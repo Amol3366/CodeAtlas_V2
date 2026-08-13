@@ -14,6 +14,7 @@
     "direct_impact_recall": 0.0,
     "exact_evidence_rate": null,
     "exact_symbol_resolution": 0.0,
+    "finding_count_correctness": null,
     "finding_precision": 0.0,
     "lexical_resolution": null,
     "mean_reciprocal_rank": 0.0,
