@@ -1412,10 +1412,34 @@ minutes to redo.
       the register.** A real preflight over 7 edited files returned **526
       findings, 524 `SYMBOL_DELETED` at high**, naming Markdown sections of
       `PLAN.md` and this file that exist in **both** states. No matching
-      `SYMBOL_ADDED`, so not ADR-0042's shape. One title reads
-      `2026-07-25T15:15:00Z � P0-SETUP started` — **a decode step is corrupting
-      an em dash**, which would make a section name unequal to its own twin.
-      Start there, not at the pairing logic. Also worth carrying: that run took
+      `SYMBOL_ADDED`, so not ADR-0042's shape.
+
+      **I published a cause I had not verified, and it was wrong.** The report
+      said a decode step was corrupting an em dash, from a title that printed as
+      `2026-07-25T15:15:00Z � P0-SETUP started`. That was **my terminal**: the
+      JSON on disk holds `—` intact, with no U+FFFD and no cp1252 `0x97`. The
+      retraction is the lesson — a wrong cause in the register costs the next
+      reader more than the bug, because they follow it. What the numbers
+      actually say is that **505 sections produced 524 deletions**, so nothing
+      paired at all.
+
+      **Resolved the same day: the engine was right and the measurement was
+      wrong.** The 12-minute analysis ran over a **live working tree while this
+      session was rewriting `PLAN.md`** with `Path.write_text`, which truncates
+      before it writes. The read landed in that window and saw an empty file.
+      An empty target *should* report every section deleted. Proven by exact
+      reproduction — empty target: **496 deletions**, against **496** in the
+      artifact; truncated mid-write: 491+1; the real edited bytes: **2 findings,
+      zero deletions**.
+
+      **This is the sixth consecutive investigation of this shape to find the
+      instrument at fault rather than the engine** (ADR-0017, 0018, 0024, 0027,
+      0038). The plan predicted that from base rate and made Task 3's
+      deliverable *a written cause rather than a patch* — which is the only
+      reason no fix was applied to code that was already correct. Two lessons
+      worth more than the finding: **do not edit the tree you are measuring**,
+      and **a wall of deletions with no additions means the target was not there
+      to be read**, not that pairing broke. Three tests now pin all of it. Also worth carrying: that run took
       **over 15 minutes** on this repository, which the docs already explain —
       the engine parses **both full states** every time, O(repository) not
       O(change).

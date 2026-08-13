@@ -265,6 +265,15 @@ instead of two subprocesses per file.
   One committed 3 MB CSV therefore makes a repository impossible to preflight.
   This is open and recorded in the Deferred Register; today's behaviour is
   pinned by a test so it cannot change silently while the ruling is pending.
+- **An analysis over a working tree is not an atomic observation.** The engine
+  parses both full states, which on a large repository takes minutes; a file
+  rewritten during that window is reported as it was *when it was read*. A file
+  caught mid-write reads as empty, and an empty file means every symbol in it
+  was deleted — which is the correct answer to the wrong question. On
+  2026-08-13 this produced **496 false `SYMBOL_DELETED` findings** and an
+  `overall_risk` of `high`. Git behaves the same way and no defence is planned:
+  **do not edit the tree you are measuring.** The signature to recognise is
+  deletions equal to a file's whole symbol count with no additions.
 - Line endings are normalized on both sides, so a change that is *only* line
   endings reports nothing (ADR-0043). Intentional, and the same answer Git
   gives under `text=auto`.
