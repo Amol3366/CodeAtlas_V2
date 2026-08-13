@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import shutil
 import sqlite3
+import subprocess
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -332,3 +333,91 @@ def test_snapshot_state_view_read_returns_none_for_missing_file(
         FileStore(connection),
     )
     assert view.read_file("src/missing.py") is None
+
+
+# --- Line endings are not a change (ADR-0043) --------------------------------
+
+
+def _commit_lf_file(root: Path, relative_path: str, text: str) -> None:
+    """Write `text` with LF endings and commit it, whatever the platform.
+
+    The bytes are written explicitly rather than through a fixture, because the
+    fixtures themselves are built with Python's text mode and therefore already
+    carry CRLF on Windows -- the very hazard under test.
+    """
+    target = root / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(text.replace("\r\n", "\n").encode("utf-8"))
+    identity = (
+        "-c", "user.email=test@example.com",
+        "-c", "user.name=Test",
+        "-c", "core.autocrlf=false",
+    )
+    subprocess.run(
+        ["git", *identity, "add", "--", relative_path],
+        cwd=root, check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", *identity, "commit", "-m", f"add {relative_path}"],
+        cwd=root, check=True, capture_output=True,
+    )
+
+
+_SOURCE = "def handler():\n    return 1\n"
+
+
+@requires_git
+def test_a_crlf_working_copy_of_an_lf_blob_is_not_a_change(git_repo: Path) -> None:
+    """The two comparison views must agree with Git about what changed.
+
+    `core.autocrlf=true` is the Windows default, so a working copy can hold
+    CRLF where the blob holds LF. Hashing raw bytes made every such file differ
+    on both sides at once: Git reported the tree clean while preflight reported
+    the whole file changed, and on a real repository that was 150 findings for
+    an unedited checkout.
+    """
+    _commit_lf_file(git_repo, "eol.py", _SOURCE)
+    blob = GitBlobStateView(git_repo, "HEAD")
+    before = {file.relative_path: file.content_hash for file in blob.list_files()}
+
+    (git_repo / "eol.py").write_bytes(_SOURCE.replace("\n", "\r\n").encode("utf-8"))
+
+    directory = DirectoryStateView(git_repo)
+    after = {file.relative_path: file.content_hash for file in directory.list_files()}
+
+    assert after["eol.py"] == before["eol.py"]
+
+
+@requires_git
+def test_an_edit_is_still_a_change_when_line_endings_also_differ(
+    git_repo: Path,
+) -> None:
+    """Normalizing the endings must not normalize away the edit inside them."""
+    _commit_lf_file(git_repo, "eol.py", _SOURCE)
+    blob = GitBlobStateView(git_repo, "HEAD")
+    before = {file.relative_path: file.content_hash for file in blob.list_files()}
+
+    edited = (_SOURCE + "def added():\n    return 2\n").replace("\n", "\r\n")
+    (git_repo / "eol.py").write_bytes(edited.encode("utf-8"))
+
+    directory = DirectoryStateView(git_repo)
+    after = {file.relative_path: file.content_hash for file in directory.list_files()}
+
+    assert after["eol.py"] != before["eol.py"]
+
+
+@requires_git
+def test_both_sides_hand_the_parser_bytes_with_no_carriage_returns(
+    git_repo: Path,
+) -> None:
+    """File-level agreement is not enough: the two sides must also parse the
+    same bytes, or every symbol inside a CRLF file differs by its hash."""
+    _commit_lf_file(git_repo, "eol.py", _SOURCE)
+    (git_repo / "eol.py").write_bytes(_SOURCE.replace("\n", "\r\n").encode("utf-8"))
+
+    from_disk = DirectoryStateView(git_repo).read_file("eol.py")
+    from_git = GitBlobStateView(git_repo, "HEAD").read_file("eol.py")
+
+    assert from_disk is not None and from_git is not None
+    assert b"\r" not in from_disk
+    assert from_disk == from_git

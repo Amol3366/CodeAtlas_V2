@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-11
+Last updated: 2026-08-13
 
 ## Current Phase
 
@@ -1320,6 +1320,50 @@ minutes to redo.
       wider than intended, in a new place; do the revert from a copy. And
       `npx prettier` is **not** a tool of this project (ESLint is the gate);
       running it reported "issues" in correctly formatted files.
+
+- [x] **Line endings are not a change (ADR-0043), 2026-08-11; committed
+      2026-08-13.** **Found by verifying ADR-0042 on this repository instead of
+      a fixture, and that is the whole lesson.** The small reproduction gave a
+      clean tree zero findings. This repository, unmodified, `git status`
+      empty, still reported **150 findings across 35 files**.
+
+      `GitBlobStateView` reads the blob; `DirectoryStateView` reads the working
+      tree; Git rewrites line endings between them whenever `core.autocrlf` is
+      on — **the Windows default**, on the platform Section 5 names as primary.
+      Both hashed raw bytes, so every line of such a file differed. **Git and
+      CodeAtlas gave opposite answers to "did this file change?"** — for a
+      product that is a second opinion on a diff, the worst available
+      disagreement.
+
+      Both views now normalize CRLF and lone CR to LF, for the compared hash
+      **and** the bytes handed to the parser. Doing only the file level would
+      have pushed the disagreement down to every symbol hash inside the file.
+      Binaries excluded; `SnapshotStateView` deliberately untouched, because it
+      checks disk against an index-time hash and nothing pairs it with another
+      view. **1592 → (ADR-0042) 150 → 26.** No schema, contract, or version
+      change, and no re-index required by this record.
+
+      **Fourth defect the corpus could not see** (ADR-0016, ADR-0029, ADR-0042),
+      second in one day — the fixtures are LF on both sides, so every baseline
+      reproduced byte-for-byte. ADR-0022 added the `.gitattributes` pinning
+      `eol=lf` for exactly this hazard; **it protected the corpus and not the
+      engine.** When a rule is enforced by a file that only the fixtures live
+      under, the product is not covered by it.
+
+      **A process failure worth more than the fix.** The work was finished on
+      2026-08-11 and then left uncommitted for two days, with its handoff entry
+      sitting in a scratchpad file at the repository root and PLAN.md carrying
+      408 lines of Markdown table reflow with zero content change. That is the
+      `per-repository-embedding-model` failure mode (2026-08-06) again, smaller:
+      finished work outside `main` drifts against whatever is decided next.
+      Re-verified before committing rather than trusted — 2191 passed, ruff and
+      mypy clean — and the reflow was reverted so the handoff is legible in the
+      diff. **A formatter run is not a handoff.**
+
+      Open, and the last 26 of the original 1592: the two views disagree about
+      which files *exist*, so a tracked file matching a built-in ignore default
+      reports `SYMBOL_DELETED` at **high** severity on a clean tree. It is a
+      ruling, not a patch, and it is in the Deferred Register.
 
 ## Decisions Made
 
