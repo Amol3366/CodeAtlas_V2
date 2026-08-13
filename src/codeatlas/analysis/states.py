@@ -27,7 +27,11 @@ from codeatlas.domain.paths import resolve_inside_root, validate_relative_path
 from codeatlas.domain.repository import FileClassification, FileRecord, ScanLimits
 from codeatlas.repositories.git_diff import GitDiffAdapter
 from codeatlas.repositories.ignore_rules import IgnoreRules
-from codeatlas.repositories.scanner import RepositoryScanner
+from codeatlas.repositories.scanner import (
+    RepositoryScanner,
+    decode_text,
+    is_binary_content,
+)
 from codeatlas.storage.sqlite.stores import FileStore
 
 
@@ -181,6 +185,29 @@ class GitBlobStateView:
                     blob = self._git.read_blob(self._root, self._ref, path)
                     if blob is not None:
                         contents[path] = blob
+            # A file can be tracked at the ref *and* match an ignore rule --
+            # committed build output is the ordinary case. `git ls-tree` lists
+            # it, the directory scan does not, so it was present on one side of
+            # a comparison and absent from the other and reported as deleted on
+            # a tree nobody had touched (ADR-0044). The rules are read from the
+            # working tree because they are the same rules that decide what is
+            # indexed, and preflight must not consider a file it would never
+            # index.
+            #
+            # The scanner also skips a file whose bytes sniff as binary or
+            # will not decode as UTF-8, and it decides both by *content* rather
+            # than by extension -- so the same two verdicts have to be reached
+            # here from the blob bytes, not from the path.
+            # `tests/fixtures/upgrade/schema_0008.db` was the last disagreement
+            # on this repository once the ignore rules were shared.
+            rules = IgnoreRules.load(self._root)
+            contents = {
+                path: content
+                for path, content in contents.items()
+                if not rules.is_ignored(path, is_directory=False)
+                and not is_binary_content(content)
+                and decode_text(content) is not None
+            }
             files: list[StateFile] = []
             for path, content in contents.items():
                 classification, language = self._classify(path)

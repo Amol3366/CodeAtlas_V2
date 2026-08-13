@@ -1365,6 +1365,69 @@ minutes to redo.
       reports `SYMBOL_DELETED` at **high** severity on a clean tree. It is a
       ruling, not a patch, and it is in the Deferred Register.
 
+- [x] **Preflight sees only what it would index (ADR-0044), 2026-08-13.** Closes
+      the item ADR-0043 left open — the last of the original 1592, and the only
+      one with a user-visible symptom.
+
+      The views disagreed about which files **exist**, not about their bytes.
+      `GitBlobStateView` lists everything tracked at the ref;
+      `DirectoryStateView` lists what a scan would index. A file that is tracked
+      **and** excluded from a scan was in the base, absent from the target, and
+      indistinguishable from a deletion — `SYMBOL_DELETED` at **high**, so
+      `overall_risk` read `high` on an unmodified checkout.
+
+      **The user's ruling: preflight never considers a file it would not index.**
+      The blob side now applies the same ignore rules and the same *content*
+      binary sniff. `is_binary_content` was made public rather than restated,
+      because two implementations of "is this binary" would put a file on one
+      side of a comparison and not the other — the very defect being fixed.
+      **12 base-only files → 0**; the two views now list byte-identical path
+      sets on this repository. The rejected alternative, letting tracked files
+      bypass ignore rules, would have pulled built output and minified bundles
+      into the index through the back door of a comparison.
+
+      **Accepted with the ruling:** a tracked-and-ignored file can be added or
+      deleted without preflight saying so. It has no symbols and no evidence to
+      cite, so reporting it would mean reporting something no answer could
+      support.
+
+      **A fourth mechanism was found by reading the scanner, not from a report.**
+      The NUL sniff is only its first test — Latin-1 prose carries no NUL and is
+      skipped just the same. Closed here too, with `decode_text` shared. It
+      returns the *text* rather than a boolean deliberately: a predicate would
+      have made the scanner decode every file twice, and paying for a comparison
+      fix on every index is the wrong trade. Nothing here triggers it, so this
+      one closed a door nobody had walked through.
+
+      **Found while fixing it, and deliberately not folded in:** the remaining
+      exclusion mechanism does not disagree, it **refuses**.
+      `GitDiffAdapter.archive` raises `ScanLimitExceededError` on any tracked
+      file over `max_file_bytes`, so one committed 3 MB CSV makes a repository
+      impossible to preflight, while the scanner merely skips it with
+      `TOO_LARGE`. Worse than the bug being fixed, and a different ruling — so
+      today's behaviour is **pinned by a test** and the question is in the
+      register. Nothing here triggers it, which is why it went unnoticed.
+
+      **The verification run found something bigger than the fix, and it is in
+      the register.** A real preflight over 7 edited files returned **526
+      findings, 524 `SYMBOL_DELETED` at high**, naming Markdown sections of
+      `PLAN.md` and this file that exist in **both** states. No matching
+      `SYMBOL_ADDED`, so not ADR-0042's shape. One title reads
+      `2026-07-25T15:15:00Z � P0-SETUP started` — **a decode step is corrupting
+      an em dash**, which would make a section name unequal to its own twin.
+      Start there, not at the pairing logic. Also worth carrying: that run took
+      **over 15 minutes** on this repository, which the docs already explain —
+      the engine parses **both full states** every time, O(repository) not
+      O(change).
+
+      **Fifth consecutive defect the corpus could not see** (ADR-0016, ADR-0029,
+      ADR-0042, ADR-0043). Worse: `test_git_blob_state_view_lists_same_paths_as_directory_view`
+      has asserted this exact property **since Phase 4** and passed the whole
+      time, because its fixture contains nothing any rule excludes. **A true
+      assertion over a corpus that cannot exercise it is not coverage** — which
+      is the argument for growing the corpus, now made five times by five
+      different defects.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

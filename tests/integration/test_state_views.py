@@ -17,7 +17,13 @@ from codeatlas.analysis.states import (
     GitBlobStateView,
     SnapshotStateView,
 )
-from codeatlas.domain.repository import FileClassification, FileRecord, Repository
+from codeatlas.domain.errors import ScanLimitExceededError
+from codeatlas.domain.repository import (
+    FileClassification,
+    FileRecord,
+    Repository,
+    ScanLimits,
+)
 from codeatlas.domain.snapshot import Snapshot, SnapshotState
 from codeatlas.repositories.git_diff import GitDiffAdapter
 from codeatlas.storage.sqlite.connection import connect
@@ -348,6 +354,11 @@ def _commit_lf_file(root: Path, relative_path: str, text: str) -> None:
     target = root / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(text.replace("\r\n", "\n").encode("utf-8"))
+    _commit_path(root, relative_path)
+
+
+def _commit_path(root: Path, relative_path: str) -> None:
+    """Stage and commit one already-written path."""
     identity = (
         "-c", "user.email=test@example.com",
         "-c", "user.name=Test",
@@ -421,3 +432,129 @@ def test_both_sides_hand_the_parser_bytes_with_no_carriage_returns(
     assert from_disk is not None and from_git is not None
     assert b"\r" not in from_disk
     assert from_disk == from_git
+
+
+# --- Both sides apply the same ignore rules (ADR-0044) -----------------------
+
+
+@requires_git
+def test_a_tracked_file_matching_an_ignore_default_is_absent_from_the_blob_view(
+    git_repo: Path,
+) -> None:
+    """A file can be committed *and* match an ignore default at the same time.
+
+    `git ls-tree` lists everything tracked at the ref while the directory scan
+    applies ignore rules, so such a file was present on one side and absent on
+    the other -- reported as deleted on a tree nobody had touched.
+    """
+    _commit_lf_file(git_repo, "dist/bundle.js", "export const x = 1;\n")
+
+    blob = GitBlobStateView(git_repo, "HEAD")
+    paths = {file.relative_path for file in blob.list_files()}
+
+    assert "dist/bundle.js" not in paths
+
+
+@requires_git
+def test_a_clean_tree_holding_a_tracked_ignored_file_shows_no_difference(
+    git_repo: Path,
+) -> None:
+    """The user-visible symptom: 26 SYMBOL_DELETED findings on a clean checkout.
+
+    The views must agree about which files *exist*, not merely about the bytes
+    of the files they both happen to list.
+    """
+    _commit_lf_file(git_repo, "dist/bundle.js", "export const x = 1;\n")
+    _commit_lf_file(git_repo, "src/app.py", _SOURCE)
+
+    blob = GitBlobStateView(git_repo, "HEAD")
+    base = {file.relative_path for file in blob.list_files()}
+    target = {file.relative_path for file in DirectoryStateView(git_repo).list_files()}
+
+    assert base == target
+
+
+@requires_git
+def test_a_tracked_ignored_path_cannot_be_read_from_the_blob_view(
+    git_repo: Path,
+) -> None:
+    """Excluded from the listing means excluded from the state, not hidden."""
+    _commit_lf_file(git_repo, "dist/bundle.js", "export const x = 1;\n")
+
+    assert GitBlobStateView(git_repo, "HEAD").read_file("dist/bundle.js") is None
+
+
+@requires_git
+def test_a_tracked_binary_file_is_absent_from_the_blob_view(git_repo: Path) -> None:
+    """Ignore rules are not the only way the two sides disagree about existence.
+
+    The directory scan skips a file whose first bytes contain NUL, so a tracked
+    binary was in the base and not the target for the same reason a tracked
+    build artifact was. On this repository it was the last remaining
+    disagreement after the ignore rules were shared.
+    """
+    target = git_repo / "fixture.db"
+    target.write_bytes(b"SQLite format 3\x00" + b"\x01\x02\x03" * 64)
+    _commit_path(git_repo, "fixture.db")
+
+    blob = GitBlobStateView(git_repo, "HEAD")
+    paths = {file.relative_path for file in blob.list_files()}
+
+    assert "fixture.db" not in paths
+
+
+@requires_git
+def test_a_tracked_file_over_the_size_limit_fails_the_whole_comparison(
+    git_repo: Path,
+) -> None:
+    """Pins today's behaviour, which is **not** what this ADR chose for the
+    other two mechanisms, and is recorded in the Deferred Register rather than
+    changed here.
+
+    The directory scan *skips* an oversized file with a `TOO_LARGE` warning.
+    The blob side raises, so a repository holding one tracked file above the
+    limit cannot be preflighted at all. Turning that refusal into a skip is a
+    change to a declared error path and deserves its own ruling; this test
+    exists so the asymmetry cannot be altered silently in either direction.
+    """
+    oversized = "x" * (ScanLimits().max_file_bytes + 1) + "\n"
+    (git_repo / "big.csv").write_bytes(oversized.encode("utf-8"))
+    _commit_path(git_repo, "big.csv")
+
+    with pytest.raises(ScanLimitExceededError):
+        GitBlobStateView(git_repo, "HEAD").list_files()
+
+
+@requires_git
+def test_a_tracked_file_that_no_rule_ignores_is_still_listed(git_repo: Path) -> None:
+    """The guard on the fix above.
+
+    A filter that excluded everything would satisfy the three tests before this
+    one. This is the half that fails if the rules are applied too widely.
+    """
+    _commit_lf_file(git_repo, "src/app.py", _SOURCE)
+
+    blob = GitBlobStateView(git_repo, "HEAD")
+    paths = {file.relative_path for file in blob.list_files()}
+
+    assert "src/app.py" in paths
+
+
+@requires_git
+def test_a_tracked_file_that_is_not_valid_utf8_is_absent_from_the_blob_view(
+    git_repo: Path,
+) -> None:
+    """The scanner skips undecodable bytes as binary even without a NUL.
+
+    Found by reading the scanner rather than by a failing report: the NUL sniff
+    is only its first test, and a file that survives the sniff but fails to
+    decode is skipped just the same. Leaving it out would have left the same
+    disagreement open through a narrower door.
+    """
+    (git_repo / "latin.txt").write_bytes(b"caf\xe9 not utf-8\n")
+    _commit_path(git_repo, "latin.txt")
+
+    blob = GitBlobStateView(git_repo, "HEAD")
+    paths = {file.relative_path for file in blob.list_files()}
+
+    assert "latin.txt" not in paths

@@ -85,7 +85,9 @@ with verification.
 | `relation_path_recall` has no gate target | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023) | That design decision is settled |
 | RRF coarse-chunk bias | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit | The module-granularity ruling lands |
 | Phase 4 `containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect** | Someone investigates per-case |
-| **A tracked file that matches an ignore default is reported deleted** | **OPEN — a ruling, not a patch, and the one open item with a user-visible symptom.** The last 26 of ADR-0043's original 1592. The two comparison views disagree about which files *exist*: `GitBlobStateView` lists everything tracked at the ref, `DirectoryStateView` applies ignore rules, so a file both tracked **and** matching a built-in default (`dist/`, `build/`, `target/`, `bin/`, `*.min.js`) is present in the base and absent in the target and reports `SYMBOL_DELETED` at **high** severity — taking `overall_risk` to `high` on a clean tree. Here it is 26 findings from tracked corpus fixtures under `tests/evaluation/**/target/**`. The question is whether preflight should consider such a file at all, and on which side | The user rules on which side owns the ignore rules |
+| **A tracked file that matches an ignore default is reported deleted** | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means | — |
+| **Editing a large Markdown file reports hundreds of its sections as deleted** | **OPEN — found 2026-08-13 while verifying ADR-0044 on a real preflight, and the largest live number in this register.** Editing 7 files (2 of them big Markdown documents) produced **526 findings: 524 `SYMBOL_DELETED` at high severity**, `overall_risk` `high`. The named sections **still exist** in both states — `1. main reconciled; PR #1 merged`, `Accept-then-stream approved (ADR-0008)`, and ~500 more from this file's own handoff log. There are **no matching `SYMBOL_ADDED` findings**, so it is not the ambiguous-pairing shape ADR-0042 fixed. One title renders as `2026-07-25T15:15:00Z � P0-SETUP started`, so **a decoding step is corrupting the em dash**, which would make a base-side section name unequal to its target-side twin and explain a pure-delete result. **Not caused by ADR-0044** — the file is neither ignored nor binary, so no filter that record adds can reach it. Unverified whether it predates ADR-0042 | Someone reproduces it on a two-heading Markdown fixture and follows the decode path; start from the mojibake, not from the pairing |
+| **An oversized tracked file fails the whole comparison** | **OPEN — found while fixing ADR-0044, deliberately not folded into it.** Not a disagreement but a **refusal**: `GitDiffAdapter.archive` raises `ScanLimitExceededError` when any tracked file exceeds `max_file_bytes`, so a single committed 3 MB CSV makes a repository impossible to preflight — while the directory scan skips the same file with a `TOO_LARGE` warning. The fourth of ADR-0044's four exclusion mechanisms, and the only one not aligned. Turning a declared error path into a silent skip is its own ruling, so today's behaviour is **pinned by a test** rather than changed. Nothing in this repository triggers it, which is exactly why it went unnoticed | The user rules whether an oversized tracked file is skipped like the scanner does, or keeps refusing |
 | ADR-0030 module-granularity ruling | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90 | The user rules |
 | **Duplicate findings, and false findings on a clean tree** | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically | — |
 | **Nested config keys report false changes (ADR-0025 regression)** | **CLOSED 2026-08-11 — ADR-0041.** A key now hashes its own value rather than the line range it cites; the reproduction went from 8 findings (7 false) to 2. `PARSER_BUNDLE_VERSION` 1.3.0 → 1.4.0, so **every snapshot must be re-indexed**. Two residues recorded there: YAML compares subtree *text*, so re-indenting a block reports a change; and every tracked baseline reproduced byte-for-byte, which means **the corpus cannot see this defect** — the unit tests are the only coverage. Original diagnosis follows | — |
@@ -239,6 +241,102 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-13T11:00:00Z — Preflight sees only what it would index (ADR-0044)
+
+- Agent: Claude Code `claude-opus-5`, branch `preflight-sees-what-it-indexes`
+- Transition: no phase task. Post-gate. **Closes the item ADR-0043 left open**,
+  which was the only entry in the Deferred Register with a user-visible symptom.
+- User ruling, given before implementation: **preflight never considers a file
+  it would not index.** The alternative — letting a tracked file bypass the
+  ignore rules because Git tracks it — was put with its trade-off and rejected;
+  it would pull built output, minified bundles, and vendored trees into the
+  index through the back door of a comparison.
+- Cause, and it is not the bytes ADR-0043 fixed: the two views disagree about
+  which files **exist**. `GitBlobStateView` lists everything tracked at the ref;
+  `DirectoryStateView` lists what a scan would index. A file that is tracked
+  **and** excluded from a scan is present in the base, absent from the target,
+  and indistinguishable from a deletion — `SYMBOL_DELETED` at **high**, taking
+  `overall_risk` to `high` on a checkout nobody had edited.
+- **Four** mechanisms exclude a file from a scan. Measured on this repository
+  before the fix: **11** files matched an ignore rule (tracked corpus fixtures
+  under `tests/evaluation/**/target/**`, where `target/` is a built-in default
+  written for Rust and Java output), **1** sniffed as binary
+  (`tests/fixtures/upgrade/schema_0008.db`), **0** failed to decode as UTF-8,
+  **0** exceeded the size limit. The last two cost nothing to observe here,
+  which is the ordinary condition of a latent defect rather than a reason to
+  skip them.
+- Fix: the blob side applies the same ignore rules, the same NUL sniff, and the
+  same UTF-8 decode. `RepositoryScanner._is_binary` became the public
+  `is_binary_content`, and the scanner's decode became the public `decode_text`
+  which the scanner itself now calls. Both are **content** tests, not extension
+  tests, and two implementations of "would this be indexed?" would put a file on
+  one side of a comparison and not the other — the defect being fixed.
+  `decode_text` returns the text rather than a boolean **so the indexing path
+  pays nothing**: a predicate would have made the scanner decode every file
+  twice, once to answer and once to count lines.
+- **The UTF-8 case was found by reading the scanner, not from a report.** The
+  NUL sniff is only its first test; Latin-1 prose carries no NUL and is skipped
+  just the same. Nothing in this repository triggers it, so the fix closes a
+  door that was open and unmeasured rather than one anybody had walked through.
+- **Measured, unmodified working tree: base-only files 12 → 0, target-only 0 → 0.**
+  The two views now list byte-identical path sets, which is the property that
+  should have held all along. **The 26 → 0 finding count is *not* claimed as
+  measured.** ADR-0043 recorded that all 26 came from these files, so it
+  follows — but the preflight run made for this purpose ran against a **dirty**
+  tree (the seven files this work edits), and a dirty-tree number is not
+  comparable to a clean-tree one. The file-level measurement is what was
+  observed; the finding count is what follows from it, and conflating the two is
+  how a handoff starts carrying figures nobody took.
+- **That run surfaced a separate and larger defect, now in the register**: 7
+  edited files produced **526 findings, 524 of them `SYMBOL_DELETED` at high
+  severity**, naming Markdown sections of `PLAN.md` and `documentation/memory.md`
+  that exist in **both** states. No matching `SYMBOL_ADDED`, so not ADR-0042's
+  ambiguous-pairing shape; one title renders `2026-07-25T15:15:00Z � P0-SETUP
+  started`, which points at a **decoding** step corrupting an em dash and making
+  a section name unequal to its own twin. **Not caused by this record** — the
+  file is neither ignored nor binary, so no filter added here can reach it.
+- **Found while fixing it, and deliberately left open rather than folded in:**
+  the third mechanism does not disagree, it **refuses**.
+  `GitDiffAdapter.archive` raises `ScanLimitExceededError` when any tracked file
+  exceeds `max_file_bytes`, so one committed 3 MB CSV makes a repository
+  impossible to preflight at all — while the directory scan skips the same file
+  with a `TOO_LARGE` warning. That is a worse defect than this one and a
+  different ruling, so today's behaviour is **pinned by a test** and the
+  question is in the Deferred Register. Nothing in this repository triggers it,
+  which is exactly why it went unnoticed.
+- Contracts/migrations: **none.** No schema, contract, or version change, and
+  **no re-index required** — indexing was never the side that was wrong.
+  `contract_version` `1.1`, `SCHEMA_VERSION` `14`, `PARSER_BUNDLE_VERSION`
+  `1.4.0`, `RESOLVER_VERSION` `1.4.0`, `CHUNKER_VERSION` `1.1.0`, all unchanged.
+  No new dependency.
+- Files: `src/codeatlas/analysis/states.py`,
+  `src/codeatlas/repositories/scanner.py` (`is_binary_content` made public,
+  `_is_binary` delegates), `tests/integration/test_state_views.py` (+6 tests),
+  `docs/adr/0044-preflight-sees-only-what-it-would-index.md` (new),
+  `docs/adr/README.md`, `docs/plans/PLAN.md`, `documentation/memory.md`.
+- Verification, exit codes read from the tools: six tests written first — five
+  observed failing for the intended reason (three on the ignore rules, one on
+  the binary sniff, and the size-limit test failing by **raising**, which is how
+  the third mechanism was discovered rather than assumed) and the sixth, the
+  guard, passing from the start as it must. Full `uv run pytest -q` **2197
+  passed, 3 skipped**; `ruff` clean; `mypy --no-incremental` clean on 349 files.
+- Mutation checks, each observed failing, run from a **file copy** rather than
+  `git checkout --` (the ADR-0042 lesson): disabling the filter fails all four
+  exclusion tests while the guard still passes; making it drop everything fails
+  the guard **and** `test_git_blob_state_view_lists_files_at_ref`. Both halves
+  matter — a filter that excluded everything would satisfy the four exclusion
+  tests on its own.
+- **Fifth consecutive defect the corpus could not see** (ADR-0016, ADR-0029,
+  ADR-0042, ADR-0043). Sharper this time:
+  `test_git_blob_state_view_lists_same_paths_as_directory_view` has asserted
+  **this exact property since Phase 4** and passed the entire time, because its
+  fixture contains no file that any rule excludes. A true assertion over a
+  corpus that cannot exercise it is not coverage — the argument for growing the
+  corpus, now made five times by five different defects.
+- Next: **nothing assigned.** The register's remaining items are the two open
+  rulings (oversized tracked files, ADR-0030 module granularity) and the corpus
+  work.
 
 ### 2026-08-11T20:30:00Z — Line endings are not a change (ADR-0043)
 
