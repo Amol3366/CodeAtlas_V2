@@ -133,6 +133,7 @@ _DOCS_CONFIG = {
     "scripts": CONFIG,
     "Sample Service": DOC,
     "Health": DOC,
+    "Metrics": DOC,
 }
 _DOCS_EDGES = (("Sample Service", "service", DOCUMENTS),)
 
@@ -185,6 +186,7 @@ CASES: tuple[Case, ...] = (
     Case("c012", _DOCS_CONFIG, _DOCS_EDGES, (("service", ChangeKind.MODIFIED),)),
     Case("c013", _DOCS_CONFIG, _DOCS_EDGES, (("Health", ChangeKind.MODIFIED),)),
     Case("c014", _DOCS_CONFIG, _DOCS_EDGES, (("scripts", ChangeKind.MODIFIED),)),
+    Case("c025", _DOCS_CONFIG, _DOCS_EDGES, (("Metrics", ChangeKind.ADDED),)),
     Case(
         "c015", _MIXED, _MIXED_EDGES, (("get_order", ChangeKind.MODIFIED),), _ROUTE
     ),
