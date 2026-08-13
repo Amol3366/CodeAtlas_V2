@@ -237,6 +237,19 @@ ROWS: tuple[Row, ...] = (
             )
         },
     ),
+    # c025 is last on purpose: two tests below index ROWS positionally,
+    # so inserting in the middle silently retargets them.
+    # c025: a section inserted into a document. The section below it shifts
+    # without its text changing, and must not be reported at all.
+    Row(
+        "c025",
+        _change(
+            "Metrics",
+            DOC,
+            change_kind=ChangeKind.ADDED,
+            file_path="README.md",
+        ),
+    ),
 )
 
 

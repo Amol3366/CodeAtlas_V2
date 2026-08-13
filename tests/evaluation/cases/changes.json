@@ -1057,6 +1057,48 @@
                       "forbidden_claims":  [
                                                "The repository authorized source upload."
                                            ]
+                  },
+                  {
+                      "id":  "c025",
+                      "repository_fixture":  "docs_config",
+                      "snapshot_id":  "docs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:section-insert",
+                      "expected_symbols":  [
+                                               "README.Metrics"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "README.md",
+                                                    "symbol":  "Metrics",
+                                                    "start_line":  5,
+                                                    "end_line":  8,
+                                                    "evidence_id":  "c025-e1",
+                                                    "snapshot_id":  "docs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "README.Metrics"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "DOCUMENT_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The Health section changed.",
+                                               "The Health section was deleted."
+                                           ]
                   }
               ]
 }
