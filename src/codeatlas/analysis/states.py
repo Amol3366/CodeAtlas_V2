@@ -24,7 +24,7 @@ from typing import Protocol
 from codeatlas.domain.change import StateFile
 from codeatlas.domain.errors import PathOutsideRootError, PathSafetyError
 from codeatlas.domain.paths import resolve_inside_root, validate_relative_path
-from codeatlas.domain.repository import FileClassification, ScanLimits
+from codeatlas.domain.repository import FileClassification, FileRecord, ScanLimits
 from codeatlas.repositories.git_diff import GitDiffAdapter
 from codeatlas.repositories.ignore_rules import IgnoreRules
 from codeatlas.repositories.scanner import RepositoryScanner
@@ -51,6 +51,32 @@ def _hash_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def normalize_line_endings(content: bytes) -> bytes:
+    """Return `content` with CRLF and lone CR reduced to LF (ADR-0043).
+
+    The two comparison views read from different places -- one from a Git blob,
+    one from the working tree -- and Git rewrites line endings between them
+    whenever `core.autocrlf` is on, which is the Windows default. Hashing the
+    raw bytes therefore made every file of such a checkout differ on both sides
+    at once: Git called the tree clean while preflight called every line
+    changed.
+
+    Applied to both sides, so a *real* edit still changes the hash; only the
+    endings stop counting. That is deliberately the same answer Git gives with
+    `text=auto`, because a change-assurance tool disagreeing with Git about
+    whether a file changed is worse than either answer on its own.
+
+    Binary content is excluded by the caller, not here: a lone CR is meaningful
+    inside a binary and this would corrupt it.
+    """
+    return content.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
+def _is_text(classification: FileClassification) -> bool:
+    """Whether line-ending normalization applies to this file."""
+    return classification is not FileClassification.BINARY
+
+
 class DirectoryStateView:
     """A state backed by a directory on disk.
 
@@ -73,7 +99,10 @@ class DirectoryStateView:
                     relative_path=record.relative_path,
                     language=record.language,
                     classification=record.classification,
-                    content_hash=record.content_hash,
+                    # The scanner hashes what is on disk. Comparison needs the
+                    # hash of the *normalized* content, or a CRLF checkout of
+                    # an LF blob differs everywhere (ADR-0043).
+                    content_hash=self._comparable_hash(record),
                     size_bytes=record.size_bytes,
                     line_count=record.line_count,
                 )
@@ -83,6 +112,14 @@ class DirectoryStateView:
         files.sort(key=lambda file: file.relative_path)
         return tuple(files)
 
+    def _comparable_hash(self, record: FileRecord) -> str:
+        if not _is_text(record.classification):
+            return record.content_hash
+        content = self._read(record.relative_path)
+        if content is None:
+            return record.content_hash
+        return _hash_bytes(normalize_line_endings(content))
+
     def read_file(self, relative_path: str) -> bytes | None:
         state_file = self._get(relative_path)
         if state_file is None:
@@ -90,6 +127,8 @@ class DirectoryStateView:
         content = self._read(relative_path)
         if content is None:
             return None
+        if _is_text(state_file.classification):
+            content = normalize_line_endings(content)
         if _hash_bytes(content) != state_file.content_hash:
             return None
         return content
@@ -142,10 +181,14 @@ class GitBlobStateView:
                     blob = self._git.read_blob(self._root, self._ref, path)
                     if blob is not None:
                         contents[path] = blob
-            self._contents = contents
             files: list[StateFile] = []
             for path, content in contents.items():
                 classification, language = self._classify(path)
+                if _is_text(classification):
+                    # Normalized once, here, so the cache and every later read
+                    # serve the same bytes the hash was taken over (ADR-0043).
+                    content = normalize_line_endings(content)
+                    contents[path] = content
                 files.append(
                     StateFile(
                         relative_path=path,
@@ -156,6 +199,7 @@ class GitBlobStateView:
                         line_count=_count_lines(content),
                     )
                 )
+            self._contents = contents
             self._files_by_path = {file.relative_path: file for file in files}
         files = list(self._files_by_path.values())
         files.sort(key=lambda file: file.relative_path)
@@ -168,6 +212,8 @@ class GitBlobStateView:
         content = self._contents.get(relative_path)
         if content is None:
             content = self._git.read_blob(self._root, self._ref, relative_path)
+            if content is not None and _is_text(state_file.classification):
+                content = normalize_line_endings(content)
         if content is None:
             return None
         if _hash_bytes(content) != state_file.content_hash:

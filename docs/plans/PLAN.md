@@ -85,6 +85,7 @@ with verification.
 | `relation_path_recall` has no gate target | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023) | That design decision is settled |
 | RRF coarse-chunk bias | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit | The module-granularity ruling lands |
 | Phase 4 `containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect** | Someone investigates per-case |
+| **A tracked file that matches an ignore default is reported deleted** | **OPEN — a ruling, not a patch, and the one open item with a user-visible symptom.** The last 26 of ADR-0043's original 1592. The two comparison views disagree about which files *exist*: `GitBlobStateView` lists everything tracked at the ref, `DirectoryStateView` applies ignore rules, so a file both tracked **and** matching a built-in default (`dist/`, `build/`, `target/`, `bin/`, `*.min.js`) is present in the base and absent in the target and reports `SYMBOL_DELETED` at **high** severity — taking `overall_risk` to `high` on a clean tree. Here it is 26 findings from tracked corpus fixtures under `tests/evaluation/**/target/**`. The question is whether preflight should consider such a file at all, and on which side | The user rules on which side owns the ignore rules |
 | ADR-0030 module-granularity ruling | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90 | The user rules |
 | **Duplicate findings, and false findings on a clean tree** | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically | — |
 | **Nested config keys report false changes (ADR-0025 regression)** | **CLOSED 2026-08-11 — ADR-0041.** A key now hashes its own value rather than the line range it cites; the reproduction went from 8 findings (7 false) to 2. `PARSER_BUNDLE_VERSION` 1.3.0 → 1.4.0, so **every snapshot must be re-indexed**. Two residues recorded there: YAML compares subtree *text*, so re-indenting a block reports a change; and every tracked baseline reproduced byte-for-byte, which means **the corpus cannot see this defect** — the unit tests are the only coverage. Original diagnosis follows | — |
@@ -238,6 +239,90 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-11T20:30:00Z — Line endings are not a change (ADR-0043)
+
+- Agent: Claude Code `claude-opus-5`, branch `line-endings-are-not-a-change`
+- Transition: no phase task. Post-gate. Follows ADR-0042 the same day.
+- **Found by verifying ADR-0042 on the real repository instead of a fixture**,
+  which is the transferable lesson. On the small reproduction a clean tree gave
+  zero findings; on this repository, with the duplicates gone, an **unmodified**
+  checkout still reported **150 findings across 35 files** while `git status`
+  was empty.
+- Cause: `GitBlobStateView` reads the blob and `DirectoryStateView` reads the
+  working tree, and Git rewrites line endings between them whenever
+  `core.autocrlf` is on — **the Windows default**, on the platform Section 5
+  names as primary. Both hashed raw bytes, so every line differed. **Git and
+  CodeAtlas gave opposite answers to "did this file change?"**, which for a
+  second-opinion-on-a-diff product is the worst available disagreement.
+- Proven per file before changing anything: normalized hashes identical, raw
+  hashes different (`321f96ea…` vs `c80d46fb…` for
+  `src/codeatlas/api/routers/repositories.py`).
+- Fix: both comparison views normalize CRLF and lone CR to LF, for the compared
+  hash **and** the bytes handed to the parser. Doing only the file level would
+  have moved the disagreement down to every symbol hash inside the file; a test
+  pins that the two views return byte-identical content. Binaries excluded.
+  `SnapshotStateView` deliberately untouched — it verifies disk against an
+  index-time hash and no flow pairs it with another view.
+- Stated limitation: a change that is *only* line endings now reports nothing.
+  Intentional, matches Git, and a real blind spot.
+- **The user's working tree was also renormalized** — 23 tracked files held CRLF
+  against LF blobs. Git reported no content change (its clean filter normalizes
+  either way), so there was nothing to commit; the point was to make the bytes
+  on disk match the bytes in the blob.
+- Measured on this repository, unmodified tree: **1592 → (ADR-0042) 150 →
+  (this) 26**.
+- Contracts/migrations: **none.** No schema, contract, or version change, and
+  **no re-index required by this record** — indexing still hashes raw bytes.
+  ADR-0042's `RESOLVER_VERSION` bump already requires one.
+- Files: `src/codeatlas/analysis/states.py`,
+  `tests/integration/test_state_views.py` (+3 tests),
+  `docs/adr/0043-line-endings-are-not-a-change.md` (new), `docs/adr/README.md`,
+  `docs/plans/PLAN.md`, `documentation/memory.md`.
+- Verification, exit codes read from the tools: tests written first and observed
+  failing (`assert b"\r" not in from_disk`); `uv run pytest -q` **2191 passed,
+  3 skipped**; `ruff` clean; `mypy` clean; `check_phase4.ps1 -SkipSync` exit 0
+  with **all three baselines reproducing byte-for-byte and none regenerated**.
+- Mutation check, observed failing: making `normalize_line_endings` return its
+  input unchanged fails two of the three new tests, and the edit-detection test
+  keeps passing — which is the pair that matters, since a normalizer that
+  normalized *everything* away would also make the first two pass.
+- **No baseline moved, because the corpus is LF on both sides and could never
+  have seen this.** Fourth defect invisible to the corpus (ADR-0016, ADR-0029,
+  ADR-0042), second in one day. ADR-0022 added the `.gitattributes` that pins
+  `eol=lf` for exactly this hazard on the *corpus* side; it protected the
+  fixtures and not the engine.
+- **Left open, and it is the last 26 of the original 1592:** the two views
+  disagree about which files *exist*. `GitBlobStateView` lists everything
+  tracked at the ref; `DirectoryStateView` applies ignore rules. A file both
+  tracked and matching a built-in ignore default (`dist/`, `build/`, `target/`,
+  `bin/`, `*.min.js`) is in the base and not the target, so it reports
+  `SYMBOL_DELETED` at **high** severity and drives `overall_risk` to `high` on a
+  clean tree. Recorded in the Deferred Register as a ruling rather than a patch:
+  whether preflight should consider such a file at all, and on which side.
+- Process note carried from ADR-0042: the mutation check was done from a **file
+  copy** this time, not `git checkout --`, which last time reverted the fix
+  along with the mutation.
+
+**Recorded at commit time, 2026-08-13, by the session that committed this work.**
+The entry above was written when the change was made but never appended, and the
+work sat uncommitted for two days — the `per-repository-embedding-model` failure
+mode (2026-08-06) in miniature, where finished work left outside `main` drifts
+against decisions made after it. Before committing, this session re-ran the
+verification rather than trusting the record: `uv run pytest -q` **2191 passed,
+3 skipped** (exit 0), `ruff check src tests scripts apps` clean, `mypy
+--no-incremental` clean on `analysis/states.py`, and
+`tests/integration/test_state_views.py` **13 passed**. The Deferred Register row
+for the tracked-but-ignored ruling was added in the same commit, because ADR-0043
+and this entry both claim it is recorded there and a claim without the row is the
+documentation defect this project keeps finding in its own instruments.
+
+**One thing was dropped, not committed.** The working copy of this file also
+carried a whole-file Markdown table reflow — separator padding rewritten, wrapped
+lines unwrapped, blank lines moved — touching 408 lines with **zero** content
+change (`git diff -w` showed only table separators and re-wraps). It was reverted
+before the append, so this entry is legible in the diff instead of buried in
+churn. A formatter run is not a handoff.
 
 ### 2026-08-11T14:00:00Z — Duplicate and false preflight findings (ADR-0042)
 
