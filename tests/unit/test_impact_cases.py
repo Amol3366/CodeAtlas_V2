@@ -1,4 +1,4 @@
-"""The orientation rules, pinned against all 24 declared change cases.
+"""The orientation rules, pinned against all 28 declared change cases.
 
 `tests/unit/test_impact.py` proves each rule in isolation. This file proves the
 rules *together* reproduce every impact-path set the Phase 0 corpus declares,
@@ -134,6 +134,8 @@ _DOCS_CONFIG = {
     "Sample Service": DOC,
     "Health": DOC,
     "Metrics": DOC,
+    "server.port": CONFIG,
+    "cache.ttl": CONFIG,
 }
 _DOCS_EDGES = (("Sample Service", "service", DOCUMENTS),)
 
@@ -187,6 +189,14 @@ CASES: tuple[Case, ...] = (
     Case("c013", _DOCS_CONFIG, _DOCS_EDGES, (("Health", ChangeKind.MODIFIED),)),
     Case("c014", _DOCS_CONFIG, _DOCS_EDGES, (("scripts", ChangeKind.MODIFIED),)),
     Case("c025", _DOCS_CONFIG, _DOCS_EDGES, (("Metrics", ChangeKind.ADDED),)),
+    # A nested config leaf carries no DOCUMENTS edge, so neither c026 nor c027
+    # expands to an impact path; the point of both is the *count* of what
+    # changed, which `test_findings.py` pins.
+    Case("c026", _DOCS_CONFIG, _DOCS_EDGES, (("server.port", ChangeKind.MODIFIED),)),
+    Case("c027", _DOCS_CONFIG, _DOCS_EDGES, (("cache.ttl", ChangeKind.MODIFIED),)),
+    # c028 changes nothing, so there is nothing to orient. An empty change set
+    # is the assertion, not a gap in the table.
+    Case("c028", _PYTHON_APP, _PYTHON_EDGES, ()),
     Case(
         "c015", _MIXED, _MIXED_EDGES, (("get_order", ChangeKind.MODIFIED),), _ROUTE
     ),

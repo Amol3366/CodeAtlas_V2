@@ -155,11 +155,20 @@ def test_no_case_is_answered_with_an_empty_prediction(
     predictions: dict[str, ChangePrediction],
 ) -> None:
     """Every declared case has a real change; an empty prediction means the
-    adapter handed the engine two identical states."""
+    adapter handed the engine two identical states.
+
+    c028 is the one declared exception and is exempt by id, not by widening the
+    rule: its two states differ in bytes and agree in content, so "no changed
+    symbols" *is* its expectation (ADR-0043). Note what this costs — for c028
+    alone, a genuine adapter failure produces the same empty prediction as a
+    pass, because `_empty_change` emits exactly this shape when the engine
+    raises. `test_the_crlf_case_still_holds_the_bytes_it_measures` is what keeps
+    that from being silent: it asserts the two sides really do differ on disk.
+    """
     empty = sorted(
         case_id
         for case_id, item in predictions.items()
-        if not item.changed_symbols
+        if not item.changed_symbols and case_id != "c028"
     )
     assert empty == []
 

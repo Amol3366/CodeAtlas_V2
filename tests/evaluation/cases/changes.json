@@ -1099,6 +1099,127 @@
                                                "The Health section changed.",
                                                "The Health section was deleted."
                                            ]
+                  },
+                  {
+                      "id":  "c026",
+                      "repository_fixture":  "docs_config",
+                      "snapshot_id":  "docs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:toml-port",
+                      "expected_symbols":  [
+                                               "server.port"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "app.toml",
+                                                    "symbol":  "server.port",
+                                                    "start_line":  3,
+                                                    "end_line":  3,
+                                                    "evidence_id":  "c026-e1",
+                                                    "snapshot_id":  "docs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "server.port"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "CONFIG_VALUE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The server block changed.",
+                                               "The debug flag changed.",
+                                               "The host changed."
+                                           ]
+                  },
+                  {
+                      "id":  "c027",
+                      "repository_fixture":  "docs_config",
+                      "snapshot_id":  "docs-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:duplicate-key",
+                      "expected_symbols":  [
+                                               "cache.ttl"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "services/alpha.yaml",
+                                                    "symbol":  "cache.ttl",
+                                                    "start_line":  2,
+                                                    "end_line":  2,
+                                                    "evidence_id":  "c027-e1",
+                                                    "snapshot_id":  "docs-v1"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "cache.ttl"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "CONFIG_VALUE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The beta service configuration changed.",
+                                               "Two cache settings changed."
+                                           ]
+                  },
+                  {
+                      "id":  "c028",
+                      "repository_fixture":  "python_app",
+                      "snapshot_id":  "py-v1",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:crlf-only",
+                      "expected_symbols":  [
+
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+
+                                            ],
+                      "expected_changed_symbols":  [
+
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The capture method changed.",
+                                               "The PaymentService class changed.",
+                                               "The service module changed."
+                                           ]
                   }
               ]
 }

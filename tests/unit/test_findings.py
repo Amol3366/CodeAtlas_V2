@@ -1,4 +1,4 @@
-"""The finding rule table, pinned against all 24 declared change cases.
+"""The finding rule table, pinned against all 28 declared change cases.
 
 Finding precision is a release gate, so this file asserts set *equality*, not
 membership: a rule that fires one extra finding fails here. That is the point.
@@ -58,7 +58,11 @@ class Row:
     """One corpus case reduced to the inputs the rule table reads."""
 
     case_id: str
-    change: SymbolChange
+    # `None` means the case declares that *nothing* changed. c028 is the first:
+    # a file whose only difference is its line endings must reach the rule table
+    # with an empty change list, and any placeholder change here would assert
+    # the opposite of what the case exists to prove (ADR-0043).
+    change: SymbolChange | None = None
     edges: tuple[tuple[str, str, RelationKind], ...] = ()
     base_edges: tuple[tuple[str, str, RelationKind], ...] = ()
     route_edges: frozenset[tuple[str, str]] = frozenset()
@@ -250,6 +254,15 @@ ROWS: tuple[Row, ...] = (
             file_path="README.md",
         ),
     ),
+    # c026-c028 stay after c025 for the same positional reason.
+    # c026: one leaf of a nested TOML block. Exactly one finding, not one per
+    # ancestor -- the shape that emitted eight findings for one edit (ADR-0041).
+    Row("c026", _change("server.port", CONFIG, file_path="app.toml")),
+    # c027: a key name that exists in two files, one of them edited. Exactly one
+    # finding, not the 2N an ambiguous cross-file match produced (ADR-0042).
+    Row("c027", _change("cache.ttl", CONFIG, file_path="services/alpha.yaml")),
+    # c028: line endings are not a change, so nothing reaches the rule table.
+    Row("c028"),
 )
 
 
@@ -268,7 +281,7 @@ def _codes(drafts: tuple[FindingDraft, ...]) -> set[str]:
 
 def _run(row: Row) -> tuple[FindingDraft, ...]:
     return evaluate_findings(
-        [row.change],
+        [] if row.change is None else [row.change],
         files=row.files,
         base=_side(row.base_edges or row.edges, row.route_edges),
         target=_side(row.edges, row.route_edges),
