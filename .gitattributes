@@ -9,6 +9,18 @@
 # So: normalized in the repository, LF in the working tree, on every platform.
 * text=auto eol=lf
 
+# The one deliberate exception to the rule above, and the reason it is narrow.
+#
+# ADR-0043 records that a checkout whose line endings Git rewrote made preflight
+# call every line of every file changed while `git status` was empty. The corpus
+# could never see that defect precisely *because* of the `eol=lf` rule above:
+# both sides are LF, so there is nothing to disagree about. The c028 target is
+# therefore the only file in this repository allowed to keep CRLF bytes through
+# a checkout. Marking it `-text` — not `binary` — keeps it diffable.
+#
+# Do not "fix" the line endings of this file. Its bytes are the test.
+tests/evaluation/cases/variants/python_app/crlf-only/target/src/payments/service.py -text
+
 # Binary formats must never be touched.
 *.png binary
 *.jpg binary

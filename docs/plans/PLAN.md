@@ -81,6 +81,7 @@ with verification.
 | Unsigned packaged executable | **DEFERRED — not an engineering task.** SmartScreen warns on first run. Needs a purchased code-signing certificate | A certificate is purchased |
 | **Seven** Playwright tests skipped on Chromium, across **five** spec files | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all seven, so coverage is not lost. **Counted from the gate run on 2026-08-11, not copied forward:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings`, and `stream-reconnection` ×2. The seventh is ADR-0042's navigation test, which is skipped for the same reason as the reload test beside it. The figure understated itself twice before (corrected 2026-08-07 and 2026-08-10); it is re-counted here rather than incremented | The upstream bug is fixed |
 | Packaged semantic tree 1.05 GB | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted | A deterministic-only second artifact is wanted |
+| **The change corpus cannot express an ADR-0044-shaped defect** | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason | Someone gives the corpus a Git-backed change case, which is a new fixture shape rather than a new case |
 | Grow the symbol corpus toward 50 cases | **DEFERRED — multi-day.** 13+ cases, each needing gold ranges. Nothing is *wrong* today: ADR-0033 records that 0.98 is inexpressible at 27 cases and is documented at the constant | Someone commits the days |
 | `relation_path_recall` has no gate target | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023) | That design decision is settled |
 | RRF coarse-chunk bias | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit | The module-granularity ruling lands |
@@ -244,6 +245,109 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-14T21:30:00Z — WS-1 Task 3: three blind-spot cases, and one that cannot exist
+
+- Agent: Claude Code `claude-opus-5`, branch `corpus-blind-spot-cases`.
+- Transition: no phase task. Post-gate, second execution against
+  `docs/superpowers/plans/2026-08-14-post-closeout-program.md`.
+- Commit `a6dba3c`. **No `src/` change** — corpus and test-harness only.
+
+**Three of the four planned cases landed; the fourth cannot be written.**
+
+- **c026 — nested TOML leaf (ADR-0041).** One `port` edit in `app.toml`, one
+  `CONFIG_VALUE_CHANGED` expected. This is the shape that reported eight
+  findings for one edit on a real `pyproject.toml`.
+- **c027 — a key name in two files, one edited (ADR-0042).** `cache.ttl` in
+  `services/alpha.yaml` and `services/beta.yaml`. Only assertable because
+  Task 1 made `expected_findings` count.
+- **c028 — line endings are not a change (ADR-0043).** A `service.py` whose
+  only difference from its base is CRLF. Zero changed symbols expected.
+
+**3c (tracked-but-ignored, ADR-0044) is deliberately not added, because this
+corpus structurally cannot express it.** `predict_changes` compares two
+`DirectoryStateView`s (`engine_adapter.py:581`); ADR-0044's fix lives inside
+`GitBlobStateView`, and no evaluation path constructs a Git repository at all.
+Both directory sides have applied the same ignore rules since Phase 4, so a
+file committed under `dist/` is absent from *both* states and the case would
+assert nothing — it would pass on the first run, pass with the fix reverted,
+and read in the register as coverage that does not exist. Recorded as a
+register row instead. **ADR-0044's own integration tests remain its coverage.**
+
+**All three passed on the first run, so all three were mutation-checked.**
+Reverted from a file copy each time, never `git checkout --`:
+
+| Case | Mutation | Result with the fix removed |
+| --- | --- | --- |
+| c026 | leaf inherits the parent block's value (pre-ADR-0041) | `server.debug`, `server.host`, `server.port` changed; **3** findings |
+| c027 | same-file pairing disabled (pre-ADR-0042) | `cache.ttl` **×4**; **2** findings — the `2N` shape |
+| c028 | `normalize_line_endings` returns input (pre-ADR-0043) | `PaymentService.__init__` and `PaymentService.capture` reported changed |
+
+`grep -rc MUTATION src/` is 0 and `git status src/` is empty; every mutation
+was restored before the gates ran.
+
+**Two of the plan's premises were stale, the same shape as Task 2's.** Task 2
+found c013 already edits a document; here, **3a's premise was wrong twice
+over** — c012 already edits a nested YAML leaf, *and* has asserted its count
+since Task 1. c026 was therefore retargeted to `app.toml`, which no case
+touched and which takes ADR-0041's *parsed-value* path rather than YAML's
+subtree-text path. **c028's first draft was also wrong**: written against
+`README.md`, it passed with the mutation applied, because a Markdown section's
+hash is taken over parsed text and line endings dissolve before the diff ever
+sees them. It only bites on a code file. **The failed mutation is what caught
+that** — the case would otherwise have been committed as permanent green.
+
+**Three existing guards had to be exempted, narrowly, rather than widened:**
+
+1. `test_every_corpus_file_has_lf_endings_in_the_working_tree` forbids CRLF
+   anywhere in the corpus — **which is precisely why ADR-0043 was invisible
+   here.** One declared path is now skipped, and the exemption is backed by a
+   *positive* test (`test_the_crlf_case_still_holds_the_bytes_it_measures`)
+   asserting the two sides still differ in bytes and agree once normalized. An
+   exemption with nothing asserting the bytes is how c028 would quietly stop
+   measuring. Its message also no longer recommends `git checkout --`.
+2. `test_no_case_is_answered_with_an_empty_prediction` — c028 exempt by id.
+   **Cost stated in the docstring:** for c028 alone, a genuine adapter failure
+   now looks identical to a pass, since `_empty_change` emits the same shape.
+   The bytes test above is the mitigation.
+3. `Row.change` in `test_findings.py` became optional. A placeholder change
+   would have asserted the opposite of what c028 exists to prove.
+
+`.gitattributes` gained one `-text` line for the c028 target.
+`git ls-files --eol` confirms `i/crlf w/crlf`, so the bytes survive a fresh
+clone — the failure mode ADR-0022 recorded.
+
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`; `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`, `CHUNKER_VERSION` all
+  unchanged, so **no snapshot is stale.** No new dependency. Corpus is now
+  **28 change cases / 40 query cases**.
+- **Baselines moved for arithmetic, not engine reasons, and must not be quoted
+  as improvement.** Three cases scoring perfectly widen every denominator:
+  `changed_symbol_precision` 0.9400 → 0.9464, `containing_evidence_rate`
+  0.6860 → 0.6932, `containing_evidence_recall_at_10` 0.8333 → 0.8387,
+  `exact_evidence_rate` / `valid_evidence_rate` 0.5814 → 0.5909,
+  `primary_evidence_recall_at_10` 0.7667 → 0.7742. `changed_symbol_precision`
+  remains **below its 0.95 target** — the accepted structural miss, moved
+  toward the target by denominator growth and not by any engine change.
+  Phase-0 and phase-3 changed only where the case count appears.
+- Verification, exit codes read from the process: `uv run pytest -q` **2212
+  passed, 3 skipped**; `ruff check src tests scripts apps` exit 0; `mypy
+  --no-incremental src tests scripts apps` clean on 350 files;
+  `check_phase4.ps1 -SkipSync` exit 0 (dataset validation reported 28 change
+  cases); `check_phase7.ps1 -SkipSync` exit 0 with 15 Playwright passed and
+  **7 skipped on Chromium**, matching the register's re-counted figure.
+  **That last exit code is still inferred**: the script has no explicit
+  `exit 0`, so it reports whatever its final native command left, and its
+  final three steps were skips. Unchanged here deliberately — it is its own
+  register row with its own test requirement, and folding it in would be the
+  unrelated scope Section 4.5 forbids.
+- Limitations: `.test-tmp` was cleared by hand before each gate. The lockfile
+  the register asks for is still not written, so the rule that produced four
+  void runs in two days is still only a rule.
+- Next: **WS-1 Task 4** — ~13 more `EXACT_SYMBOL` cases toward 50, spread
+  across Python/TS/JS. Watch the Task 4 threshold rule: if
+  `exact_symbol_resolution` drops below 0.98 at the wider denominator,
+  **stop and report** rather than adjusting anything (ADR-0033).
 
 ### 2026-08-14T17:00:00Z — WS-0 and the first two corpus tasks
 

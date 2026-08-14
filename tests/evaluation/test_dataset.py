@@ -9,6 +9,12 @@ import pytest
 
 from codeatlas.evaluation.dataset import DatasetError, load_dataset
 
+# The single corpus file allowed to hold CRLF in the working tree, matched by
+# `.gitattributes`. c028 exists to prove that line endings alone are not a
+# change (ADR-0043), which the LF guard below would otherwise make unwritable —
+# and that guard is precisely why the corpus could never see the defect.
+CRLF_CASE_TARGET = "variants/python_app/crlf-only/target/src/payments/service.py"
+
 DATASET_ROOT = Path("tests/evaluation/cases")
 
 
@@ -17,9 +23,9 @@ def test_shipped_dataset_has_declared_phase_zero_cardinality() -> None:
 
     assert len(dataset.fixtures) == 6
     assert len(dataset.query_cases) == 40
-    assert len(dataset.change_cases) == 25
+    assert len(dataset.change_cases) == 28
     assert len({case.id for case in dataset.query_cases}) == 40
-    assert len({case.id for case in dataset.change_cases}) == 25
+    assert len({case.id for case in dataset.change_cases}) == 28
 
 
 def test_shipped_dataset_evidence_resolves_inside_fixture_roots() -> None:
@@ -239,11 +245,40 @@ def test_every_corpus_file_has_lf_endings_in_the_working_tree(root: Path) -> Non
     for path in sorted(root.rglob("*")):
         if not path.is_file() or "__pycache__" in path.parts:
             continue
+        if path.as_posix().endswith(CRLF_CASE_TARGET):
+            continue
         data = path.read_bytes()
         if b"\r\n" in data:
             offenders.append(str(path))
 
     assert offenders == [], (
         "CRLF found in corpus files; the evaluation reads these bytes directly. "
-        "Restore them with `git checkout -- <path>` so .gitattributes applies."
+        "Restore them from a copy of the file, and note that `git checkout --` "
+        "has twice reverted a fix along with the thing it was meant to undo "
+        "(ADR-0022, ADR-0042)."
+    )
+
+
+def test_the_crlf_case_still_holds_the_bytes_it_measures() -> None:
+    """c028's target must keep CRLF, or the case silently stops asserting.
+
+    This is the positive half of the exemption above. The guard cannot tell
+    "deliberately CRLF" from "accidentally CRLF", so the one exempt path is
+    pinned here instead: it must differ from the base in raw bytes and agree
+    with it once normalized. If someone "tidies" the line endings, c028 keeps
+    passing while measuring nothing — and a case that cannot fail is the exact
+    thing WS-1 exists to stop adding.
+    """
+    root = Path("tests/evaluation/cases")
+    target = (root / "variants/python_app/crlf-only/target/src/payments/service.py")
+    base = root / "fixtures/python_app/src/payments/service.py"
+
+    target_bytes = target.read_bytes()
+    base_bytes = base.read_bytes()
+
+    assert b"\r\n" in target_bytes, "c028's target no longer holds CRLF"
+    assert b"\r\n" not in base_bytes, "c028's base must stay LF"
+    assert target_bytes != base_bytes
+    assert target_bytes.replace(b"\r\n", b"\n") == base_bytes, (
+        "c028 must differ from its base in line endings and nothing else"
     )
