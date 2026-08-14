@@ -1489,6 +1489,58 @@ minutes to redo.
       document case existed. Both corrected on reasoning rather than on a number
       moving, which is the ADR-0003 line.
 
+- [x] **Three blind-spot corpus cases, and one that cannot be written (WS-1
+      Task 3), 2026-08-14.** Commit `a6dba3c`. Corpus is now **28 change cases
+      / 40 query cases**. No `src/` change; no version bump, so no snapshot is
+      stale.
+
+      **c026** pins ADR-0041 (one nested TOML leaf edit, one finding),
+      **c027** pins ADR-0042 (a key name in two files, one finding not four),
+      **c028** pins ADR-0043 (a CRLF-only difference is not a change).
+
+      **The one that cannot be written is the lesson.** 3c wanted a
+      tracked-but-ignored file (ADR-0044), and the corpus **structurally cannot
+      express it**: `predict_changes` compares two `DirectoryStateView`s
+      (`engine_adapter.py:581`) and never builds a Git repository, while
+      ADR-0044's fix lives in `GitBlobStateView`. Both directory sides already
+      apply the same ignore rules, so the case would pass with the fix
+      **reverted**. Recorded as a register row rather than committed — because
+      a case that always passes reads as coverage and is worse than no case.
+      **Check what the harness can actually distinguish before writing a case
+      for it.**
+
+      **Every case passed on its first run, so every case was mutation-checked**
+      — and that is what caught a bad one. c028's first draft used a Markdown
+      file and **passed with the mutation applied**: a section's hash comes from
+      parsed text, so line endings dissolve before the diff sees them. It only
+      bites on a code file. Without the mutation check it would have been
+      committed as permanent green.
+
+      **The plan's premises were stale again, twice.** Same shape as Task 2's
+      "no case edits a document". 3a's target already existed — c012 edits a
+      nested YAML leaf and has counted since Task 1 — so c026 moved to
+      `app.toml`, which nothing touched and which takes ADR-0041's
+      *parsed-value* path instead of YAML's subtree-text path. **Assume the
+      next stated gap is already half-covered and check first.**
+
+      **Three guards had to be exempted, and the first one is why the defect
+      was invisible.** `test_every_corpus_file_has_lf_endings_in_the_working_tree`
+      forbids CRLF anywhere in the corpus — so ADR-0043 could never have a case.
+      One declared path is now skipped, `.gitattributes` holds its bytes with
+      `-text` (`git ls-files --eol` shows `i/crlf w/crlf`), and a **positive**
+      test asserts the two sides still differ in bytes and agree normalized.
+      An exemption with nothing asserting the bytes is how a case silently stops
+      measuring. Also exempted: the empty-prediction guard (c028 by id, with the
+      cost written down — a real adapter failure now looks like a pass for that
+      one case), and `Row.change`, which became optional so a case can declare
+      that *nothing* changed without a placeholder asserting the opposite.
+
+      **Baselines moved for arithmetic and must not be quoted as improvement.**
+      Three perfect-scoring cases widen every denominator:
+      `changed_symbol_precision` 0.9400 → 0.9464 — still under its 0.95 target,
+      still the accepted structural miss — `containing_evidence_rate` 0.6860 →
+      0.6932, `primary_evidence_recall_at_10` 0.7667 → 0.7742.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

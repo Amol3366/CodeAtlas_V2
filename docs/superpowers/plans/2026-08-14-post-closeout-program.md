@@ -57,11 +57,36 @@ Both are product questions. Neither has a technically-correct answer, and each d
 | WS-0 | **done** — `5f255b8`, `860c726` |
 | WS-1 Task 1 (`expected_findings` counts) | **done** — `fc7af34`, merged `7f834c0` |
 | WS-1 Task 2 (document-section case c025) | **done** — `f28a300`, merged `06bcff2` |
-| WS-1 Task 3 (four blind-spot cases) | **next** |
-| WS-1 Tasks 4–5, WS-2 … WS-6 | not started |
+| WS-1 Task 3 (blind-spot cases) | **done** — `a6dba3c`. Three of four; 3c is inexpressible, see below |
+| WS-1 Task 4 (symbol cases toward 50) | **next** |
+| WS-1 Task 5, WS-2 … WS-6 | not started |
 
-`main` is at `06bcff2`, pushed, working tree clean, no branch outstanding. The
-corpus is **25 change cases / 40 query cases**.
+The corpus is **28 change cases / 40 query cases**.
+
+### What Task 3 changed about the plan
+
+**3c cannot be written and was not.** `predict_changes` compares two
+`DirectoryStateView`s (`engine_adapter.py:581`); ADR-0044's fix is inside
+`GitBlobStateView`, which the corpus never constructs. Both directory sides
+already apply the same ignore rules, so a tracked-but-ignored file is absent
+from both states and the case would pass with the fix reverted. It is a
+register row now, not a case. **Expressing it needs a Git-backed fixture
+shape, which is a WS of its own, not a case.**
+
+**Two more stale premises, so assume the next one is stale too.** 3a's target
+already existed (c012 edits a nested YAML leaf and has counted since Task 1),
+so c026 was retargeted to `app.toml` — untouched by any case, and on
+ADR-0041's parsed-value path rather than YAML's subtree-text path. And 3d's
+first draft used a Markdown file, where line endings dissolve into the parsed
+section text before the diff sees them; it only bites on a code file. **The
+mutation check caught that**, which is the argument for mutation-checking
+every case that passes first time.
+
+**Budget was accurate**: half a day, driven by the guard exemptions rather
+than the counts. The nine hardcoded counts were found in one `grep` pass as
+planned. Three *guards* then needed narrow exemptions — the corpus LF check,
+the empty-prediction check, and `Row.change` — none of which the plan
+anticipated, and each of which had to keep its value rather than be widened.
 
 ### What Task 2 changed about the plan
 
@@ -183,11 +208,11 @@ The gap that let the 2026-08-13 false report go unnoticed for a day: **no change
 
 One case per class of defect that escaped. Each is small; together they are the return on this whole workstream.
 
-- [ ] **3a — nested configuration keys (ADR-0041).** Edit one leaf of a nested TOML/YAML block; assert exactly one `CONFIG_VALUE_CHANGED`, not one per ancestor. This is the case whose absence hid an 8-findings-for-one-edit defect.
-- [ ] **3b — a duplicate-prone name across files (ADR-0042).** The same config key name in two files, one edited; assert one finding, not four. Depends on Task 1 to be assertable at all.
-- [ ] **3c — a tracked-but-ignored file (ADR-0044).** A file committed under `dist/` and a tracked binary; assert **no** `SYMBOL_DELETED` on an otherwise-clean comparison. Note the fixture must be genuinely tracked in the variant tree for this to mean anything.
-- [ ] **3d — CRLF (ADR-0043).** A file whose only difference is line endings; assert no findings. **The repository `.gitattributes` pins `eol=lf`**, which is why the corpus could never see this — the case must therefore construct its bytes explicitly rather than relying on what Git checks out, the same technique `tests/integration/test_state_views.py::_commit_lf_file` uses.
-- [ ] **Step 4:** After each, run the dataset validator and `pytest tests/evaluation -q`. Regenerate the baseline once at the end of 3a–3d, not four times.
+- [x] **3a — nested configuration keys (ADR-0041).** Landed as **c026**, on `app.toml` rather than YAML: c012 already covered the YAML leaf and has asserted its count since Task 1. TOML takes ADR-0041's parsed-value path, which nothing else exercised.
+- [x] **3b — a duplicate-prone name across files (ADR-0042).** Landed as **c027**. `cache.ttl` in two files, one edited. Mutation confirms the `2N` shape: four occurrences, two findings.
+- [x] ~~**3c — a tracked-but-ignored file (ADR-0044).**~~ **Not written — structurally inexpressible**, and deliberately not committed as a case that always passes. The corpus compares two `DirectoryStateView`s; ADR-0044's fix is in `GitBlobStateView`, which no evaluation path builds. Now a Deferred Register row.
+- [x] **3d — CRLF (ADR-0043).** Landed as **c028**, on a **code** file. A Markdown target does not work: a section's hash comes from parsed text, so line endings never reach the diff. Bytes written explicitly and held through checkout by one `-text` line in `.gitattributes`, backed by a test that they still differ.
+- [x] **Step 4:** Dataset validator reports `status: valid`, 28 change cases. Baseline regenerated once, at the end.
 
 ### Task 4: Grow the symbol cases toward 50
 
