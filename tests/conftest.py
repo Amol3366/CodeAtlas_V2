@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
@@ -35,6 +39,92 @@ def _is_installed(module: str) -> bool:
 collect_ignore_glob: list[str] = []
 if not _is_installed("sentence_transformers"):
     collect_ignore_glob.append("semantic/*")
+
+
+# --- Per-session temporary directories ---------------------------------------
+#
+# `--basetemp` was pinned to `.test-tmp` in `pyproject.toml`, and pytest deletes
+# the directory it is given the moment the first `tmp_path` is requested -- the
+# directory itself, not a numbered subdirectory of it. Two runs therefore wiped
+# each other's live files, which is why "never run two gates at once" had to be
+# a written rule and why four runs in two days were void rather than red.
+#
+# The root stays repository-local deliberately: `development-windows.md` records
+# that a locked-down Windows account may be unable to write the system temp
+# directory. Only the leaf is per-session.
+TEST_TMP_ROOT = Path(".test-tmp")
+_SESSION_RETENTION = timedelta(hours=24)
+
+
+def _prune_old_sessions(root: Path) -> None:
+    """Delete session directories left behind by earlier runs.
+
+    Age-based, not count-based, and never ownership-based: a live session's
+    directory must never be removed, and a pid is a slot the OS reassigns
+    (ADR-0037), so "is another pytest still using this?" has no reliable answer.
+    A generous retention buys that safety cheaply -- these are temporary files
+    on a developer's disk, not a resource under pressure.
+
+    Every failure is ignored. A directory another process holds open is not a
+    reason to fail the run that was only tidying up; that would trade the defect
+    being fixed for a new one of the same shape.
+    """
+    cutoff = (datetime.now(UTC) - _SESSION_RETENTION).timestamp()
+    for candidate in root.glob("s-*"):
+        try:
+            if candidate.is_dir() and candidate.stat().st_mtime < cutoff:
+                shutil.rmtree(candidate, ignore_errors=True)
+        except OSError:
+            continue
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config: pytest.Config) -> None:
+    """Give this session its own basetemp under the shared root.
+
+    `tryfirst` is load-bearing: pytest's own `tmpdir` plugin reads `basetemp` in
+    its `pytest_configure`, so this has to win the race to set it.
+
+    An explicit `--basetemp` is honoured untouched -- passing one is how you ask
+    to inspect a specific run's files, and overriding that would take away a
+    debugging tool to fix a concurrency bug.
+
+    The suffix is a uuid rather than a timestamp because Windows clock
+    granularity is coarse enough that four processes launched together observed
+    the *same* `time.time_ns()`; only the pid differed, and pids are reused.
+    """
+    if config.option.basetemp is not None:
+        return
+    TEST_TMP_ROOT.mkdir(parents=True, exist_ok=True)
+    _prune_old_sessions(TEST_TMP_ROOT)
+    config.option.basetemp = str(
+        TEST_TMP_ROOT / f"s-{os.getpid()}-{uuid4().hex[:8]}"
+    )
+
+
+# The two helpers above are reached by `tests/unit/test_temporary_directories.py`
+# through fixtures rather than by importing this module. Importing it makes mypy
+# see this file under both `conftest` and `tests.conftest` and refuse the whole
+# run -- the same collision the `collect_ignore_glob` comment above records for a
+# second conftest module, arriving by a different route.
+
+
+@pytest.fixture()
+def session_tmp_root() -> Path:
+    """The repository-local root every session's directory is created under."""
+    return TEST_TMP_ROOT
+
+
+@pytest.fixture()
+def prune_sessions() -> Callable[[Path], None]:
+    """The age-based pruner, for tests that need to drive it directly."""
+    return _prune_old_sessions
+
+
+@pytest.fixture()
+def assign_session_basetemp() -> Callable[[Any], None]:
+    """The `pytest_configure` hook, callable against a stub config."""
+    return pytest_configure
 
 
 @pytest.fixture(scope="session")

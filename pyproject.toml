@@ -59,7 +59,7 @@ packages = ["src/codeatlas"]
 "src/codeatlas/storage/sqlite/migrations" = "codeatlas/storage/sqlite/migrations"
 
 [tool.pytest.ini_options]
-addopts = "-ra -p no:cacheprovider --basetemp=.test-tmp"
+addopts = "-ra -p no:cacheprovider"
 pythonpath = ["src", "."]
 testpaths = ["tests"]
 norecursedirs = [
