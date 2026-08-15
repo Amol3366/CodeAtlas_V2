@@ -1,0 +1,21 @@
+# This fixture's two sides are `base/` and `target/`, and those names are not
+# cosmetic: `_resolve_side` treats the literal refs `base` and `target` as
+# selecting that subdirectory as the state root, which is how c020-c023 compare
+# the two sides.
+#
+# `target/` is also a build-output ignore default (Rust, Maven), so for *query*
+# cases -- which index the fixture root rather than one side -- half this
+# fixture was invisible. q034 asks "where is `process` in the target tree?" and
+# could only ever be answered from `base/`, because `target/processor.py` was
+# excluded from every index. Its recall was structurally 0 and always had been.
+#
+# Re-included here rather than by renaming the directory, which would break the
+# ref grammar above, and rather than marking the cases unmeasured, which would
+# make ADR-0024's honest "the adapter declined to run this" signal mean two
+# things. `.codeatlasignore` is compiled with `overrides=True`, so this beats
+# the builtin default; the default itself is untouched and still applies to
+# every other repository.
+#
+# Change cases are unaffected: they select `base/` or `target/` as the state
+# root, so this file sits above them and is never read for them.
+!target/
