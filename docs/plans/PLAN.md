@@ -86,7 +86,11 @@ with verification.
 | **The new symbol cases are not ranking-sensitive** | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage | Someone adds cases whose answer sets are large enough for order to matter |
 | `relation_path_recall` has no gate target                                                | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
 | RRF coarse-chunk bias | **DEFERRED — reframed 2026-08-15 by ADR-0046.** Its stated trigger ("the module-granularity ruling lands") is now satisfied, and the ruling was **not** to implement the penalty. So this is no longer "fix the bias" but **"measure whether it costs anything"** at the larger corpus. ADR-0030's finding stands: the obvious lever demotes the chunk currently providing a rank-1 containment hit | Someone measures it corpus-wide |
-| Phase 4`containing_evidence_rate` **0.6885** and `containing_evidence_recall_at_10` **0.8824** (values refreshed 2026-08-15; they read 0.6667 and 0.8305 when this row was written) | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Someone investigates per-case                                                                                                                                               |
+| ~~Phase 4 `containing_evidence_rate` and `containing_evidence_recall_at_10`~~ | **INVESTIGATED 2026-08-15, RULED 2026-08-16 — superseded by the four rows below.** The per-case run found the recall shortfall is **exactly 10 of 85 cases scoring 0.00** while the other 75 score 1.00, from **two unrelated causes** — and that the rate metric's 1.00 target is unreachable while the engine obeys ADR-0020. Each cause is now its own row with its own ruling | — |
+| **Ruling 1 — graph evidence is the reference site** | **RULED 2026-08-16, not yet implemented. An absent decision, not a faulty instrument**: nobody ever ruled what a graph answer should cite, and the corpus and engine were each internally consistent. The claim is "X calls Y" and the **call site** proves it; a definition range cites more than the claim needs, which `AGENTS.md` §4.1 forbids. **`_contains` is correct and is not to be loosened** — loosening it would be the "move a number" move in disguise. The majority argument is struck, and the ADR-0031 parallel is not to be leaned on: there the engine *could not* produce the expectation, here it could and chose not to | ADR-0047 lands with q003, q006, q007, q013, q016, q017, q026, q032 corrected |
+| **Ruling 2 — q034/q035: re-include `target/` in the fixture** | **RULED 2026-08-16, not yet implemented. A faulty instrument.** `target/` is a build-output ignore default, so the declared evidence file can never be indexed. **Rename refused** (breaks the `base`/`target` ref grammar); **`measured=False` refused** (ADR-0024 marks cases the adapter declined to run, and it runs these fine). Fixed by a fixture-local `.codeatlasignore` containing `!target/` — verified: `.codeatlasignore` compiles with `overrides=True` (`ignore_rules.py:124`) and `!` negation is supported (`:170`). **This moves a number (0.8824 → ≈0.9059) and the ADR must say so**; the justification is that the collision is accidental and the case always meant to measure the target tree | Confirmed that change cases, which select `target/` as the state root, are unaffected |
+| **Ruling 3 — `containing_evidence_rate` is ungated** | **RULED 2026-08-16, not yet implemented. ADR-0038 applied literally.** It is precision over every emitted evidence item; crediting all ten zero-recall cases reaches only **0.8115**, leaving 23 items that are correct supporting evidence the corpus never declared. **ADR-0020 requires emitting every supporting edge**, so 1.00 punishes compliance. Keep reporting the value, remove the gate, add recall beside it — **retaining the number matters**, or every historical baseline quietly changes meaning. The 0.8115 ceiling calculation belongs in the ADR body | ADR-0048 lands, last among the code changes |
+| **Ruling 4 — the ADR-0036 validator checks evidence files are indexed** | **RULED 2026-08-16, not yet implemented.** "Exists on disk" would **not** have caught Finding B — `processor.py` exists. The validator must assert every expected evidence file is **indexed in the fixture's active snapshot**. Lands *before* the Ruling 2 fix on purpose: it should go red on exactly q034 and q035 the day it arrives, because a validator that passes on the day it lands has proven nothing | It goes red on those two, then green after Ruling 2 |
 | **A tracked file that matches an ignore default is reported deleted**                | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | —                                                                                                                                                                          |
 | ~~Editing a large Markdown file reports hundreds of its sections as deleted~~             | **CLOSED 2026-08-13 — not a defect. The engine was right and the measurement was wrong**, which is the **sixth** consecutive investigation of this shape to end that way (ADR-0017, 0018, 0024, 0027, 0038). The 12-minute analysis ran over a **live working tree while the same session rewrote `PLAN.md`** with `Path.write_text`, which truncates before it writes; the read landed in that window and saw an empty file. Proven by exact reproduction: an empty target yields **496 `SYMBOL_DELETED`** against the artifact's **496** for that file, a truncated one yields 491+1, and the real edited bytes yield **2 findings and zero deletions**. Eliminated on the way, and they should stay eliminated: text decoding (the mojibake was the terminal — the JSON holds `—` intact), symbol pairing with matching *and* mismatched `file_id`s, parse divergence (both views: 497 symbols, same ids, zero diagnostics), scale (50/200/497 sections all correct), and the real `GitBlobStateView`-vs-`DirectoryStateView` pairing. Three regression tests kept in `tests/unit/test_document_section_diff.py`, one of which pins the truncation shape so the next wall of deletions is diagnosable in a single run. Full account: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` | —                                                                                                                                                                          |
 | ~~**`check_phase7.ps1` can exit non-zero while reporting success**~~                    | **CLOSED 2026-08-15, with the diagnosis corrected.** The recorded mechanism — "the process exit code is whatever the last native command left" — **does not reproduce.** Under `powershell -File` a trailing `cmd /c "exit 3"` still exits **0**, so the success path was never leaking; and a failing step already exited non-zero, because `Invoke-Checked` throws under `$ErrorActionPreference = "Stop"`. The real exposure is one invocation-form narrower: a **caller** that reads `$LASTEXITCODE` after invoking a gate sees the stale code, measured at **3** through a wrapper `.ps1`. Worth fixing anyway — a release gate should state its verdict rather than leave it to how it was called. **All eight** gate scripts lacked the line, not just Phase 7; all eight now end `exit 0`, guarded with no exemption list. The risk that this masks a red gate is covered twice: a dynamic test asserting a throwing step still exits 1 with `exit 0` below it, and a deliberate breakage of the real Phase 4 gate, which exited **1** naming `Dataset validation failed with exit code 2`                                                                                                                                                                                                             | —                                                                                                                                                                          |
@@ -247,6 +251,117 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-16T00:00:00Z — WS-4: four rulings recorded, no implementation
+
+- Agent: Claude Code `claude-opus-5`, branch `record-ws4-rulings`.
+- Transition: no phase task. Post-gate. **Rulings only — no code, no corpus
+  change, no metric change.** Recorded before any implementation so that every
+  later ADR cites the decision rather than restating it.
+- Rulings given by the user 2026-08-16, on the per-case investigation in the
+  2026-08-15T12:00:00Z handoff.
+
+**First, a correction to how that investigation framed itself.** It said "the
+standing prior held for an eighth time: the instrument is wrong, not the
+engine." **That is right for Finding B and wrong for Finding A**, and the
+conflation matters:
+
+| Finding | What it actually is |
+| --- | --- |
+| A — graph evidence convention | **An absent decision.** Nobody ever ruled what evidence a graph answer should cite. The corpus and the engine were each internally consistent the whole time |
+| B — `target/` ignore collision | **A faulty instrument.** The fixture declares evidence in a file no index can contain |
+
+These need different fixes, and from here **every finding states which of the
+two it is.** A prior confirmed eight times starts being applied as a reflex,
+and a reflex is how a real engine defect eventually gets waved past.
+
+---
+
+**Ruling 1 — graph evidence is the reference site, not the definition range.**
+
+The reason is the **evidence contract**, not the fact that more cases use it.
+For a graph intent the claim is "X calls Y", and what proves that claim is the
+**call site**. Citing Y's whole definition cites more than the claim needs, and
+`AGENTS.md` §4.1 requires evidence to *support* the claim rather than surround
+it. ADR-0020 already leans this way by requiring every supporting edge — an
+edge's evidence is a reference site by nature.
+
+**The majority argument is struck.** A convention is not correct because more
+cases follow it.
+
+**`_contains` is correct and is not to be loosened.** Its directionality and its
+docstring stand. The eight gold ranges are corrected; the comparator is left
+alone. Loosening it to accept overlap would be the "move a number" move wearing
+a disguise.
+
+**The ADR-0031 parallel is not to be leaned on.** ADR-0031 corrected
+expectations naming something the engine *could not produce*. Here the engine
+*could* emit a definition range for a graph answer and chooses not to. That is
+the difference between a broken instrument and a missing product decision, and
+ADR-0047 must say so.
+
+**Ruling 2 — q034/q035 are fixed by re-including `target/` in that fixture.**
+Neither renamed nor marked unmeasured.
+
+- **Rename is refused**: it breaks the `base`/`target` ref grammar that
+  `_resolve_side` depends on.
+- **`measured=False` is refused**: ADR-0024 marks cases the adapter *declined to
+  run*, and the adapter runs q034/q035 fine — it just answers from `base/`.
+  Borrowing that flag for "the fixture is misconfigured" would make an honest
+  signal mean two things.
+
+The fifth option is a fixture-local negation. **Verified before recording:**
+`IgnoreRules.load` compiles `.codeatlasignore` with `overrides=True`
+(`ignore_rules.py:124`) and supports `!` negation (`:170`), read from the state
+root — so `!target/` at the fixture root re-includes it and beats the builtin.
+No rename, no grammar break, no engine change, no change to the defaults.
+
+**To confirm before committing, not assume:** change cases select
+`git_changes/target/` as the state *root*, so a `.codeatlasignore` at
+`git_changes/` should not be read for them and they should stay unaffected.
+
+**This moves a number (0.8824 → ≈0.9059) and the ADR must say so plainly.** The
+justification is that `target/` was chosen for the ref grammar and collides with
+a build-output default *by accident*; restoring what the case always meant to
+measure is legitimate. Stated any other way it reads as tuning.
+
+**Ruling 3 — `containing_evidence_rate` is ungated. ADR-0038 applied
+literally.**
+
+A precision metric that cannot reach its target while the engine obeys ADR-0020
+is a metric punishing compliance. Keep reporting the value, remove its gate, add
+recall beside it. **Retaining the number matters**: dropping it would quietly
+change the meaning of every historical baseline.
+
+**The 0.8115 ceiling calculation belongs in the ADR body**, not only in a
+handoff entry — that computation is the whole argument.
+
+**Ruling 4 — ADR-0036's validator is extended, and must check the right thing.**
+
+"Exists on disk" would **not** have caught Finding B: `processor.py` exists. The
+validator must assert every expected evidence file **is indexed in the fixture's
+active snapshot**. That is the check with teeth, and it closes the class by
+construction.
+
+---
+
+**Sequencing, which matters more than any single ruling.** Fixing B alone turns
+the gate green while the eight-case convention split stays open. **Ruling 1 is
+implemented first**; B lands after it or in the same change. A gate that goes
+green for the smaller, duller reason is how the interesting finding gets buried.
+Ruling 3 goes last among the code changes, so the green is attributable to
+correcting causes rather than to relaxing a threshold.
+
+The validator (Ruling 4) lands **before** the fixture fix, deliberately: it
+should go red on exactly q034 and q035 the day it arrives. A validator that
+passes on the day it lands has proven nothing.
+
+- Contracts/migrations: none. **Nothing was implemented in this entry.**
+- Next: ADR-0047 and the eight corrected expectations (q003, q006, q007, q013,
+  q016, q017, q026, q032). Expect `containing_evidence_recall_at_10` ≈ 0.9765
+  and **stop to check that it matches** — if it does not, the model of the
+  failure is wrong and everything downstream is suspect.
+
 
 ### 2026-08-15T12:00:00Z — WS-4: both evidence metrics investigated per case; a ruling is needed
 
