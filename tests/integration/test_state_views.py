@@ -17,7 +17,6 @@ from codeatlas.analysis.states import (
     GitBlobStateView,
     SnapshotStateView,
 )
-from codeatlas.domain.errors import ScanLimitExceededError
 from codeatlas.domain.repository import (
     FileClassification,
     FileRecord,
@@ -504,25 +503,87 @@ def test_a_tracked_binary_file_is_absent_from_the_blob_view(git_repo: Path) -> N
 
 
 @requires_git
-def test_a_tracked_file_over_the_size_limit_fails_the_whole_comparison(
+def test_a_tracked_file_over_the_size_limit_is_skipped_not_refused(
     git_repo: Path,
 ) -> None:
-    """Pins today's behaviour, which is **not** what this ADR chose for the
-    other two mechanisms, and is recorded in the Deferred Register rather than
-    changed here.
+    """The fourth of ADR-0044's exclusion mechanisms, now aligned (ADR-0045).
 
-    The directory scan *skips* an oversized file with a `TOO_LARGE` warning.
-    The blob side raises, so a repository holding one tracked file above the
-    limit cannot be preflighted at all. Turning that refusal into a skip is a
-    change to a declared error path and deserves its own ruling; this test
-    exists so the asymmetry cannot be altered silently in either direction.
+    This assertion is the **inverse** of the one it replaces. That test pinned
+    the refusal deliberately, so the asymmetry could not be altered silently in
+    either direction, and recorded that turning it into a skip needed its own
+    ruling. The ruling was given on 2026-08-15: skip it like the scanner does,
+    and declare the omission.
+
+    One committed 3 MB CSV previously made a repository impossible to preflight
+    at all, while the directory scan merely skipped the same file.
     """
     oversized = "x" * (ScanLimits().max_file_bytes + 1) + "\n"
     (git_repo / "big.csv").write_bytes(oversized.encode("utf-8"))
     _commit_path(git_repo, "big.csv")
 
-    with pytest.raises(ScanLimitExceededError):
-        GitBlobStateView(git_repo, "HEAD").list_files()
+    files = GitBlobStateView(git_repo, "HEAD").list_files()
+
+    assert "big.csv" not in {file.relative_path for file in files}
+    assert files, "the rest of the tree must still be listed"
+
+
+@requires_git
+def test_an_oversized_tracked_file_is_declared_rather_than_dropped_in_silence(
+    git_repo: Path,
+) -> None:
+    """The half of the ruling that keeps the skip honest.
+
+    "Skip it" on its own trades a loud failure for a silent omission, which for
+    a change-assurance tool is the worse defect. The exclusion is therefore
+    reported, and the engine turns it into a limitation.
+    """
+    oversized = "x" * (ScanLimits().max_file_bytes + 1) + "\n"
+    (git_repo / "big.csv").write_bytes(oversized.encode("utf-8"))
+    _commit_path(git_repo, "big.csv")
+
+    view = GitBlobStateView(git_repo, "HEAD")
+    view.list_files()
+
+    excluded = {item.relative_path: item.reason_code for item in view.excluded_files()}
+    assert excluded == {"big.csv": "TOO_LARGE"}
+
+
+def test_the_directory_view_declares_its_own_oversized_skips(
+    tmp_path: Path,
+) -> None:
+    """Both sides report, or the comparison still has a silent half.
+
+    The scanner has skipped oversized files with a `TOO_LARGE` reason since
+    Phase 1, but nothing carried that into a change report -- so before
+    ADR-0045 an oversized file was invisible on *both* sides, one loudly and
+    one quietly.
+    """
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "small.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (root / "big.csv").write_bytes(
+        ("x" * (ScanLimits().max_file_bytes + 1) + "\n").encode("utf-8")
+    )
+
+    view = DirectoryStateView(root)
+    paths = {file.relative_path for file in view.list_files()}
+
+    assert "big.csv" not in paths
+    assert "small.py" in paths
+    excluded = {item.relative_path: item.reason_code for item in view.excluded_files()}
+    assert excluded == {"big.csv": "TOO_LARGE"}
+
+
+def test_a_state_view_with_nothing_excluded_reports_nothing(tmp_path: Path) -> None:
+    """An empty tuple, not `None`: a caller must not have to test for absence."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "small.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    view = DirectoryStateView(root)
+    view.list_files()
+
+    assert view.excluded_files() == ()
 
 
 @requires_git

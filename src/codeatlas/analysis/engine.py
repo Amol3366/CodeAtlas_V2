@@ -128,6 +128,28 @@ class ChangeAnalysisEngine:
                     "not be parsed; symbols in them were not compared."
                 )
 
+        # A file over the size limit is excluded from the comparison rather
+        # than refused (ADR-0045). Skipping it silently would trade a loud
+        # failure for a quiet one, which for a change-assurance tool is the
+        # worse defect -- so the omission is named here. Reported once across
+        # both sides, because the same oversized file is normally in both and
+        # two identical limitations read as two problems.
+        oversized = sorted(
+            {
+                item.relative_path
+                for view in (base, target)
+                for item in view.excluded_files()
+                if item.reason_code == "TOO_LARGE"
+            }
+        )
+        if oversized:
+            warnings.append("FILE_TOO_LARGE")
+            limitations.append(
+                f"{len(oversized)} file(s) exceed the maximum file size and "
+                "were excluded from the comparison; changes inside them were "
+                f"not detected: {', '.join(oversized)}."
+            )
+
         with _timed(timings, "symbol_diff"):
             changes = compute_symbol_changes(
                 _diff_input(base_state), _diff_input(target_state)

@@ -38,6 +38,19 @@ _ChangeKind = Literal["added", "deleted", "modified", "renamed"]
 
 
 @dataclass(frozen=True)
+class ArchiveResult:
+    """Every readable blob at a ref, plus the ones deliberately left out.
+
+    `oversized` exists so a caller can declare the omission. Returning only the
+    contents would make an excluded file indistinguishable from an absent one,
+    which is the silent half of the trade ADR-0045 refused to make.
+    """
+
+    contents: dict[str, bytes]
+    oversized: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ChangedFileEntry:
     """One file-level change between a base and a target state."""
 
@@ -271,15 +284,21 @@ class GitDiffAdapter:
         paths.sort()
         return tuple(paths)
 
-    def archive(self, root: Path, ref: str) -> dict[str, bytes] | None:
+    def archive(self, root: Path, ref: str) -> ArchiveResult | None:
         """Every blob at ``ref`` from one subprocess, or ``None`` to fall back.
 
         ``read_blob`` costs two Git invocations per file, which makes a
         whole-tree read O(files) subprocesses; ``git archive`` delivers the
         same bytes in one. Entry names are untrusted output and are validated
-        exactly like ``ls-tree`` paths. An entry over the size limit raises the
-        same :class:`ScanLimitExceededError` the per-blob path raises, so the
-        two paths refuse the same trees rather than silently diverging.
+        exactly like ``ls-tree`` paths.
+
+        An entry over the size limit is **skipped and named**, not raised on
+        (ADR-0045). It used to raise, which meant a single committed 3 MB CSV
+        made a repository impossible to preflight while the directory scan
+        merely skipped the same file. The names travel back with the contents
+        so the caller can declare the omission rather than inherit a silent
+        one -- `read_blob` still raises, because it is asked for one specific
+        blob and answering "here is nothing" would be worse.
         """
         self._validate_ref(ref)
         # `git archive` applies worktree text conversion by default; the
@@ -299,24 +318,19 @@ class GitDiffAdapter:
             return None
 
         contents: dict[str, bytes] = {}
+        oversized: list[str] = []
         try:
             with tarfile.open(fileobj=io.BytesIO(stdout)) as archive:
                 for member in archive:
                     if not member.isfile():
                         continue
-                    if member.size > self._limits.max_file_bytes:
-                        raise ScanLimitExceededError(
-                            "The blob exceeds the configured maximum file size.",
-                            details={
-                                "relative_path": member.name,
-                                "size_bytes": str(member.size),
-                                "max_file_bytes": str(
-                                    self._limits.max_file_bytes
-                                ),
-                            },
-                        )
                     path = self._validate_output_path(member.name)
                     if path is None:
+                        continue
+                    # Checked after path validation on purpose: an entry whose
+                    # name is not safe to use must not be reported by that name.
+                    if member.size > self._limits.max_file_bytes:
+                        oversized.append(path)
                         continue
                     handle = archive.extractfile(member)
                     if handle is None:
@@ -324,7 +338,7 @@ class GitDiffAdapter:
                     contents[path] = handle.read()
         except tarfile.TarError:
             return None
-        return contents
+        return ArchiveResult(contents=contents, oversized=tuple(sorted(oversized)))
 
     def _validate_ref(self, ref: str) -> None:
         """Raise when a ref is not safe to pass to Git."""

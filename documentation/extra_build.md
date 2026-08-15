@@ -44,14 +44,14 @@ symbol-intent denominator of **50**.
 
 Current Phase 4 baseline, for the three items below that argue from it:
 
-| Metric | Value | Target | State |
-| --- | ---: | ---: | --- |
-| `exact_symbol_resolution` | 1.0000 | 0.98 | met — and 0.98 finally *means* 0.98 at 50 cases |
-| `containing_evidence_rate` | 0.6885 | 1.00 | **unmet** |
-| `containing_evidence_recall_at_10` | 0.8824 | 0.90 | **unmet** |
-| `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural |
-| `symbol_recall_at_10` | 0.8879 | 0.90 | ungated on this profile (ADR-0023) |
-| `relation_path_recall` | 0.9130 | — | deliberately ungated until Task 3 |
+| Metric                               |  Value | Target | State                                             |
+| ------------------------------------ | -----: | -----: | ------------------------------------------------- |
+| `exact_symbol_resolution`          | 1.0000 |   0.98 | met — and 0.98 finally*means* 0.98 at 50 cases |
+| `containing_evidence_rate`         | 0.6885 |   1.00 | **unmet**                                   |
+| `containing_evidence_recall_at_10` | 0.8824 |   0.90 | **unmet**                                   |
+| `changed_symbol_precision`         | 0.9464 |   0.95 | unmet, closed as structural                       |
+| `symbol_recall_at_10`              | 0.8879 |   0.90 | ungated on this profile (ADR-0023)                |
+| `relation_path_recall`             | 0.9130 |     — | deliberately ungated until Task 3                 |
 
 ---
 
@@ -80,6 +80,7 @@ than it has ever been, though by denominator growth on 2026-08-15 rather than by
 any engine change, and it must not be quoted as improvement.
 
 **Where to work**
+
 - `src/codeatlas/evaluation/runner.py` — `score_query_case`, and the evidence
   scoring around lines 596–680
 - `docs/evaluation/baseline-phase-4.json` — **aggregates only**, which is the
@@ -87,6 +88,7 @@ any engine change, and it must not be quoted as improvement.
 - `tests/evaluation/cases/queries.json` — the gold evidence declarations
 
 **Approach**
+
 1. Get per-case output. The artifact does not store it, so this needs an
    evaluation run that emits per case. A working shape already exists in the
    2026-08-15 handoff: build predictions with `predict_exact_symbols`, then call
@@ -100,6 +102,7 @@ any engine change, and it must not be quoted as improvement.
    defect**, and the prior says it is the least likely.
 
 **Traps**
+
 - **Graph answers cite the reference site, not the definition** (ADR-0003, and
   every existing graph case — q005 cites `10-10`). This exact mistake was made
   on 2026-08-15 while authoring new cases and cost 0.09 on this very metric.
@@ -126,6 +129,7 @@ findings sharing a code and title render identically and collide on
 `FindingsList`'s React key. Recorded as ADR-0042 follow-up 1.
 
 **Where to work**
+
 - `src/codeatlas/contracts.py` — the `Finding` model
 - `src/codeatlas/analysis/findings.py` — populate the new fields
 - `src/codeatlas/delivery/` — the JSON, Markdown and SARIF renderers
@@ -138,6 +142,7 @@ derived from. Surface in all three renderers and the web list, and key the React
 list on subject + path.
 
 **Traps**
+
 - **SARIF has its own location model.** Map to it rather than inventing a
   parallel field.
 - Do not let this grow into a `Finding` redesign.
@@ -161,6 +166,7 @@ ADR-0023's rule is that a threshold over an unsettled cause cannot be reasoned
 about.
 
 **Where to work**
+
 - `src/codeatlas/application/graph_queries.py`
 - `src/codeatlas/conversations/pipeline.py` — where the answer is assembled
 - `tests/evaluation/cases/queries.json` — q027, q029
@@ -171,6 +177,7 @@ only then, propose a gate target for `relation_path_recall` with all four
 ADR-0034 causes settled.
 
 **Traps**
+
 - A lexical hit is evidence of *wording*, not behaviour. Emitting relation paths
   must not upgrade a lexical match's derivation.
 - Adding the gate target is a **separate** decision from populating the paths.
@@ -201,60 +208,48 @@ ones from before it.
 
 ---
 
-## Task 5 — Oversized tracked file (WS-3) — **needs Gate A**
+## ~~Task 5 — Oversized tracked file (WS-3)~~ — **done 2026-08-15**
 
-**Cost:** ½ day once ruled. **Blocked by:** a product ruling.
+Gate A was ruled **A3: skip it, and declare the omission**, and WS-3 is
+delivered. See **ADR-0045**. `archive` skips and names oversized entries,
+`read_blob` still raises (it is asked for one specific blob), and the engine
+emits a `FILE_TOO_LARGE` warning plus a limitation naming the files.
 
-**The question.** `GitDiffAdapter.archive` raises `ScanLimitExceededError` when
-any tracked file exceeds `max_file_bytes` (2 MB), so one committed 3 MB CSV makes
-a repository **impossible to preflight** — while the directory scan merely skips
-the same file with a `TOO_LARGE` warning. This is the fourth of ADR-0044's four
-exclusion mechanisms and the only one not aligned.
+The investigation also found the directory side had been omitting oversized
+files *silently* since Phase 1 — the scanner recorded `TOO_LARGE` and nothing
+carried it into a report. Both sides now declare.
 
-- *Skip it, like the scanner does* — consistent with ADR-0044's ruling that
-  preflight sees only what it would index. The file becomes invisible to
-  preflight.
-- *Keep refusing* — a preflight that silently ignores part of the tree is
-  arguably worse than one that declines; but the refusal then needs a better
-  error and a documented remedy.
+## Task 6 — RRF coarse-chunk measurement (WS-5) — **reframed, not unblocked**
 
-**Where to work.** `src/codeatlas/repositories/git_diff.py`,
-`src/codeatlas/analysis/states.py`, and
-`test_a_tracked_file_over_the_size_limit_fails_the_whole_comparison`, which
-currently pins today's behaviour and changes either way.
+**Cost:** 1–2 days. **Blocked by:** nothing, but the shape changed.
 
-**Note.** "Skip it" changes product behaviour and therefore needs an ADR;
-"keep refusing" closes with a handoff.
+Gate B was ruled **B1: a module-level answer satisfies a conceptual question**,
+with **no ranking change**. See **ADR-0046**. So this is no longer "fix the RRF
+coarse-chunk bias" — the coarse-chunk penalty stays unimplemented, and the
+rank-1 containment hit s001 produces is preserved.
 
----
+What remains is a **measurement**: does the bias cost anything now the corpus is
+larger? ADR-0030's finding still stands — the obvious lever demotes the chunk
+currently providing that rank-1 hit — so any proposal to change ranking has to
+show corpus-wide numbers, not one case.
 
-## Task 6 — Module granularity and RRF bias (WS-5) — **needs Gate B**
-
-**Cost:** 1–2 days. **Blocked by:** a product ruling.
-
-**The question (ADR-0030).** When a concept is documented at module level and
-the corpus declares the method implementing it, does the module satisfy the
-question? Nothing fails today.
-
-**Why it is not just a preference.** ADR-0030 records that the obvious lever —
-penalising coarse chunks — promotes the method the corpus declares **and**
-demotes the chunk currently providing a rank-1 containment hit. It trades an
-evidence hit for a symbol hit, so it needs corpus-wide measurement rather than a
-one-case fix. The corpus is now large enough for that to mean something.
-
----
+**Also permitted by the ruling, and worth doing first:** a conceptual expectation
+that names only the implementing symbol may be **widened** to accept the module
+that documents the concept. Widening only, never replacement, and only on the
+ADR-0031/0036 justification. ADR-0003 still forbids editing the corpus to move a
+number.
 
 ## Open, but waiting on a trigger rather than on effort
 
 These are not scheduled. Each has a named condition in the register that
 reopens it.
 
-| Item | Trigger |
-| --- | --- |
-| **Preflight takes >15 min on a 664-file repository.** The engine parses *both* full states per analysis — O(repository), not O(change) — and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented | Someone measures it properly, or a user reports it |
-| **A `check_phase7` run once exited 1 while printing every step as passing.** Exit 1 is the uncaught-throw signature; the trailing `exit 0` added 2026-08-15 can neither cause nor prevent it. Did **not** recur in the 2026-08-15 gate run — one clean data point, not a diagnosis | It recurs — chase it before trusting a green |
-| **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under the corpus | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
-| **`relation_path_recall` has no gate target** | Task 3 settles ADR-0034's last cause |
+| Item                                                                                                                                                                                                                                                                                                | Trigger                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Preflight takes >15 min on a 664-file repository.** The engine parses *both* full states per analysis — O(repository), not O(change) — and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented                                                                  | Someone measures it properly, or a user reports it                              |
+| **A `check_phase7` run once exited 1 while printing every step as passing.** Exit 1 is the uncaught-throw signature; the trailing `exit 0` added 2026-08-15 can neither cause nor prevent it. Did **not** recur in the 2026-08-15 gate run — one clean data point, not a diagnosis | It recurs — chase it before trusting a green                                   |
+| **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under the corpus                                                                               | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
+| **`relation_path_recall` has no gate target**                                                                                                                                                                                                                                               | Task 3 settles ADR-0034's last cause                                            |
 
 ---
 

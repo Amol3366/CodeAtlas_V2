@@ -22,13 +22,18 @@ from pathlib import Path
 from typing import Protocol
 
 from codeatlas.domain.change import StateFile
-from codeatlas.domain.errors import PathOutsideRootError, PathSafetyError
+from codeatlas.domain.errors import (
+    PathOutsideRootError,
+    PathSafetyError,
+    ScanLimitExceededError,
+)
 from codeatlas.domain.paths import resolve_inside_root, validate_relative_path
 from codeatlas.domain.repository import FileClassification, FileRecord, ScanLimits
 from codeatlas.repositories.git_diff import GitDiffAdapter
 from codeatlas.repositories.ignore_rules import IgnoreRules
 from codeatlas.repositories.scanner import (
     RepositoryScanner,
+    SkippedFile,
     decode_text,
     is_binary_content,
 )
@@ -47,6 +52,20 @@ class StateView(Protocol):
 
         Returns ``None`` when the path is absent, escapes the root, is unreadable,
         or has drifted from the hash the state claims.
+        """
+        ...
+
+    def excluded_files(self) -> tuple[SkippedFile, ...]:
+        """Files this state deliberately left out, and why (ADR-0045).
+
+        Only exclusions a reader would otherwise mistake for absence belong
+        here. An *ignored* file is not reported: ADR-0044 ruled that preflight
+        never considers a file it would not index, and accepted as a
+        consequence that such a file can be added or deleted without preflight
+        saying so. Reporting them would relitigate that ruling in warning text.
+
+        Valid only after :meth:`list_files`; empty before it, and empty rather
+        than ``None`` so a caller never has to test for absence.
         """
         ...
 
@@ -92,12 +111,20 @@ class DirectoryStateView:
         self._root = root
         self._limits = limits or ScanLimits()
         self._files_by_path: dict[str, StateFile] | None = None
+        self._excluded: tuple[SkippedFile, ...] = ()
 
     def list_files(self) -> tuple[StateFile, ...]:
         if self._files_by_path is None:
             rules = IgnoreRules.load(self._root)
             scanner = RepositoryScanner(limits=self._limits)
             scan = scanner.scan(self._root, rules)
+            # The scanner has recorded TOO_LARGE since Phase 1, but nothing
+            # carried it into a change report, so an oversized file was
+            # invisible on this side too -- quietly, where the blob side was
+            # loud about it (ADR-0045).
+            self._excluded = tuple(
+                item for item in scan.skipped if item.reason_code == "TOO_LARGE"
+            )
             self._files_by_path = {
                 record.relative_path: StateFile(
                     relative_path=record.relative_path,
@@ -137,6 +164,9 @@ class DirectoryStateView:
             return None
         return content
 
+    def excluded_files(self) -> tuple[SkippedFile, ...]:
+        return self._excluded
+
     def _get(self, relative_path: str) -> StateFile | None:
         try:
             validate_relative_path(relative_path)
@@ -172,19 +202,35 @@ class GitBlobStateView:
         self._git = git or GitDiffAdapter()
         self._files_by_path: dict[str, StateFile] | None = None
         self._contents: dict[str, bytes] = {}
+        self._excluded: tuple[SkippedFile, ...] = ()
 
     def list_files(self) -> tuple[StateFile, ...]:
         if self._files_by_path is None:
             # One `git archive` call replaces two subprocesses per blob; the
             # per-blob path stays as the fallback when archive cannot serve
             # (and per-file reads re-verify hashes either way).
-            contents = self._git.archive(self._root, self._ref)
-            if contents is None:
+            oversized: list[str] = []
+            archived = self._git.archive(self._root, self._ref)
+            if archived is None:
                 contents = {}
                 for path in self._git.list_files(self._root, self._ref):
-                    blob = self._git.read_blob(self._root, self._ref, path)
+                    # `read_blob` still raises for an oversized blob, because
+                    # it is asked for one specific file. Here the answer is
+                    # "everything readable", so the limit is a skip and the
+                    # name is kept to be declared (ADR-0045).
+                    try:
+                        blob = self._git.read_blob(self._root, self._ref, path)
+                    except ScanLimitExceededError:
+                        oversized.append(path)
+                        continue
                     if blob is not None:
                         contents[path] = blob
+            else:
+                contents = archived.contents
+                oversized.extend(archived.oversized)
+            self._excluded = tuple(
+                SkippedFile(path, "TOO_LARGE") for path in sorted(oversized)
+            )
             # A file can be tracked at the ref *and* match an ignore rule --
             # committed build output is the ordinary case. `git ls-tree` lists
             # it, the directory scan does not, so it was present on one side of
@@ -256,8 +302,10 @@ class GitBlobStateView:
         assert self._files_by_path is not None
         return self._files_by_path.get(relative_path)
 
-    @staticmethod
+    def excluded_files(self) -> tuple[SkippedFile, ...]:
+        return self._excluded
 
+    @staticmethod
     def _classify(relative_path: str) -> tuple[FileClassification, str]:
         from codeatlas.repositories.classification import classify
 
@@ -322,6 +370,13 @@ class SnapshotStateView:
         assert self._files_by_path is not None
         return self._files_by_path.get(relative_path)
 
+    def excluded_files(self) -> tuple[SkippedFile, ...]:
+        """Always empty: a snapshot records what was indexed, not what was not.
+
+        An oversized file never entered the snapshot in the first place, so
+        there is nothing here to declare that the snapshot itself knows about.
+        """
+        return ()
 
     def _read(self, relative_path: str) -> bytes | None:
         try:

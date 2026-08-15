@@ -13,6 +13,7 @@ from codeatlas.analysis.architecture import parse_rules
 from codeatlas.analysis.engine import ChangeAnalysisEngine, ChangeReport
 from codeatlas.analysis.states import DirectoryStateView
 from codeatlas.contracts import ChangeKind, Derivation, OverallRisk
+from codeatlas.domain.repository import ScanLimits
 
 SERVICE_BASE = (
     "from .idempotency import IdempotencyStore\n"
@@ -157,6 +158,39 @@ def test_an_unparsable_file_is_reported_rather_than_skipped_silently(
 
     assert any("PARSE_FAILED" in warning for warning in report.warnings)
     assert report.limitations
+
+
+def test_an_oversized_file_is_declared_rather_than_silently_omitted(
+    tmp_path: Path,
+) -> None:
+    """ADR-0045's second half. The skip is only acceptable if it is announced.
+
+    Trading a loud refusal for a silent omission would be the worse defect for
+    a change-assurance tool, so the exclusion reaches the report as a warning
+    and a limitation naming the file.
+    """
+    oversized = "x" * (ScanLimits().max_file_bytes + 1) + "\n"
+    report = _run(
+        tmp_path,
+        {"small.py": "VALUE = 1\n", "big.csv": oversized},
+        {"small.py": "VALUE = 2\n", "big.csv": oversized},
+    )
+
+    assert any("FILE_TOO_LARGE" in warning for warning in report.warnings)
+    assert any("big.csv" in item for item in report.limitations)
+
+
+def test_a_tree_with_nothing_oversized_says_nothing_about_size(
+    tmp_path: Path,
+) -> None:
+    """The guard on the test above: a limitation nobody earned is noise."""
+    report = _run(
+        tmp_path,
+        {"small.py": "VALUE = 1\n"},
+        {"small.py": "VALUE = 2\n"},
+    )
+
+    assert not any("FILE_TOO_LARGE" in warning for warning in report.warnings)
 
 
 def test_a_document_change_is_reported_as_a_document(tmp_path: Path) -> None:
