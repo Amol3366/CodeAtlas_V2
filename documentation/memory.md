@@ -1580,6 +1580,46 @@ minutes to redo.
       collision its own comment records for a second conftest module, by a
       different route. Share helpers as **fixtures**.
 
+- [x] **The symbol corpus reaches fifty, and WS-1 is closed (2026-08-15).**
+      Commits `c98e72d`, `9f919f0`. Scored symbol-intent cases **27 → 50**, so
+      `exact_symbol_resolution`'s 0.98 finally tolerates one miss instead of
+      silently requiring 27/27 — ADR-0033's open condition. Corpus is now 63
+      query / 28 change cases over 7 fixtures. `exact_symbol_resolution` held
+      at **1.0000** across all 50.
+
+      **Check a threshold's arithmetic before growing a corpus toward it.** The
+      plan said "~13 more cases". 27 + 13 = 40, where one miss scores 0.9750
+      and 0.98 is as inexpressible as before. The real number was **23**,
+      because 50 is the first integer where `ceil(0.98 × N) < N`.
+
+      **Count the material, not the cases.** The five fixtures held only ~20
+      distinct non-module symbols between them, and the existing 27 cases
+      already queried all of them — four pairs ask the same question twice.
+      More cases against that material would have padded a denominator to
+      loosen a release target, the mirror image of ADR-0032/0033. A **new
+      fixture** was the answer.
+
+      **Every intent in `SYMBOL_INTENTS` feeds `exact_symbol_resolution`**, not
+      just `EXACT_SYMBOL`. So corpus growth and graph coverage are the same
+      job, and the corpus stopped being 16/27 `EXACT_SYMBOL`.
+
+      **A tripwire firing is the tripwire working.** Two
+      `test_threshold_granularity.py` tests failed; ADR-0033 wrote them to do
+      exactly that once the corpus grew — one says so in its docstring. They
+      are now inverted to assert the separation, so a *shrinking* corpus fails
+      loudly.
+
+      **Mutation-check with a mutation that matches the claim.** Reversing the
+      ranking failed **0 of 23** new cases — most return a single symbol, so a
+      reversal is a no-op. Dropping the top hit failed **18 of 23**. The first
+      result is not a pass; it is the discovery that these cases are not
+      ranking-sensitive, now its own register row.
+
+      **My declared evidence was wrong and the engine was right, again.** Graph
+      cases cite the *reference site*, not the definition range (ADR-0003, and
+      every existing graph case). Correcting to the convention moved
+      `containing_evidence_rate` 0.5984 → 0.6885.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

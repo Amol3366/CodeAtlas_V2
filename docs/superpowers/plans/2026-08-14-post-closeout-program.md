@@ -58,10 +58,23 @@ Both are product questions. Neither has a technically-correct answer, and each d
 | WS-1 Task 1 (`expected_findings` counts) | **done** — `fc7af34`, merged `7f834c0` |
 | WS-1 Task 2 (document-section case c025) | **done** — `f28a300`, merged `06bcff2` |
 | WS-1 Task 3 (blind-spot cases) | **done** — `a6dba3c`. Three of four; 3c is inexpressible, see below |
-| WS-1 Task 4 (symbol cases toward 50) | **next** |
-| WS-1 Task 5, WS-2 … WS-6 | not started |
+| WS-1 Tasks 4–5 (symbol cases to 50) | **done** — `c98e72d`, `9f919f0`. **WS-1 is closed** |
+| WS-2 … WS-6 | not started. WS-2 and WS-6 are unblocked; WS-3 and WS-5 need Gates A and B |
 
-The corpus is **28 change cases / 40 query cases**.
+The corpus is **28 change cases / 63 query cases** over **7 fixtures**, and the
+scored symbol-intent denominator is **50**.
+
+### What Tasks 4–5 changed about the plan
+
+**Both of Task 4's assumptions were wrong, and both were measurable in
+minutes.** "~13 more cases" lands on 40, where one miss scores 0.9750 and 0.98
+stays exactly as inexpressible as at 27 — **50 is the first integer that
+works**. And the five fixtures held only ~20 distinct symbol-shaped targets
+between them, already queried by the existing 27, so the cases had nowhere to
+come from. A **new fixture** was the answer, not more questions.
+
+**Check the arithmetic of a threshold before growing a corpus toward it, and
+count the material before counting the cases.**
 
 ### What Task 3 changed about the plan
 

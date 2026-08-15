@@ -82,7 +82,8 @@ with verification.
 | **Seven** Playwright tests skipped on Chromium, across **five** spec files     | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all seven, so coverage is not lost. **Counted from the gate run on 2026-08-11, not copied forward:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings`, and `stream-reconnection` ×2. The seventh is ADR-0042's navigation test, which is skipped for the same reason as the reload test beside it. The figure understated itself twice before (corrected 2026-08-07 and 2026-08-10); it is re-counted here rather than incremented                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The upstream bug is fixed                                                                                                                                                   |
 | Packaged semantic tree 1.05 GB                                                             | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | A deterministic-only second artifact is wanted                                                                                                                              |
 | **The change corpus cannot express an ADR-0044-shaped defect**                       | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Someone gives the corpus a Git-backed change case, which is a new fixture shape rather than a new case                                                                      |
-| Grow the symbol corpus toward 50 cases                                                     | **DEFERRED — multi-day.** 13+ cases, each needing gold ranges. Nothing is *wrong* today: ADR-0033 records that 0.98 is inexpressible at 27 cases and is documented at the constant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone commits the days                                                                                                                                                    |
+| ~~Grow the symbol corpus toward 50 cases~~ | **CLOSED 2026-08-15.** Scored symbol-intent cases 27 -> **50**, so `exact_symbol_resolution`'s 0.98 finally tolerates one miss (0.9800) rather than silently requiring 27/27 - the condition ADR-0033 left open. **Both assumptions in the estimate were wrong.** It needed **23** cases, not "13+": 27 + 13 = 40, where one miss still scores 0.9750 and the target is as inexpressible as before. And it needed a **new fixture**, because the five existing ones hold only ~20 distinct symbol-shaped targets between them, already queried by the existing 27 - more cases against those would have padded a denominator to loosen a release target, the mirror image of ADR-0032/0033. `symbol_breadth` adds 25 symbols and 69 relations; the other five fixtures stay byte-identical. **`exact_symbol_resolution` held at 1.0000 across all 50** | - |
+| **The new symbol cases are not ranking-sensitive** | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage | Someone adds cases whose answer sets are large enough for order to matter |
 | `relation_path_recall` has no gate target                                                | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
 | RRF coarse-chunk bias                                                                      | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | The module-granularity ruling lands                                                                                                                                         |
 | Phase 4`containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Someone investigates per-case                                                                                                                                               |
@@ -246,6 +247,113 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-15T06:00:00Z — WS-1 Tasks 4–5: the symbol corpus reaches fifty
+
+- Agent: Claude Code `claude-opus-5`, branch `symbol-corpus-to-fifty`.
+- Transition: no phase task. Post-gate. Executed
+  `docs/superpowers/plans/2026-08-15-symbol-corpus-to-fifty.md`, which closes
+  WS-1 of the post-closeout program.
+- Commits `c98e72d` (fixture), `9f919f0` (23 cases), plus this record.
+
+**Scored symbol-intent cases 27 → 50, and `exact_symbol_resolution`'s 0.98 now
+tolerates exactly one miss (0.9800).** That is the condition ADR-0033 left open
+and named corpus size as the only honest fix for.
+
+**Both assumptions in the "~13 cases" estimate were wrong, and each was
+measured before any code was written.**
+
+1. **13 was the wrong number.** The metric averages over cases whose intent is
+   in `SYMBOL_INTENTS` with non-empty `expected_symbols`, measured — 27 today.
+   27 + 13 = 40, where one miss scores **0.9750** and 0.98 remains exactly as
+   inexpressible as at 27. **50 is the first integer that works.**
+2. **The fixtures had nothing left to ask about.** Indexing all five supported
+   fixtures yields **~20** distinct non-module symbols in total
+   (`python_app` 9, `tsjs_app` 4, `mixed_app` 5, `git_changes` 2), and the
+   existing 27 cases already query them — q002/q009, q014/q018, q025/q030 and
+   q033/q034 each ask the same question twice. 23 more cases against 20 symbols
+   is **padding a denominator to loosen a release target**, the mirror image of
+   what ADR-0032 and ADR-0033 refused to do. Ruled by the user: a new fixture.
+
+**`symbol_breadth`** yields 25 non-module symbols and 69 relations, and carries
+shapes nothing else had — an `Enum` with assignment members (ADR-0029's shape),
+a TS type alias, an arrow function assigned to a const, a default export, an
+async method, and a test reaching a method by import-and-call on its class.
+**The other five fixtures are byte-identical**, proven by regenerating
+`baseline-phase-4` with the fixture declared but before any case referenced it:
+no diff at all.
+
+**A third finding made the work better rather than smaller.** Every intent in
+`SYMBOL_INTENTS` feeds the metric, not just `EXACT_SYMBOL` — and the corpus was
+16 of 27 `EXACT_SYMBOL`. The 23 new cases are 11 `EXACT_SYMBOL`, 4
+`DEPENDENCIES`, 3 `CALLERS`, 2 `EXPORTS`, 2 `RELATED_TESTS`, 1 `TRACE_FLOW`, so
+raising the count and fixing that imbalance were the same job.
+
+**Three things went wrong in execution, all worth more than the task:**
+
+1. **Two `test_threshold_granularity.py` tests failed, and that was correct.**
+   ADR-0033 wrote them as tripwires; one says in its own docstring that it
+   "fails deliberately once the corpus is large enough for 0.98 and 1.0 to
+   differ". The corpus grew and they tripped. They are now **inverted** to
+   assert the separation, so a future shrinkage — or a fixture quietly dropped
+   from `SUPPORTED_FIXTURES`, which ADR-0017 records happening for four phases
+   — puts the illusion back and fails loudly instead of passing.
+2. **My graph-case evidence was wrong and the engine was right.** I declared
+   *definition* ranges; every existing graph case declares the *reference site*
+   (q005 cites `10-10`, a call line), which is what a graph answer cites under
+   ADR-0003. Corrected on that convention — not because a number moved, though
+   it took `containing_evidence_rate` from 0.5984 back to **0.6885** and
+   `primary_evidence_recall_at_10` from 0.7059 to **0.8353**. The first
+   measurement, before the correction, is kept here because it is the evidence
+   that the convention is load-bearing rather than cosmetic.
+3. **`SUPPORTED_FIXTURES` could not be updated with the fixture.** The plan put
+   it in Task 1; `test_every_corpus_fixture_is_measured_unless_deliberately_unsupported`
+   correctly refused, because it derives its expectation from the fixtures the
+   *query cases* name. Admitting a fixture no case uses is a real error, so the
+   entry moved to the commit that adds the cases.
+
+**Mutation-checked twice, and the first result is a finding rather than a
+formality:**
+
+| Mutation | New cases caught | Old cases caught |
+| --- | ---: | ---: |
+| Reverse the ranking | **0 / 23** | 9 / 35 |
+| Drop the top-ranked hit | **18 / 23** | 31 / 35 |
+
+So the new cases **do** measure resolution but are **not ranking-sensitive** —
+most return a single symbol, so a reversal is a no-op for them. Recorded as its
+own register row rather than left implied by a green run.
+
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`; `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`, `CHUNKER_VERSION`
+  unchanged, so **no snapshot is stale.** No new dependency. The only `src/`
+  change is one tuple entry. Corpus is now **63 query cases / 28 change cases**
+  over **7 fixtures**.
+- **Metric movement, none of which is improvement — it is a wider denominator.**
+  `exact_symbol_resolution` **held at 1.0000** across all 50. Up:
+  `containing_evidence_recall_at_10` 0.8387 → 0.8824,
+  `primary_evidence_recall_at_10` 0.7742 → 0.8353, `exact_evidence_rate` and
+  `valid_evidence_rate` 0.5909 → 0.6148, `relation_path_correctness` 0.7273 →
+  0.8261, `relation_path_recall` 0.8182 → 0.9130. Down: `symbol_recall_at_10`
+  0.9143 → 0.8879 and `ndcg_at_10` 0.9337 → 0.9145 — **both ungated on this
+  profile**: `symbol_recall_at_10`'s 0.90 applies only to the *conceptual*
+  profile (ADR-0023), and the main corpus is `retrieval`. That was checked
+  rather than assumed, because the number crossing 0.90 looks like a broken
+  gate. `containing_evidence_rate` 0.6932 → 0.6885. **The unmet set is
+  unchanged**: `changed_symbol_precision`, `containing_evidence_rate`,
+  `containing_evidence_recall_at_10`.
+- Verification, exit codes read from the process: `uv run pytest -q` **2230
+  passed, 3 skipped**; `ruff check src tests scripts apps` exit 0; `mypy
+  --no-incremental src tests scripts apps` clean on **352** source files;
+  `check_phase4.ps1 -SkipSync` exit **0** (validator reported 63 query cases,
+  28 change cases, 7 fixtures).
+- **Limitation: `check_phase7.ps1 -SkipSync` was not run against these
+  changes**, carried forward from the previous handoff. Nothing here touches
+  the web application or the semantic layer, but its Playwright suites have not
+  run since `f4fdae4`. **Run it before the next release claim.**
+- Next: **WS-1 is closed.** Remaining program work is WS-2 (subject and file
+  path on `Finding`, ½–1 day, unblocked), WS-6 (lexical intents and relation
+  paths, unblocked), and WS-3/WS-5, which still need Gates A and B.
 
 ### 2026-08-15T02:00:00Z — Gate exit codes and test isolation; both register diagnoses were wrong
 
