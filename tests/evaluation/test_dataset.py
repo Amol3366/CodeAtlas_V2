@@ -22,9 +22,9 @@ def test_shipped_dataset_has_declared_phase_zero_cardinality() -> None:
     dataset = load_dataset(DATASET_ROOT)
 
     assert len(dataset.fixtures) == 7
-    assert len(dataset.query_cases) == 40
+    assert len(dataset.query_cases) == 63
     assert len(dataset.change_cases) == 28
-    assert len({case.id for case in dataset.query_cases}) == 40
+    assert len({case.id for case in dataset.query_cases}) == 63
     assert len({case.id for case in dataset.change_cases}) == 28
 
 

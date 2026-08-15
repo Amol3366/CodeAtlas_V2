@@ -64,39 +64,43 @@ def test_the_replaced_threshold_selected_the_same_cases() -> None:
     assert math.ceil(0.90 * scored - 1e-9) == math.ceil(1.0 * scored - 1e-9)
 
 
-def test_the_exact_symbol_gate_is_stricter_than_its_stated_target() -> None:
-    """Section 19.3 declares >= 98%. At 27 cases that enforces 27/27.
+def test_the_exact_symbol_gate_now_expresses_its_stated_target() -> None:
+    """Section 19.3 declares >= 98%, and at 50 cases it finally means that.
 
-    Kept at 0.98 rather than restated as 1.0 (ADR-0033). Unlike
-    `lexical_resolution`'s provisional 0.90, this is a release commitment that
-    becomes expressible once the corpus reaches roughly fifty cases; restating
-    it would tighten a product promise to match an artifact of corpus size.
+    **This assertion is the inverse of the one it replaces**, and the change is
+    the point rather than a relaxation. At 27 cases `ceil(0.98 * 27) == 27`, so
+    the gate silently required 27/27 while reading as though one miss were
+    acceptable; ADR-0033 kept 0.98 anyway, because restating a Section 19.3
+    release commitment as 1.0 would have tightened a product promise to match an
+    artifact of corpus size, and recorded that the real fix was corpus size.
 
-    Being stricter than the target is safe -- nothing violating 98% can pass.
-    This test exists so the discrepancy is visible rather than surprising.
+    The corpus reached 50 on 2026-08-15 and the two values separated. The old
+    assertion failed at that moment, exactly as the pair of tripwires below it
+    was written to do.
     """
     scored = _scored(SYMBOL_INTENTS)
     required = math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9)
 
-    assert scored == 27
-    assert required == scored, "0.98 tolerates no failures at this corpus size"
+    assert scored == 50
+    assert required == 49
+    assert required < scored, "0.98 must now tolerate exactly one miss"
 
 
-def test_the_exact_symbol_target_becomes_meaningful_on_a_larger_corpus() -> None:
-    """The condition under which 0.98 starts expressing what it says.
+def test_the_exact_symbol_target_has_separated_from_one_point_zero() -> None:
+    """ADR-0033's condition, now discharged.
 
-    Fails deliberately once the corpus is large enough for 0.98 and 1.0 to
-    differ -- at which point the gate stops being stricter than its target and
-    ADR-0033's reasoning no longer needs stating.
+    Its predecessor asserted that 0.98 and 1.0 selected the *same* number of
+    cases and was documented as failing deliberately once that stopped being
+    true. It stopped being true. Keeping the tripwire pointed the other way
+    means a future shrinkage of the corpus -- or a fixture quietly dropped from
+    `SUPPORTED_FIXTURES`, which ADR-0017 records happening for four phases --
+    puts the illusion back and fails here rather than passing quietly.
     """
     scored = _scored(SYMBOL_INTENTS)
 
-    assert math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9) == math.ceil(
+    assert math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9) != math.ceil(
         1.0 * scored - 1e-9
-    ), "0.98 and 1.0 have separated; revisit ADR-0033"
-
-    fifty = 50
-    assert math.ceil(EXACT_SYMBOL_THRESHOLD * fifty - 1e-9) < fifty
+    ), "0.98 and 1.0 have collapsed together again; the corpus shrank"
 
 
 def test_a_lower_threshold_would_have_to_be_a_multiple_of_the_case_size() -> None:
