@@ -347,10 +347,15 @@ own register row rather than left implied by a green run.
   --no-incremental src tests scripts apps` clean on **352** source files;
   `check_phase4.ps1 -SkipSync` exit **0** (validator reported 63 query cases,
   28 change cases, 7 fixtures).
-- **Limitation: `check_phase7.ps1 -SkipSync` was not run against these
-  changes**, carried forward from the previous handoff. Nothing here touches
-  the web application or the semantic layer, but its Playwright suites have not
-  run since `f4fdae4`. **Run it before the next release claim.**
+- ~~**Limitation: `check_phase7.ps1 -SkipSync` was not run against these
+  changes.**~~ **Run 2026-08-15 at `1495a47`, exit 0**, clearing the gap this
+  and the previous handoff both carried. Every step executed: 2230 passed / 3
+  skipped, lint and types clean, all three baselines reproduced, web suite 201
+  passed across 22 files, end-to-end **15 passed / 7 skipped** — the 7 being
+  the known Chromium renderer defect, matching the register's re-counted
+  figure, with Firefox running all of them. **The exit code is now stated by
+  the script rather than inferred**, this being the first Phase 7 run since the
+  trailing `exit 0` landed.
 - Next: **WS-1 is closed.** Remaining program work is WS-2 (subject and file
   path on `Finding`, ½–1 day, unblocked), WS-6 (lexical intents and relation
   paths, unblocked), and WS-3/WS-5, which still need Gates A and B.
