@@ -1,6 +1,6 @@
 # Extra Build — the remaining work, in the order to do it
 
-Status: current as of 2026-08-15
+Status: current as of 2026-08-16, after WS-3 and WS-4 closed.
 
 **Authority note.** This file is a **work plan**, not a status list. The single
 authoritative record of what is open is the **Deferred Register in
@@ -10,39 +10,49 @@ wins and this file is the bug.
 
 It exists because the register answers "what is open and why" but not "how would
 someone actually do it" — which files, which traps, what counts as done. That is
-what is written down here, per task. **Deliberately no status column**, because
+what is written here, per task. **Deliberately no status column**, because
 `documentation/memory.md` already records the lesson that two copies of a status
 list is how they drift.
 
-**Relationship to the post-closeout program.** The workstream numbering (WS-2
-through WS-6) is
-`docs/superpowers/plans/2026-08-14-post-closeout-program.md`, and each task
-below names its WS so the two can be matched. That file remains the record of
-*why* the work was scoped this way and what its decision gates are; this file is
-the current *execution order*, re-sequenced now that WS-0 and WS-1 are closed.
-Two documents describing an order is exactly the drift this project keeps
-paying for, so the split is deliberate and narrow: **if they disagree about
-sequence, this file is newer; if they disagree about scope or rationale, the
-program plan wins.** When the program is finished, delete this file rather than
-leaving it to rot.
+**Relationship to the post-closeout program.** The workstream numbering (WS-2,
+WS-5, WS-6) is
+`docs/superpowers/plans/2026-08-14-post-closeout-program.md`, and each task below
+names its WS where one applies. That file remains the record of *why* the work
+was scoped this way and what its decision gates were; this file is the current
+*execution order*. **If they disagree about sequence, this file is newer; if they
+disagree about scope or rationale, the program plan wins.** When the program is
+finished, delete this file rather than leaving it to rot.
 
-Ordering is execution order, not priority: each item is placed where its
-dependencies are satisfied.
+Ordering is execution order. Task 1 is first because a release gate currently
+has no margin and Task 1 is what is consuming it.
+
+---
+
+## Start here tomorrow
+
+1. **Task 1 — q035.** A gate passes with **zero margin** and q035 is the case
+   eating it. Everything else can wait a day; this cannot wait a regression.
+2. Then **Task 2 — q006**, the only candidate *engine* finding this project has
+   produced in nine investigations.
+3. After that the order is open: Tasks 3–7 are independent.
 
 ---
 
 ## Where things stand
 
 Phases 0–7 complete with user-approved gates; the project was closed out
-2026-08-10 and everything since is post-gate work. The post-closeout program
-(`docs/superpowers/plans/2026-08-14-post-closeout-program.md`) has **WS-0 and
-WS-1 closed**, along with both process defects (gate exit codes, test
-isolation).
+2026-08-10 and everything since is post-gate work. Of the post-closeout program,
+**WS-0, WS-1, WS-3 and WS-4 are closed**, along with both process defects (gate
+exit codes, test isolation). **WS-2, WS-5 and WS-6 remain.**
 
 Corpus: **63 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
 
-Current Phase 4 baseline, refreshed 2026-08-16 after ADR-0047 and ADR-0048:
+`origin/main` is at `e07c5ff`. All five gates pass, exit codes read from the
+process: pytest 2240 passed / 3 skipped, ruff, mypy on 352 files,
+`check_phase4 -SkipSync`, `check_phase7 -SkipSync`.
+
+### Phase 4 baseline, refreshed 2026-08-16
 
 | Metric | Value | Target | State |
 | --- | ---: | ---: | --- |
@@ -51,58 +61,120 @@ Current Phase 4 baseline, refreshed 2026-08-16 after ADR-0047 and ADR-0048:
 | `containing_evidence_rate` | 0.7561 | — | **ungated** (ADR-0048); reported, ceiling 0.7724 |
 | `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural — **the only unmet target** |
 | `abstention_correctness` | 0.9828 | — | ungated; the miss is q035 |
+| `mean_reciprocal_rank` | 0.9828 | — | ungated; the miss is q035 |
 | `symbol_recall_at_10` | 0.8707 | 0.90 | ungated on this profile (ADR-0023) |
-| `relation_path_recall` | 0.9130 | — | deliberately ungated until Task 3 |
+| `ndcg_at_10` | 0.8973 | — | ungated |
+| `relation_path_recall` | 0.9130 | — | deliberately ungated until Task 4 |
 
-**`exact_symbol_resolution` has no headroom.** ADR-0033 predicted 0.98 would
-become expressible at 50 cases because 50 is the first size tolerating one miss.
-The corpus reached 50, and the first real miss landed exactly on the threshold.
-One more miss anywhere gives 0.9600 and the gate fails. The case consuming the
-whole margin is **q035**.
-
------------------------------------- | -----: | -----: | ------------------------------------------------- |
-| `exact_symbol_resolution`          | 1.0000 |   0.98 | met — and 0.98 finally*means* 0.98 at 50 cases |
-| `containing_evidence_rate`         | 0.6885 |   1.00 | **unmet**                                   |
-| `containing_evidence_recall_at_10` | 0.8824 |   0.90 | **unmet**                                   |
-| `changed_symbol_precision`         | 0.9464 |   0.95 | unmet, closed as structural                       |
-| `symbol_recall_at_10`              | 0.8879 |   0.90 | ungated on this profile (ADR-0023)                |
-| `relation_path_recall`             | 0.9130 |     — | deliberately ungated until Task 3                 |
+> **`exact_symbol_resolution` has no headroom.** ADR-0033 predicted 0.98 would
+> become expressible at 50 cases, because 50 is the first size tolerating one
+> miss. The corpus reached 50 on 2026-08-15 and **the first real miss landed
+> exactly on the threshold**. It passes at 49/50 = 0.9800. One more miss
+> anywhere gives 0.9600 and the gate fails. **A green gate here is not
+> headroom.** Say so whenever this number is quoted.
 
 ---
 
 ## The rule that governs almost all of this
 
-**The standing prior is that the instrument is wrong, not the engine.** Seven
-consecutive investigations of this shape have ended that way: ADR-0017, 0018,
-0024, 0027, 0038, the 2026-08-13 document-section false report, and both
-register rows corrected on 2026-08-15.
+**State, per finding, whether it is a faulty instrument or an absent decision.
+They need different fixes.**
 
-So: **investigate per case before calling anything a defect**, and expect the
-measurement apparatus to be at fault first. Two of the tasks below exist only
-because that prior was not applied earlier.
+The standing prior — *the instrument is wrong, not the engine* — has now held
+eight times: ADR-0017, 0018, 0024, 0027, 0038, the 2026-08-13 document-section
+false report, and both register rows corrected on 2026-08-15. **But it was
+applied too broadly on 2026-08-15 and the user corrected it.** Of the two WS-4
+findings:
+
+- the `target/` ignore collision was a **faulty instrument** — the fixture
+  declared evidence in a file no index could contain;
+- the graph-evidence convention was an **absent decision** — nobody had ever
+  ruled what a graph answer cites, and the corpus and the engine were each
+  internally consistent the whole time.
+
+**A prior confirmed eight times gets applied as a reflex, and a reflex is how a
+real engine defect eventually gets waved past.** Task 2 exists because that was
+avoided once, narrowly.
+
+**The corollary, learned twice on 2026-08-16:** derive an expectation from the
+claim, never from the engine's output. Both WS-4 step predictions failed
+(0.9765 → 0.9588, then ≈1.0000 → 0.9706) precisely *because* the corrections
+were derived independently. Copying the engine's lines would have matched both
+predictions exactly and buried q006. **When a prediction fails, the model was
+wrong and that is information. When it succeeds because you fitted the
+expectation to the output, you have learned nothing.**
 
 ---
 
-## ~~Task 1 — Phase 4 evidence rates (WS-4)~~ — **done 2026-08-16**
+## Task 1 — q035: an under-specified expectation eating the gate margin
 
-Four rulings given and implemented: **ADR-0047** (graph evidence is the
-reference site), a fixture-local `.codeatlasignore` re-including `target/`,
-**ADR-0048** (`containing_evidence_rate` reported not gated), and an extended
-ADR-0036 validator asserting expected evidence files are *indexed*.
+**Cost:** hours. **Blocked by:** a corpus decision that is the owner's to make.
+**Do this first.**
 
-`unmet_targets` is now `['changed_symbol_precision']` alone.
+**Why now.** `exact_symbol_resolution` is 49/50 = 0.9800 against a 0.98 target.
+q035 is the single miss. Until it is settled, *any* new case that misses for any
+reason fails a release gate.
 
-**Three cases remain below 1.0 and each is its own open register row**, because
-the investigation deliberately derived every corrected range from the claim
-rather than copying the engine's output — which is what surfaced them:
+**What happened.** WS-4's Ruling 2 re-included `git_changes/target/` so q034
+could be answered. That put a **second `process`** into the fixture index —
+`base/service.py` and `target/processor.py` both define it. q035 ("What does
+strict mode do?") names `process` as its subject, the trace subject is now
+ambiguous, and the answer **abstains**.
 
-- **q006** — a candidate *engine* finding, the only one in the whole
-  investigation. The engine cites a line that does not prove the claim.
-- **q032** — a two-hop trace carries no evidence for its far end; caps at 0.50.
-- **q035** — an under-specified expectation, and now **the priority**: it
-  consumes the entire `exact_symbol_resolution` margin.
+**Abstaining is correct behaviour.** `AGENTS.md` §4.1 requires abstention over
+guessing. The problem is the expectation, which names a symbol that exists twice
+with no way to say which. Before the fix it resolved unambiguously *to the wrong
+file*; the fix converted a wrong answer into no answer, and the accuracy metrics
+score those differently — four metrics moved from this one case.
 
-## Task 2 — Subject and file path on `Finding` (WS-2)
+**Options, none of which should be chosen without a ruling**
+
+- Give q035 a `query_subject` that disambiguates — but `find_exact` resolves by
+  name and there is no file-scoped selector, so this may not be expressible.
+- Rename the symbol in `target/processor.py` so the two sides differ. **A corpus
+  edit**; needs the ADR-0031/0036 justification, and the fixture's whole point
+  is that the two sides are versions of the same code.
+- Rule that a fixture may not hold two symbols of one name, and fix the fixture.
+- Accept the abstention and remove q035's symbol expectation, measuring only
+  what it can measure.
+
+**Where to work:** `tests/evaluation/cases/queries.json` (q035),
+`tests/evaluation/cases/fixtures/git_changes/`.
+
+**Done when** `exact_symbol_resolution` has margin again, or the owner has ruled
+that 49/50 is the accepted state and the register says so explicitly.
+
+---
+
+## Task 2 — q006: the engine cites a line that does not prove the claim
+
+**Cost:** ½ day to investigate. **Blocked by:** nothing.
+
+**Why it matters out of proportion to its size.** This is the **only candidate
+engine finding** produced by nine investigations. Every other one was the
+instrument. It surfaced only because the WS-4 corrections were derived from the
+claim rather than copied from the engine, and the reflex would have buried it.
+
+**The finding.** q006 asks "How are duplicate keys handled?" and names
+`IdempotencyStore.claim`. The line that proves duplicate handling is
+`return "duplicate"` — `idempotency.py:7`. **The engine cites line 8**,
+`self._keys.add(key)`, which records a key rather than handling a repeat.
+
+**Not proven to be a defect.** `claim` has no outgoing resolved relation, so the
+trace has no edge to cite and the evidence is falling back to something else —
+plausibly a chunk or lexical hit. Establish *why* line 8 is selected before
+calling it wrong.
+
+**Where to work:** `src/codeatlas/conversations/pipeline.py`,
+`src/codeatlas/application/graph_queries.py`, and the retrieval channels behind
+a `TRACE_FLOW` with no traversable edge.
+
+**Done when** the selection of line 8 has a stated cause, labelled *faulty
+instrument* or *absent decision* or — for the first time — *engine defect*.
+
+---
+
+## Task 3 — Subject and file path on `Finding` (WS-2)
 
 **Cost:** ½–1 day. **Blocked by:** nothing.
 
@@ -114,14 +186,14 @@ findings sharing a code and title render identically and collide on
 
 - `src/codeatlas/contracts.py` — the `Finding` model
 - `src/codeatlas/analysis/findings.py` — populate the new fields
-- `src/codeatlas/delivery/` — the JSON, Markdown and SARIF renderers
+- `src/codeatlas/delivery/` — the JSON, Markdown, PR and SARIF renderers
 - `apps/web/src/features/change-analysis/` — `FindingsList`
-- `tests/contract/` — cross-adapter coverage of all three renderers
+- `tests/contract/` — cross-adapter coverage of every renderer
 
 **Approach.** Additive optional fields only, so `contract_version` stays `1.1`
 and no migration is needed. Populate from the `SymbolChange` the finding was
-derived from. Surface in all three renderers and the web list, and key the React
-list on subject + path.
+derived from. Surface in every renderer and the web list, and key the React list
+on subject + path.
 
 **Traps**
 
@@ -130,14 +202,17 @@ list on subject + path.
 - Do not let this grow into a `Finding` redesign.
 - Regenerate the frontend API types with `scripts/generate_web_types.ps1`; never
   hand-edit them.
+- **There are four renderers, not three.** `text_report.py` is the CLI verdict
+  and was the one that silently dropped limitations until 2026-08-15 (ADR-0045).
+  Check it explicitly.
 
 **Done when** two same-code findings in different files render distinguishably
-in JSON, Markdown, SARIF and the web app, with cross-adapter tests covering all
-three renderers.
+in JSON, Markdown, PR, SARIF and the web app, with cross-adapter tests covering
+each.
 
 ---
 
-## Task 3 — Lexical intents populate relation paths (WS-6)
+## Task 4 — Lexical intents populate relation paths (WS-6)
 
 **Cost:** ½–1 day. **Blocked by:** nothing.
 
@@ -164,74 +239,86 @@ ADR-0034 causes settled.
   must not upgrade a lexical match's derivation.
 - Adding the gate target is a **separate** decision from populating the paths.
   Do not bundle them.
+- Watch `containing_evidence_rate`: more emitted evidence lowers it. It is
+  ungated now (ADR-0048), so this is worth noting in a handoff, not avoiding.
 
-**Done when** q027 and q029 emit their stored edges, and the ADR-0034 cause list
-is fully discharged.
+**Done when** q027 and q029 emit their stored edges, and ADR-0034's cause list is
+fully discharged.
 
 ---
 
-## Task 4 — Ranking sensitivity of the symbol corpus
+## Task 5 — q032: a two-hop trace carries no evidence for its far end
 
-**Cost:** hours. **Blocked by:** nothing. Best folded into Task 1 if that
-touches ranking anyway.
+**Cost:** hours once ruled. **Blocked by:** a product decision.
+
+**Why.** q032 traces frontend → backend. After ADR-0047 the frontend hop matches;
+`backend.py:1-2` — the endpoint the flow actually reaches — is **never cited**,
+so the case caps at **0.50**.
+
+Either a trace answer should carry evidence at its far end, or a two-hop
+expectation should not declare one. **A product question, not a defect**, and
+adjacent to Task 4: both are about what a traversal-derived answer carries.
+
+**Where to work:** `src/codeatlas/application/graph_queries.py` (the `trace`
+path), `tests/evaluation/cases/queries.json` (q032).
+
+---
+
+## Task 6 — Ranking sensitivity of the symbol corpus
+
+**Cost:** hours. **Blocked by:** nothing.
 
 **Why.** Mutation-checking the 23 cases added 2026-08-15 gave two answers:
 dropping the top hit fails **18 of 23**, but reversing the ranking fails **0 of
 23** — most return a single symbol, so a reversal is a no-op for them. The nine
-cases that do catch a reversal are all older. Corpus growth therefore raised the
-count without adding ranking coverage.
+cases that *do* catch a reversal are all older. Corpus growth raised the count
+without adding ranking coverage.
 
 **Approach.** Add cases whose answer sets are large enough for order to matter,
 and mutation-check them with a *ranking* mutation specifically — reversing
 `_ranked_symbols` in `src/codeatlas/evaluation/engine_adapter.py`.
+
+**Trap:** adding scored symbol-intent cases changes the
+`exact_symbol_resolution` denominator, which currently has **zero margin**.
+Do Task 1 first, or compute the new denominator before adding anything.
 
 **Done when** a ranking reversal fails cases added after 2026-08-15, not only
 ones from before it.
 
 ---
 
-## ~~Task 5 — Oversized tracked file (WS-3)~~ — **done 2026-08-15**
+## Task 7 — RRF coarse-chunk measurement (WS-5) — reframed, not blocked
 
-Gate A was ruled **A3: skip it, and declare the omission**, and WS-3 is
-delivered. See **ADR-0045**. `archive` skips and names oversized entries,
-`read_blob` still raises (it is asked for one specific blob), and the engine
-emits a `FILE_TOO_LARGE` warning plus a limitation naming the files.
-
-The investigation also found the directory side had been omitting oversized
-files *silently* since Phase 1 — the scanner recorded `TOO_LARGE` and nothing
-carried it into a report. Both sides now declare.
-
-## Task 6 — RRF coarse-chunk measurement (WS-5) — **reframed, not unblocked**
-
-**Cost:** 1–2 days. **Blocked by:** nothing, but the shape changed.
+**Cost:** 1–2 days. **Blocked by:** nothing; the shape changed.
 
 Gate B was ruled **B1: a module-level answer satisfies a conceptual question**,
-with **no ranking change**. See **ADR-0046**. So this is no longer "fix the RRF
-coarse-chunk bias" — the coarse-chunk penalty stays unimplemented, and the
-rank-1 containment hit s001 produces is preserved.
+with **no ranking change** (ADR-0046). So this is no longer "fix the RRF
+coarse-chunk bias" — the penalty stays unimplemented and s001's rank-1
+containment hit is preserved.
 
 What remains is a **measurement**: does the bias cost anything now the corpus is
-larger? ADR-0030's finding still stands — the obvious lever demotes the chunk
-currently providing that rank-1 hit — so any proposal to change ranking has to
-show corpus-wide numbers, not one case.
+larger? ADR-0030's finding stands — the obvious lever demotes the chunk
+providing that rank-1 hit — so any proposal to change ranking must show
+corpus-wide numbers, not one case.
 
-**Also permitted by the ruling, and worth doing first:** a conceptual expectation
-that names only the implementing symbol may be **widened** to accept the module
-that documents the concept. Widening only, never replacement, and only on the
+**Also permitted by the ruling, and cheaper:** a conceptual expectation naming
+only the implementing symbol may be **widened** to accept the module that
+documents the concept. Widening only, never replacement, and only on the
 ADR-0031/0036 justification. ADR-0003 still forbids editing the corpus to move a
 number.
 
+---
+
 ## Open, but waiting on a trigger rather than on effort
 
-These are not scheduled. Each has a named condition in the register that
-reopens it.
+Not scheduled. Each has a named condition in the register that reopens it.
 
-| Item                                                                                                                                                                                                                                                                                                | Trigger                                                                         |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Preflight takes >15 min on a 664-file repository.** The engine parses *both* full states per analysis — O(repository), not O(change) — and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented                                                                  | Someone measures it properly, or a user reports it                              |
-| **A `check_phase7` run once exited 1 while printing every step as passing.** Exit 1 is the uncaught-throw signature; the trailing `exit 0` added 2026-08-15 can neither cause nor prevent it. Did **not** recur in the 2026-08-15 gate run — one clean data point, not a diagnosis | It recurs — chase it before trusting a green                                   |
-| **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under the corpus                                                                               | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
-| **`relation_path_recall` has no gate target**                                                                                                                                                                                                                                               | Task 3 settles ADR-0034's last cause                                            |
+| Item | Trigger |
+| --- | --- |
+| **Preflight takes >15 min on a 664-file repository.** The engine parses *both* full states per analysis — O(repository), not O(change) — and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented | Someone measures it properly, or a user reports it |
+| **A `check_phase7` run once exited 1 while printing every step as passing.** Exit 1 is the uncaught-throw signature; the trailing `exit 0` added 2026-08-15 can neither cause nor prevent it. Has **not** recurred in the three gate runs since | It recurs — chase it before trusting a green |
+| **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under it | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
+| **`relation_path_recall` has no gate target** | Task 4 settles ADR-0034's last cause |
 
 ---
 
@@ -242,27 +329,39 @@ Listed so they are not re-proposed as work.
 - **Code signing** — a purchasing decision, not an engineering task. The
   packaged executable stays unsigned and SmartScreen warns on first run.
 - **Seven Chromium-skipped Playwright tests** — an upstream renderer defect on
-  client-side navigation. Firefox runs all seven, confirmed again in the
-  2026-08-15 gate run, so coverage is not lost. **Re-count rather than copy the
-  figure forward** if it is ever quoted; it has understated itself twice.
+  client-side navigation. Firefox runs all seven, confirmed again on 2026-08-16,
+  so coverage is not lost. **Re-count rather than copy the figure forward** if it
+  is ever quoted; it has understated itself twice.
 - **The 1.05 GB packaged semantic tree** — accepted at the Phase 7 activation
   gate; the torch cost was known when the semantic layer was admitted.
 - **Phase 4 `changed_symbol_precision` 0.9464 vs 0.95** — closed as structural.
   c020–c022 split one physical diff into three single-symbol cases that count
-  each other's symbols against them; the other cases score 1.0. The corpus is
-  not edited to move a number (ADR-0003).
+  each other's symbols against them; the others score 1.0. The corpus is not
+  edited to move a number (ADR-0003).
+- **Loosening `_contains` to accept overlap** — refused in ADR-0047. Its
+  directionality is correct; loosening it moves a number without settling
+  anything.
+- **Lowering `containing_evidence_rate`'s threshold** — refused in ADR-0048. It
+  is ungated instead, because a threshold chosen to be passed says less than it
+  appears to (ADR-0032, ADR-0033).
 
 ---
 
 ## Working rules for whoever picks these up
 
-Copied from `AGENTS.md`, the register, and lessons paid for in the past week.
+From `AGENTS.md`, the register, and lessons paid for over the past fortnight.
 
 - `AGENTS.md` is the release-blocking contract. `docs/plans/PLAN.md` is live
   status; **append** handoffs, never rewrite them.
-- **Test-first**, and **mutation-check every fix**. A test that passes on its
-  first run proves nothing until you have watched it fail — and pick a mutation
-  that matches the claim, or you get the false comfort Task 4 records.
+- **Test-first**, and **mutation-check every fix.** A test that passes on its
+  first run proves nothing until you have watched it fail — and **pick a
+  mutation that matches the claim**, or you get the false comfort Task 6
+  records.
+- **Derive an expectation from the claim, never from the engine's output.**
+  See the governing rule above; this is what surfaced Task 2.
+- **A failing prediction is information.** If a measured number does not match a
+  predicted one, the model of the failure is wrong and everything downstream is
+  suspect. Stop and say so.
 - **Revert a mutation from a file copy, never `git checkout --`.** It has twice
   reverted the fix along with the mutation (ADR-0022, ADR-0042).
 - **Do not edit the tree you are measuring.** A preflight over a live working
@@ -270,13 +369,18 @@ Copied from `AGENTS.md`, the register, and lessons paid for in the past week.
   false findings on 2026-08-13.
 - **ADR-0003: the corpus is never edited to move a number.** Adding coverage is
   legitimate; changing an expectation needs the ADR-0031/0036 justification.
+- **When an exclusion stops being loud, check every surface that reported the
+  loudness** (ADR-0045). Four renderers carry limitations; the CLI verdict was
+  the one that silently did not.
 - Declare any change to `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION` or
   `CHUNKER_VERSION` explicitly: it makes every snapshot stale and forces a
   re-index.
 - Gates before any completion claim: `uv run pytest -q`,
   `ruff check src tests scripts apps`,
   `mypy --no-incremental src tests scripts apps`,
-  `check_phase4.ps1 -SkipSync`, `check_phase7.ps1 -SkipSync`. Read exit codes
-  from the process. **They may now be run concurrently** — the shared
-  `.test-tmp` collision was fixed 2026-08-15 and the one-at-a-time rule is
-  retired.
+  `check_phase4.ps1 -SkipSync`, `check_phase7.ps1 -SkipSync`. **Read exit codes
+  from the process, not the printed output.** They may be run **concurrently** —
+  the shared `.test-tmp` collision was fixed 2026-08-15 and the one-at-a-time
+  rule is retired.
+- **Regenerate `baseline-phase-0`, `-3` and `-4` once, at the end of a change.**
+  `-1` and `-2` stay frozen as history.
