@@ -68,3 +68,11 @@ Invoke-Checked "Phase 1 engine baseline" @(
 )
 
 Write-Output "Phase 1 verification completed."
+
+# The verdict belongs in the exit code, not only in the line above it.
+# Without this, a caller that reads $LASTEXITCODE after invoking the gate
+# gets whatever the last native command left -- measured at 3 through a
+# wrapper script. A failing step never reaches here: Invoke-Checked throws
+# and $ErrorActionPreference is Stop, which
+# tests/unit/test_gate_exit_codes.py pins.
+exit 0

@@ -17,7 +17,7 @@ Apply to every workstream. Copied from `AGENTS.md`, the register, and lessons pa
 - `AGENTS.md` is the release-blocking contract. `docs/plans/PLAN.md` is live status; append handoffs, never rewrite them.
 - **Test-first.** No production code without a test observed failing first, and mutation-check every fix.
 - **Revert a mutation from a file copy, never `git checkout --`.** It has twice reverted the fix along with the mutation (ADR-0022, ADR-0042).
-- **Never run two gates, or a gate and a pytest, concurrently.** They share `.test-tmp` and collide with `FileExistsError`. A gate that fails that way is void, not a result — this cost a wasted run on 2026-08-13.
+- ~~**Never run two gates, or a gate and a pytest, concurrently.**~~ **Retired 2026-08-15.** They no longer share a temporary directory: each session gets `.test-tmp/s-<pid>-<uuid>`. The rule existed because pytest *deletes* the `--basetemp` it is given, so a second run destroyed the first run's live files — not because of residue, and not something a lockfile was needed for.
 - **Do not edit the tree you are measuring.** A preflight over a live working tree is not atomic; a file caught mid-write reads as empty and reports every symbol in it deleted. This produced 496 false findings on 2026-08-13.
 - **ADR-0003: the corpus is never edited to move a number.** *Adding* coverage is legitimate; *changing* an expectation requires the ADR-0031/0036 justification — the expectation named something the engine cannot produce, or contradicted itself.
 - Declare any change to `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`, or `CHUNKER_VERSION` explicitly: it makes every snapshot stale and forces a re-index.
@@ -111,24 +111,29 @@ Per case, the full checklist:
 5. a `Case` in `tests/unit/test_impact_cases.py` (plus its fixture symbol map)
 6. regenerate `baseline-phase-0`, `-3`, `-4`; **never** `-1` or `-2`
 
-### Two fixes worth doing before Task 3
+### Two fixes worth doing before Task 3 — **both done 2026-08-15**
 
-Both are small, both address things that cost time today, and neither is
-required:
+Planned and executed as `docs/superpowers/plans/2026-08-14-gate-exit-codes-and-test-isolation.md`. **Both stated mechanisms were wrong**, which is the transferable part:
 
-- **`exit 0` at the end of `check_phase7.ps1`.** It prints "verification
-  completed" and exits with whatever the last native command left, so its log
-  and its exit code can disagree — which is how several runs today were read as
-  green without `$?` being captured.
-- **A lockfile around `.test-tmp`, plus clean-on-start.** Four void runs in two
-  days: three from concurrent pytest, one from residue left by the previous
-  gate. Task 3 is four more cycles of that exact shape.
+- [x] ~~**`exit 0` at the end of `check_phase7.ps1`.**~~ Done, in **all eight**
+  scripts. But the premise did not reproduce: under `powershell -File` a
+  trailing non-zero native command still exits 0. The real exposure is a
+  *caller* reading `$LASTEXITCODE`, measured at 3 through a wrapper.
+- [x] ~~**A lockfile around `.test-tmp`, plus clean-on-start.**~~ Done, but
+  **not as a lockfile** — that was rejected. pytest *deletes* the `--basetemp`
+  it is given, so the shared directory was the bug; each session now gets its
+  own leaf, and two suites now run concurrently and both pass.
 
 ### Still open from today, unattributed
 
 One `check_phase7` run exited 1 while printing every step as passing, and did
 not reproduce on a clean `main` or on a re-run with the same changes. **Not
 diagnosed, not guessed at.** If it recurs, chase it before trusting a green.
+
+**Explicitly not closed by the `exit 0` work**: exit 1 is the uncaught-throw
+signature, so something threw, and a trailing `exit 0` can neither cause nor
+prevent it. It now has its own Deferred Register row so that closing the
+fixable half did not carry it away.
 
 **WS-1 first among the substantial ones**, because WS-4 and WS-5 are both measurements and measuring against a corpus this thin is what produced five instrument-not-engine findings.
 

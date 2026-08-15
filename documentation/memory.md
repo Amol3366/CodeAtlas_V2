@@ -1541,6 +1541,45 @@ minutes to redo.
       still the accepted structural miss — `containing_evidence_rate` 0.6860 →
       0.6932, `primary_evidence_recall_at_10` 0.7667 → 0.7742.
 
+- [x] **Gate exit codes and test isolation — and both register diagnoses were
+      wrong (2026-08-15).** Commits `1605fe2`, `19a7c32`. No `src/` change, no
+      version bump, no baseline moved.
+
+      **A remedy written into the register is still a hypothesis.** Both rows
+      named a mechanism that measurement contradicted, and one of them named a
+      *fix* (a lockfile) that would have been wrong. **Seventh
+      instrument-not-engine finding.** Reproduce before implementing the
+      remedy someone already wrote down — including when that someone was a
+      previous session of me.
+
+      **pytest deletes the `--basetemp` you give it** — the directory itself,
+      when the first `tmp_path` is requested, with none of the numbering or
+      retention it uses by default. Sharing one across runs is the bug; the
+      residue in it was a symptom. A second run destroyed a *live* session's
+      files. Each session now gets `.test-tmp/s-<pid>-<uuid>`, so two suites
+      run concurrently (706 and 815, both green) and the "never run two gates
+      at once" rule is retired. **A uuid, not a timestamp**: four processes
+      launched together read the *same* `time.time_ns()` on Windows, leaving
+      only the pid, and pids are reused (ADR-0037).
+
+      **`powershell -File` does not propagate a trailing native exit code.** A
+      script ending `cmd /c "exit 3"` exits 0. The leak only appears in a
+      *caller* that reads `$LASTEXITCODE` — measured at 3 through a wrapper.
+      So the gates were less broken than recorded, and all eight were fixed
+      rather than the one the register named. The safety property — that
+      `exit 0` cannot turn a red gate green — is pinned by a test *and* by
+      deliberately breaking the real Phase 4 gate, which exited 1.
+
+      **The mutation check earned its cost by failing to fail.** A test the
+      plan called a guard passed with the defect reintroduced, because it
+      asserted the root was *somewhere* above `tmp_path` — true either way. It
+      now asserts the session leaf. A guard nobody has watched fail is a guess.
+
+      **Do not import `tests/conftest.py`.** Doing so makes mypy find it under
+      both `conftest` and `tests.conftest` and refuse the entire run — the same
+      collision its own comment records for a second conftest module, by a
+      different route. Share helpers as **fixtures**.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
