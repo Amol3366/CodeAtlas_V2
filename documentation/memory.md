@@ -1620,6 +1620,43 @@ minutes to redo.
       every existing graph case). Correcting to the convention moved
       `containing_evidence_rate` 0.5984 → 0.6885.
 
+- [x] **Gates A and B ruled; WS-3 delivered, WS-5 reframed (2026-08-15).**
+      ADR-0045 and ADR-0046. Both decision gates the post-closeout program had
+      carried are closed.
+
+      **Gate A → skip an oversized tracked file, and declare it.** One
+      committed 3 MB CSV used to make a repository impossible to preflight,
+      while the directory scan merely skipped the same file. **`read_blob`
+      still raises on purpose** — it is asked for one specific blob, and
+      answering "here is nothing" for a file the caller named is a worse
+      contract than refusing. The two Git paths differ deliberately now, and
+      the reason is written at both.
+
+      **"Skip it" is only acceptable with the second half.** Trading a loud
+      failure for a silent omission is the worse defect for a change-assurance
+      tool, so the engine emits a `FILE_TOO_LARGE` warning and a limitation
+      naming the files.
+
+      **The quiet half nobody had recorded:** the scanner has recorded
+      `TOO_LARGE` since Phase 1 and **nothing ever carried it into a change
+      report**, so the directory side was already omitting oversized files
+      *silently*. The blob side was at least loud. Look for the silent twin of
+      a loud defect.
+
+      **Gate B → a module-level answer satisfies a conceptual question, and no
+      ranking change is made.** **The right outcome was to write no code.**
+      ADR-0030 had already investigated s001 and found no defect; ruling the
+      other way would have declared one, spent real risk on a metric ungated on
+      the retrieval profile (ADR-0023), and traded an evidence hit for a symbol
+      hit — inverting what the product is for. WS-5 becomes a measurement, not
+      a fix.
+
+      **Inverting a pinning test is not deleting it.**
+      `test_a_tracked_file_over_the_size_limit_fails_the_whole_comparison`
+      existed so the asymmetry could not change silently *in either direction*.
+      It now asserts the skip in the same place, beside a test that `read_blob`
+      still raises — so the deliberate difference cannot erode either.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

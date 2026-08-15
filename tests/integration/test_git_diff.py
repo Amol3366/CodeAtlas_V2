@@ -8,7 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from codeatlas.domain.errors import GitRefUnresolvableError
+from codeatlas.domain.errors import (
+    GitRefUnresolvableError,
+    ScanLimitExceededError,
+)
+from codeatlas.domain.repository import ScanLimits
 from codeatlas.repositories.git_diff import GitDiffAdapter
 
 requires_git = pytest.mark.skipif(
@@ -161,9 +165,41 @@ def test_archive_returns_the_same_bytes_as_per_blob_reads(
     adapter = GitDiffAdapter()
     head = adapter.resolve_ref(git_repo_with_history, "HEAD")
 
-    contents = adapter.archive(git_repo_with_history, head)
+    archived = adapter.archive(git_repo_with_history, head)
 
-    assert contents is not None
-    assert set(contents) == set(adapter.list_files(git_repo_with_history, head))
-    for path, blob in contents.items():
+    assert archived is not None
+    assert archived.oversized == ()
+    assert set(archived.contents) == set(
+        adapter.list_files(git_repo_with_history, head)
+    )
+    for path, blob in archived.contents.items():
         assert blob == adapter.read_blob(git_repo_with_history, head, path)
+
+
+@requires_git
+def test_archive_skips_an_oversized_blob_and_names_it(git_repo: Path) -> None:
+    """ADR-0045: `archive` answers "everything readable", so the limit is a
+    skip. `read_blob` is asked for one specific blob and still raises, because
+    answering "here is nothing" for a named file would be worse."""
+    adapter = GitDiffAdapter()
+    oversized = "x" * (ScanLimits().max_file_bytes + 1) + "\n"
+    (git_repo / "big.csv").write_bytes(oversized.encode("utf-8"))
+    subprocess.run(
+        ["git", "-c", "user.email=d@e.invalid", "-c", "user.name=D",
+         "add", "big.csv"],
+        cwd=git_repo, check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-c", "user.email=d@e.invalid", "-c", "user.name=D",
+         "commit", "-m", "big"],
+        cwd=git_repo, check=True, capture_output=True,
+    )
+    head = adapter.resolve_ref(git_repo, "HEAD")
+
+    archived = adapter.archive(git_repo, head)
+
+    assert archived is not None
+    assert archived.oversized == ("big.csv",)
+    assert "big.csv" not in archived.contents
+    with pytest.raises(ScanLimitExceededError):
+        adapter.read_blob(git_repo, head, "big.csv")
