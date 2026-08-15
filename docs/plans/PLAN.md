@@ -47,16 +47,16 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 
 ## Active Work
 
-| Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active phase    | **none - closed.** Phases 0-7 are all `complete`. Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed; that condition has since been met under a corrected metric (ADR-0027), and the correction must be cited with it |
-| Active task     | **none - closed.** The 2026-08-10 closeout settled the four remaining substantial items (ADR-0037 to ADR-0040) and dispositioned every other open item in the Deferred Register below. **This project has a terminal state; it is not an open tail.** |
-| Task status     | `complete` - Phase 7 stays approved. Everything since is post-gate work, not a reopened phase task. `SCHEMA_VERSION` is **14** (migration `0014`); `contract_version` remains `1.1` |
-| Agent           | Claude Code `claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Started UTC     | 2026-08-10T08:00:00Z (project closeout; all earlier work is in the handoff log) |
-| Git state       | Branch `main`, clean at closeout. Five branches merged: `closeout-pid-reuse`, `closeout-relation-path-recall`, `closeout-imports-target`, `closeout-ephemeral-scope`, `closeout-terminal-state`. Changed: `indexing/ownership.py`, `evaluation/runner.py`, one CLI docstring, one corpus endpoint. No schema, contract, migration, or generated artifact changed |
+| Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Active phase    | **none - closed.** Phases 0-7 are all `complete`. Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed; that condition has since been met under a corrected metric (ADR-0027), and the correction must be cited with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Active task     | **none - closed.** The 2026-08-10 closeout settled the four remaining substantial items (ADR-0037 to ADR-0040) and dispositioned every other open item in the Deferred Register below. **This project has a terminal state; it is not an open tail.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Task status     | `complete` - Phase 7 stays approved. Everything since is post-gate work, not a reopened phase task. `SCHEMA_VERSION` is **14** (migration `0014`); `contract_version` remains `1.1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Started UTC     | 2026-08-10T08:00:00Z (project closeout; all earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Git state       | Branch`main`, clean at closeout. Five branches merged: `closeout-pid-reuse`, `closeout-relation-path-recall`, `closeout-imports-target`, `closeout-ephemeral-scope`, `closeout-terminal-state`. Changed: `indexing/ownership.py`, `evaluation/runner.py`, one CLI docstring, one corpus endpoint. No schema, contract, migration, or generated artifact changed                                                                                                                                                                                                                                                                                                                                                                                 |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision**, and the Deferred Register names what each candidate would cost |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded.**New work requires an explicit user decision**, and the Deferred Register names what each candidate would cost                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ## Deferred Register
 
@@ -71,31 +71,32 @@ trigger that reopens it. **Nothing here is silently dropped.** An item leaving
 this register requires the same evidence as any other task: a handoff entry
 with verification.
 
-| Item | Disposition | Reopens when |
-| --- | --- | --- |
-| Pid-reuse detection in crash recovery | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called | — |
-| `relation_path_correctness` measured precision | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning | — |
-| q010: does `IMPORTS` target the module or the bound class? | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols` | — |
-| `CODEATLAS_EPHEMERAL` CLI scope | **CLOSED** — ADR-0040, won't-fix with reasoning. A CLI command exits immediately, so a session database would make every invocation an island | — |
-| Phase 4 `changed_symbol_precision` 0.9375 vs ≥0.95 | **CLOSED as structural.** c020–c022 split one physical diff into three single-symbol cases that count each other's symbols against them; the other 21 score 1.0. Fully explained in `docs/evaluation/phase-4-baseline-environment.md` | Never — the corpus is not edited to move a number (ADR-0003) |
-| Unsigned packaged executable | **DEFERRED — not an engineering task.** SmartScreen warns on first run. Needs a purchased code-signing certificate | A certificate is purchased |
-| **Seven** Playwright tests skipped on Chromium, across **five** spec files | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all seven, so coverage is not lost. **Counted from the gate run on 2026-08-11, not copied forward:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings`, and `stream-reconnection` ×2. The seventh is ADR-0042's navigation test, which is skipped for the same reason as the reload test beside it. The figure understated itself twice before (corrected 2026-08-07 and 2026-08-10); it is re-counted here rather than incremented | The upstream bug is fixed |
-| Packaged semantic tree 1.05 GB | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted | A deterministic-only second artifact is wanted |
-| **The change corpus cannot express an ADR-0044-shaped defect** | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason | Someone gives the corpus a Git-backed change case, which is a new fixture shape rather than a new case |
-| Grow the symbol corpus toward 50 cases | **DEFERRED — multi-day.** 13+ cases, each needing gold ranges. Nothing is *wrong* today: ADR-0033 records that 0.98 is inexpressible at 27 cases and is documented at the constant | Someone commits the days |
-| `relation_path_recall` has no gate target | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023) | That design decision is settled |
-| RRF coarse-chunk bias | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit | The module-granularity ruling lands |
-| Phase 4 `containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect** | Someone investigates per-case |
-| **A tracked file that matches an ignore default is reported deleted** | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means | — |
-| ~~Editing a large Markdown file reports hundreds of its sections as deleted~~ | **CLOSED 2026-08-13 — not a defect. The engine was right and the measurement was wrong**, which is the **sixth** consecutive investigation of this shape to end that way (ADR-0017, 0018, 0024, 0027, 0038). The 12-minute analysis ran over a **live working tree while the same session rewrote `PLAN.md`** with `Path.write_text`, which truncates before it writes; the read landed in that window and saw an empty file. Proven by exact reproduction: an empty target yields **496 `SYMBOL_DELETED`** against the artifact's **496** for that file, a truncated one yields 491+1, and the real edited bytes yield **2 findings and zero deletions**. Eliminated on the way, and they should stay eliminated: text decoding (the mojibake was the terminal — the JSON holds `—` intact), symbol pairing with matching *and* mismatched `file_id`s, parse divergence (both views: 497 symbols, same ids, zero diagnostics), scale (50/200/497 sections all correct), and the real `GitBlobStateView`-vs-`DirectoryStateView` pairing. Three regression tests kept in `tests/unit/test_document_section_diff.py`, one of which pins the truncation shape so the next wall of deletions is diagnosable in a single run. Full account: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` | — |
-| **`check_phase7.ps1` can exit non-zero while reporting success** | **OPEN — a defect in a release gate.** The script ends with `Write-Output "Phase 7 verification completed."` and no explicit `exit 0`, so the process exit code is whatever the last native command left. A human reading the log and a CI system reading the exit code can therefore disagree. Found 2026-08-14 after several runs this session were reported green from the log line rather than from `$?`; the underlying suites did pass, but the claim was inferred | Someone adds `exit 0` and a test that the gate's exit code matches its verdict |
-| **`.test-tmp` residue and concurrency void gate runs** | **OPEN — four occurrences in two days.** Two pytest invocations at once collide with `FileExistsError`; running `check_phase7` immediately after `check_phase4` fails at Tests on leftover state. Every occurrence produced a *void* run that looks like a failure, and one of them was briefly mistaken for a real one. The rule "never run two gates concurrently" is written in the program plan's Global Constraints and keeps being broken | A lockfile around `.test-tmp` plus clean-on-start makes it unbreakable |
-| **Preflight takes >15 minutes on a 664-file repository** | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time** | Someone measures it properly, or a user reports it |
-| **An oversized tracked file fails the whole comparison** | **OPEN — found while fixing ADR-0044, deliberately not folded into it.** Not a disagreement but a **refusal**: `GitDiffAdapter.archive` raises `ScanLimitExceededError` when any tracked file exceeds `max_file_bytes`, so a single committed 3 MB CSV makes a repository impossible to preflight — while the directory scan skips the same file with a `TOO_LARGE` warning. The fourth of ADR-0044's four exclusion mechanisms, and the only one not aligned. Turning a declared error path into a silent skip is its own ruling, so today's behaviour is **pinned by a test** rather than changed. Nothing in this repository triggers it, which is exactly why it went unnoticed | The user rules whether an oversized tracked file is skipped like the scanner does, or keeps refusing |
-| ADR-0030 module-granularity ruling | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90 | The user rules |
-| **Duplicate findings, and false findings on a clean tree** | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically | — |
-| **Nested config keys report false changes (ADR-0025 regression)** | **CLOSED 2026-08-11 — ADR-0041.** A key now hashes its own value rather than the line range it cites; the reproduction went from 8 findings (7 false) to 2. `PARSER_BUNDLE_VERSION` 1.3.0 → 1.4.0, so **every snapshot must be re-indexed**. Two residues recorded there: YAML compares subtree *text*, so re-indenting a block reports a change; and every tracked baseline reproduced byte-for-byte, which means **the corpus cannot see this defect** — the unit tests are the only coverage. Original diagnosis follows | — |
-| ~~Nested config keys, original entry~~ | **OPEN — a real defect in the core wedge, reported by the user 2026-08-11 and reproduced.** Changing **one line** of `pyproject.toml` (`version`) yields **8 `CONFIG_VALUE_CHANGED` findings, 7 false**: `project`, `project.optional-dependencies`, `…semantic-local`, `…semantic-openai`, `project.scripts`, `…codeatlas`, `…codeatlas-mcp`, plus the one true `project.version`. **Cause:** ADR-0025 made nested keys addressable symbols, and a leaf whose own line cannot be located keeps its **parent's range** — so its content hash is the whole parent block, and any change inside that block marks every nested key modified. They also render with identical spans, which is what reads on screen as duplicated findings. **The engine does not emit literal duplicates** — the JSON findings are distinct — so a separately-reported duplicate *rendering* in the web Preflight screen is unreproduced and may be a UI issue | Next session. Fixing it means giving a leaf a real hash of its own value rather than inheriting the parent block's, which is a `PARSER_BUNDLE_VERSION` bump and a re-index |
+| Item                                                                                       | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Reopens when                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pid-reuse detection in crash recovery                                                      | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                                                                                                                                                                          |
+| `relation_path_correctness` measured precision                                           | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
+| q010: does`IMPORTS` target the module or the bound class?                                | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                                          |
+| `CODEATLAS_EPHEMERAL` CLI scope                                                          | **CLOSED** — ADR-0040, won't-fix with reasoning. A CLI command exits immediately, so a session database would make every invocation an island                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | —                                                                                                                                                                          |
+| Phase 4`changed_symbol_precision` 0.9375 vs ≥0.95                                       | **CLOSED as structural.** c020–c022 split one physical diff into three single-symbol cases that count each other's symbols against them; the other 21 score 1.0. Fully explained in `docs/evaluation/phase-4-baseline-environment.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Never — the corpus is not edited to move a number (ADR-0003)                                                                                                               |
+| Unsigned packaged executable                                                               | **DEFERRED — not an engineering task.** SmartScreen warns on first run. Needs a purchased code-signing certificate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | A certificate is purchased                                                                                                                                                  |
+| **Seven** Playwright tests skipped on Chromium, across **five** spec files     | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all seven, so coverage is not lost. **Counted from the gate run on 2026-08-11, not copied forward:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings`, and `stream-reconnection` ×2. The seventh is ADR-0042's navigation test, which is skipped for the same reason as the reload test beside it. The figure understated itself twice before (corrected 2026-08-07 and 2026-08-10); it is re-counted here rather than incremented                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The upstream bug is fixed                                                                                                                                                   |
+| Packaged semantic tree 1.05 GB                                                             | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | A deterministic-only second artifact is wanted                                                                                                                              |
+| **The change corpus cannot express an ADR-0044-shaped defect**                       | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Someone gives the corpus a Git-backed change case, which is a new fixture shape rather than a new case                                                                      |
+| Grow the symbol corpus toward 50 cases                                                     | **DEFERRED — multi-day.** 13+ cases, each needing gold ranges. Nothing is *wrong* today: ADR-0033 records that 0.98 is inexpressible at 27 cases and is documented at the constant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone commits the days                                                                                                                                                    |
+| `relation_path_recall` has no gate target                                                | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
+| RRF coarse-chunk bias                                                                      | **DEFERRED — needs corpus-wide measurement,** not a one-case fix. ADR-0030 records that the obvious lever demotes the chunk currently providing a rank-1 containment hit, trading an evidence hit for a symbol hit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | The module-granularity ruling lands                                                                                                                                         |
+| Phase 4`containing_evidence_rate` 0.6667 and `containing_evidence_recall_at_10` 0.8305 | **DEFERRED — cause unknown, and the prior is that the instrument is wrong again.** Five investigations (ADR-0017, 0018, 0024, 0027, 0038) found the apparatus at fault rather than the engine. **Investigate per-case before calling this a defect**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Someone investigates per-case                                                                                                                                               |
+| **A tracked file that matches an ignore default is reported deleted**                | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | —                                                                                                                                                                          |
+| ~~Editing a large Markdown file reports hundreds of its sections as deleted~~             | **CLOSED 2026-08-13 — not a defect. The engine was right and the measurement was wrong**, which is the **sixth** consecutive investigation of this shape to end that way (ADR-0017, 0018, 0024, 0027, 0038). The 12-minute analysis ran over a **live working tree while the same session rewrote `PLAN.md`** with `Path.write_text`, which truncates before it writes; the read landed in that window and saw an empty file. Proven by exact reproduction: an empty target yields **496 `SYMBOL_DELETED`** against the artifact's **496** for that file, a truncated one yields 491+1, and the real edited bytes yield **2 findings and zero deletions**. Eliminated on the way, and they should stay eliminated: text decoding (the mojibake was the terminal — the JSON holds `—` intact), symbol pairing with matching *and* mismatched `file_id`s, parse divergence (both views: 497 symbols, same ids, zero diagnostics), scale (50/200/497 sections all correct), and the real `GitBlobStateView`-vs-`DirectoryStateView` pairing. Three regression tests kept in `tests/unit/test_document_section_diff.py`, one of which pins the truncation shape so the next wall of deletions is diagnosable in a single run. Full account: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` | —                                                                                                                                                                          |
+| ~~**`check_phase7.ps1` can exit non-zero while reporting success**~~                    | **CLOSED 2026-08-15, with the diagnosis corrected.** The recorded mechanism — "the process exit code is whatever the last native command left" — **does not reproduce.** Under `powershell -File` a trailing `cmd /c "exit 3"` still exits **0**, so the success path was never leaking; and a failing step already exited non-zero, because `Invoke-Checked` throws under `$ErrorActionPreference = "Stop"`. The real exposure is one invocation-form narrower: a **caller** that reads `$LASTEXITCODE` after invoking a gate sees the stale code, measured at **3** through a wrapper `.ps1`. Worth fixing anyway — a release gate should state its verdict rather than leave it to how it was called. **All eight** gate scripts lacked the line, not just Phase 7; all eight now end `exit 0`, guarded with no exemption list. The risk that this masks a red gate is covered twice: a dynamic test asserting a throwing step still exits 1 with `exit 0` below it, and a deliberate breakage of the real Phase 4 gate, which exited **1** naming `Dataset validation failed with exit code 2`                                                                                                                                                                                                             | —                                                                                                                                                                          |
+| **One `check_phase7` run exited 1 while printing every step as passing**           | **OPEN — still unattributed, and explicitly *not* closed by the `exit 0` work above.** Exit 1 is the **uncaught-throw** signature, so something threw; the trailing `exit 0` cannot produce or prevent it. Observed once on 2026-08-14, did not reproduce on a clean `main` or on a re-run with the same changes. Split out from the exit-code row on 2026-08-15 so that closing the fixable half did not carry this away with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | It recurs — chase it before trusting a green                                                                                                                               |
+| ~~**`.test-tmp` residue and concurrency void gate runs**~~                              | **CLOSED 2026-08-15. The cause was not residue and the fix was not a lockfile.** `--basetemp=.test-tmp` named a *shared* directory, and pytest **deletes the directory it is given** the moment the first `tmp_path` is requested — the directory itself, not a numbered subdirectory of it. A second run therefore **destroyed a running session's live files** rather than merely colliding with it, which is why the symptoms looked like both `FileExistsError` and "leftover state". Each session now gets `.test-tmp/s-<pid>-<uuid>`, pruned by age at start; the root stays repository-local because `development-windows.md` records that a locked-down Windows account may be unable to write system temp. **A lockfile was rejected**: it serializes runs instead of making them safe, and would need stale-lock detection — the pid-ownership problem ADR-0037 had to solve. Proven by running `tests/integration` and `tests/unit` concurrently: both passed (706 and 815) into two distinct session directories. **The "never run two gates at once" rule is retired**                                                                                                                                                                                                                                           | —                                                                                                                                                                          |
+| **Preflight takes >15 minutes on a 664-file repository**                             | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone measures it properly, or a user reports it                                                                                                                          |
+| **An oversized tracked file fails the whole comparison**                             | **OPEN — found while fixing ADR-0044, deliberately not folded into it.** Not a disagreement but a **refusal**: `GitDiffAdapter.archive` raises `ScanLimitExceededError` when any tracked file exceeds `max_file_bytes`, so a single committed 3 MB CSV makes a repository impossible to preflight — while the directory scan skips the same file with a `TOO_LARGE` warning. The fourth of ADR-0044's four exclusion mechanisms, and the only one not aligned. Turning a declared error path into a silent skip is its own ruling, so today's behaviour is **pinned by a test** rather than changed. Nothing in this repository triggers it, which is exactly why it went unnoticed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | The user rules whether an oversized tracked file is skipped like the scanner does, or keeps refusing                                                                        |
+| ADR-0030 module-granularity ruling                                                         | **OPEN — a product question, not a defect.** When a concept is documented at module level, does the module satisfy a conceptual question? Nothing fails today; `symbol_recall_at_10` is 0.9286 against 0.90                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | The user rules                                                                                                                                                              |
+| **Duplicate findings, and false findings on a clean tree**                           | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                                                                          |
+| **Nested config keys report false changes (ADR-0025 regression)**                    | **CLOSED 2026-08-11 — ADR-0041.** A key now hashes its own value rather than the line range it cites; the reproduction went from 8 findings (7 false) to 2. `PARSER_BUNDLE_VERSION` 1.3.0 → 1.4.0, so **every snapshot must be re-indexed**. Two residues recorded there: YAML compares subtree *text*, so re-indenting a block reports a change; and every tracked baseline reproduced byte-for-byte, which means **the corpus cannot see this defect** — the unit tests are the only coverage. Original diagnosis follows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | —                                                                                                                                                                          |
+| ~~Nested config keys, original entry~~                                                    | **OPEN — a real defect in the core wedge, reported by the user 2026-08-11 and reproduced.** Changing **one line** of `pyproject.toml` (`version`) yields **8 `CONFIG_VALUE_CHANGED` findings, 7 false**: `project`, `project.optional-dependencies`, `…semantic-local`, `…semantic-openai`, `project.scripts`, `…codeatlas`, `…codeatlas-mcp`, plus the one true `project.version`. **Cause:** ADR-0025 made nested keys addressable symbols, and a leaf whose own line cannot be located keeps its **parent's range** — so its content hash is the whole parent block, and any change inside that block marks every nested key modified. They also render with identical spans, which is what reads on screen as duplicated findings. **The engine does not emit literal duplicates** — the JSON findings are distinct — so a separately-reported duplicate *rendering* in the web Preflight screen is unreproduced and may be a UI issue                                                                                                                                                                                                                                                                                                                                                                | Next session. Fixing it means giving a leaf a real hash of its own value rather than inheriting the parent block's, which is a`PARSER_BUNDLE_VERSION` bump and a re-index |
 
 ### Phase 7 Task Board
 
@@ -246,6 +247,87 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-15T02:00:00Z — Gate exit codes and test isolation; both register diagnoses were wrong
+
+- Agent: Claude Code `claude-opus-5`, branch `gate-exit-codes-and-test-isolation`.
+- Transition: no phase task. Post-gate. Executed
+  `docs/superpowers/plans/2026-08-14-gate-exit-codes-and-test-isolation.md`.
+- Commits `1605fe2` (test isolation), `19a7c32` (gate exit codes), plus this
+  record. **No `src/` change**; no version bump, so no snapshot is stale.
+
+**Both Deferred Register rows named a mechanism that measurement contradicted.
+This is the seventh instrument-not-engine finding** (ADR-0017, 0018, 0024,
+0027, 0038, the 2026-08-13 document-section report, and now this pair). Both
+rows were written from inference; neither had been reproduced.
+
+**`.test-tmp` — the cause was not residue, and a lockfile would have been the
+wrong fix.** `--basetemp=.test-tmp` named a shared directory, and pytest
+**deletes the directory it is given** when the first `tmp_path` is requested —
+the directory itself, not a numbered subdirectory. A second run therefore
+*destroyed a running session's live files*. Proven by planting a marker:
+`marker survived? -> NO - WIPED`. Each session now gets
+`.test-tmp/s-<pid>-<uuid>`, pruned by age at start, root still
+repository-local. The suffix is a **uuid, not a timestamp**: four processes
+launched together observed the *same* `time.time_ns()` on Windows, leaving only
+the pid to disambiguate, and pids are reused (ADR-0037).
+
+- **Evidence the rule can be retired:** `tests/integration` and `tests/unit`
+  run concurrently — `706 passed` and `815 passed, 3 skipped`, both exit 0,
+  into two distinct session directories. The program plan's "never run two
+  gates at once" constraint is struck.
+
+**Gate exit codes — the recorded mechanism does not reproduce.** Under
+`powershell -File`, a trailing `cmd /c "exit 3"` still exits **0**; a failing
+step already exited non-zero because `Invoke-Checked` throws under
+`$ErrorActionPreference = "Stop"`. The real exposure is a **caller** reading
+`$LASTEXITCODE`, measured at **3** through a wrapper `.ps1`. All **eight**
+scripts lacked the line, not just Phase 7.
+
+- **The masking risk is covered twice**, because a trailing `exit 0` could in
+  principle turn a red gate green: a dynamic test asserting a throwing step
+  still exits 1 with `exit 0` below it, and a deliberate breakage of the real
+  Phase 4 gate — pointed at a non-existent dataset — which exited **1** with
+  `Dataset validation failed with exit code 2`. The same gate exits **0**
+  unbroken.
+- **The unattributed intermittent is deliberately not closed by this.** Exit 1
+  is the uncaught-throw signature, so the trailing line can neither cause nor
+  prevent it. It has been **split into its own register row** rather than
+  carried away by closing the fixable half.
+
+**Two things the plan got wrong, both caught by executing it rather than by
+reading it:**
+
+1. **A test the plan called a guard was not one.** The mutation check showed
+   `test_the_session_basetemp_is_inside_the_repository_local_root` *passing*
+   with the shared basetemp restored — `.test-tmp` is a parent of `tmp_path`
+   either way. It now asserts the `s-` leaf separately, and both guards fail
+   under the mutation. **The mutation check earned its cost by failing to fail.**
+2. **Importing `tests.conftest` broke mypy entirely** — `Source file found twice under different module names: "conftest" and "tests.conftest"`, the
+   same collision that file's own comment records for a second conftest module,
+   arriving by a different route. The helpers are reached through **fixtures**
+   instead, which is the idiomatic pytest answer anyway.
+
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`; `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`, `CHUNKER_VERSION`
+  unchanged. No new dependency. No baseline moved — nothing here touches the
+  engine or the corpus.
+- Verification, exit codes read from the process: `uv run pytest -q` **2230
+  passed, 3 skipped** — 2212 at `f4fdae4`, plus 7 isolation tests and 11 gate
+  tests; `ruff check src tests scripts apps` exit 0;
+  `mypy --no-incremental src tests scripts apps` clean on **352** source files;
+  `check_phase4.ps1 -SkipSync` exit **0**, and the deliberately broken copy of
+  the same gate exit **1**.
+- **Limitation, stated rather than glossed: `check_phase7.ps1 -SkipSync` was
+  not run against these changes.** The run was declined in this session, so
+  there is no current evidence for it and none is claimed. What that leaves
+  unverified is narrow — the eight-line change is identical in every script and
+  `check_phase4` exercises it both ways — but the Playwright suites inside
+  Phase 7 have not been run since `f4fdae4`. **Run it before the next release
+  claim.**
+- Next: **WS-1 Task 4** — ~13 more `EXACT_SYMBOL` cases toward 50. Its gate
+  cycles are now safe to run concurrently, which is most of why these two
+  fixes came first.
+
 ### 2026-08-14T21:30:00Z — WS-1 Task 3: three blind-spot cases, and one that cannot exist
 
 - Agent: Claude Code `claude-opus-5`, branch `corpus-blind-spot-cases`.
@@ -277,11 +359,11 @@ register row instead. **ADR-0044's own integration tests remain its coverage.**
 **All three passed on the first run, so all three were mutation-checked.**
 Reverted from a file copy each time, never `git checkout --`:
 
-| Case | Mutation | Result with the fix removed |
-| --- | --- | --- |
-| c026 | leaf inherits the parent block's value (pre-ADR-0041) | `server.debug`, `server.host`, `server.port` changed; **3** findings |
-| c027 | same-file pairing disabled (pre-ADR-0042) | `cache.ttl` **×4**; **2** findings — the `2N` shape |
-| c028 | `normalize_line_endings` returns input (pre-ADR-0043) | `PaymentService.__init__` and `PaymentService.capture` reported changed |
+| Case | Mutation                                                | Result with the fix removed                                                      |
+| ---- | ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| c026 | leaf inherits the parent block's value (pre-ADR-0041)   | `server.debug`, `server.host`, `server.port` changed; **3** findings |
+| c027 | same-file pairing disabled (pre-ADR-0042)               | `cache.ttl` **×4**; **2** findings — the `2N` shape            |
+| c028 | `normalize_line_endings` returns input (pre-ADR-0043) | `PaymentService.__init__` and `PaymentService.capture` reported changed      |
 
 `grep -rc MUTATION src/` is 0 and `git status src/` is empty; every mutation
 was restored before the gates ran.
@@ -331,8 +413,7 @@ clone — the failure mode ADR-0022 recorded.
   toward the target by denominator growth and not by any engine change.
   Phase-0 and phase-3 changed only where the case count appears.
 - Verification, exit codes read from the process: `uv run pytest -q` **2212
-  passed, 3 skipped**; `ruff check src tests scripts apps` exit 0; `mypy
-  --no-incremental src tests scripts apps` clean on 350 files;
+  passed, 3 skipped**; `ruff check src tests scripts apps` exit 0; `mypy --no-incremental src tests scripts apps` clean on 350 files;
   `check_phase4.ps1 -SkipSync` exit 0 (dataset validation reported 28 change
   cases); `check_phase7.ps1 -SkipSync` exit 0 with 15 Playwright passed and
   **7 skipped on Chromium**, matching the register's re-counted figure.
@@ -393,14 +474,12 @@ engine agreed.
   5-7 follows at end-of-file. Corrected on that reasoning, not because a number
   improved (ADR-0003).
 - Mutation-checked by making the target identical to the base; the **dataset
-  validator rejected the corpus outright** (`evidence line range exceeds
-  README.md: 8 > 7`), louder than designed. Restored from a file copy.
+  validator rejected the corpus outright** (`evidence line range exceeds README.md: 8 > 7`), louder than designed. Restored from a file copy.
 - **Baselines moved for arithmetic, not engine reasons, and must not be quoted
   as improvement:** phase-4 `containing_evidence_rate` 0.6824 → 0.6860 and
   `primary_evidence_recall_at_10` 0.7627 → 0.7667 because c025 scores
   perfectly; phase-3's two recall metrics *fell*, because that engine had no
   change assurance to answer it with.
-
 - Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
   `14`; `PARSER_BUNDLE_VERSION`, `RESOLVER_VERSION`, `CHUNKER_VERSION` all
   unchanged, so **no snapshot is stale**. No new dependency. Corpus is now 25
@@ -459,11 +538,11 @@ empty file means.
 
 Proven by exact reproduction rather than by argument:
 
-| Target state at read time | Result |
-| --- | --- |
-| Empty (0 bytes) | **496 `SYMBOL_DELETED`** |
-| Truncated mid-write (5 KB of 699 KB) | 491 `SYMBOL_DELETED` + 1 `DOCUMENT_CHANGED` |
-| The real edited bytes | **2 `DOCUMENT_CHANGED`, 0 deletions** |
+| Target state at read time            | Result                                         |
+| ------------------------------------ | ---------------------------------------------- |
+| Empty (0 bytes)                      | **496 `SYMBOL_DELETED`**               |
+| Truncated mid-write (5 KB of 699 KB) | 491`SYMBOL_DELETED` + 1 `DOCUMENT_CHANGED` |
+| The real edited bytes                | **2 `DOCUMENT_CHANGED`, 0 deletions**  |
 
 The artifact contains **496** deletions for `PLAN.md` out of 497 sections. An
 exact match is not a coincidence.
@@ -563,8 +642,7 @@ exact match is not a coincidence.
   edited files produced **526 findings, 524 of them `SYMBOL_DELETED` at high
   severity**, naming Markdown sections of `PLAN.md` and `documentation/memory.md`
   that exist in **both** states. No matching `SYMBOL_ADDED`, so not ADR-0042's
-  ambiguous-pairing shape; one title renders `2026-07-25T15:15:00Z � P0-SETUP
-  started`, which points at a **decoding** step corrupting an em dash and making
+  ambiguous-pairing shape; one title renders `2026-07-25T15:15:00Z � P0-SETUP started`, which points at a **decoding** step corrupting an em dash and making
   a section name unequal to its own twin. **Not caused by this record** — the
   file is neither ignored nor binary, so no filter added here can reach it.
 - **Found while fixing it, and deliberately left open rather than folded in:**
@@ -679,8 +757,7 @@ work sat uncommitted for two days — the `per-repository-embedding-model` failu
 mode (2026-08-06) in miniature, where finished work left outside `main` drifts
 against decisions made after it. Before committing, this session re-ran the
 verification rather than trusting the record: `uv run pytest -q` **2191 passed,
-3 skipped** (exit 0), `ruff check src tests scripts apps` clean, `mypy
---no-incremental` clean on `analysis/states.py`, and
+3 skipped** (exit 0), `ruff check src tests scripts apps` clean, `mypy --no-incremental` clean on `analysis/states.py`, and
 `tests/integration/test_state_views.py` **13 passed**. The Deferred Register row
 for the tracked-but-ignored ruling was added in the same commit, because ADR-0043
 and this entry both claim it is recorded there and a claim without the row is the
@@ -910,8 +987,7 @@ sides so the ruling is enforced rather than merely written down.
   and `CHUNKER_VERSION` all unchanged, so **no snapshot is made stale by this
   work**. No new dependency; `uv.lock` and `pnpm-lock.yaml` untouched.
 - Verification, exit codes read from the tools rather than inferred:
-  `uv run ruff check src tests scripts apps` clean; `uv run mypy
-  --no-incremental src tests scripts apps` clean on 347 files; full
+  `uv run ruff check src tests scripts apps` clean; `uv run mypy --no-incremental src tests scripts apps` clean on 347 files; full
   `uv run pytest -q` **2155 passed, 3 skipped**; `check_phase4.ps1 -SkipSync`
   exit 0 twice (after Task 2 and after Task 3), including all three live
   baselines reproducing byte-for-byte and the ADR-0016 invariants;
@@ -1008,6 +1084,7 @@ sides so the ruling is enforced rather than merely written down.
   validation 40 cases `valid`; Phase 3 and Phase 4 baselines `--check` exit 0;
   `check_phase4.ps1 -SkipSync` exit 0.
 - Next / open:
+
   1. Extend the validator to `expected_evidence` paths and line ranges, and to
      the change cases.
   2. `relation_path_correctness` 0.6364 with two causes left — the
@@ -1091,16 +1168,16 @@ sides so the ruling is enforced rather than merely written down.
   target — a threshold over four different things cannot be reasoned about, the
   same lesson ADR-0023 recorded when one target table was applied to two corpora.
 
-  | Cause | Cases |
-  | --- | --- |
-  | A flow answer emits no path at all | q026, q032 |
-  | Lexical intents emit no relation paths | q027, q029 |
+  | Cause                                        | Cases            |
+  | -------------------------------------------- | ---------------- |
+  | A flow answer emits no path at all           | q026, q032       |
+  | Lexical intents emit no relation paths       | q027, q029       |
   | Module naming (`orders` vs `src.orders`) | q010, q015, q017 |
-  | Precision penalises a second, true edge | q005 |
-  | Passing | q007, q013, q016 |
-
+  | Precision penalises a second, true edge      | q005             |
+  | Passing                                      | q007, q013, q016 |
 - **Fixed the first only, by the user's ruling.** Neither case was a retrieval
   failure: `loadOrder ROUTES_TO get_order` is extracted, resolved and **stored**.
+
   1. **`trace` never traversed `ROUTES_TO`** — kinds were `CALLS`, `MAY_CALL`,
      `IMPORTS`. That relation exists to model an HTTP boundary (P4-05), and a
      flow question is the one that most needs to cross it; without it a trace
@@ -1146,9 +1223,9 @@ sides so the ruling is enforced rather than merely written down.
   the new warning being emitted unconditionally, which would make the first
   meaningless.
 - Verification: `ruff` and `mypy` clean; full `uv run pytest -q` **2144 passed,
-  3 skipped** with the exit code captured from pytest; `check_phase4.ps1
-  -SkipSync` exit 0; Phase 7 baseline and rerank `--check` both exit 0.
+  3 skipped** with the exit code captured from pytest; `check_phase4.ps1 -SkipSync` exit 0; Phase 7 baseline and rerank `--check` both exit 0.
 - Next / open:
+
   1. The three unfixed `relation_path_correctness` causes above.
   2. Grow the symbol-shaped corpus toward fifty cases (ADR-0033).
   3. The module-granularity ruling (ADR-0030).
@@ -1216,11 +1293,11 @@ sides so the ruling is enforced rather than merely written down.
   lexical intent; `q037` and `q039` sit on `malicious_unsupported` and are
   excluded by ADR-0024. Eight cases means values are multiples of 0.125:
 
-  | Threshold | Requires | Failures tolerated |
-  | --- | --- | ---: |
-  | **0.90 (existing)** | 8/8 | **0** |
-  | 0.875 | 7/8 | 1 |
-  | 1.0 | 8/8 | 0 |
+  | Threshold                 | Requires | Failures tolerated |
+  | ------------------------- | -------- | -----------------: |
+  | **0.90 (existing)** | 8/8      |        **0** |
+  | 0.875                     | 7/8      |                  1 |
+  | 1.0                       | 8/8      |                  0 |
 
   **0.90 and 1.0 selected exactly the same pass/fail set.** The gate always
   demanded every scored case while reading as though a miss were acceptable.
@@ -1255,6 +1332,7 @@ sides so the ruling is enforced rather than merely written down.
   `check_phase4.ps1 -SkipSync` exit 0; Phase 3 and Phase 4 baselines `--check`
   exit 0.
 - Next / open:
+
   1. **`exact_symbol_resolution`'s 0.98**, above — the same illusion on a
      Section 19.3 target.
   2. **The module-granularity ruling** (ADR-0030).
@@ -1287,13 +1365,13 @@ sides so the ruling is enforced rather than merely written down.
   range, or forbidden claim touched, and no engine code changed.
 - Measured, on both live baselines:
 
-  | Metric | Before | After |
-  | --- | ---: | ---: |
-  | `lexical_resolution` | 0.8750 | **1.0000** (8/8) |
-  | `mean_reciprocal_rank` | 0.9714 | **1.0000** |
-  | `abstention_correctness` | 0.9714 | **1.0000** |
-  | `ndcg_at_10` | 0.9051 | 0.9337 |
-  | `symbol_recall_at_10` | 0.8857 | 0.9143 |
+  | Metric                     | Before |                  After |
+  | -------------------------- | -----: | ---------------------: |
+  | `lexical_resolution`     | 0.8750 | **1.0000** (8/8) |
+  | `mean_reciprocal_rank`   | 0.9714 |       **1.0000** |
+  | `abstention_correctness` | 0.9714 |       **1.0000** |
+  | `ndcg_at_10`             | 0.9051 |                 0.9337 |
+  | `symbol_recall_at_10`    | 0.8857 |                 0.9143 |
 
   `lexical_resolution` leaves `unmet_targets` on `baseline-phase-3` and `-4`.
 - **A one-line corpus edit moving five metrics is exactly the leverage ADR-0003
@@ -1324,6 +1402,7 @@ sides so the ruling is enforced rather than merely written down.
   and `mypy` clean; full `uv run pytest -q` exit code captured from pytest;
   `check_phase4.ps1 -SkipSync` exit 0.
 - Next / open, now shorter:
+
   1. **`lexical_resolution`'s threshold is less urgent but unanswered.** At 8/8
      it reads 1.0000 and the provisional 0.90 passes, but with eight scorable
      cases every value is a multiple of 0.125, so 0.90 still means "8 of 8".
@@ -1338,8 +1417,7 @@ sides so the ruling is enforced rather than merely written down.
 - Agent: Claude Code `claude-opus-5`, branch `s001-granularity`
 - Transition: no phase task. Post-gate. Takes the last conceptual miss ADR-0029
   left open, and **closes it by deciding not to act.**
-- Finding: no defect. The relaxed query is `"stop" OR "two" OR "shoppers" OR
-  "buying" OR "last" OR "one" OR "something"`. The **module** chunk
+- Finding: no defect. The relaxed query is `"stop" OR "two" OR "shoppers" OR "buying" OR "last" OR "one" OR "something"`. The **module** chunk
   `src.orders.inventory` matches on `two` — its docstring is *"Keeping two
   customers from being sold the same unit"*, which paraphrases the question.
   `InventoryLedger.reserve` matches **nothing**: its docstring is about holding
@@ -1349,10 +1427,10 @@ sides so the ruling is enforced rather than merely written down.
   as asked, and the corpus declares the method that implements it.
 - **The metric tension is the reusable part.**
 
-  | Metric | s001 today |
-  | --- | --- |
+  | Metric                               | s001 today                                                                       |
+  | ------------------------------------ | -------------------------------------------------------------------------------- |
   | `containing_evidence_recall_at_10` | **satisfied at rank 1** — module `1-36` contains the expected `20-28` |
-  | `symbol_recall_at_10` | missed — the method is 12th by name |
+  | `symbol_recall_at_10`              | missed — the method is 12th by name                                             |
 
   The obvious lever is the coarse-chunk penalty ADR-0028 recorded as untuned and
   predicted would resurface. Applied here it **demotes the very chunk providing
@@ -1380,6 +1458,7 @@ sides so the ruling is enforced rather than merely written down.
   metric is unchanged because nothing was changed; the baselines from the
   ADR-0029 entry stand as measured there.
 - Next / open:
+
   1. **The module-granularity ruling above**, and **q019's naming ruling** —
      the same class of question, both needing the corpus owner.
   2. **RRF's coarse-chunk bias** (ADR-0028), now with a concrete case attached
@@ -1428,13 +1507,13 @@ sides so the ruling is enforced rather than merely written down.
   two chunking rules in one snapshot.
 - Measured, semantic side:
 
-  | Metric | Before | After |
-  | --- | ---: | ---: |
-  | `symbol_recall_at_10` | 0.8571 | **0.9286** |
-  | `primary_evidence_recall_at_10` | 0.7333 | **0.8000** |
-  | `ndcg_at_10` | 0.7292 | **0.7530** |
-  | `mean_reciprocal_rank` | 0.6875 | 0.6977 |
-  | `containing_evidence_recall_at_10` | 1.0000 | 1.0000 |
+  | Metric                               | Before |            After |
+  | ------------------------------------ | -----: | ---------------: |
+  | `symbol_recall_at_10`              | 0.8571 | **0.9286** |
+  | `primary_evidence_recall_at_10`    | 0.7333 | **0.8000** |
+  | `ndcg_at_10`                       | 0.7292 | **0.7530** |
+  | `mean_reciprocal_rank`             | 0.6875 |           0.6977 |
+  | `containing_evidence_recall_at_10` | 1.0000 |           1.0000 |
 
   s013 retrieves `OrderStatus` at rank 7, from absent.
 - **Phase 7's conceptual corpus now reports `targets_met: true` with no unmet
@@ -1476,6 +1555,7 @@ sides so the ruling is enforced rather than merely written down.
   what stops this widening into "every class repeats its members", which is the
   duplication the outline rule exists to prevent.
 - Next / open:
+
   1. **s001 is the last conceptual miss**, at rank 12. It no longer fails a
      declared target, so it is discretionary.
   2. **The retrieval corpus has no enum**, so it cannot see this rule at all.
@@ -1513,13 +1593,13 @@ sides so the ruling is enforced rather than merely written down.
   combining them would invent a number that means nothing.
 - Measured, semantic side:
 
-  | Metric | Before | After |
-  | --- | ---: | ---: |
-  | `containing_evidence_recall_at_10` | 0.9333 | **1.0000** |
-  | `symbol_recall_at_10` | 0.7857 | **0.8571** |
-  | `mean_reciprocal_rank` | 0.4429 | **0.6875** |
-  | `ndcg_at_10` | 0.5271 | **0.7292** |
-  | `exact` / `containing_evidence_rate` | — | **unchanged** |
+  | Metric                                   | Before |               After |
+  | ---------------------------------------- | -----: | ------------------: |
+  | `containing_evidence_recall_at_10`     | 0.9333 |    **1.0000** |
+  | `symbol_recall_at_10`                  | 0.7857 |    **0.8571** |
+  | `mean_reciprocal_rank`                 | 0.4429 |    **0.6875** |
+  | `ndcg_at_10`                           | 0.5271 |    **0.7292** |
+  | `exact` / `containing_evidence_rate` |     — | **unchanged** |
 
   **Evidence rates not moving is the correct signature for a pure reorder** —
   the same evidence, in a better order. Contrast ADR-0025, where recall rose and
@@ -1567,12 +1647,11 @@ sides so the ruling is enforced rather than merely written down.
   missing module. The `k` constant is pinned by a test rather than a comment,
   because its value *is* the behaviour: near zero, whichever channel ranked an
   item first would win outright and fusing would be pointless.
-- Verification: `ruff check src tests scripts apps` clean; `mypy
-  --no-incremental src tests scripts apps` clean on 343 files; full `uv run
-  pytest -q` **2130 passed, 3 skipped**; `check_phase4.ps1 -SkipSync` exit 0;
+- Verification: `ruff check src tests scripts apps` clean; `mypy --no-incremental src tests scripts apps` clean on 343 files; full `uv run pytest -q` **2130 passed, 3 skipped**; `check_phase4.ps1 -SkipSync` exit 0;
   `check_phase7.ps1 -SkipSync` exit 0; `baseline-phase-7 --check` run directly
   (it sits inside `check_phase7`'s `-Semantic` block) and reproduces.
 - Next / open:
+
   1. **`symbol_recall_at_10` 0.8571 against 0.90** — Phase 7's only remaining
      unmet target. Residue is s013 and s001.
   2. **Neither channel retrieves `OrderStatus` directly**; both reach it only
@@ -1598,13 +1677,13 @@ sides so the ruling is enforced rather than merely written down.
 - Root cause of the actual gap: `primary_evidence_recall_at_10` compares
   `snapshot:path:start:end` for **exact string equality**. Per-case on Phase 7:
 
-  | Case | Expected | Result |
-  | --- | --- | --- |
-  | s001 | `inventory.py:20-28` | contained at **rank 1** |
-  | s012 | `runbook.md:3-6` | returned `3-7` at **rank 1** |
-  | s008 | `architecture.md:14-18` | returned `14-19` at rank 2 |
-  | s013 | `models.py:6-12` | contained at rank 4 |
-  | s007 | `service.py:56-69` | genuinely absent |
+  | Case | Expected                  | Result                              |
+  | ---- | ------------------------- | ----------------------------------- |
+  | s001 | `inventory.py:20-28`    | contained at**rank 1**        |
+  | s012 | `runbook.md:3-6`        | returned`3-7` at **rank 1** |
+  | s008 | `architecture.md:14-18` | returned`14-19` at rank 2         |
+  | s013 | `models.py:6-12`        | contained at rank 4                 |
+  | s007 | `service.py:56-69`      | genuinely absent                    |
 
   Four of five return the right evidence and score zero. **One** is retrieval.
 - ADR-0003 had already ruled containment correct and written `_contains`;
@@ -1624,10 +1703,10 @@ sides so the ruling is enforced rather than merely written down.
   reason for publishing both.
 - Measured:
 
-  | Metric | Deterministic | Semantic |
-  | --- | ---: | ---: |
-  | `primary_evidence_recall_at_10` (retained) | 0.6000 | 0.6667 |
-  | `containing_evidence_recall_at_10` (gated) | 0.8667 | **0.9333** |
+  | Metric                                       | Deterministic |         Semantic |
+  | -------------------------------------------- | ------------: | ---------------: |
+  | `primary_evidence_recall_at_10` (retained) |        0.6000 |           0.6667 |
+  | `containing_evidence_recall_at_10` (gated) |        0.8667 | **0.9333** |
 
   **Phase 7 condition 7 passes at 0.9333 against ≥ 0.90, and the deterministic
   side does not** — the semantic layer carries the last 0.0667. Phase 3 (0.4068)
@@ -1677,9 +1756,7 @@ sides so the ruling is enforced rather than merely written down.
   drift into overlap and start rewarding partial citations. A second guard pins
   that the exact-match metric still misses the one-line case, so the retained
   number cannot quietly change meaning.
-- Verification: `ruff check src tests scripts apps` clean; `mypy
-  --no-incremental src tests scripts apps` clean on 341 files; full `uv run
-  pytest -q` **2124 passed, 3 skipped**; `check_phase4.ps1 -SkipSync` exit 0;
+- Verification: `ruff check src tests scripts apps` clean; `mypy --no-incremental src tests scripts apps` clean on 341 files; full `uv run pytest -q` **2124 passed, 3 skipped**; `check_phase4.ps1 -SkipSync` exit 0;
   `check_phase7.ps1 -SkipSync` exit 0 (Playwright 14 passed, 6 skipped — the
   known Chromium skips).
 - **`check_phase7.ps1 -SkipSync` does not verify `baseline-phase-7`.** That
@@ -1690,6 +1767,7 @@ sides so the ruling is enforced rather than merely written down.
   passed", because a green gate that skipped the relevant check is how a stale
   artifact survives three ADRs, which is exactly what this session found twice.
 - Next / open:
+
   1. **s007** — the one genuine retrieval miss, worth 0.0667. Its own slice by
      the user's ruling.
   2. **s003's ranking weakness** — still real, still unfixed, and now correctly
@@ -1741,8 +1819,7 @@ sides so the ruling is enforced rather than merely written down.
   No REST, MCP, or `--json` payload changed; stdout is byte-identical.
 - Test-first: all three new tests written and observed failing against empty
   stderr before `_announce_database` existed.
-- Verification: `ruff check src tests scripts apps` clean; `mypy
-  --no-incremental src` clean on 144 files; full `uv run pytest -q` **2120
+- Verification: `ruff check src tests scripts apps` clean; `mypy --no-incremental src` clean on 144 files; full `uv run pytest -q` **2120
   passed, 3 skipped** (2117 before, plus the three new);
   `check_phase4.ps1 -SkipSync` exit 0 (captured from the command).
 - **`ruff format --check` reports `cli/main.py` as unformatted and it was left
@@ -1767,11 +1844,11 @@ sides so the ruling is enforced rather than merely written down.
   produced a smaller artifact silently missing the semantic layer and looked
   like a successful rebuild.
 
-  | | Outgoing (2026-08-07) | New |
-  | --- | --- | --- |
-  | `parser_bundle_version` | 1.2.1 | **1.3.0** |
-  | `resolver_version` | 1.1.0 | **1.3.0** |
-  | tree / exe / zip | 901 MB | 1.1 GB / 83 MB / 372 MB |
+  |                           | Outgoing (2026-08-07) | New                     |
+  | ------------------------- | --------------------- | ----------------------- |
+  | `parser_bundle_version` | 1.2.1                 | **1.3.0**         |
+  | `resolver_version`      | 1.1.0                 | **1.3.0**         |
+  | tree / exe / zip          | 901 MB                | 1.1 GB / 83 MB / 372 MB |
 
   All three of the script's own guards passed, including the web-asset tree
   digest against `apps/web/dist` — the guard added after the 2026-08-05 stale
@@ -1781,6 +1858,7 @@ sides so the ruling is enforced rather than merely written down.
   proves PyInstaller ran, not that the bumped code is inside the bundle. The
   `python_app` fixture was indexed *with the packaged executable* into a
   throwaway `--db`:
+
   1. the resulting snapshot row is stamped `parser_bundle_version=1.3.0` and
      `resolver_version=1.3.0`;
   2. `tests <repo> PaymentService.capture` returns
@@ -1815,6 +1893,7 @@ sides so the ruling is enforced rather than merely written down.
   finding of this entry.** The intent was to re-index both repositories onto
   1.3.0. Then the user asked why those repositories existed at all, given the
   project's fresh-storage policy. Two independent causes:
+
   1. Both were registered **before ADR-0013 existed** — 2026-08-01 and
      2026-08-03 against an ADR dated 2026-08-04 — so ephemeral mode never had a
      chance to exclude them. It also could not have deleted them later:
@@ -1845,6 +1924,7 @@ sides so the ruling is enforced rather than merely written down.
   row counts all zero with integrity and foreign-key checks clean. No test suite
   was run — no tracked source changed, so there was nothing for it to regress.
 - Next / open, unchanged from the ADR-0026 entry except item 5:
+
   1. q019 — the corpus uses two naming conventions. Needs a ruling.
   2. `lexical_resolution`'s threshold, settable once (1) is decided.
   3. `relation_path_correctness` naming convention and gate target.
@@ -1875,6 +1955,7 @@ sides so the ruling is enforced rather than merely written down.
   `search_chunks`' own docstring argues for when it refuses a column name it did
   not choose.
 - Two bounds stated in the code rather than left implicit:
+
   1. **Reorders only within the window the query already returned.** `limit` is
      applied by SQL, so an exact match ranked below the cutoff never arrives to
      be promoted. This is **not** a guarantee that an exact match always wins and
@@ -1891,13 +1972,13 @@ sides so the ruling is enforced rather than merely written down.
   future author think before reordering, and that is what it achieved.
 - Measured:
 
-  | Metric | ADR-0025 | Now |
-  | --- | ---: | ---: |
-  | `lexical_resolution` | 0.6250 | **0.8750** (7/8) |
-  | `mean_reciprocal_rank` | 0.9429 | 0.9714 |
-  | `ndcg_at_10` | 0.8840 | 0.9051 |
-  | `exact` / `containing_evidence_rate` | 0.5647 / 0.6588 | unchanged |
-  | change-side metrics | — | unchanged |
+  | Metric                                   |        ADR-0025 |                    Now |
+  | ---------------------------------------- | --------------: | ---------------------: |
+  | `lexical_resolution`                   |          0.6250 | **0.8750** (7/8) |
+  | `mean_reciprocal_rank`                 |          0.9429 |                 0.9714 |
+  | `ndcg_at_10`                           |          0.8840 |                 0.9051 |
+  | `exact` / `containing_evidence_rate` | 0.5647 / 0.6588 |              unchanged |
+  | change-side metrics                      |              — |              unchanged |
 
   Evidence rates not moving is the correct signature for a pure reorder: the
   same evidence, in a better order.
@@ -1921,6 +2002,7 @@ sides so the ruling is enforced rather than merely written down.
   `check_phase4.ps1 -SkipSync` exit 0 (captured from the command, not a pipeline
   tail).
 - Next / open, all decisions rather than work:
+
   1. **q019 — the corpus uses two naming conventions.** It expects
      `README.Health` while extraction emits the bare `Health`; q027/q031 expect
      a bare `Order flow` and pass. Needs a ruling on which is correct.
@@ -1970,6 +2052,7 @@ sides so the ruling is enforced rather than merely written down.
   a key inside its parent's block. A config lookup that cannot point at the
   assignment line is barely better than returning the parent.
 - Two honesty constraints, both pinned by tests:
+
   1. **A failed line match is not invented.** JSON/TOML paths come from a parsed
      structure carrying no line information, so this is a heuristic. A leaf whose
      line cannot be found keeps its **parent's range** — still true, merely less
@@ -1985,15 +2068,15 @@ sides so the ruling is enforced rather than merely written down.
   index needs a re-index for both reasons.
 - Measured:
 
-  | Metric | Before | After |
-  | --- | ---: | ---: |
-  | `lexical_resolution` | 0.3750 | **0.6250** (5/8) |
-  | `symbol_recall_at_10` | 0.7714 | 0.8857 |
-  | `mean_reciprocal_rank` | 0.8571 | 0.9429 |
-  | `ndcg_at_10` | 0.7908 | 0.8840 |
-  | `exact_evidence_rate` / `valid_evidence_rate` | 0.6316 | **0.5647** |
-  | `containing_evidence_rate` | 0.6974 | **0.6588** |
-  | change-side metrics | — | unchanged |
+  | Metric                                            | Before |                  After |
+  | ------------------------------------------------- | -----: | ---------------------: |
+  | `lexical_resolution`                            | 0.3750 | **0.6250** (5/8) |
+  | `symbol_recall_at_10`                           | 0.7714 |                 0.8857 |
+  | `mean_reciprocal_rank`                          | 0.8571 |                 0.9429 |
+  | `ndcg_at_10`                                    | 0.7908 |                 0.8840 |
+  | `exact_evidence_rate` / `valid_evidence_rate` | 0.6316 |       **0.5647** |
+  | `containing_evidence_rate`                      | 0.6974 |       **0.6588** |
+  | change-side metrics                               |     — |              unchanged |
 
   **The evidence rates fell and that is the honest cost**: more symbols means
   more evidence items whose spans do not match the corpus's gold ranges exactly
@@ -2079,16 +2162,16 @@ sides so the ruling is enforced rather than merely written down.
   would let any metric improve by refusing to answer.
 - Measured:
 
-  | Metric | Before | After |
-  | --- | ---: | ---: |
-  | `lexical_resolution` | 0.3000 | **0.3750** (3/8) |
-  | `symbol_recall_at_10` | 0.6923 | 0.7714 |
-  | `mean_reciprocal_rank` | 0.7692 | 0.8571 |
-  | `ndcg_at_10` | 0.7097 | 0.7908 |
-  | `primary_evidence_recall_at_10` | 0.6984 | 0.7458 |
-  | `relation_path_correctness` | 0.2917 | 0.3182 |
-  | `abstention_correctness` | 0.8750 | 0.9714 |
-  | `exact_symbol_resolution` | 1.0000 | 1.0000 (all its cases were measured) |
+  | Metric                            | Before |                                After |
+  | --------------------------------- | -----: | -----------------------------------: |
+  | `lexical_resolution`            | 0.3000 |               **0.3750** (3/8) |
+  | `symbol_recall_at_10`           | 0.6923 |                               0.7714 |
+  | `mean_reciprocal_rank`          | 0.7692 |                               0.8571 |
+  | `ndcg_at_10`                    | 0.7097 |                               0.7908 |
+  | `primary_evidence_recall_at_10` | 0.6984 |                               0.7458 |
+  | `relation_path_correctness`     | 0.2917 |                               0.3182 |
+  | `abstention_correctness`        | 0.8750 |                               0.9714 |
+  | `exact_symbol_resolution`       | 1.0000 | 1.0000 (all its cases were measured) |
 
   **No engine behaviour changed.** Numbers rose because cases the engine was
   never shown stopped counting against it. Quoting this as an improvement in
@@ -2145,18 +2228,19 @@ sides so the ruling is enforced rather than merely written down.
 - Evidence that shaped the ruling — decomposing `exact_symbol_resolution` on the
   main corpus:
 
-  | Intent group | Top-1 | Rate |
-  | --- | --- | ---: |
-  | `EXACT_SYMBOL` | 15/15 | 1.0000 |
+  | Intent group                                                                      | Top-1 |   Rate |
+  | --------------------------------------------------------------------------------- | ----- | -----: |
+  | `EXACT_SYMBOL`                                                                  | 15/15 | 1.0000 |
   | Graph (`CALLERS`/`DEPENDENCIES`/`EXPORTS`/`RELATED_TESTS`/`TRACE_FLOW`) | 12/12 | 1.0000 |
-  | `CONFIG_LOOKUP` | 1/6 | 0.1667 |
-  | `DOCUMENT_LOOKUP` | 2/4 | 0.5000 |
-  | `CONCEPTUAL` / `POLICY` (force-abstained by the intent gate) | 0/2 | 0.0000 |
+  | `CONFIG_LOOKUP`                                                                 | 1/6   | 0.1667 |
+  | `DOCUMENT_LOOKUP`                                                               | 2/4   | 0.5000 |
+  | `CONCEPTUAL` / `POLICY` (force-abstained by the intent gate)                  | 0/2   | 0.0000 |
 
   The engine is perfect on every symbol-shaped question; the aggregate was
   produced entirely by lexical lookups, where "did the right *symbol* rank
   first" asks something other than what was posed.
 - Three user rulings, all implemented:
+
   1. **`exact_symbol_resolution` scoped to symbol-shaped intents**, with a new
      **`lexical_resolution`** gating `CONFIG_LOOKUP`/`DOCUMENT_LOOKUP`. Scoping
      a metric until it reads 1.0000 is how a number gets gamed, so the lexical
@@ -2171,12 +2255,12 @@ sides so the ruling is enforced rather than merely written down.
      would have been the quiet relaxation.
 - Measured:
 
-  | Corpus / metric | Before | After |
-  | --- | ---: | ---: |
-  | main `exact_symbol_resolution` | 0.7692 / 0.98 unmet | **1.0000 / 0.98 met** |
-  | main `lexical_resolution` | — | **0.3000 / 0.90 unmet (new)** |
-  | main evidence gate | `valid_evidence_rate` 0.6316 / 1.0 | `containing_evidence_rate` 0.6974 / 1.0 |
-  | Phase 7 unmet targets | 4 | **2** |
+  | Corpus / metric                 |                               Before |                                     After |
+  | ------------------------------- | -----------------------------------: | ----------------------------------------: |
+  | main`exact_symbol_resolution` |                  0.7692 / 0.98 unmet |               **1.0000 / 0.98 met** |
+  | main`lexical_resolution`      |                                   — |       **0.3000 / 0.90 unmet (new)** |
+  | main evidence gate              | `valid_evidence_rate` 0.6316 / 1.0 | `containing_evidence_rate` 0.6974 / 1.0 |
+  | Phase 7 unmet targets           |                                    4 |                               **2** |
 
   Phase 7's remaining two are `primary_evidence_recall_at_10` (0.6667) and
   `symbol_recall_at_10` (0.7857); `exact_symbol_resolution` reports **not
@@ -2329,6 +2413,7 @@ sides so the ruling is enforced rather than merely written down.
   instance. **No method anywhere could carry a `TESTS` edge**, which in Python
   and TypeScript is most of the code.
 - Three surfaces, only the first known:
+
   1. `related_tests(method)` returned nothing.
   2. **`test_gaps` reported every changed method as untested.** Verified by
      running the real `ChangeAnalysisEngine` over two directory states of the
@@ -2346,8 +2431,7 @@ sides so the ruling is enforced rather than merely written down.
   rejected the stronger one.
 - Decision (user approved extraction-time, `static_resolved`, all three
   surfaces): emit `TESTS` when an imported class's method is called with a
-  resolved call; widen `_QUALIFYING_COVERAGE` to `{static_resolved,
-  high_confidence_heuristic}`; correct the reason text. Import-and-call is
+  resolved call; widen `_QUALIFYING_COVERAGE` to `{static_resolved, high_confidence_heuristic}`; correct the reason text. Import-and-call is
   unchanged as a principle, applied at the right granularity.
 - **`RESOLVER_VERSION` 1.2.0 → 1.3.0.** Existing snapshots are stale until
   re-indexed; `change_analysis.py` already refuses a stale resolver version
@@ -2357,8 +2441,7 @@ sides so the ruling is enforced rather than merely written down.
   entry's most important line.** The first implementation accepted any owner,
   which included modules, so `import orders` + `orders.Order()` qualified — one
   module import vouching for every symbol it contains, the blanket promotion
-  this product refuses. The corpus failed immediately with `i001: Order was
-  expected to remain a gap but was not reported` and `i002: total …`. Those
+  this product refuses. The corpus failed immediately with `i001: Order was expected to remain a gap but was not reported` and `i002: total …`. Those
   fixtures are deliberately written that way, with a `conftest.py` comment
   saying so. The rule now requires the owner to be a **CLASS** and the target a
   **METHOD**: a class import is evidence about its methods, a module import is
@@ -2367,15 +2450,15 @@ sides so the ruling is enforced rather than merely written down.
   who believed the change was safe.
 - Measured:
 
-  | Metric | Before | After |
-  | --- | ---: | ---: |
-  | `exact_symbol_resolution` | 0.7436 | 0.7692 |
-  | `relation_path_correctness` | 0.2083 | 0.2917 |
-  | `abstention_correctness` | 0.8500 | 0.8750 |
-  | `symbol_recall_at_10` | 0.6667 | 0.6923 |
-  | `valid` / `exact_evidence_rate` | 0.6400 | 0.6316 |
-  | `containing_evidence_rate` | 0.7067 | 0.6974 |
-  | change-side metrics | — | unchanged |
+  | Metric                              | Before |     After |
+  | ----------------------------------- | -----: | --------: |
+  | `exact_symbol_resolution`         | 0.7436 |    0.7692 |
+  | `relation_path_correctness`       | 0.2083 |    0.2917 |
+  | `abstention_correctness`          | 0.8500 |    0.8750 |
+  | `symbol_recall_at_10`             | 0.6667 |    0.6923 |
+  | `valid` / `exact_evidence_rate` | 0.6400 |    0.6316 |
+  | `containing_evidence_rate`        | 0.7067 |    0.6974 |
+  | change-side metrics                 |     — | unchanged |
 
   The evidence rates fall for the ADR-0018 reason — more edges returned, and per
   ADR-0003 a call site rarely equals a gold definition range — so recall and
@@ -2398,8 +2481,7 @@ sides so the ruling is enforced rather than merely written down.
   uncalled sibling method, and a test double defined locally — passed from the
   start and are deliberately kept: they are what stops the rule widening later.
 - Verification: `ruff` clean; `mypy --no-incremental src` clean on 144 files;
-  full `uv run pytest -q` **2097 passed, 3 skipped**; `check_phase4.ps1
-  -SkipSync` exit **0**.
+  full `uv run pytest -q` **2097 passed, 3 skipped**; `check_phase4.ps1 -SkipSync` exit **0**.
 - Limitations: target still unmet, **0.7692 against 0.98**. A constructor call
   records no edge to `__init__`, so constructors remain gaps —
   `PaymentService.__init__` still reports one. That may well be correct (the
@@ -2445,14 +2527,14 @@ sides so the ruling is enforced rather than merely written down.
   number that twelve declared corpus expectations were feeding.
 - Measured, in two separately-recorded stages:
 
-  | Metric | Before | After product change | After harness change |
-  | --- | ---: | ---: | ---: |
-  | `exact_symbol_resolution` | 0.6923 | 0.6923 | 0.7436 |
-  | `mean_reciprocal_rank` | 0.7051 | 0.7051 | 0.7436 |
-  | `relation_path_correctness` | 0.0000 | 0.0000 | **0.2083** |
-  | `symbol_recall_at_10` | 0.6538 | 0.6538 | 0.6667 |
-  | `ndcg_at_10` | 0.6625 | 0.6625 | 0.6841 |
-  | change-side metrics | — | — | unchanged |
+  | Metric                        | Before | After product change | After harness change |
+  | ----------------------------- | -----: | -------------------: | -------------------: |
+  | `exact_symbol_resolution`   | 0.6923 |               0.6923 |               0.7436 |
+  | `mean_reciprocal_rank`      | 0.7051 |               0.7051 |               0.7436 |
+  | `relation_path_correctness` | 0.0000 |               0.0000 |     **0.2083** |
+  | `symbol_recall_at_10`       | 0.6538 |               0.6538 |               0.6667 |
+  | `ndcg_at_10`                | 0.6625 |               0.6625 |               0.6841 |
+  | change-side metrics           |     — |                   — |            unchanged |
 
   **The product change alone moved nothing**, and that is the correct ordering:
   the response gained data the evaluation could not previously read, and only
@@ -2508,8 +2590,7 @@ sides so the ruling is enforced rather than merely written down.
   item with the edge's *source* symbol. That is correct for almost every
   relation kind, which cites a **reference site** — a call, an import, a name
   use — living inside the source. `EXPORTS` is the exception: it cites the
-  **exported symbol's own definition**, so `orders.ts:1-3` (`export interface
-  Order`) was labelled `src.orders`. The evidence named one symbol and showed
+  **exported symbol's own definition**, so `orders.ts:1-3` (`export interface Order`) was labelled `src.orders`. The evidence named one symbol and showed
   another — the ADR-0016 defect on a new surface, on a product whose whole claim
   is that a reader can verify what they are shown.
 - Fix: `_cited_symbol` labels with the symbol whose definition the cited range
@@ -2593,13 +2674,13 @@ sides so the ruling is enforced rather than merely written down.
   now as a precise finding rather than a shrug.
 - Measured effect:
 
-  | Metric | ADR-0017 | ADR-0018 | Δ |
-  | --- | ---: | ---: | ---: |
-  | `exact_symbol_resolution` | 0.6154 | 0.6667 | +0.0513 |
-  | `primary_evidence_recall_at_10` | 0.6508 | 0.6984 | +0.0476 |
-  | `valid_evidence_rate` / `exact_evidence_rate` | 0.6618 | 0.6400 | **−0.0218** |
-  | `containing_evidence_rate` | 0.7353 | 0.7067 | **−0.0286** |
-  | change-side metrics | — | — | 0.0000 |
+  | Metric                                            | ADR-0017 | ADR-0018 |                 Δ |
+  | ------------------------------------------------- | -------: | -------: | -----------------: |
+  | `exact_symbol_resolution`                       |   0.6154 |   0.6667 |            +0.0513 |
+  | `primary_evidence_recall_at_10`                 |   0.6508 |   0.6984 |            +0.0476 |
+  | `valid_evidence_rate` / `exact_evidence_rate` |   0.6618 |   0.6400 | **−0.0218** |
+  | `containing_evidence_rate`                      |   0.7353 |   0.7067 | **−0.0286** |
+  | change-side metrics                               |       — |       — |             0.0000 |
 
   **Recall rose and evidence-span precision fell for the same reason** — the
   correct subject returns more evidence (the supporting edges), and per ADR-0003
@@ -2627,6 +2708,7 @@ sides so the ruling is enforced rather than merely written down.
   corpus is untouched — `predict_conceptual` has no fixture gate and no graph
   intents.
 - Next / open, both deliberately deferred so this baseline stays attributable:
+
   1. **Module-scoped graph queries rank the module's own symbol first.**
      `dependencies(module)` / `exports(module)` return `src.client`,
      `src.orders`, `src.payments.service` at rank 1 ahead of the relations
@@ -2671,15 +2753,15 @@ sides so the ruling is enforced rather than merely written down.
   corpus must not answer by side effect.
 - Measured effect on `tests/evaluation/cases` (40 query, 24 change):
 
-  | Metric | Before | After | Δ |
-  | --- | ---: | ---: | ---: |
-  | `exact_symbol_resolution` | 0.3846 | 0.6154 | +0.2308 |
-  | `mean_reciprocal_rank` | 0.3846 | 0.6154 | +0.2308 |
-  | `abstention_correctness` | 0.5250 | 0.7500 | +0.2250 |
-  | `symbol_recall_at_10` | 0.3718 | 0.5897 | +0.2179 |
-  | `primary_evidence_recall_at_10` | 0.5556 | 0.6508 | +0.0952 |
-  | `changed_symbol_precision` | 0.9375 | 0.9375 | 0.0000 |
-  | `changed_symbol_recall` / `direct_impact_recall` / `finding_precision` | 1.0000 | 1.0000 | 0.0000 |
+  | Metric                                                                       | Before |  After |      Δ |
+  | ---------------------------------------------------------------------------- | -----: | -----: | ------: |
+  | `exact_symbol_resolution`                                                  | 0.3846 | 0.6154 | +0.2308 |
+  | `mean_reciprocal_rank`                                                     | 0.3846 | 0.6154 | +0.2308 |
+  | `abstention_correctness`                                                   | 0.5250 | 0.7500 | +0.2250 |
+  | `symbol_recall_at_10`                                                      | 0.3718 | 0.5897 | +0.2179 |
+  | `primary_evidence_recall_at_10`                                            | 0.5556 | 0.6508 | +0.0952 |
+  | `changed_symbol_precision`                                                 | 0.9375 | 0.9375 |  0.0000 |
+  | `changed_symbol_recall` / `direct_impact_recall` / `finding_precision` | 1.0000 | 1.0000 |  0.0000 |
 
   The `abstention_correctness` movement is the serious one: the harness was
   recording incorrect abstentions, so the baseline reported CodeAtlas declining
@@ -2826,9 +2908,7 @@ sides so the ruling is enforced rather than merely written down.
   fails exactly one unit test. Phase 4 separation proven by an empty
   `git diff --stat main` on `baseline-phase-4.{json,md}`, `dataset.py`,
   `runner.py`, and `cases/changes.json`.
-- Incidental fix: `tests/unit/test_impact.py` asserted a reason `is not
-  CALLED_NOT_IMPORTED` immediately after asserting it `is
-  NO_TEST_FILE_REFERENCE` — vacuous, and flagged by mypy as a non-overlapping
+- Incidental fix: `tests/unit/test_impact.py` asserted a reason `is not CALLED_NOT_IMPORTED` immediately after asserting it `is NO_TEST_FILE_REFERENCE` — vacuous, and flagged by mypy as a non-overlapping
   identity check. Pre-existing on `main`; removed because it blocked the gate.
 - Exit codes: a broken invariant exits 7, a stale artifact exits 5. Kept
   separate deliberately — one says the product regressed, the other says
@@ -3106,10 +3186,10 @@ Both new tests passed immediately, because the behaviour already existed. A
 test written against working code proves nothing until it is shown to fail
 against broken code, so each was mutation-checked:
 
-| Mutation | Result |
-| --- | --- |
+| Mutation                                             | Result                                                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------- |
 | `if not vectors or not vectors[0]` → `if False` | `test_a_provider_that_returns_no_vector_is_not_ok` **fails** |
-| success branch `ok=True` → `ok=False` | `test_a_working_provider_is_reported_as_ok` **fails** |
+| success branch`ok=True` → `ok=False`            | `test_a_working_provider_is_reported_as_ok` **fails**        |
 
 Each mutation failed exactly one test, the one that names that behaviour, and
 both pass again with the source restored — confirmed byte-identical by
@@ -3773,8 +3853,7 @@ investigation blamed a packaged build four days older than the redesign, which
 
 Rendering `/settings` in a real browser against the running server settled it.
 The page header was the new design. The body was raw, unstyled markup: the
-provider options ran together as one line of text, `DisabledStays on this
-machineLocal modelStays on this machine OpenAI⚠ Sends…`, with no cards, edges,
+provider options ran together as one line of text, `DisabledStays on this machineLocal modelStays on this machine OpenAI⚠ Sends…`, with no cards, edges,
 or spacing.
 
 `SemanticSettings.tsx` contained **zero `className` attributes**;
@@ -3809,15 +3888,15 @@ None. Presentation only. No contract, migration, REST, or dependency change.
 `powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync`
 — every section passed and the script printed "Phase 7 verification completed".
 
-| Section | Result |
-| --- | --- |
-| Python tests | **1871 passed**, 3 skipped, 267 s |
-| Lint (Ruff) | All checks passed |
-| Types (strict MyPy) | no issues in 313 source files |
-| Dataset, Phase 0/3/4 baselines, rerank artifact | pass |
-| Web lint, types, build | pass |
-| Web tests | **147 passed**, 12 files |
-| End-to-end suites | **13 passed**, 5 skipped |
+| Section                                         | Result                                  |
+| ----------------------------------------------- | --------------------------------------- |
+| Python tests                                    | **1871 passed**, 3 skipped, 267 s |
+| Lint (Ruff)                                     | All checks passed                       |
+| Types (strict MyPy)                             | no issues in 313 source files           |
+| Dataset, Phase 0/3/4 baselines, rerank artifact | pass                                    |
+| Web lint, types, build                          | pass                                    |
+| Web tests                                       | **147 passed**, 12 files          |
+| End-to-end suites                               | **13 passed**, 5 skipped          |
 
 The harness reported exit `-1` because the detached process was lost, not
 because a step failed; the script's own completion line is the evidence, and
@@ -3907,18 +3986,18 @@ None. Test-only change.
 `powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -SkipSync`
 — **exit 0**, "Phase 7 verification completed".
 
-| Section | Result |
-| --- | --- |
-| Contract schema freshness | pass |
-| Python tests | **1870 passed**, 3 skipped, 160.83 s |
-| Lint (Ruff) | All checks passed |
-| Types (strict MyPy) | no issues in **313 source files** |
-| Dataset validation | pass |
-| Phase 0 / 3 / 4 baselines, Phase 7 rerank artifact | pass |
-| Web lint, web types | pass |
-| Web tests | **147 passed**, 12 files |
-| Web build | pass |
-| End-to-end suites | **13 passed, 5 skipped** |
+| Section                                            | Result                                     |
+| -------------------------------------------------- | ------------------------------------------ |
+| Contract schema freshness                          | pass                                       |
+| Python tests                                       | **1870 passed**, 3 skipped, 160.83 s |
+| Lint (Ruff)                                        | All checks passed                          |
+| Types (strict MyPy)                                | no issues in**313 source files**     |
+| Dataset validation                                 | pass                                       |
+| Phase 0 / 3 / 4 baselines, Phase 7 rerank artifact | pass                                       |
+| Web lint, web types                                | pass                                       |
+| Web tests                                          | **147 passed**, 12 files             |
+| Web build                                          | pass                                       |
+| End-to-end suites                                  | **13 passed, 5 skipped**             |
 
 Before the fix the same suites reported 10 passed, 3 failed, 5 skipped. The
 targeted re-run of `settings.spec.ts` alone reported 3 passed, 1 skipped.
@@ -4099,6 +4178,7 @@ gap — wire it or correct the documentation — and consider making
 `scripts/build_package.ps1` refuse when `apps/web/dist` is newer than the
 release tree, so this mismatch reports itself instead of resurfacing as a
 phantom UI regression.
+
 ### 2026-08-04T23:50:00Z — Per-repository embedding model (ADR-0014)
 
 - Agent: Claude Code `claude-opus-5`, branch `per-repository-embedding-model`,
@@ -4175,8 +4255,7 @@ unknown OpenAI id also needs a declared width that cannot be measured for free.
   tests, web lint/types/build clean.
 - `uv run pytest tests -q --ignore=tests/end_to_end` — 1850 passed, 3 skipped.
 - Validation success path confirmed against a real model:
-  `EmbeddingModelValidation(model_id='sentence-transformers/all-MiniLM-L6-v2',
-  ok=True, dimensions=384, detail_code=None, latency_ms=22983)`.
+  `EmbeddingModelValidation(model_id='sentence-transformers/all-MiniLM-L6-v2', ok=True, dimensions=384, detail_code=None, latency_ms=22983)`.
 - `uv sync --extra semantic-local` installed sentence-transformers 5.6.1 and
   torch 2.13.0 in this environment.
 
