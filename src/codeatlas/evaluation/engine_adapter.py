@@ -105,6 +105,11 @@ SUPPORTED_FIXTURES = (
     "mixed_app",
     "tsjs_app",
     "git_changes",
+    # Added 2026-08-15 with the cases that use it. ADR-0017 records this
+    # tuple frozen at Phase 1, understating two metrics for four phases;
+    # a fixture admitted here without cases is refused by
+    # test_every_corpus_fixture_is_measured_unless_deliberately_unsupported.
+    "symbol_breadth",
 )
 
 

@@ -1345,6 +1345,799 @@
                       "forbidden_claims":  [
                                                "broken is a valid function definition."
                                            ]
+                  },
+                  {
+                      "id":  "q041",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is OrderRepository defined?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderRepository"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/repository.py",
+                                                    "symbol":  "OrderRepository",
+                                                    "start_line":  14,
+                                                    "end_line":  24,
+                                                    "evidence_id":  "q041-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderRepository writes to a database."
+                                           ]
+                  },
+                  {
+                      "id":  "q042",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is OrderRepository.get implemented?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderRepository.get"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/repository.py",
+                                                    "symbol":  "OrderRepository.get",
+                                                    "start_line":  20,
+                                                    "end_line":  21,
+                                                    "evidence_id":  "q042-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "get performs a network call."
+                                           ]
+                  },
+                  {
+                      "id":  "q043",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is fetch_all implemented?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderRepository.fetch_all"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/repository.py",
+                                                    "symbol":  "OrderRepository.fetch_all",
+                                                    "start_line":  23,
+                                                    "end_line":  24,
+                                                    "evidence_id":  "q043-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "fetch_all runs concurrently."
+                                           ]
+                  },
+                  {
+                      "id":  "q044",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is OrderRecord declared?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderRecord"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/repository.py",
+                                                    "symbol":  "OrderRecord",
+                                                    "start_line":  6,
+                                                    "end_line":  11,
+                                                    "evidence_id":  "q044-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderRecord is a dataclass."
+                                           ]
+                  },
+                  {
+                      "id":  "q045",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is build_repository defined?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "build_repository"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/repository.py",
+                                                    "symbol":  "build_repository",
+                                                    "start_line":  27,
+                                                    "end_line":  28,
+                                                    "evidence_id":  "q045-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "build_repository reads configuration."
+                                           ]
+                  },
+                  {
+                      "id":  "q046",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is OrderStage declared?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderStage"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "OrderStage",
+                                                    "start_line":  10,
+                                                    "end_line":  14,
+                                                    "evidence_id":  "q046-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderStage has a CANCELLED member."
+                                           ]
+                  },
+                  {
+                      "id":  "q047",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is advance implemented?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderPipeline.advance"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "OrderPipeline.advance",
+                                                    "start_line":  23,
+                                                    "end_line":  24,
+                                                    "evidence_id":  "q047-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "advance persists the order."
+                                           ]
+                  },
+                  {
+                      "id":  "q048",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is run_pipeline defined?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "run_pipeline"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "run_pipeline",
+                                                    "start_line":  27,
+                                                    "end_line":  28,
+                                                    "evidence_id":  "q048-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "run_pipeline retries on failure."
+                                           ]
+                  },
+                  {
+                      "id":  "q049",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is OrderController declared?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderController"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/handlers.ts",
+                                                    "symbol":  "OrderController",
+                                                    "start_line":  8,
+                                                    "end_line":  14,
+                                                    "evidence_id":  "q049-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderController issues HTTP requests."
+                                           ]
+                  },
+                  {
+                      "id":  "q050",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is OrderView declared?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderView"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/handlers.ts",
+                                                    "symbol":  "OrderView",
+                                                    "start_line":  1,
+                                                    "end_line":  4,
+                                                    "evidence_id":  "q050-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderView is a runtime class."
+                                           ]
+                  },
+                  {
+                      "id":  "q051",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is renderList defined?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "renderList"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/widgets.js",
+                                                    "symbol":  "renderList",
+                                                    "start_line":  5,
+                                                    "end_line":  5,
+                                                    "evidence_id":  "q051-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "renderList sanitizes its input."
+                                           ]
+                  },
+                  {
+                      "id":  "q052",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Who calls renderList?",
+                      "intent":  "CALLERS",
+                      "expected_abstention":  false,
+                      "query_subject":  "renderList",
+                      "expected_symbols":  [
+                                               "mount",
+                                               "renderList"
+                                           ],
+                      "expected_relations":  [
+                                                 "mount CALLS renderList"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/widgets.js",
+                                                    "symbol":  "mount",
+                                                    "start_line":  8,
+                                                    "end_line":  8,
+                                                    "evidence_id":  "q052-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "renderList is called by the browser."
+                                           ]
+                  },
+                  {
+                      "id":  "q053",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Who calls advance?",
+                      "intent":  "CALLERS",
+                      "expected_abstention":  false,
+                      "query_subject":  "OrderPipeline.advance",
+                      "expected_symbols":  [
+                                               "run_pipeline",
+                                               "test_pipeline_advances",
+                                               "OrderPipeline.advance"
+                                           ],
+                      "expected_relations":  [
+                                                 "run_pipeline CALLS OrderPipeline.advance"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "run_pipeline",
+                                                    "start_line":  28,
+                                                    "end_line":  28,
+                                                    "evidence_id":  "q053-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "advance is called by a scheduler."
+                                           ]
+                  },
+                  {
+                      "id":  "q054",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Who constructs OrderRepository?",
+                      "intent":  "CALLERS",
+                      "expected_abstention":  false,
+                      "query_subject":  "OrderRepository",
+                      "expected_symbols":  [
+                                               "build_repository",
+                                               "test_pipeline_advances",
+                                               "OrderRepository"
+                                           ],
+                      "expected_relations":  [
+                                                 "build_repository CALLS OrderRepository"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/repository.py",
+                                                    "symbol":  "build_repository",
+                                                    "start_line":  28,
+                                                    "end_line":  28,
+                                                    "evidence_id":  "q054-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderRepository is constructed at import time."
+                                           ]
+                  },
+                  {
+                      "id":  "q055",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "What does advance depend on?",
+                      "intent":  "DEPENDENCIES",
+                      "expected_abstention":  false,
+                      "query_subject":  "OrderPipeline.advance",
+                      "expected_symbols":  [
+                                               "OrderPipeline.advance",
+                                               "OrderStage"
+                                           ],
+                      "expected_relations":  [
+                                                 "OrderPipeline.advance REFERENCES OrderStage"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "OrderPipeline.advance",
+                                                    "start_line":  23,
+                                                    "end_line":  23,
+                                                    "evidence_id":  "q055-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "advance depends on OrderRecord."
+                                           ]
+                  },
+                  {
+                      "id":  "q056",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "What does build_repository depend on?",
+                      "intent":  "DEPENDENCIES",
+                      "expected_abstention":  false,
+                      "query_subject":  "build_repository",
+                      "expected_symbols":  [
+                                               "build_repository",
+                                               "OrderRepository"
+                                           ],
+                      "expected_relations":  [
+                                                 "build_repository REFERENCES OrderRepository"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/repository.py",
+                                                    "symbol":  "build_repository",
+                                                    "start_line":  27,
+                                                    "end_line":  27,
+                                                    "evidence_id":  "q056-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "build_repository depends on OrderStage."
+                                           ]
+                  },
+                  {
+                      "id":  "q057",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "What does formatTotal depend on?",
+                      "intent":  "DEPENDENCIES",
+                      "expected_abstention":  false,
+                      "query_subject":  "formatTotal",
+                      "expected_symbols":  [
+                                               "formatTotal",
+                                               "OrderView"
+                                           ],
+                      "expected_relations":  [
+                                                 "formatTotal REFERENCES OrderView"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/handlers.ts",
+                                                    "symbol":  "formatTotal",
+                                                    "start_line":  16,
+                                                    "end_line":  16,
+                                                    "evidence_id":  "q057-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "formatTotal depends on OrderController."
+                                           ]
+                  },
+                  {
+                      "id":  "q058",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "What does the pipeline module import?",
+                      "intent":  "DEPENDENCIES",
+                      "expected_abstention":  false,
+                      "query_subject":  "src.orders.pipeline",
+                      "expected_symbols":  [
+                                               "src.orders.pipeline",
+                                               "OrderRepository"
+                                           ],
+                      "expected_relations":  [
+                                                 "src.orders.pipeline IMPORTS OrderRepository"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "src.orders.pipeline",
+                                                    "start_line":  7,
+                                                    "end_line":  7,
+                                                    "evidence_id":  "q058-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The pipeline module imports OrderView."
+                                           ]
+                  },
+                  {
+                      "id":  "q059",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "What does the widgets module export?",
+                      "intent":  "EXPORTS",
+                      "expected_abstention":  false,
+                      "query_subject":  "src.web.widgets",
+                      "expected_symbols":  [
+                                               "renderOrder",
+                                               "renderList",
+                                               "mount"
+                                           ],
+                      "expected_relations":  [
+                                                 "src.web.widgets EXPORTS renderOrder",
+                                                 "src.web.widgets EXPORTS renderList",
+                                                 "src.web.widgets EXPORTS mount"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/widgets.js",
+                                                    "symbol":  "renderOrder",
+                                                    "start_line":  1,
+                                                    "end_line":  3,
+                                                    "evidence_id":  "q059-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The widgets module exports OrderView."
+                                           ]
+                  },
+                  {
+                      "id":  "q060",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "What does the handlers module export?",
+                      "intent":  "EXPORTS",
+                      "expected_abstention":  false,
+                      "query_subject":  "src.web.handlers",
+                      "expected_symbols":  [
+                                               "OrderView",
+                                               "OrderList",
+                                               "OrderController",
+                                               "formatTotal",
+                                               "ORDERS_PATH"
+                                           ],
+                      "expected_relations":  [
+                                                 "src.web.handlers EXPORTS OrderView",
+                                                 "src.web.handlers EXPORTS OrderList",
+                                                 "src.web.handlers EXPORTS OrderController",
+                                                 "src.web.handlers EXPORTS formatTotal",
+                                                 "src.web.handlers EXPORTS ORDERS_PATH"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/handlers.ts",
+                                                    "symbol":  "OrderView",
+                                                    "start_line":  1,
+                                                    "end_line":  4,
+                                                    "evidence_id":  "q060-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "The handlers module exports mount."
+                                           ]
+                  },
+                  {
+                      "id":  "q061",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Which tests cover advance?",
+                      "intent":  "RELATED_TESTS",
+                      "expected_abstention":  false,
+                      "query_subject":  "OrderPipeline.advance",
+                      "expected_symbols":  [
+                                               "test_pipeline_advances"
+                                           ],
+                      "expected_relations":  [
+                                                 "test_pipeline_advances TESTS OrderPipeline.advance"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "tests/test_pipeline.py",
+                                                    "symbol":  "test_pipeline_advances",
+                                                    "start_line":  7,
+                                                    "end_line":  7,
+                                                    "evidence_id":  "q061-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "advance is covered by an integration test."
+                                           ]
+                  },
+                  {
+                      "id":  "q062",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Which tests cover OrderRepository?",
+                      "intent":  "RELATED_TESTS",
+                      "expected_abstention":  false,
+                      "query_subject":  "OrderRepository",
+                      "expected_symbols":  [
+                                               "test_pipeline_advances"
+                                           ],
+                      "expected_relations":  [
+                                                 "test_pipeline_advances TESTS OrderRepository"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "tests/test_pipeline.py",
+                                                    "symbol":  "test_pipeline_advances",
+                                                    "start_line":  6,
+                                                    "end_line":  6,
+                                                    "evidence_id":  "q062-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderRepository has no test coverage."
+                                           ]
+                  },
+                  {
+                      "id":  "q063",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Trace the flow from mount.",
+                      "intent":  "TRACE_FLOW",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "mount",
+                                               "renderList",
+                                               "renderOrder"
+                                           ],
+                      "expected_relations":  [
+                                                 "mount CALLS renderList"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/web/widgets.js",
+                                                    "symbol":  "mount",
+                                                    "start_line":  8,
+                                                    "end_line":  8,
+                                                    "evidence_id":  "q063-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "mount renders on the server."
+                                           ]
                   }
               ]
 }
