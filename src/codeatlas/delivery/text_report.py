@@ -34,8 +34,34 @@ _DETAIL: Final[str] = " " * 10
 
 def render_text(report: ChangeAnalysisReport) -> str:
     """Render one analysis as plain text for a terminal."""
-    lines = _verdict(report) + _findings(report) + _gaps(report) + _impact(report)
+    lines = (
+        _verdict(report)
+        + _findings(report)
+        + _gaps(report)
+        + _impact(report)
+        + _notes(report)
+    )
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _notes(report: ChangeAnalysisReport) -> list[str]:
+    """Warnings and limitations, which this renderer used to drop entirely.
+
+    Survivable while every excluded file produced a loud failure somewhere
+    else. ADR-0045 turned an oversized tracked file into a *silent* skip, and
+    this is the surface where that silence would have landed: `impact` prints a
+    verdict by default, so a reader would have seen a clean result and never
+    learned a file was left out.
+
+    Last on purpose. The verdict is what a reader at a prompt came for; the
+    caveats qualify it and belong after it, not in front of it.
+    """
+    if not report.warnings and not report.limitations:
+        return []
+    lines = ["", "Warnings and limitations"]
+    lines += [f"{_INDENT}{_clean(item)}" for item in report.warnings]
+    lines += [f"{_INDENT}{_clean(item)}" for item in report.limitations]
+    return lines
 
 
 def _clean(value: str) -> str:

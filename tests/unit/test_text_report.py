@@ -199,3 +199,32 @@ def test_a_control_character_from_the_repository_is_stripped() -> None:
     text = render_text(_report(test_gaps=["a\x1b[2Kb"]))
 
     assert "\x1b" not in text
+
+
+def test_a_limitation_reaches_the_terminal() -> None:
+    """The CLI verdict dropped warnings and limitations entirely.
+
+    That was survivable while an excluded file produced a *loud* failure
+    somewhere else. ADR-0045 turned an oversized tracked file into a silent
+    skip, which made this renderer the surface where the omission disappeared:
+    `codeatlas impact` printed a clean verdict and never said a file had been
+    left out. A change-assurance tool that quietly analyses less than it was
+    asked to is the defect ADR-0045 exists to avoid.
+    """
+    text = render_text(
+        _report(
+            warnings=["FILE_TOO_LARGE"],
+            limitations=["1 file(s) exceed the maximum file size: big.csv."],
+        )
+    )
+
+    assert "big.csv" in text
+    assert "FILE_TOO_LARGE" in text
+
+
+def test_a_clean_report_says_nothing_about_limits() -> None:
+    """A heading nobody earned is noise in a terminal verdict."""
+    text = render_text(_report())
+
+    assert "Limitations" not in text
+    assert "Warnings" not in text
