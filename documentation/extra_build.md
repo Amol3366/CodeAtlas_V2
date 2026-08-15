@@ -68,57 +68,58 @@ because that prior was not applied earlier.
 
 ---
 
-## Task 1 — Phase 4 evidence rates, per case (WS-4)
+## Task 1 — Phase 4 evidence rates (WS-4) — **investigated 2026-08-15; needs four rulings**
 
-**Cost:** 1–2 days. **Blocked by:** nothing. WS-1 was its prerequisite and is
-done.
+The per-case investigation is **done**. No change has been made, and none
+should be until the rulings below are given — WS-1's rule is to record the
+number, name the cases, and stop.
 
-**Why now.** The only remaining work that targets unmet gate targets.
-`containing_evidence_rate` is 0.6885 against 1.00 and
-`containing_evidence_recall_at_10` is 0.8824 against 0.90 — the latter is closer
-than it has ever been, though by denominator growth on 2026-08-15 rather than by
-any engine change, and it must not be quoted as improvement.
+**The shortfall is exactly ten cases**, out of 85 scored. The other 75 score
+1.00. They split into two unrelated causes.
 
-**Where to work**
+**Finding A (8 cases) — the corpus holds two conventions for graph evidence.**
+`_contains` (`runner.py:873`) is directional by design: predicted must fully
+cover expected. In q003, q006, q007, q013, q016, q017, q026 and q032 the engine
+cites a **precise reference line inside** a gold range declaring the **whole
+definition**, so containment fails. But q005 and q015 — same intents, same era —
+declare the *narrow reference site* and score 1.00, as do all 23 graph cases
+added 2026-08-15. Two conventions have coexisted since Phase 0 and no aggregate
+could show it. **The ADR-0031 shape.**
 
-- `src/codeatlas/evaluation/runner.py` — `score_query_case`, and the evidence
-  scoring around lines 596–680
-- `docs/evaluation/baseline-phase-4.json` — **aggregates only**, which is the
-  first obstacle: it cannot answer a per-case question
-- `tests/evaluation/cases/queries.json` — the gold evidence declarations
+**Finding B (2 cases) — a fixture path collides with an ignore default.**
+q034 and q035 declare evidence in `git_changes/target/processor.py`, and
+**`target/` is a default ignore pattern** (`ignore_rules.py:31`, Rust/Maven
+build output). That file is never indexed, so the engine answers from
+`base/service.py` and their recall is structurally 0. Change cases are
+unaffected — they select `target/` as the state *root*, where nothing excludes
+it. ADR-0036's validator passed throughout because it checks that
+`expected_symbols` resolve, and `process` does resolve, from `base/`.
 
-**Approach**
+**Rulings needed**
 
-1. Get per-case output. The artifact does not store it, so this needs an
-   evaluation run that emits per case. A working shape already exists in the
-   2026-08-15 handoff: build predictions with `predict_exact_symbols`, then call
-   `score_query_case` per case and read `containing_evidence_count` and
-   `predicted_evidence_count`.
-2. Rank cases by uncredited evidence (`predicted - containing`) and look at the
-   worst ten *individually* before forming any theory.
-3. For each, decide which of three things is true: the gold range is wrong by
-   the corpus's own convention; the metric asks the wrong question; or the
-   engine genuinely cites the wrong lines. **Only the third is an engine
-   defect**, and the prior says it is the least likely.
+1. **Which convention is correct for graph evidence** — the reference site the
+   engine cites, or the definition range the answer lives in? Eight cases say
+   one, twelve-plus say the other. Correcting the minority is ADR-0031-class
+   work, not "editing the corpus to move a number", *if* the ruling says so.
+2. **What to do about the two `target/` cases** — rename the fixture directory
+   (which would break the `base`/`target` ref grammar `_resolve_side` depends
+   on), mark them unmeasured under ADR-0024, or leave them failing and lower
+   nothing.
+3. **Whether `containing_evidence_rate` should stay gated at 1.00.** It is
+   *precision* over every emitted evidence item. Crediting all ten zero-recall
+   cases reaches only **0.8115**, leaving 23 uncredited items that are correct
+   supporting evidence the corpus never declared. **ADR-0020 requires emitting
+   every supporting edge**, so 1.00 punishes the engine for obeying an accepted
+   decision — the **ADR-0038 shape**, which was resolved there by adding recall
+   beside precision and leaving precision ungated.
+4. **Whether ADR-0036's validator should also check evidence file paths**, which
+   would have caught Finding B by construction.
 
-**Traps**
-
-- **Graph answers cite the reference site, not the definition** (ADR-0003, and
-  every existing graph case — q005 cites `10-10`). This exact mistake was made
-  on 2026-08-15 while authoring new cases and cost 0.09 on this very metric.
-- `containing_evidence_rate` is `containing / predicted`, so a case where the
-  engine cites five items against one gold item scores 0.2 even when the right
-  line is among them. Decide whether that is the intended question before
-  treating a low value as a defect.
-- ADR-0003: the corpus is never edited to move a number. Correcting an
-  expectation requires the ADR-0031/0036 justification — it named something the
-  engine cannot produce, or contradicted itself.
-
-**Done when** every case in the bottom decile has a stated cause, each labelled
-instrument or engine, and any threshold change is argued from those causes
-rather than from the aggregate.
-
----
+**What each disposition is worth for `containing_evidence_recall_at_10`**
+(0.8824 today, target 0.90): fix B only → **0.9059**; exclude the two as
+unmeasured → **0.9036**; fix A only → 0.9765; fix both → 1.0000. **Three of the
+four options pass the gate**, which is why the ruling should be argued from the
+cause and not from the number.
 
 ## Task 2 — Subject and file path on `Finding` (WS-2)
 

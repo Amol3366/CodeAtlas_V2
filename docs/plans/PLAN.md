@@ -248,6 +248,97 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-15T12:00:00Z — WS-4: both evidence metrics investigated per case; a ruling is needed
+
+- Agent: Claude Code `claude-opus-5`, branch `evidence-rates-per-case`.
+- Transition: no phase task. Post-gate. WS-4 of the post-closeout program.
+- **Investigation only. No engine change, no corpus change, no metric change.**
+  Stopping for a ruling is the instruction WS-1 set and this entry follows it.
+
+**The standing prior held for an eighth time: the instrument is wrong, not the
+engine.** Neither unmet target is caused by the engine citing the wrong thing.
+
+**Per-case decomposition** (the artifact stores aggregates only, so this needed
+a run emitting per case): 85 scored cases, `containing/predicted = 84/122`.
+`containing_evidence_recall_at_10` is `0.8824` because **exactly 10 cases score
+0.00 and the other 75 score 1.00** — `75/85 = 0.882`. The shortfall is those
+ten, and they split cleanly into two unrelated causes.
+
+**Finding A — eight cases: the corpus holds two conventions for graph evidence,
+and only one of them can score.**
+
+`_contains` is directional by design: the predicted range must *fully cover* the
+expected one, because "a citation that omits part of the answer has not proven
+it". In all eight, the engine cites a **precise reference line inside** a gold
+range that declares the **whole definition**:
+
+| Case | Intent | Gold | Engine cites |
+| --- | --- | --- | --- |
+| q003 | TRACE_FLOW | `service.py:7-10` | `9-9`, `10-10` |
+| q006 | TRACE_FLOW | `idempotency.py:5-9` | `8-8` |
+| q007 | RELATED_TESTS | `test_service.py:3-5` | `5-5` |
+| q013 | DEPENDENCIES | `orders.ts:5-6` | `5-5` |
+| q016 | CALLERS | `client.js:3-4` | `4-4` |
+| q017 | EXPORTS | `orders.ts:1-7` | `1-3`, `5-7` |
+| q026 | TRACE_FLOW | `frontend.ts:1-4` | `2-2`, `3-3` |
+| q032 | TRACE_FLOW | `frontend.ts:1-4`, `backend.py:1-2` | `2-2`, `3-3` |
+
+**The corpus contradicts itself.** q005 and q015 are the same intents from the
+same era and declare the *narrow reference site* (`service.py:10-10`,
+`client.js:1-1`) — and score 1.00. The 23 graph cases added 2026-08-15 also
+declare reference sites, and score 1.00. So two conventions have coexisted since
+Phase 0, and the aggregate could never show it. **This is the ADR-0031 shape
+exactly** — that record found two conventions for naming a Markdown section, one
+of which named something the engine could not produce.
+
+**Finding B — two cases: the fixture path collides with an ignore default.**
+
+q034 ("Where is `process` in the **target tree**?") and q035 declare evidence in
+`git_changes/target/processor.py`. **`target/` is a default ignore pattern**
+(Rust/Maven build output), so that file is *never indexed* and the engine can
+never cite it — it answers from `base/service.py`, the only side it can see.
+Their recall is structurally 0, permanently.
+
+Change cases on the same fixture are unaffected: `_resolve_side` selects
+`target/` as the state **root**, and ignore rules load relative to the root, so
+`processor.py` sits at the top and nothing excludes it. Only the *query* side,
+which indexes the fixture root, loses it.
+
+**ADR-0036's validator passed throughout**, because it asserts `expected_symbols`
+resolve via `find_exact` — and `process` does resolve, from `base/`. The
+guarantee never covered the evidence *file*.
+
+**What each disposition is worth, computed rather than estimated:**
+
+| Disposition | `containing_evidence_recall_at_10` |
+| --- | ---: |
+| today | 0.8824 (target 0.90) |
+| fix Finding B only | **0.9059 — passes** |
+| exclude the two as unmeasured (ADR-0024) | **0.9036 — passes** |
+| fix Finding A only | 0.9765 |
+| fix both | 1.0000 |
+
+**`containing_evidence_rate` is a separate problem and its target looks
+unreachable by construction.** It is *precision*: `containing / predicted` over
+every evidence item emitted. Crediting all ten zero-recall cases takes it only
+to **0.8115**, leaving **23** uncredited items that are *correct supporting
+evidence the corpus does not declare* — q060 cites 5 items against 1 gold, c021
+4 against 1, and so on. Reaching 1.00 requires the engine to emit nothing beyond
+what the corpus declares, while **ADR-0020 requires emitting every supporting
+edge**. **That is the ADR-0038 shape**: a precision metric punishing the engine
+for obeying an accepted decision, which ADR-0038 resolved for
+`relation_path_correctness` by adding recall beside it and leaving precision
+ungated.
+
+- Contracts/migrations: none. Nothing was changed.
+- Verification: the per-case figures above are reproducible from
+  `predict_exact_symbols` + `predict_changes` and `score_query_case` /
+  `score_change_case`; `_contains` is `runner.py:873`; the ignore default is
+  `ignore_rules.py:31`.
+- Next: **four rulings are needed** before any of this becomes a change. They
+  are stated in `documentation/extra_build.md` under Task 1.
+
+
 ### 2026-08-15T09:00:00Z — Gates A and B ruled; WS-3 delivered, WS-5 reframed
 
 - Agent: Claude Code `claude-opus-5`, branch `oversized-tracked-file`.
