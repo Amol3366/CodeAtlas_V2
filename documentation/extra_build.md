@@ -42,10 +42,25 @@ isolation).
 Corpus: **63 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
 
-Current Phase 4 baseline, for the three items below that argue from it:
+Current Phase 4 baseline, refreshed 2026-08-16 after ADR-0047 and ADR-0048:
 
-| Metric                               |  Value | Target | State                                             |
-| ------------------------------------ | -----: | -----: | ------------------------------------------------- |
+| Metric | Value | Target | State |
+| --- | ---: | ---: | --- |
+| `exact_symbol_resolution` | 0.9800 | 0.98 | met — **49/50, exactly on the line, zero margin** |
+| `containing_evidence_recall_at_10` | 0.9706 | 0.90 | met |
+| `containing_evidence_rate` | 0.7561 | — | **ungated** (ADR-0048); reported, ceiling 0.7724 |
+| `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural — **the only unmet target** |
+| `abstention_correctness` | 0.9828 | — | ungated; the miss is q035 |
+| `symbol_recall_at_10` | 0.8707 | 0.90 | ungated on this profile (ADR-0023) |
+| `relation_path_recall` | 0.9130 | — | deliberately ungated until Task 3 |
+
+**`exact_symbol_resolution` has no headroom.** ADR-0033 predicted 0.98 would
+become expressible at 50 cases because 50 is the first size tolerating one miss.
+The corpus reached 50, and the first real miss landed exactly on the threshold.
+One more miss anywhere gives 0.9600 and the gate fails. The case consuming the
+whole margin is **q035**.
+
+------------------------------------ | -----: | -----: | ------------------------------------------------- |
 | `exact_symbol_resolution`          | 1.0000 |   0.98 | met — and 0.98 finally*means* 0.98 at 50 cases |
 | `containing_evidence_rate`         | 0.6885 |   1.00 | **unmet**                                   |
 | `containing_evidence_recall_at_10` | 0.8824 |   0.90 | **unmet**                                   |
@@ -68,58 +83,24 @@ because that prior was not applied earlier.
 
 ---
 
-## Task 1 — Phase 4 evidence rates (WS-4) — **investigated 2026-08-15; needs four rulings**
+## ~~Task 1 — Phase 4 evidence rates (WS-4)~~ — **done 2026-08-16**
 
-The per-case investigation is **done**. No change has been made, and none
-should be until the rulings below are given — WS-1's rule is to record the
-number, name the cases, and stop.
+Four rulings given and implemented: **ADR-0047** (graph evidence is the
+reference site), a fixture-local `.codeatlasignore` re-including `target/`,
+**ADR-0048** (`containing_evidence_rate` reported not gated), and an extended
+ADR-0036 validator asserting expected evidence files are *indexed*.
 
-**The shortfall is exactly ten cases**, out of 85 scored. The other 75 score
-1.00. They split into two unrelated causes.
+`unmet_targets` is now `['changed_symbol_precision']` alone.
 
-**Finding A (8 cases) — the corpus holds two conventions for graph evidence.**
-`_contains` (`runner.py:873`) is directional by design: predicted must fully
-cover expected. In q003, q006, q007, q013, q016, q017, q026 and q032 the engine
-cites a **precise reference line inside** a gold range declaring the **whole
-definition**, so containment fails. But q005 and q015 — same intents, same era —
-declare the *narrow reference site* and score 1.00, as do all 23 graph cases
-added 2026-08-15. Two conventions have coexisted since Phase 0 and no aggregate
-could show it. **The ADR-0031 shape.**
+**Three cases remain below 1.0 and each is its own open register row**, because
+the investigation deliberately derived every corrected range from the claim
+rather than copying the engine's output — which is what surfaced them:
 
-**Finding B (2 cases) — a fixture path collides with an ignore default.**
-q034 and q035 declare evidence in `git_changes/target/processor.py`, and
-**`target/` is a default ignore pattern** (`ignore_rules.py:31`, Rust/Maven
-build output). That file is never indexed, so the engine answers from
-`base/service.py` and their recall is structurally 0. Change cases are
-unaffected — they select `target/` as the state *root*, where nothing excludes
-it. ADR-0036's validator passed throughout because it checks that
-`expected_symbols` resolve, and `process` does resolve, from `base/`.
-
-**Rulings needed**
-
-1. **Which convention is correct for graph evidence** — the reference site the
-   engine cites, or the definition range the answer lives in? Eight cases say
-   one, twelve-plus say the other. Correcting the minority is ADR-0031-class
-   work, not "editing the corpus to move a number", *if* the ruling says so.
-2. **What to do about the two `target/` cases** — rename the fixture directory
-   (which would break the `base`/`target` ref grammar `_resolve_side` depends
-   on), mark them unmeasured under ADR-0024, or leave them failing and lower
-   nothing.
-3. **Whether `containing_evidence_rate` should stay gated at 1.00.** It is
-   *precision* over every emitted evidence item. Crediting all ten zero-recall
-   cases reaches only **0.8115**, leaving 23 uncredited items that are correct
-   supporting evidence the corpus never declared. **ADR-0020 requires emitting
-   every supporting edge**, so 1.00 punishes the engine for obeying an accepted
-   decision — the **ADR-0038 shape**, which was resolved there by adding recall
-   beside precision and leaving precision ungated.
-4. **Whether ADR-0036's validator should also check evidence file paths**, which
-   would have caught Finding B by construction.
-
-**What each disposition is worth for `containing_evidence_recall_at_10`**
-(0.8824 today, target 0.90): fix B only → **0.9059**; exclude the two as
-unmeasured → **0.9036**; fix A only → 0.9765; fix both → 1.0000. **Three of the
-four options pass the gate**, which is why the ruling should be argued from the
-cause and not from the number.
+- **q006** — a candidate *engine* finding, the only one in the whole
+  investigation. The engine cites a line that does not prove the claim.
+- **q032** — a two-hop trace carries no evidence for its far end; caps at 0.50.
+- **q035** — an under-specified expectation, and now **the priority**: it
+  consumes the entire `exact_symbol_resolution` margin.
 
 ## Task 2 — Subject and file path on `Finding` (WS-2)
 

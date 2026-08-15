@@ -6,31 +6,29 @@
   "contract_version": "1.0",
   "implementation_status": "implemented",
   "metrics": {
-    "abstention_correctness": 1.0,
+    "abstention_correctness": 0.9827586206896551,
     "changed_symbol_precision": 0.9464285714285714,
     "changed_symbol_recall": 1.0,
-    "containing_evidence_rate": 0.6885245901639344,
-    "containing_evidence_recall_at_10": 0.8823529411764706,
+    "containing_evidence_rate": 0.7560975609756098,
+    "containing_evidence_recall_at_10": 0.9705882352941176,
     "direct_impact_recall": 1.0,
-    "exact_evidence_rate": 0.6147540983606558,
-    "exact_symbol_resolution": 1.0,
+    "exact_evidence_rate": 0.6829268292682927,
+    "exact_symbol_resolution": 0.98,
     "finding_count_correctness": 1.0,
     "finding_precision": 1.0,
     "lexical_resolution": 1.0,
-    "mean_reciprocal_rank": 1.0,
-    "ndcg_at_10": 0.9144948453687225,
-    "primary_evidence_recall_at_10": 0.8352941176470589,
+    "mean_reciprocal_rank": 0.9827586206896551,
+    "ndcg_at_10": 0.8972534660583777,
+    "primary_evidence_recall_at_10": 0.9235294117647059,
     "relation_path_correctness": 0.8260869565217391,
     "relation_path_recall": 0.9130434782608695,
-    "symbol_recall_at_10": 0.8879310344827587,
+    "symbol_recall_at_10": 0.8706896551724138,
     "total_duration_ms": 0.0,
     "unsupported_claim_rate": 0.0,
-    "valid_evidence_rate": 0.6147540983606558
+    "valid_evidence_rate": 0.6829268292682927
   },
   "targets_met": false,
   "unmet_targets": [
-    "changed_symbol_precision",
-    "containing_evidence_recall_at_10",
-    "containing_evidence_rate"
+    "changed_symbol_precision"
   ]
 }
