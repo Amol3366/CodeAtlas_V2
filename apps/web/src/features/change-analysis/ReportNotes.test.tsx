@@ -18,6 +18,15 @@ describe("ReportNotes", () => {
     expect(screen.getByText(/too long to show in full/i)).toBeInTheDocument();
   });
 
+  it("explains the oversized-file warning in plain language", () => {
+    // ADR-0045 made an oversized tracked file a silent skip rather than a
+    // refusal, so the warning is the only thing telling a reader the
+    // comparison covered less than the tree.
+    render(<ReportNotes warnings={["FILE_TOO_LARGE"]} limitations={[]} />);
+
+    expect(screen.getByText(/too large to analyse/i)).toBeInTheDocument();
+  });
+
   it("shows an unknown code as itself rather than dropping it", () => {
     // A code nobody has written prose for is still information. Hiding it
     // would silently shrink what the report disclosed.

@@ -93,6 +93,25 @@ It is also the shape of the defect ADR-0044 had just finished fixing.
   asserted in the same place the old one was — including that `read_blob` still
   raises, so the deliberate difference between the two paths cannot erode.
 
+## Follow-up found after the ruling landed
+
+Delivering the skip exposed a gap in the surface that mattered most for it.
+**`render_text` — the CLI's default `impact` output — dropped warnings and
+limitations entirely.** That was survivable while an excluded file produced a
+loud failure elsewhere; this decision turns it into a silent skip, so the
+renderer that a developer at a prompt actually reads would have shown a clean
+verdict and never said a file was left out. That is precisely the defect this
+ADR exists to avoid, arriving through the back door.
+
+Fixed in the same change: `render_text` now emits a "Warnings and limitations"
+section, last, after the verdict. `FILE_TOO_LARGE` was also added to the web
+app's known-warning prose; an unknown code already rendered as itself, so this
+is polish rather than a hole.
+
+**The lesson is general: when an exclusion stops being loud, check every
+surface that reported the loudness.** The JSON, Markdown, PR and SARIF
+renderers already carried limitations; only the terminal one did not.
+
 ## Verification
 
 Mutation-checked in both halves, restored from file copies:

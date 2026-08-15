@@ -12,6 +12,8 @@ const KNOWN_WARNINGS: Readonly<Record<string, string>> = {
     "Some evidence was too long to show in full and was shortened.",
   LEXICAL_QUERY_RELAXED:
     "The text search was broadened to find matches. Lexical search matches wording, which is not proof of behaviour.",
+  FILE_TOO_LARGE:
+    "Some files were too large to analyse and were left out of the comparison. Changes inside them were not detected — the limitation below names them.",
 };
 
 export function ReportNotes({
