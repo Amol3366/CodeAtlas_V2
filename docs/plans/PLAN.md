@@ -87,10 +87,13 @@ with verification.
 | `relation_path_recall` has no gate target                                                | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
 | RRF coarse-chunk bias | **DEFERRED — reframed 2026-08-15 by ADR-0046.** Its stated trigger ("the module-granularity ruling lands") is now satisfied, and the ruling was **not** to implement the penalty. So this is no longer "fix the bias" but **"measure whether it costs anything"** at the larger corpus. ADR-0030's finding stands: the obvious lever demotes the chunk currently providing a rank-1 containment hit | Someone measures it corpus-wide |
 | ~~Phase 4 `containing_evidence_rate` and `containing_evidence_recall_at_10`~~ | **INVESTIGATED 2026-08-15, RULED 2026-08-16 — superseded by the four rows below.** The per-case run found the recall shortfall is **exactly 10 of 85 cases scoring 0.00** while the other 75 score 1.00, from **two unrelated causes** — and that the rate metric's 1.00 target is unreachable while the engine obeys ADR-0020. Each cause is now its own row with its own ruling | — |
-| **Ruling 1 — graph evidence is the reference site** | **RULED 2026-08-16, not yet implemented. An absent decision, not a faulty instrument**: nobody ever ruled what a graph answer should cite, and the corpus and engine were each internally consistent. The claim is "X calls Y" and the **call site** proves it; a definition range cites more than the claim needs, which `AGENTS.md` §4.1 forbids. **`_contains` is correct and is not to be loosened** — loosening it would be the "move a number" move in disguise. The majority argument is struck, and the ADR-0031 parallel is not to be leaned on: there the engine *could not* produce the expectation, here it could and chose not to | ADR-0047 lands with q003, q006, q007, q013, q016, q017, q026, q032 corrected |
-| **Ruling 2 — q034/q035: re-include `target/` in the fixture** | **RULED 2026-08-16, not yet implemented. A faulty instrument.** `target/` is a build-output ignore default, so the declared evidence file can never be indexed. **Rename refused** (breaks the `base`/`target` ref grammar); **`measured=False` refused** (ADR-0024 marks cases the adapter declined to run, and it runs these fine). Fixed by a fixture-local `.codeatlasignore` containing `!target/` — verified: `.codeatlasignore` compiles with `overrides=True` (`ignore_rules.py:124`) and `!` negation is supported (`:170`). **This moves a number (0.8824 → ≈0.9059) and the ADR must say so**; the justification is that the collision is accidental and the case always meant to measure the target tree | Confirmed that change cases, which select `target/` as the state root, are unaffected |
-| **Ruling 3 — `containing_evidence_rate` is ungated** | **RULED 2026-08-16, not yet implemented. ADR-0038 applied literally.** It is precision over every emitted evidence item; crediting all ten zero-recall cases reaches only **0.8115**, leaving 23 items that are correct supporting evidence the corpus never declared. **ADR-0020 requires emitting every supporting edge**, so 1.00 punishes compliance. Keep reporting the value, remove the gate, add recall beside it — **retaining the number matters**, or every historical baseline quietly changes meaning. The 0.8115 ceiling calculation belongs in the ADR body | ADR-0048 lands, last among the code changes |
-| **Ruling 4 — the ADR-0036 validator checks evidence files are indexed** | **RULED 2026-08-16, not yet implemented.** "Exists on disk" would **not** have caught Finding B — `processor.py` exists. The validator must assert every expected evidence file is **indexed in the fixture's active snapshot**. Lands *before* the Ruling 2 fix on purpose: it should go red on exactly q034 and q035 the day it arrives, because a validator that passes on the day it lands has proven nothing | It goes red on those two, then green after Ruling 2 |
+| **q035: an under-specified expectation, now consuming the entire `exact_symbol_resolution` margin** | **OPEN — the priority.** Re-including `target/` put a second `process` in the `git_changes` index, so q035's trace subject is ambiguous and the answer abstains. Abstaining is defensible (`AGENTS.md` §4.1 prefers it to guessing), but it turned a wrong answer into no answer, and **`exact_symbol_resolution` is now 49/50 = 0.9800 against a 0.98 target — exactly on the line, zero margin.** One more miss anywhere gives 0.9600 and the gate fails. q035 also causes the `abstention_correctness` drop to 0.9828. The case says "what does strict mode do?" and names `process` when two exist, with no way to say which | Someone disambiguates the expectation, or rules that the fixture may not hold two symbols of one name |
+| **q006: the engine cites a line that does not prove the claim** | **OPEN — a candidate ENGINE finding, the first in this investigation that is not the instrument.** Surfaced 2026-08-16 by applying ADR-0047. The claim is "duplicate keys are handled"; the line that proves it is `return "duplicate"` (`idempotency.py:7`). The engine cites line 8, `self._keys.add(key)`. **Not proven to be a defect** — the trace answer may be selecting a chunk line rather than the claim-bearing one. Recorded because the reflex the rulings warned about would have declared line 8 "because the engine says so", matched the predicted number, and buried it | Someone investigates why trace evidence selects that line |
+| **q032: a two-hop trace carries no evidence for its far end** | **OPEN — an absent capability or an over-broad expectation, not a defect.** Surfaced 2026-08-16. q032 traces frontend → backend; after ADR-0047 the frontend hop matches, but `backend.py:1-2` — the endpoint the flow reaches — is never cited, so the case caps at **0.50**. Either a trace should cite evidence at its far end, or a two-hop expectation should not declare one. **A product question** | The user rules, or WS-6 settles what a trace answer carries |
+| ~~**Ruling 1 — graph evidence is the reference site**~~ | **CLOSED 2026-08-16 — ADR-0047.** Eight expectations corrected; `_contains`, the engine and the metric definitions untouched. **Six were pure convention mismatches; two were not** — q006 and q032 became their own rows below, which is why the predicted 0.9765 came out at 0.9588 | — |
+| ~~**Ruling 2 — re-include `target/` in the fixture**~~ | **CLOSED 2026-08-16.** A fixture-local `.codeatlasignore` holding `!target/`. Change cases confirmed unaffected by capturing c020–c023 before and after: byte-identical. **q034 now passes; q035 does not** — the fix put a second `process` in the index, so its trace subject is ambiguous and the answer abstains. That regressed four metrics, all from that one case; see the q035 row | — |
+| ~~**Ruling 3 — `containing_evidence_rate` is ungated**~~ | **CLOSED 2026-08-16 — ADR-0048.** Reported, not gated; recall keeps its 0.90 gate and meets it at 0.9706. The ceiling was recomputed for today and is **lower** than the figure first quoted: **95/123 = 0.7724** with 28 items still uncredited, against a 1.00 target | — |
+| ~~**Ruling 4 — the validator checks evidence files are indexed**~~ | **CLOSED 2026-08-16.** Landed before the Ruling 2 fix and was **red on exactly q034 and q035** the day it arrived — the free mutation-check proving it had teeth — then green after | — |
 | **A tracked file that matches an ignore default is reported deleted**                | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | —                                                                                                                                                                          |
 | ~~Editing a large Markdown file reports hundreds of its sections as deleted~~             | **CLOSED 2026-08-13 — not a defect. The engine was right and the measurement was wrong**, which is the **sixth** consecutive investigation of this shape to end that way (ADR-0017, 0018, 0024, 0027, 0038). The 12-minute analysis ran over a **live working tree while the same session rewrote `PLAN.md`** with `Path.write_text`, which truncates before it writes; the read landed in that window and saw an empty file. Proven by exact reproduction: an empty target yields **496 `SYMBOL_DELETED`** against the artifact's **496** for that file, a truncated one yields 491+1, and the real edited bytes yield **2 findings and zero deletions**. Eliminated on the way, and they should stay eliminated: text decoding (the mojibake was the terminal — the JSON holds `—` intact), symbol pairing with matching *and* mismatched `file_id`s, parse divergence (both views: 497 symbols, same ids, zero diagnostics), scale (50/200/497 sections all correct), and the real `GitBlobStateView`-vs-`DirectoryStateView` pairing. Three regression tests kept in `tests/unit/test_document_section_diff.py`, one of which pins the truncation shape so the next wall of deletions is diagnosable in a single run. Full account: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` | —                                                                                                                                                                          |
 | ~~**`check_phase7.ps1` can exit non-zero while reporting success**~~                    | **CLOSED 2026-08-15, with the diagnosis corrected.** The recorded mechanism — "the process exit code is whatever the last native command left" — **does not reproduce.** Under `powershell -File` a trailing `cmd /c "exit 3"` still exits **0**, so the success path was never leaking; and a failing step already exited non-zero, because `Invoke-Checked` throws under `$ErrorActionPreference = "Stop"`. The real exposure is one invocation-form narrower: a **caller** that reads `$LASTEXITCODE` after invoking a gate sees the stale code, measured at **3** through a wrapper `.ps1`. Worth fixing anyway — a release gate should state its verdict rather than leave it to how it was called. **All eight** gate scripts lacked the line, not just Phase 7; all eight now end `exit 0`, guarded with no exemption list. The risk that this masks a red gate is covered twice: a dynamic test asserting a throwing step still exits 1 with `exit 0` below it, and a deliberate breakage of the real Phase 4 gate, which exited **1** naming `Dataset validation failed with exit code 2`                                                                                                                                                                                                             | —                                                                                                                                                                          |
@@ -251,6 +254,92 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-16T18:00:00Z — WS-4 implemented: ADR-0047, ADR-0048, and a gate now passing with zero margin
+
+- Agent: Claude Code `claude-opus-5`, branch `adr-0047-graph-evidence`.
+- Transition: no phase task. Post-gate. All four rulings of 2026-08-16
+  implemented, in the sequence the user set.
+- New records: **ADR-0047** (graph evidence is the reference site) and
+  **ADR-0048** (`containing_evidence_rate` is reported, not gated).
+
+**`unmet_targets` is now `['changed_symbol_precision']` alone** — the accepted
+structural miss (c020–c022 split one physical diff into three cases). Every
+other Phase 4 target is met.
+
+**Read this before quoting any of it: `exact_symbol_resolution` is 0.9800
+against a 0.98 target — 49/50, exactly on the line, with zero margin.** One more
+miss takes it to 0.9600 and the gate fails. ADR-0033 said 0.98 would become
+expressible at ~50 cases because 50 is the first size tolerating one miss; the
+corpus reached 50 on 2026-08-15 and **the first real miss landed exactly on the
+threshold.** It passes. It is not comfortable, and a green gate must not be read
+as headroom.
+
+The sole miss is **q035**, and it is the same case behind the
+`abstention_correctness` drop.
+
+**How the numbers moved, and what caused each.**
+
+| Metric | Before | After | Cause |
+| --- | ---: | ---: | --- |
+| `containing_evidence_recall_at_10` | 0.8824 | **0.9706** | ADR-0047 (step 2, 0.9588) then the fixture fix (step 4) |
+| `containing_evidence_rate` | 0.6885 | 0.7561 | same; **now ungated** (ADR-0048) |
+| `primary_evidence_recall_at_10` | 0.8353 | 0.9235 | ADR-0047 |
+| `exact_evidence_rate` / `valid_evidence_rate` | 0.6148 | 0.6829 | ADR-0047 |
+| `exact_symbol_resolution` | 1.0000 | **0.9800** | **regression** — q035 abstains |
+| `abstention_correctness` | 1.0000 | 0.9828 | **regression** — q035 abstains |
+| `mean_reciprocal_rank` | 1.0000 | 0.9828 | q035 |
+| `symbol_recall_at_10` | 0.8879 | 0.8707 | q035; ungated on this profile (ADR-0023) |
+| `ndcg_at_10` | 0.9145 | 0.8973 | q035; ungated |
+
+**Four metrics regressed, all from one case, and the cause is our own fixture
+fix.** Re-including `target/` (Ruling 2) put a second `process` into the
+`git_changes` index. q035 traces `process`, the subject became ambiguous, and
+the answer now abstains where it previously cited the wrong file. **Abstaining
+on an ambiguous subject is defensible** — `AGENTS.md` §4.1 requires abstention
+over guessing — but it converted a wrong answer into no answer, and the
+accuracy metrics score those differently.
+
+**Two predictions failed, and both failures were informative.**
+
+- Step 2 predicted `containing_evidence_recall_at_10` ≈ 0.9765; measured
+  **0.9588**. Six of the eight corrected cases were pure convention mismatches;
+  two were not. **q006** is a candidate *engine* finding — the claim is
+  "duplicate keys are handled", the line proving it is `return "duplicate"`
+  (`idempotency.py:7`), and the engine cites line 8. **q032** is a two-hop trace
+  that carries no evidence for its far end and caps at 0.50.
+- Step 4 predicted ≈1.0000; measured **0.9706**, for the q035 reason above.
+
+**Both predictions failed because each correction was derived from the claim
+against the fixture's relation table, not copied from the engine's output.**
+Copying would have matched both predictions and buried q006 — which is exactly
+the reflex the rulings warned about.
+
+**Per-finding labels, as the rulings require:**
+
+| Finding | Label |
+| --- | --- |
+| Graph evidence convention (8 cases) | **Absent decision** — settled by ADR-0047 |
+| `target/` ignore collision (q034) | **Faulty instrument** — fixed by Ruling 2 |
+| q006 cites a non-proving line | **Candidate engine finding** — open, not proven |
+| q032 two-hop trace far end | **Absent capability or over-broad expectation** — open |
+| q035 ambiguous subject | **Under-specified expectation** — open, and now load-bearing |
+
+- Contracts/migrations: **none.** `contract_version` `1.1`, `SCHEMA_VERSION`
+  `14`; no version constant moved, so **no snapshot is stale**. No new
+  dependency. One dead parameter removed from `_unmet_targets` — it took
+  `implementation_status` only for the gate ADR-0048 deleted.
+- Verification, exit codes read from `$LASTEXITCODE` rather than printed output:
+  `uv run pytest -q` **2240 passed, 3 skipped**, exit 0; `ruff` exit 0; `mypy
+  --no-incremental` clean on **352** files, exit 0; `check_phase4.ps1 -SkipSync`
+  exit **0**; `check_phase7.ps1 -SkipSync` exit **0**.
+- Baselines `-0`, `-3`, `-4` regenerated once, at the end, so the movement is
+  attributable to the corrections rather than to the ungating. `-1` and `-2`
+  stay frozen as history.
+- Next: **q035 is the priority**, because `exact_symbol_resolution` now has no
+  margin and q035 is the case consuming it. q006 is the only candidate engine
+  finding in the whole investigation and deserves its own look.
+
 
 ### 2026-08-16T00:00:00Z — WS-4: four rulings recorded, no implementation
 

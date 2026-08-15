@@ -45,7 +45,7 @@ from codeatlas.contracts import RelationKind
 from codeatlas.evaluation.dataset import Dataset, load_dataset
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
-from codeatlas.storage.sqlite.stores import SnapshotStore, SymbolStore
+from codeatlas.storage.sqlite.stores import FileStore, SnapshotStore, SymbolStore
 
 DATASET_ROOT = Path("tests/evaluation/cases")
 
@@ -63,6 +63,7 @@ class _Resolver:
 
     def __init__(self, dataset: Dataset, stack: ExitStack) -> None:
         self._by_fixture: dict[str, tuple[SymbolStore, str]] = {}
+        self._files_by_fixture: dict[str, frozenset[str]] = {}
         fixtures = {case.repository_fixture for case in dataset.query_cases}
         for fixture in sorted(fixtures):
             workspace = stack.enter_context(tempfile.TemporaryDirectory())
@@ -78,10 +79,27 @@ class _Resolver:
             snapshot = SnapshotStore(connection).get_active(repository.repository_id)
             assert snapshot is not None, f"{fixture} produced no active snapshot"
             self._by_fixture[fixture] = (SymbolStore(connection), snapshot.snapshot_id)
+            self._files_by_fixture[fixture] = frozenset(
+                record.relative_path
+                for record in FileStore(connection).list_for_snapshot(
+                    snapshot.snapshot_id
+                )
+            )
 
     def resolves(self, fixture: str, name: str) -> bool:
         store, snapshot_id = self._by_fixture[fixture]
         return bool(store.find_exact(snapshot_id, name, 1))
+
+    def indexes(self, fixture: str, relative_path: str) -> bool:
+        """Whether the fixture's active snapshot actually contains that file.
+
+        **Indexed, not present on disk.** "Exists" would not have caught the
+        defect this check was added for: `git_changes/target/processor.py` is
+        on disk and readable, and is excluded from every index because
+        `target/` is a build-output ignore default. A case declaring evidence
+        there can never be satisfied, and nothing said so.
+        """
+        return relative_path in self._files_by_fixture[fixture]
 
 
 @pytest.fixture(scope="module")
@@ -159,3 +177,30 @@ def test_the_resolver_actually_rejects_something(corpus) -> None:  # type: ignor
     assert not resolver.resolves("docs_config", "README.Sample Service")
     assert not resolver.resolves("tsjs_app", "definitely_not_a_symbol")
     assert resolver.resolves("docs_config", "Sample Service")
+
+
+def test_every_expected_evidence_file_is_indexed(corpus) -> None:  # type: ignore[no-untyped-def]
+    """An expectation must cite a file the engine can actually reach.
+
+    ADR-0036 asserted that expected *symbols* resolve. That guarantee never
+    covered the evidence **file**, and the gap had teeth: q034 and q035 declared
+    evidence in `git_changes/target/processor.py`, which is on disk, readable,
+    and excluded from every index because `target/` is a build-output ignore
+    default. Their recall was structurally 0 and always had been, while
+    `find_exact` happily resolved `process` -- from `base/service.py`, the only
+    side the index could see.
+
+    So the check is **indexed in the fixture's active snapshot**, not "exists".
+    The weaker form would have passed on the day it landed and proven nothing.
+    """
+    dataset, resolver = corpus
+    missing = [
+        f"{case.id} ({case.repository_fixture}): {item.file_path} is not indexed"
+        for case in dataset.query_cases
+        for item in case.expected_evidence
+        if not resolver.indexes(case.repository_fixture, item.file_path)
+    ]
+
+    assert not missing, "expectations citing a file no index contains:\n  " + (
+        "\n  ".join(missing)
+    )

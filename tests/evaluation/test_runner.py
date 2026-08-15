@@ -466,20 +466,41 @@ def test_the_conceptual_profile_drops_targets_it_cannot_measure() -> None:
     assert "symbol_recall_at_10" in report.unmet_targets
 
 
-def test_the_evidence_gate_reads_containing_rather_than_exact_spans() -> None:
-    """ADR-0003: a call site rarely equals a gold range describing a definition.
+def test_containing_evidence_rate_is_reported_but_not_gated() -> None:
+    """ADR-0048, applying ADR-0038 literally.
 
-    The threshold stays 1.0 — "all evidence must be valid" is unchanged. Only
-    what *valid* means is corrected, so nothing was quietly relaxed.
+    This assertion is the **inverse** of the one it replaces, and the reason is
+    not that the number was inconvenient. `containing_evidence_rate` is
+    *precision* over every emitted evidence item, so it asks whether the engine
+    emitted nothing beyond what the corpus declared — while **ADR-0020 requires
+    emitting every supporting edge**. Measured 2026-08-16: crediting every
+    remaining failing case reaches 0.7724 against a 1.00 target, leaving 28
+    items that are correct supporting evidence no expectation declares.
+
+    A gate that cannot be met while the engine obeys an accepted decision is a
+    gate punishing compliance. The metric stays — dropping it would quietly
+    change the meaning of every tracked baseline.
     """
     report = _report(DATASET_ROOT)
 
-    assert "containing_evidence_rate" in report.unmet_targets
+    assert "containing_evidence_rate" not in report.unmet_targets
     assert "valid_evidence_rate" not in report.unmet_targets
-    # Still reported, because the gap between the two rates is the measurement.
-    # (Both are None here: an empty prediction file predicts no evidence at all.
-    # What matters is that the report still carries the field.)
+    # Still reported. (All are None here: an empty prediction file predicts no
+    # evidence at all. What matters is that the report still carries them.)
+    assert "containing_evidence_rate" in report.metrics.model_dump()
     assert "exact_evidence_rate" in report.metrics.model_dump()
+
+
+def test_evidence_recall_keeps_its_gate() -> None:
+    """Ungating precision does not ungate recall.
+
+    ADR-0038's pattern is precision reported beside gated recall, not both let
+    go. *Did the answer's evidence surface* is the honest question for this
+    corpus, and unlike precision it does not penalise completeness.
+    """
+    report = _report(DATASET_ROOT)
+
+    assert "containing_evidence_recall_at_10" in report.unmet_targets
 
 
 # --- Unmeasured cases are not wrong answers (ADR-0024) --------------------------

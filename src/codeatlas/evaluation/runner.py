@@ -456,7 +456,7 @@ def null_baseline(dataset: Dataset) -> EvaluationReport:
         abstention_correctness=None,
         total_duration_ms=0.0,
     )
-    unmet_targets = _unmet_targets(metrics, "not_implemented", "retrieval")
+    unmet_targets = _unmet_targets(metrics, "retrieval")
     return EvaluationReport(
         implementation_status="not_implemented",
         case_counts={
@@ -573,9 +573,7 @@ def _evaluate(
         for case in dataset.change_cases
     ]
     metrics = _aggregate(query_scores, change_scores, dataset)
-    unmet_targets = _unmet_targets(
-        metrics, predictions.implementation_status, dataset.target_profile
-    )
+    unmet_targets = _unmet_targets(metrics, dataset.target_profile)
     return EvaluationReport(
         implementation_status=predictions.implementation_status,
         case_counts={
@@ -743,7 +741,6 @@ def _aggregate(
 
 def _unmet_targets(
     metrics: AggregateMetrics,
-    implementation_status: str,
     profile: TargetProfile,
 ) -> list[str]:
     """Which gates a report misses, chosen by the corpus's declared profile.
@@ -813,19 +810,26 @@ def _unmet_targets(
         for name, (value, target) in minimums.items()
         if value is None or value < target
     ]
-    gate_evidence = implementation_status == "implemented" and profile == "retrieval"
-    # The threshold is unchanged at 1.0 -- "all evidence must be valid" is
-    # the same demand. Only the definition of *valid* is corrected: per
-    # ADR-0003 a call site rarely equals a gold range describing a
-    # definition, so requiring an exact span match gated on a granularity
-    # disagreement rather than on validity. `exact_evidence_rate` is still
-    # reported beside it, because the gap between the two is the
-    # measurement.
-    if gate_evidence and (
-        metrics.containing_evidence_rate is None
-        or metrics.containing_evidence_rate < 1.0
-    ):
-        unmet.append("containing_evidence_rate")
+    # `containing_evidence_rate` is **deliberately not a gate condition**
+    # (ADR-0048), and it is deliberately still computed and still reported.
+    #
+    # It is *precision*: containing / predicted over every evidence item the
+    # engine emits. So it asks whether the engine emitted nothing beyond what
+    # the corpus declared -- while **ADR-0020 requires every graph answer to
+    # emit every supporting edge**, each of which carries evidence. An answer
+    # citing five supporting locations against a case declaring one scores 1/5
+    # for being complete.
+    #
+    # Measured 2026-08-16: crediting every remaining failing case reaches
+    # 0.7724 against the old 1.00 target, leaving 28 items that are correct
+    # supporting evidence no expectation declares. The gap cannot be closed by
+    # improving the engine -- only by emitting less, which ADR-0020 forbids.
+    #
+    # This is ADR-0038's shape and its resolution: precision retained and
+    # reported, recall gated. `containing_evidence_recall_at_10` keeps its 0.90
+    # threshold above, because "did the evidence surface" does not penalise
+    # completeness. The number stays because every tracked baseline carries it
+    # and removing it would quietly change what those artifacts mean.
     if (
         metrics.unsupported_claim_rate is not None
         and metrics.unsupported_claim_rate >= 0.02

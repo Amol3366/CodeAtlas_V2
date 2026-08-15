@@ -1657,6 +1657,51 @@ minutes to redo.
       It now asserts the skip in the same place, beside a test that `read_blob`
       still raises — so the deliberate difference cannot erode either.
 
+- [x] **WS-4 ruled and implemented; a gate now passes with zero margin
+      (2026-08-16).** ADR-0047 and ADR-0048. `unmet_targets` is down to
+      `['changed_symbol_precision']` alone.
+
+      **`exact_symbol_resolution` is 49/50 = 0.9800 against 0.98 — exactly on
+      the line.** ADR-0033 predicted 0.98 would become expressible at 50 cases
+      because 50 is the first size tolerating one miss. The corpus reached 50
+      and **the first real miss landed exactly on the threshold**. It passes;
+      one more miss anywhere gives 0.9600 and it fails. **A green gate is not
+      headroom** — say so whenever this number is quoted.
+
+      **Two predictions failed, and both failures were the point.** Step 2
+      predicted 0.9765 and gave 0.9588; step 4 predicted ~1.0000 and gave
+      0.9706. Both failed **because every corrected range was derived from the
+      claim against the fixture's relation table, never copied from the engine's
+      output.** Copying would have matched both predictions and buried q006 —
+      the only candidate *engine* finding in the entire investigation. **When a
+      prediction fails, the model was wrong and that is information; when it
+      succeeds because you fitted the expectation to the output, you have
+      learned nothing.**
+
+      **State per finding whether it is a faulty instrument or an absent
+      decision.** The graph-evidence convention was an *absent decision* —
+      nobody had ever ruled what a graph answer cites, and corpus and engine
+      were each internally consistent. The `target/` ignore collision was a
+      *faulty instrument*. Calling both "the instrument is wrong" was the
+      reflex, and a reflex confirmed eight times is how a real engine defect
+      eventually gets waved past.
+
+      **A fix can regress metrics it never touched.** Re-including `target/`
+      put a second `process` in the index; q035's trace subject became
+      ambiguous and the answer now abstains. Abstaining is right
+      (`AGENTS.md` §4.1), but it turned a wrong answer into no answer, and the
+      accuracy metrics score those differently — four metrics moved, all from
+      that one case.
+
+      **Argue a convention from the contract, not from a head count.** The
+      reference site is correct because the claim is "X calls Y" and the call
+      site proves it, not because more cases used it.
+
+      **A precision metric that cannot be met while the engine obeys an
+      accepted decision is punishing compliance** (ADR-0048, ADR-0038's shape).
+      Ungate it, keep reporting it — dropping the number changes what every
+      tracked baseline means.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
