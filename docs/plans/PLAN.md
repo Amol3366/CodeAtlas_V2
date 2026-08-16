@@ -90,8 +90,11 @@ with verification.
 | ~~**q035: an under-specified expectation, now consuming the entire `exact_symbol_resolution` margin**~~ | **CLOSED 2026-08-16 — ADR-0050.** Ruled by the user. Two corrections on different authorities: q035 declares `query_subject: "target.processor.process"` (additive, the field's own comment sanctions it), and its `expected_evidence` becomes the reference site `4-4` — a **ninth instance of ADR-0047**, which q035 could not be part of on 2026-08-16 because it was abstaining and emitted nothing to compare. `exact_symbol_resolution` **0.9800 → 1.0000 (50/50)**, so the gate tolerates one future miss again; `containing_evidence_recall_at_10` 0.9706 → **0.9824**; `abstention_correctness` and `mean_reciprocal_rank` → 1.0000; `containing_evidence_rate` 0.7561 → 0.7520, ungated (ADR-0048). No engine, `_contains`, or metric-definition change. **The subject fix alone passed its own wrong-side mutation** — see the row below | — |
 | **The stated blocker for q035 was wrong, and the ambiguity message is why** | **OPEN — a small live-path usability defect, recorded not fixed.** `extra_build.md` carried "`find_exact` resolves by name and there is no file-scoped selector, so this may not be expressible" as a constraint on the option set. **There is one:** `find_exact` (`storage/sqlite/stores.py:463`) tries four tiers and tier 2 is `module_path \|\| '.' \|\| qualified_name`; `target.processor.process` resolves to exactly one symbol. The belief was never tested against the store. **Why it survived: the abstention message does not disambiguate** — it reads "matches 2 symbols: process, process. Ask again with a qualified name", printing `qualified_name`, which is *identical* for both candidates. A caller is told to qualify and shown two identical names. The fix is to print the tier-2 form, in `GraphQueryService._answer` (`application/graph_queries.py:236-249`). Not done here because ADR-0050 is a corpus ruling and this is an engine change | Someone fixes the message, or a user reports being unable to disambiguate |
 | **A corpus fix can restore a number without restoring the measurement** | **OPEN — a stated limit found by mutation, generalising the row above about the 2026-08-15 cases.** Declaring q035's `query_subject` restored `exact_symbol_resolution` to 1.0000, and then **the wrong-side mutation was not detected**: pointing the subject at `base.service.process` scored *identically*, because `expected_symbols` is `["process"]` and both fixture sides define a symbol of that name. Only correcting the evidence to the reference site made the case discriminate, because the two sides' reference sites are in different files while their symbol names are not. **The general shape: `exact_symbol_resolution`, `mean_reciprocal_rank` and `abstention_correctness` all read the symbol's *name*, so no name-based metric can separate two same-named symbols.** Any fixture holding same-named symbols has this blind spot | Someone audits the corpus for other same-named-symbol cases resting on name-based metrics alone |
-| **`baseline-phase-7.json` has not reproduced since 2026-08-14** | **OPEN — found 2026-08-16 while verifying ADR-0050, pre-existing and unrelated to it.** `run_phase7_baseline.py --check` exits **5**. The whole difference is one **added metric key**: `finding_count_correctness` entered the report model in `fc7af34` (2026-08-14, "a repeated finding is visible to the score"), and the artifact was last regenerated in `7b2f8ab`, which `git merge-base --is-ancestor` confirms is an **ancestor** of it. Phases 0, 3 and 4 all carry the field; Phase 7 alone does not. **No metric value differs** — regenerating adds two lines, both `"finding_count_correctness": 1.0`. **Why nobody saw it: the semantic block is `-Semantic`-gated and opt-in**, so `check_phase7 -SkipSync` never reaches that step, which is precisely the ADR-0022 process note ("it happened to pass, because the corpora are disjoint — luck, not diligence"). Deliberately **not** regenerated here: ADR-0022's rule is that a gated artifact which stops reproducing is reviewed, not absorbed, and this is outside the ADR-0050 change | Someone regenerates it as its own reviewed commit, or makes the semantic step non-optional |
-| **The packaged web bundle is five days behind `apps/web/dist`** | **OPEN — environmental, found 2026-08-16, not a repository regression.** `test_the_packaged_web_assets_match_the_source_build` fails, which aborts `check_phase4` and `check_phase7` at their *first* step. Both directories are **gitignored build output** — `git ls-files` returns 0 tracked files for each — so this is local state, and a fresh clone skips the test because `apps/web/dist` would be absent. Source built **2026-08-16 02:02**, package built **2026-08-11 19:14**; they differ by one hashed JS asset and the `index.html` naming it. The count corroborates: 2240 passed at `e07c5ff`, now 2239 passed / 1 failed of the same 2240. **The guard is correct and is reporting real staleness** — the packaged executable would serve a five-day-old UI, the 2026-08-05 Settings incident's exact shape | `scripts/build_package.ps1` is run |
+| **Concurrent full-suite runs fail; the same tree passes solo** | **OPEN — an observation with an unconfirmed mechanism, recorded because it contradicts a standing rule.** Running `check_phase4` and `check_phase7` **at the same time** on 2026-08-16 gave **3 failed / 2237 passed**. The identical tree, run once and alone, gave **2240 passed, exit 0**, and both gates then passed sequentially. **Which three failed was not captured** — the gate output was piped through `Select-Object -Last N`, which truncated the `FAILED` lines — so the mechanism is a hypothesis, not a finding: the packaged end-to-end tests start the packaged server on a **loopback port** and read one **shared `dist/codeatlas-win64`**, neither of which the 2026-08-15 `.test-tmp` fix made concurrency-safe. **That fix made temp *directories* safe and the register then retired the one-at-a-time rule generally, which looks too broad.** Do not pipe a gate through `Select-Object` when the result matters | Someone reproduces it with full output captured and names the three tests |
+| ~~**`baseline-phase-7.json` has not reproduced since 2026-08-14**~~ | **CLOSED 2026-08-16.** Regenerated as its own reviewed commit; **`rerank-phase-7.json` had the identical staleness**, from the same commit `7b2f8ab` and the same cause, and was found only because fixing the first let `check_phase7 -Semantic` reach the next step. Both diffs are two added `finding_count_correctness` lines with no value change. An audit of every tracked artifact carrying a metrics block found only three lacking the key; the other two are **`baseline-phase-1` and `-2`, deliberately left frozen** (ADR-0017 — their gate scripts are SUPERSEDED and exit 5 by design, so regenerating would overwrite the record those gates were approved on). Original entry follows | — |
+| ~~original entry~~ | **OPEN — found 2026-08-16 while verifying ADR-0050, pre-existing and unrelated to it.** `run_phase7_baseline.py --check` exits **5**. The whole difference is one **added metric key**: `finding_count_correctness` entered the report model in `fc7af34` (2026-08-14, "a repeated finding is visible to the score"), and the artifact was last regenerated in `7b2f8ab`, which `git merge-base --is-ancestor` confirms is an **ancestor** of it. Phases 0, 3 and 4 all carry the field; Phase 7 alone does not. **No metric value differs** — regenerating adds two lines, both `"finding_count_correctness": 1.0`. **Why nobody saw it: the semantic block is `-Semantic`-gated and opt-in**, so `check_phase7 -SkipSync` never reaches that step, which is precisely the ADR-0022 process note ("it happened to pass, because the corpora are disjoint — luck, not diligence"). Deliberately **not** regenerated here: ADR-0022's rule is that a gated artifact which stops reproducing is reviewed, not absorbed, and this is outside the ADR-0050 change | Someone regenerates it as its own reviewed commit, or makes the semantic step non-optional |
+| ~~**The packaged web bundle is five days behind `apps/web/dist`**~~ | **CLOSED 2026-08-16.** Rebuilt with `scripts/build_package.ps1 -SemanticLocal`. **The flag mattered:** the existing package carried `torch` and `lancedb`, so building without it would have silently turned a semantic artifact into a deterministic-only one — a change nobody asked for. The zip was rebuilt too (335 MB → 370 MB) rather than left inconsistent with the folder beside it. `tests/end_to_end/test_packaged_build.py` **6 passed**, and the build script's own verification step reports "web assets match apps/web/dist". Original entry follows | — |
+| ~~original entry~~ | **OPEN — environmental, found 2026-08-16, not a repository regression.** `test_the_packaged_web_assets_match_the_source_build` fails, which aborts `check_phase4` and `check_phase7` at their *first* step. Both directories are **gitignored build output** — `git ls-files` returns 0 tracked files for each — so this is local state, and a fresh clone skips the test because `apps/web/dist` would be absent. Source built **2026-08-16 02:02**, package built **2026-08-11 19:14**; they differ by one hashed JS asset and the `index.html` naming it. The count corroborates: 2240 passed at `e07c5ff`, now 2239 passed / 1 failed of the same 2240. **The guard is correct and is reporting real staleness** — the packaged executable would serve a five-day-old UI, the 2026-08-05 Settings incident's exact shape | `scripts/build_package.ps1` is run |
 | **ADR-0047 forward-references an ADR-0049 that was never written** | **OPEN — a dangling citation, not a defect.** ADR-0047 line 39 cites "ADR-0049" for the `target/` ignore collision, contrasting it as a *faulty instrument* against its own *absent decision*. Ruling 2 landed as a fixture-local `.codeatlasignore` without an ADR, so 0049 is reserved-but-empty. **ADR-0050 deliberately skipped it** rather than hijacking the number, which would have made ADR-0047's sentence describe the wrong record. The ADR README index was also stale by two records (0047, 0048 absent); all three added | Someone writes the `target/` ignore-collision record as 0049 |
 | **q006: the engine cites a line that does not prove the claim** | **OPEN — a candidate ENGINE finding, the first in this investigation that is not the instrument.** Surfaced 2026-08-16 by applying ADR-0047. The claim is "duplicate keys are handled"; the line that proves it is `return "duplicate"` (`idempotency.py:7`). The engine cites line 8, `self._keys.add(key)`. **Not proven to be a defect** — the trace answer may be selecting a chunk line rather than the claim-bearing one. Recorded because the reflex the rulings warned about would have declared line 8 "because the engine says so", matched the predicted number, and buried it | Someone investigates why trace evidence selects that line |
 | **q032: a two-hop trace carries no evidence for its far end** | **OPEN — an absent capability or an over-broad expectation, not a defect.** Surfaced 2026-08-16. q032 traces frontend → backend; after ADR-0047 the frontend hop matches, but `backend.py:1-2` — the endpoint the flow reaches — is never cited, so the case caps at **0.50**. Either a trace should cite evidence at its far end, or a two-hop expectation should not declare one. **A product question** | The user rules, or WS-6 settles what a trace answer carries |
@@ -259,6 +262,66 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-16T23:00:00Z — Both gates genuinely pass; three stale artifacts and a concurrency hazard
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: no phase task. Post-gate cleanup, taken on the user's instruction
+  to clear the two failures the ADR-0050 handoff recorded before starting Task 2.
+- No ADR: nothing here is a decision. Two artifacts regenerated, one binary
+  rebuilt, no source and no corpus change.
+
+**`check_phase4 -SkipSync` → exit 0. `check_phase7 -SkipSync -Semantic` → exit 0.**
+Both run to completion for the first time in this session, and the Phase 7 run
+includes the semantic block, the uplift baseline, the rerank artifact and
+Playwright (15 passed, 7 skipped — the documented Chromium skips, re-counted not
+copied). `uv run pytest -q` → **2240 passed, 3 skipped**, the count `e07c5ff`
+had.
+
+**The packaged bundle.** Rebuilt with `-SemanticLocal`. **The flag was not
+optional:** the existing package carried `torch` and `lancedb`, so rebuilding
+without it would have quietly converted a semantic artifact into a
+deterministic-only one. The zip was rebuilt too (335 MB → 370 MB) rather than
+left inconsistent with the folder beside it.
+
+**Three stale artifacts, not one, and the third was only reachable after the
+second.** `baseline-phase-7.json` was stale since 2026-08-14; regenerating it let
+`check_phase7 -Semantic` advance one step, which immediately failed on
+`rerank-phase-7.json` carrying the **identical** staleness — same commit
+`7b2f8ab`, same cause, two added `finding_count_correctness` lines, no value
+changed. Rather than wait for a fourth, every tracked artifact with a metrics
+block was audited: only `baseline-phase-1` and `-2` also lack the key, and those
+are **deliberately frozen** (ADR-0017 — their gate scripts are SUPERSEDED and
+exit 5 by design; regenerating would overwrite the record those gates were
+approved on). Each regeneration is its own commit with its diff reviewed in the
+message, per ADR-0022.
+
+> **A gated artifact behind an opt-in flag is not gated.** Both stale files sat
+> behind `-Semantic`, so two days of green `-SkipSync` runs never touched them.
+> The ADR-0022 process note said this once already. **Quote the flags whenever
+> claiming a gate passed.**
+
+**A concurrency hazard, and it is recorded as an observation rather than a
+finding.** Running both gate scripts simultaneously produced **3 failed / 2237
+passed**; the same tree solo produced **2240 passed, exit 0**, and the gates then
+passed one after the other. **Which three failed was not captured**, because the
+output was piped through `Select-Object -Last N` and the `FAILED` lines were
+truncated — so the mechanism below is a hypothesis and is labelled one: the
+packaged end-to-end tests bind a **loopback port** and read one **shared
+`dist/`**, neither made safe by the 2026-08-15 `.test-tmp` fix. That fix made
+temp *directories* safe, and the register then retired the one-at-a-time rule
+**generally**, which now looks too broad. Register row added.
+
+**Two process mistakes worth recording, both self-inflicted and both caught.**
+`$?` after a pipe reports the *pipe's* status, which produced four false `EXIT=0`
+readings, one on a genuinely failing step. And a scratch path written as
+`/c/Users/...` instead of `C:/Users/...` is meaningless to Windows Python: the
+script **exited 0 while writing nothing where expected**, and the diff that
+followed compared a real file against a missing one. Both are the same shape as
+the defects this project keeps finding — *a success signal that was never
+actually observed*.
+
+- Next: **Task 2 — q006**, now unblocked against a clean tree.
 
 ### 2026-08-16T21:30:00Z — Task 1 (q035) closed: ADR-0050, and the gate margin is back
 

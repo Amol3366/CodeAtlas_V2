@@ -1752,6 +1752,43 @@ minutes to redo.
       that sentence point at the wrong document; and the ADR README index was
       **stale by two records** (0047, 0048 missing). Both are register rows.
 
+- [x] Gate hygiene: three stale artifacts and a concurrency hazard, 2026-08-16.
+      Cleanup after ADR-0050, on the user's instruction. `check_phase4 -SkipSync`
+      and `check_phase7 -SkipSync -Semantic` both exit 0; pytest 2240 passed.
+      No source, corpus or contract change.
+
+      **A gated artifact behind an opt-in flag is not gated.**
+      `baseline-phase-7.json` had not reproduced since 2026-08-14, and fixing it
+      let the gate advance one step onto `rerank-phase-7.json` carrying the
+      **identical** staleness — same commit, same cause, two added
+      `finding_count_correctness` lines, no value changed. Both sat behind
+      `-Semantic`, so two days of green `-SkipSync` runs never reached them.
+      Rather than wait for a fourth, every tracked artifact with a metrics block
+      was audited: only `baseline-phase-1` and `-2` also lack the key, and those
+      stay **frozen** (ADR-0017). Each regeneration is its own commit with the
+      diff reviewed in the message (ADR-0022).
+
+      **Rebuild the package with the flags it was built with.** The existing
+      artifact carried `torch` and `lancedb`; `build_package.ps1` without
+      `-SemanticLocal` would have silently produced a deterministic-only
+      package. The zip was rebuilt alongside the folder rather than left
+      inconsistent with it.
+
+      **Do not run two gate scripts at once.** Concurrently they gave 3 failed /
+      2237 passed; solo the same tree gave 2240 passed, exit 0. The 2026-08-15
+      `.test-tmp` fix made temp *directories* safe and the one-at-a-time rule was
+      then retired **generally** — too broad, because the packaged e2e tests bind
+      a loopback port and share one `dist/`. **Which three failed was not
+      captured**, because the output was piped through `Select-Object -Last N`,
+      so the mechanism is recorded as a hypothesis rather than a finding.
+
+      **Two self-inflicted false-success signals, both the shape this project
+      keeps finding.** `$?` after a pipe reports the *pipe's* status — four false
+      `EXIT=0` readings, one on a genuinely failing step. And a scratch path
+      written `/c/Users/...` rather than `C:/Users/...` is meaningless to Windows
+      Python: the script **exited 0 while writing nothing where expected**, and
+      the comparison that followed diffed a real file against a missing one.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
