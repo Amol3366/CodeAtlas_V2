@@ -1169,6 +1169,7 @@
                       "question":  "What does strict mode do?",
                       "intent":  "TRACE_FLOW",
                       "expected_abstention":  false,
+                      "query_subject":  "target.processor.process",
                       "expected_symbols":  [
                                                "process"
                                            ],
@@ -1179,8 +1180,8 @@
                                                 {
                                                     "file_path":  "target/processor.py",
                                                     "symbol":  "process",
-                                                    "start_line":  1,
-                                                    "end_line":  5,
+                                                    "start_line":  4,
+                                                    "end_line":  4,
                                                     "evidence_id":  "q035-e1",
                                                     "snapshot_id":  "git-target"
                                                 }

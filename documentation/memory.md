@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-14
+Last updated: 2026-08-16
 
 ## Current Phase
 
@@ -1701,6 +1701,56 @@ minutes to redo.
       accepted decision is punishing compliance** (ADR-0048, ADR-0038's shape).
       Ungate it, keep reporting it — dropping the number changes what every
       tracked baseline means.
+
+- [x] q035 closed; the gate margin restored (ADR-0050), 2026-08-16. The zero-margin
+      `exact_symbol_resolution` from the entry above is fixed: **0.9800 → 1.0000
+      (50/50)**, `containing_evidence_recall_at_10` 0.9706 → 0.9824,
+      `abstention_correctness` and `mean_reciprocal_rank` → 1.0000. Two corpus
+      lines in one case; **no source file changed**. `unmet_targets` stays
+      `['changed_symbol_precision']`.
+
+      Ruled by the user: q035 declares `query_subject:
+      "target.processor.process"`, and its `expected_evidence` becomes the
+      reference site `4-4` — a **ninth ADR-0047 instance**, which it could not
+      have been on 2026-08-16 because it was abstaining and emitted nothing to
+      compare.
+
+      **Three things worth remembering.**
+
+      **A recorded capability limit that was never probed.** `extra_build.md`
+      said a disambiguating subject "may not be expressible" because "there is
+      no file-scoped selector". `find_exact` has **four tiers** and tier 2 is
+      `module_path || '.' || qualified_name`; `target.processor.process`
+      resolves to one symbol. The claim had been reasoned about and written
+      down, never run. It survived because **the ambiguity message does not
+      disambiguate** — it prints `qualified_name`, identical for both, so
+      "ask again with a qualified name" is followed by `process, process`.
+      Still open as an engine-side row.
+
+      **The fix passed its own mutation-check, and that is the real lesson.**
+      Declaring `query_subject` restored the number. Repointing it at the
+      *wrong* side (`base.service.process`) scored **identically** — because
+      `expected_symbols` is `["process"]` and both fixture sides define that
+      name. The case would have passed while tracing the wrong file. Only the
+      evidence correction made it discriminate, since the two sides' reference
+      sites are in different *files*. Generally: **`exact_symbol_resolution`,
+      `mean_reciprocal_rank` and `abstention_correctness` all read a symbol's
+      name, so no name-based metric can separate two same-named symbols.** And
+      the obvious mutation — reverting the edit — would have failed correctly
+      and taught nothing; pick one that could be wrong in the way the case is
+      meant to catch.
+
+      **Applying a prior ruling is not fitting to output, but say so out loud.**
+      The corrected evidence coincides with what the engine emits, which the
+      standing rule warns against. The justification is that ADR-0047's
+      convention was ruled *before* q035 emitted anything, so this applies a
+      rule to a previously invisible case rather than blessing a run. Stated in
+      the ADR rather than left for a reader to worry about.
+
+      Housekeeping found on the way: ADR-0047 forward-references an **ADR-0049
+      that was never written**, so this record took **0050** rather than making
+      that sentence point at the wrong document; and the ADR README index was
+      **stale by two records** (0047, 0048 missing). Both are register rows.
 
 ## Decisions Made
 
