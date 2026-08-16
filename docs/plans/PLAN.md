@@ -87,7 +87,12 @@ with verification.
 | `relation_path_recall` has no gate target                                                | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
 | RRF coarse-chunk bias | **DEFERRED — reframed 2026-08-15 by ADR-0046.** Its stated trigger ("the module-granularity ruling lands") is now satisfied, and the ruling was **not** to implement the penalty. So this is no longer "fix the bias" but **"measure whether it costs anything"** at the larger corpus. ADR-0030's finding stands: the obvious lever demotes the chunk currently providing a rank-1 containment hit | Someone measures it corpus-wide |
 | ~~Phase 4 `containing_evidence_rate` and `containing_evidence_recall_at_10`~~ | **INVESTIGATED 2026-08-15, RULED 2026-08-16 — superseded by the four rows below.** The per-case run found the recall shortfall is **exactly 10 of 85 cases scoring 0.00** while the other 75 score 1.00, from **two unrelated causes** — and that the rate metric's 1.00 target is unreachable while the engine obeys ADR-0020. Each cause is now its own row with its own ruling | — |
-| **q035: an under-specified expectation, now consuming the entire `exact_symbol_resolution` margin** | **OPEN — the priority.** Re-including `target/` put a second `process` in the `git_changes` index, so q035's trace subject is ambiguous and the answer abstains. Abstaining is defensible (`AGENTS.md` §4.1 prefers it to guessing), but it turned a wrong answer into no answer, and **`exact_symbol_resolution` is now 49/50 = 0.9800 against a 0.98 target — exactly on the line, zero margin.** One more miss anywhere gives 0.9600 and the gate fails. q035 also causes the `abstention_correctness` drop to 0.9828. The case says "what does strict mode do?" and names `process` when two exist, with no way to say which | Someone disambiguates the expectation, or rules that the fixture may not hold two symbols of one name |
+| ~~**q035: an under-specified expectation, now consuming the entire `exact_symbol_resolution` margin**~~ | **CLOSED 2026-08-16 — ADR-0050.** Ruled by the user. Two corrections on different authorities: q035 declares `query_subject: "target.processor.process"` (additive, the field's own comment sanctions it), and its `expected_evidence` becomes the reference site `4-4` — a **ninth instance of ADR-0047**, which q035 could not be part of on 2026-08-16 because it was abstaining and emitted nothing to compare. `exact_symbol_resolution` **0.9800 → 1.0000 (50/50)**, so the gate tolerates one future miss again; `containing_evidence_recall_at_10` 0.9706 → **0.9824**; `abstention_correctness` and `mean_reciprocal_rank` → 1.0000; `containing_evidence_rate` 0.7561 → 0.7520, ungated (ADR-0048). No engine, `_contains`, or metric-definition change. **The subject fix alone passed its own wrong-side mutation** — see the row below | — |
+| **The stated blocker for q035 was wrong, and the ambiguity message is why** | **OPEN — a small live-path usability defect, recorded not fixed.** `extra_build.md` carried "`find_exact` resolves by name and there is no file-scoped selector, so this may not be expressible" as a constraint on the option set. **There is one:** `find_exact` (`storage/sqlite/stores.py:463`) tries four tiers and tier 2 is `module_path \|\| '.' \|\| qualified_name`; `target.processor.process` resolves to exactly one symbol. The belief was never tested against the store. **Why it survived: the abstention message does not disambiguate** — it reads "matches 2 symbols: process, process. Ask again with a qualified name", printing `qualified_name`, which is *identical* for both candidates. A caller is told to qualify and shown two identical names. The fix is to print the tier-2 form, in `GraphQueryService._answer` (`application/graph_queries.py:236-249`). Not done here because ADR-0050 is a corpus ruling and this is an engine change | Someone fixes the message, or a user reports being unable to disambiguate |
+| **A corpus fix can restore a number without restoring the measurement** | **OPEN — a stated limit found by mutation, generalising the row above about the 2026-08-15 cases.** Declaring q035's `query_subject` restored `exact_symbol_resolution` to 1.0000, and then **the wrong-side mutation was not detected**: pointing the subject at `base.service.process` scored *identically*, because `expected_symbols` is `["process"]` and both fixture sides define a symbol of that name. Only correcting the evidence to the reference site made the case discriminate, because the two sides' reference sites are in different files while their symbol names are not. **The general shape: `exact_symbol_resolution`, `mean_reciprocal_rank` and `abstention_correctness` all read the symbol's *name*, so no name-based metric can separate two same-named symbols.** Any fixture holding same-named symbols has this blind spot | Someone audits the corpus for other same-named-symbol cases resting on name-based metrics alone |
+| **`baseline-phase-7.json` has not reproduced since 2026-08-14** | **OPEN — found 2026-08-16 while verifying ADR-0050, pre-existing and unrelated to it.** `run_phase7_baseline.py --check` exits **5**. The whole difference is one **added metric key**: `finding_count_correctness` entered the report model in `fc7af34` (2026-08-14, "a repeated finding is visible to the score"), and the artifact was last regenerated in `7b2f8ab`, which `git merge-base --is-ancestor` confirms is an **ancestor** of it. Phases 0, 3 and 4 all carry the field; Phase 7 alone does not. **No metric value differs** — regenerating adds two lines, both `"finding_count_correctness": 1.0`. **Why nobody saw it: the semantic block is `-Semantic`-gated and opt-in**, so `check_phase7 -SkipSync` never reaches that step, which is precisely the ADR-0022 process note ("it happened to pass, because the corpora are disjoint — luck, not diligence"). Deliberately **not** regenerated here: ADR-0022's rule is that a gated artifact which stops reproducing is reviewed, not absorbed, and this is outside the ADR-0050 change | Someone regenerates it as its own reviewed commit, or makes the semantic step non-optional |
+| **The packaged web bundle is five days behind `apps/web/dist`** | **OPEN — environmental, found 2026-08-16, not a repository regression.** `test_the_packaged_web_assets_match_the_source_build` fails, which aborts `check_phase4` and `check_phase7` at their *first* step. Both directories are **gitignored build output** — `git ls-files` returns 0 tracked files for each — so this is local state, and a fresh clone skips the test because `apps/web/dist` would be absent. Source built **2026-08-16 02:02**, package built **2026-08-11 19:14**; they differ by one hashed JS asset and the `index.html` naming it. The count corroborates: 2240 passed at `e07c5ff`, now 2239 passed / 1 failed of the same 2240. **The guard is correct and is reporting real staleness** — the packaged executable would serve a five-day-old UI, the 2026-08-05 Settings incident's exact shape | `scripts/build_package.ps1` is run |
+| **ADR-0047 forward-references an ADR-0049 that was never written** | **OPEN — a dangling citation, not a defect.** ADR-0047 line 39 cites "ADR-0049" for the `target/` ignore collision, contrasting it as a *faulty instrument* against its own *absent decision*. Ruling 2 landed as a fixture-local `.codeatlasignore` without an ADR, so 0049 is reserved-but-empty. **ADR-0050 deliberately skipped it** rather than hijacking the number, which would have made ADR-0047's sentence describe the wrong record. The ADR README index was also stale by two records (0047, 0048 absent); all three added | Someone writes the `target/` ignore-collision record as 0049 |
 | **q006: the engine cites a line that does not prove the claim** | **OPEN — a candidate ENGINE finding, the first in this investigation that is not the instrument.** Surfaced 2026-08-16 by applying ADR-0047. The claim is "duplicate keys are handled"; the line that proves it is `return "duplicate"` (`idempotency.py:7`). The engine cites line 8, `self._keys.add(key)`. **Not proven to be a defect** — the trace answer may be selecting a chunk line rather than the claim-bearing one. Recorded because the reflex the rulings warned about would have declared line 8 "because the engine says so", matched the predicted number, and buried it | Someone investigates why trace evidence selects that line |
 | **q032: a two-hop trace carries no evidence for its far end** | **OPEN — an absent capability or an over-broad expectation, not a defect.** Surfaced 2026-08-16. q032 traces frontend → backend; after ADR-0047 the frontend hop matches, but `backend.py:1-2` — the endpoint the flow reaches — is never cited, so the case caps at **0.50**. Either a trace should cite evidence at its far end, or a two-hop expectation should not declare one. **A product question** | The user rules, or WS-6 settles what a trace answer carries |
 | ~~**Ruling 1 — graph evidence is the reference site**~~ | **CLOSED 2026-08-16 — ADR-0047.** Eight expectations corrected; `_contains`, the engine and the metric definitions untouched. **Six were pure convention mismatches; two were not** — q006 and q032 became their own rows below, which is why the predicted 0.9765 came out at 0.9588 | — |
@@ -254,6 +259,139 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-16T21:30:00Z — Task 1 (q035) closed: ADR-0050, and the gate margin is back
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: no phase task. Post-gate. `extra_build.md` Task 1, the item the
+  previous handoff flagged as the priority.
+- New record: **ADR-0050** (q035 declares its subject, and its evidence is the
+  reference site). Ruled by the user 2026-08-16.
+- Files: `tests/evaluation/cases/queries.json` (**two lines, one case**),
+  `docs/adr/0050-*.md` (new), `docs/adr/README.md` (index),
+  `docs/evaluation/baseline-phase-{3,4}.{json,md}`. **No source file changed.**
+
+**`exact_symbol_resolution` is 1.0000 (50/50). The gate has margin again** — one
+future miss scores 0.9800 and still passes. It should not be quoted as more than
+that: at 50 cases, 0.98 permits exactly one miss and no more.
+
+| Metric | Before | After | Note |
+| --- | ---: | ---: | --- |
+| `exact_symbol_resolution` | 0.9800 | **1.0000** | gated at 0.98; margin restored |
+| `containing_evidence_recall_at_10` | 0.9706 | **0.9824** | gated at 0.90 |
+| `primary_evidence_recall_at_10` | 0.9235 | 0.9353 | gated at 0.90 |
+| `abstention_correctness` | 0.9828 | 1.0000 | ungated |
+| `mean_reciprocal_rank` | 0.9828 | 1.0000 | ungated |
+| `symbol_recall_at_10` | 0.8707 | 0.8879 | ungated (ADR-0023) |
+| `ndcg_at_10` | 0.8973 | 0.9145 | ungated |
+| `containing_evidence_rate` | 0.7561 | 0.7520 | ungated (ADR-0048) |
+
+`unmet_targets` stays `['changed_symbol_precision']` — the accepted structural
+miss. **Every regression the previous handoff recorded from q035 is reversed,
+and all four moved back for the same single reason they moved.** No change-side
+metric moved. The control run reproduced the tracked `baseline-phase-4.json`
+byte-for-byte before any edit, so the deltas above are attributable.
+
+**Three findings, and the second is the one that matters.**
+
+**1. The stated blocker was wrong.** `extra_build.md` recorded that a
+disambiguating `query_subject` "may not be expressible" because "there is no
+file-scoped selector". `find_exact` has four tiers and tier 2 is
+`module_path || '.' || qualified_name`; `target.processor.process` resolves to
+exactly one symbol. The belief was never tested against the store, and it had
+removed the cheapest option from the option set. **Why it survived: the
+ambiguity message does not disambiguate** — it prints `qualified_name`, which is
+identical for both candidates, so a caller told to "ask again with a qualified
+name" is shown `process, process`. That is a live-path usability defect and it is
+now its own register row, deliberately not fixed here: ADR-0050 is a corpus
+ruling and that is an engine change.
+
+**2. The obvious fix passed its own mutation, and that is the reusable lesson.**
+Declaring `query_subject` restored `exact_symbol_resolution` to 1.0000. The
+mutation-check — repointing the subject at `base.service.process`, the *wrong*
+side — **was not detected**: every metric scored identically. `expected_symbols`
+is `["process"]` and both fixture sides define a symbol of that name, so the case
+would have passed while tracing the wrong file. **`exact_symbol_resolution`,
+`mean_reciprocal_rank` and `abstention_correctness` all read the symbol's name,
+so no name-based metric can separate two same-named symbols.** Only correcting
+the evidence to the reference site made the case discriminate, because the two
+sides' reference sites are in different *files*. Re-run with both corrections,
+the mutation **is** caught: `containing_evidence_recall_at_10` 0.9824 → 0.9706.
+
+This is the same shape as the open row on the 2026-08-15 cases not being
+ranking-sensitive. Stated generally: **a fix that restores a number without
+restoring discrimination is worth less than it looks, and only a mutation
+matched to the claim separates the two.** Had the mutation been "revert the
+`query_subject` line" — the obvious choice — it would have failed correctly and
+taught nothing.
+
+**3. The evidence correction is a ninth ADR-0047 instance, and the fitting risk
+is stated rather than waved away.** q035 declared the definition range `1-5`
+where the engine cites the reference site `4-4`
+(`raise ValueError("value is required")`). It could not be among the eight
+corrected on 2026-08-16 because it was abstaining and emitted nothing to compare.
+The expectation does coincide with the engine's output, which the governing rule
+warns about — the justification is that **the convention was ruled before q035
+emitted anything at all**, so this applies a prior rule to a case that had been
+invisible to it, rather than reading a number off a run and blessing it.
+
+**Housekeeping found on the way, both recorded as register rows.** ADR-0047 line
+39 forward-references an **ADR-0049 that was never written** (Ruling 2 landed as
+a fixture-local `.codeatlasignore` without one), so this record took **0050**
+rather than hijacking a number that would have made ADR-0047's sentence describe
+the wrong document. The ADR README index was also **stale by two records** —
+neither 0047 nor 0048 was listed; all three are now.
+
+**Verification.** Exit codes read from the process. Where a command is piped,
+they were re-read without the pipe — `$?` after a pipe is the *pipe's* exit code,
+which produced four false `EXIT=0` readings here before it was caught.
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest -q` | **2239 passed, 1 failed, 3 skipped** — see below |
+| `ruff check src tests scripts apps` | clean, exit 0 |
+| `mypy --no-incremental src tests scripts apps` | clean, 352 files, exit 0 |
+| `run_evaluation.py validate` | `valid`; 63 query / 28 change over 7 fixtures, exit 0 |
+| `pytest tests/evaluation` | 119 passed |
+| `export_contract_schema.py --check` | exit 0 |
+| `baseline-phase-0 --check` | exit 0 (unchanged) |
+| `baseline-phase-3 --check` | exit 0 (regenerated) |
+| `baseline-phase-4 --check` | exit 0 (regenerated) |
+| `check_invariants.py --check` | exit 0, **artifact byte-identical** |
+| `baseline-phase-7 --check` | **exit 5** — pre-existing, see below |
+| `check_phase4.ps1 -SkipSync` | **exit 1** at its first step |
+| `check_phase7.ps1 -SkipSync` | **exit 1** at its first step |
+
+**Both gate scripts abort on the same single pre-existing test, and because it is
+their *first* step their later stages never ran** — so the table above runs those
+stages directly rather than claiming a green gate this change did not produce.
+Every evaluation stage the change actually affects passes.
+
+**Two pre-existing failures, both attributed and both now register rows. Neither
+is this change**, whose diff touches one corpus file, two ADR documents and two
+baselines and **no source file at all**.
+
+- `test_the_packaged_web_assets_match_the_source_build` — `apps/web/dist` and the
+  packaged bundle are both **gitignored build output** (`git ls-files` → 0 for
+  each). Source built 2026-08-16 02:02, package 2026-08-11 19:14. The count
+  corroborates: the previous handoff recorded 2240 passed, and this is the same
+  2240 with one flipping red. A fresh clone skips it. The guard is correct — the
+  packaged executable would serve a five-day-old UI. Fix:
+  `scripts/build_package.ps1`, not run here because rebuilding a 1.05 GB
+  artifact is outside Task 1.
+- `baseline-phase-7.json` stale since **2026-08-14**, and this change cannot
+  reach it — Phase 7 measures `semantic_cases`, disjoint from the main corpus
+  edited here. The entire diff is one **added** key, `finding_count_correctness`,
+  which entered the report model in `fc7af34`; `7b2f8ab`, where the artifact was
+  last written, is an **ancestor** of that commit. No value differs. It went
+  unseen because the semantic block is `-Semantic`-gated and opt-in — the ADR-0022
+  process note, recurring. Left unregenerated on ADR-0022's own rule: a gated
+  artifact that stops reproducing is **reviewed, not absorbed**.
+
+- Next: **Task 2 — q006**, the only candidate engine finding in nine
+  investigations. Note that ADR-0050 does not touch it: q006 was among ADR-0047's
+  eight corrections and its open question is *why trace evidence selects line 8*,
+  which is unchanged.
 
 ### 2026-08-16T18:00:00Z — WS-4 implemented: ADR-0047, ADR-0048, and a gate now passing with zero margin
 

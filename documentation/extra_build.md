@@ -1,6 +1,6 @@
 # Extra Build — the remaining work, in the order to do it
 
-Status: current as of 2026-08-16, after WS-3 and WS-4 closed.
+Status: current as of 2026-08-16, after WS-3, WS-4 and **Task 1 (q035)** closed.
 
 **Authority note.** This file is a **work plan**, not a status list. The single
 authoritative record of what is open is the **Deferred Register in
@@ -30,10 +30,12 @@ has no margin and Task 1 is what is consuming it.
 
 ## Start here tomorrow
 
-1. **Task 1 — q035.** A gate passes with **zero margin** and q035 is the case
-   eating it. Everything else can wait a day; this cannot wait a regression.
-2. Then **Task 2 — q006**, the only candidate *engine* finding this project has
-   produced in nine investigations.
+1. ~~**Task 1 — q035.**~~ **DONE 2026-08-16 — ADR-0050.** The gate margin is
+   back: `exact_symbol_resolution` **1.0000 (50/50)**. Two corpus lines, no
+   source change. Read the finding under Task 1 below before starting anything
+   else — the obvious half of the fix **passed its own mutation-check**.
+2. **Task 2 — q006** is now first, and it is the only candidate *engine* finding
+   this project has produced in nine investigations. ADR-0050 does not touch it.
 3. After that the order is open: Tasks 3–7 are independent.
 
 ---
@@ -48,30 +50,52 @@ exit codes, test isolation). **WS-2, WS-5 and WS-6 remain.**
 Corpus: **63 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
 
-`origin/main` is at `e07c5ff`. All five gates pass, exit codes read from the
-process: pytest 2240 passed / 3 skipped, ruff, mypy on 352 files,
-`check_phase4 -SkipSync`, `check_phase7 -SkipSync`.
+ruff and mypy (352 files) are clean. pytest is **2239 passed / 1 failed / 3
+skipped**, and **that one failure aborts both `check_phase4` and `check_phase7`
+at their first step**, so their later stages were run directly instead — dataset
+validation, the phase-0/3/4 baseline `--check`s, the contract schema, and the
+ADR-0016 invariants all exit 0.
 
-### Phase 4 baseline, refreshed 2026-08-16
+> **Two pre-existing failures, neither caused by Task 1. Do not read either as a
+> regression, and do not let them mask a real one.**
+>
+> 1. `test_the_packaged_web_assets_match_the_source_build` — `apps/web/dist` and
+>    the packaged bundle are both **gitignored build output**. Source built
+>    2026-08-16 02:02, package 2026-08-11 19:14, so the packaged executable
+>    would serve a five-day-old UI — the 2026-08-05 Settings incident's exact
+>    shape. The guard is correct. Fix: `scripts/build_package.ps1`. A fresh
+>    clone skips it.
+> 2. **`baseline-phase-7 --check` exits 5**, stale since **2026-08-14**. The
+>    whole diff is one *added* key, `finding_count_correctness`; no value
+>    differs. Unseen because the semantic block is `-Semantic`-gated and opt-in.
+>    Left unregenerated on ADR-0022's rule — a gated artifact that stops
+>    reproducing is reviewed, not absorbed.
+>
+> **When quoting "all gates pass", say which flags.** `-SkipSync` without
+> `-Semantic` never reaches the Phase 7 semantic baseline, which is how a stale
+> artifact survived two days of green runs.
+
+### Phase 4 baseline, refreshed 2026-08-16 after ADR-0050
 
 | Metric | Value | Target | State |
 | --- | ---: | ---: | --- |
-| `exact_symbol_resolution` | 0.9800 | 0.98 | met — **49/50, exactly on the line, zero margin** |
-| `containing_evidence_recall_at_10` | 0.9706 | 0.90 | met |
-| `containing_evidence_rate` | 0.7561 | — | **ungated** (ADR-0048); reported, ceiling 0.7724 |
-| `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural — **the only unmet target** |
-| `abstention_correctness` | 0.9828 | — | ungated; the miss is q035 |
-| `mean_reciprocal_rank` | 0.9828 | — | ungated; the miss is q035 |
-| `symbol_recall_at_10` | 0.8707 | 0.90 | ungated on this profile (ADR-0023) |
-| `ndcg_at_10` | 0.8973 | — | ungated |
+| `exact_symbol_resolution` | **1.0000** | 0.98 | met — 50/50; **margin restored, and it is exactly one miss wide** |
+| `containing_evidence_recall_at_10` | 0.9824 | 0.90 | met |
+| `primary_evidence_recall_at_10` | 0.9353 | 0.90 | met |
+| `containing_evidence_rate` | 0.7520 | — | **ungated** (ADR-0048); reported |
+| `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural — **still the only unmet target** |
+| `abstention_correctness` | 1.0000 | — | ungated |
+| `mean_reciprocal_rank` | 1.0000 | — | ungated |
+| `symbol_recall_at_10` | 0.8879 | 0.90 | ungated on this profile (ADR-0023) |
+| `ndcg_at_10` | 0.9145 | — | ungated |
 | `relation_path_recall` | 0.9130 | — | deliberately ungated until Task 4 |
 
-> **`exact_symbol_resolution` has no headroom.** ADR-0033 predicted 0.98 would
-> become expressible at 50 cases, because 50 is the first size tolerating one
-> miss. The corpus reached 50 on 2026-08-15 and **the first real miss landed
-> exactly on the threshold**. It passes at 49/50 = 0.9800. One more miss
-> anywhere gives 0.9600 and the gate fails. **A green gate here is not
-> headroom.** Say so whenever this number is quoted.
+> **`exact_symbol_resolution` has one miss of headroom, and that is all.** ADR-0033
+> predicted 0.98 would become expressible at 50 cases, because 50 is the first
+> size tolerating one miss. It now reads 1.0000, so a single future miss scores
+> 0.9800 and still passes — but a second gives 0.9600 and the gate fails.
+> **Adding scored symbol-intent cases changes the denominator**, so compute the
+> new one before adding any (see Task 6).
 
 ---
 
@@ -106,43 +130,44 @@ expectation to the output, you have learned nothing.**
 
 ---
 
-## Task 1 — q035: an under-specified expectation eating the gate margin
+## Task 1 — q035 ✅ DONE 2026-08-16 (ADR-0050)
 
-**Cost:** hours. **Blocked by:** a corpus decision that is the owner's to make.
-**Do this first.**
+Kept rather than deleted, because the *way* it went wrong is reusable and Task 6
+depends on the lesson.
 
-**Why now.** `exact_symbol_resolution` is 49/50 = 0.9800 against a 0.98 target.
-q035 is the single miss. Until it is settled, *any* new case that misses for any
-reason fails a release gate.
+**What was ruled.** Two corrections to q035, on different authorities:
+`query_subject: "target.processor.process"` (additive — the field's own comment
+sanctions it) and `expected_evidence` → the reference site `4-4`, a **ninth
+instance of ADR-0047**. q035 could not be among ADR-0047's eight because it was
+abstaining and emitted nothing to compare. `exact_symbol_resolution` 0.9800 →
+**1.0000**. No source file changed; two corpus lines.
 
-**What happened.** WS-4's Ruling 2 re-included `git_changes/target/` so q034
-could be answered. That put a **second `process`** into the fixture index —
-`base/service.py` and `target/processor.py` both define it. q035 ("What does
-strict mode do?") names `process` as its subject, the trace subject is now
-ambiguous, and the answer **abstains**.
+**Finding 1 — this file was wrong, and it cost the cheapest option.** The text
+above used to say a disambiguating `query_subject` "may not be expressible"
+because "`find_exact` resolves by name and there is no file-scoped selector".
+**It has four tiers, and tier 2 is `module_path || '.' || qualified_name`**
+(`storage/sqlite/stores.py:463`). `target.processor.process` resolves to exactly
+one symbol. The claim had never been tested against the store — it was reasoned
+about and written down. *Probe the store before recording a capability limit.*
 
-**Abstaining is correct behaviour.** `AGENTS.md` §4.1 requires abstention over
-guessing. The problem is the expectation, which names a symbol that exists twice
-with no way to say which. Before the fix it resolved unambiguously *to the wrong
-file*; the fix converted a wrong answer into no answer, and the accuracy metrics
-score those differently — four metrics moved from this one case.
+**Why nobody noticed: the ambiguity message does not disambiguate.** It reads
+"matches 2 symbols: process, process. Ask again with a qualified name", printing
+`qualified_name` — identical for both. Still open, now its own register row.
 
-**Options, none of which should be chosen without a ruling**
+**Finding 2 — the fix passed its own mutation-check. This is the one to
+remember.** Declaring `query_subject` restored the number. Repointing it at
+`base.service.process`, the **wrong side**, scored **identically** — because
+`expected_symbols` is `["process"]` and both fixture sides define that name.
+The case would have passed while tracing the wrong file.
 
-- Give q035 a `query_subject` that disambiguates — but `find_exact` resolves by
-  name and there is no file-scoped selector, so this may not be expressible.
-- Rename the symbol in `target/processor.py` so the two sides differ. **A corpus
-  edit**; needs the ADR-0031/0036 justification, and the fixture's whole point
-  is that the two sides are versions of the same code.
-- Rule that a fixture may not hold two symbols of one name, and fix the fixture.
-- Accept the abstention and remove q035's symbol expectation, measuring only
-  what it can measure.
+> **No name-based metric can separate two same-named symbols.**
+> `exact_symbol_resolution`, `mean_reciprocal_rank` and `abstention_correctness`
+> all read the symbol's name. Only the evidence correction made q035
+> discriminate, because the two sides' reference sites are in different *files*.
 
-**Where to work:** `tests/evaluation/cases/queries.json` (q035),
-`tests/evaluation/cases/fixtures/git_changes/`.
-
-**Done when** `exact_symbol_resolution` has margin again, or the owner has ruled
-that 49/50 is the accepted state and the register says so explicitly.
+The obvious mutation — reverting the `query_subject` line — would have failed
+correctly and taught nothing. **Pick a mutation that could plausibly be wrong in
+the way the case is meant to catch**, not one that merely undoes the edit.
 
 ---
 
@@ -279,8 +304,15 @@ and mutation-check them with a *ranking* mutation specifically — reversing
 `_ranked_symbols` in `src/codeatlas/evaluation/engine_adapter.py`.
 
 **Trap:** adding scored symbol-intent cases changes the
-`exact_symbol_resolution` denominator, which currently has **zero margin**.
-Do Task 1 first, or compute the new denominator before adding anything.
+`exact_symbol_resolution` denominator. Task 1 restored the margin to 1.0000, but
+that is **exactly one miss wide** — compute the new denominator before adding
+anything.
+
+**Second trap, added 2026-08-16 from Task 1 and it generalises this whole task.**
+A same-named-symbol case cannot be caught by any *name-based* metric. When
+mutation-checking a new case, check it against the metric that would actually
+have to move, not against the aggregate — q035 scored identically whether the
+right or the wrong symbol was traced, and only an evidence metric separated them.
 
 **Done when** a ranking reversal fails cases added after 2026-08-15, not only
 ones from before it.
@@ -317,6 +349,8 @@ Not scheduled. Each has a named condition in the register that reopens it.
 | --- | --- |
 | **Preflight takes >15 min on a 664-file repository.** The engine parses *both* full states per analysis — O(repository), not O(change) — and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented | Someone measures it properly, or a user reports it |
 | **A `check_phase7` run once exited 1 while printing every step as passing.** Exit 1 is the uncaught-throw signature; the trailing `exit 0` added 2026-08-15 can neither cause nor prevent it. Has **not** recurred in the three gate runs since | It recurs — chase it before trusting a green |
+| **`baseline-phase-7.json` has not reproduced since 2026-08-14** — one *added* metric key, `finding_count_correctness`, no value change. Hidden by the `-Semantic` opt-in | Someone regenerates it as its own reviewed commit, or makes the semantic step non-optional |
+| **The packaged web bundle is five days behind `apps/web/dist`**, which aborts both gate scripts at step one. Gitignored build output; a fresh clone skips the test | `scripts/build_package.ps1` is run |
 | **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under it | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
 | **`relation_path_recall` has no gate target** | Task 4 settles ADR-0034's last cause |
 
@@ -382,5 +416,15 @@ From `AGENTS.md`, the register, and lessons paid for over the past fortnight.
   from the process, not the printed output.** They may be run **concurrently** —
   the shared `.test-tmp` collision was fixed 2026-08-15 and the one-at-a-time
   rule is retired.
+- **`$?` after a pipe is the pipe's exit code, not the command's.** `cmd | tail`
+  then `echo $?` reports `tail`, which always succeeds. This produced four false
+  `EXIT=0` readings on 2026-08-16, one of them for a step that was actually
+  failing. Capture into a variable first, or use `${PIPESTATUS[0]}`. It is the
+  same class as the gate-script exit-code defect and it survives *because a
+  false green looks exactly like a real one*.
+- **A gate script aborts at its first failing step, so a red step-one hides
+  everything after it.** When the pytest step fails, nothing downstream in
+  `check_phase4` / `check_phase7` has run — do not report those gates as
+  anything until their later stages are run directly.
 - **Regenerate `baseline-phase-0`, `-3` and `-4` once, at the end of a change.**
   `-1` and `-2` stay frozen as history.
