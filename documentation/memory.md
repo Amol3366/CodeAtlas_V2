@@ -1910,6 +1910,47 @@ minutes to redo.
       mutated: a mutation that does not apply looks exactly like a test that
       does not catch it. Assert the anchor matched, and prefer byte-level edits.
 
+- [x] Task 3: a finding says what it is about (ADR-0054), 2026-08-17. The
+      recorded task was a **rendering** problem; reproducing it found an
+      **engine defect** underneath.
+
+      `_finding_citations` keyed changed symbols on `qualified_name` **alone**,
+      so two modules each defining `total` collapsed to whichever the dict saw
+      last and **the finding about `billing.py` cited lines in `orders.py`** —
+      a §4.1 violation, and **ADR-0042's own rule ("pair within the file
+      first") reaching a surface that ruling did not touch**. The ambiguity
+      began earlier: `FindingDraft.subject` was a bare string.
+
+      **Look for what already carries the fact before adding a field to hold
+      it.** `Finding` gained optional `subject`/`file_path`, but they are
+      **derived from the citation, never stored**: every finding cites exactly
+      one evidence item and `_cite` had labelled it with the subject since
+      Phase 4. So no migration — `change_findings` has no such columns and
+      storing them would be a second copy that can disagree — and one helper
+      serves both the fresh and the rehydration path. `contract_version` stays
+      `1.1`, `SCHEMA_VERSION` stays 14.
+
+      **The plan was wrong twice**, and neither mattered much once checked:
+      construction is in `application/change_analysis.py`, not
+      `analysis/findings.py`; and "no migration needed" was right for the wrong
+      reason.
+
+      **Six surfaces. SARIF needed nothing** — it already carries the location
+      in `artifactLocation`, so fixing the citation was enough, which is what
+      "map to its own location model" actually asked for.
+
+      **The web test had no teeth and only a mutation showed it.** Asserting
+      both findings *render* stayed green when the key was reverted: React
+      renders both children whatever the key, and a duplicate surfaces only as
+      a console warning. **Assert on the mechanism the defect produces, not on
+      what you hope it disturbs.** Rewritten to spy on `console.error`.
+
+      **A derived field breaks round-trip equality, and that is worth saying
+      out loud.** A finding saved without a subject reads back *with* one. That
+      is normalisation from stored data rather than invention, and it is now
+      pinned by its own test instead of being smoothed away by loosening the
+      round-trip assertion.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

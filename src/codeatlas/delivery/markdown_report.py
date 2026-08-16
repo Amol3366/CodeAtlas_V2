@@ -113,6 +113,17 @@ def _findings(
                 f"- **{escape_inline(finding.title)}**"
                 f" (`{escape_inline(finding.code)}`)"
             )
+            if finding.subject:
+                # Two findings can share a code and a title; only the subject
+                # and its file tell them apart (ADR-0054).
+                lines.append(
+                    f"  - Subject: `{escape_inline(finding.subject)}`"
+                    + (
+                        f" in `{escape_inline(finding.file_path)}`"
+                        if finding.file_path
+                        else ""
+                    )
+                )
             lines.append(f"  - {escape_inline(finding.description)}")
             lines.append(
                 f"  - Derivation: `{escape_inline(finding.derivation.value)}`,"

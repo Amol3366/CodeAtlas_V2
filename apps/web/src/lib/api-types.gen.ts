@@ -1300,11 +1300,15 @@ export interface components {
             description: string;
             /** Evidence Ids */
             evidence_ids: string[];
+            /** File Path */
+            file_path?: string | null;
             /** Limitations */
             limitations?: string[];
             /** Remediation */
             remediation?: string | null;
             severity: components["schemas"]["Severity"];
+            /** Subject */
+            subject?: string | null;
             /** Title */
             title: string;
         };

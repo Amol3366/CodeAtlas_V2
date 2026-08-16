@@ -1402,6 +1402,18 @@
             "title": "Evidence Ids",
             "type": "array"
           },
+          "file_path": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
           "limitations": {
             "items": {
               "type": "string"
@@ -1422,6 +1434,18 @@
           },
           "severity": {
             "$ref": "#/components/schemas/Severity"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
           },
           "title": {
             "minLength": 1,

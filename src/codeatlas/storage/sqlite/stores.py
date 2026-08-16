@@ -35,6 +35,7 @@ from codeatlas.contracts import (
     Severity,
     SnapshotFreshness,
     SymbolKind,
+    locate_finding,
 )
 from codeatlas.contracts import ImpactEdge as ContractImpactEdge
 from codeatlas.domain.chunks import ChunkRole, LogicalChunk
@@ -1504,6 +1505,10 @@ class ChangeAnalysisStore:
         ).fetchone()
         if row is None:
             return None
+        # Read once and share: `_findings` derives each finding's subject and
+        # file from the citation it carries, so it needs the same evidence the
+        # report returns rather than a second query that could drift from it.
+        stored_evidence = self._evidence(analysis_id)
         return ChangeAnalysisReport(
             analysis_id=row["analysis_id"],
             request_id=row["analysis_id"],
@@ -1532,8 +1537,8 @@ class ChangeAnalysisStore:
                 ContractImpactEdge.model_validate(item)
                 for item in json.loads(row["impact_edges_json"])
             ],
-            findings=self._findings(analysis_id),
-            evidence=self._evidence(analysis_id),
+            findings=self._findings(analysis_id, stored_evidence),
+            evidence=stored_evidence,
             test_gaps=json.loads(row["test_gaps_json"]),
             warnings=json.loads(row["warnings_json"]),
             limitations=json.loads(row["limitations_json"]),
@@ -1584,25 +1589,42 @@ class ChangeAnalysisStore:
             for row in rows
         ]
 
-    def _findings(self, analysis_id: str) -> list[Finding]:
+    def _findings(
+        self, analysis_id: str, evidence: Sequence[ChangeEvidenceItem]
+    ) -> list[Finding]:
+        """Rebuild the stored findings, deriving each one's subject and file.
+
+        `change_findings` has no columns for those, deliberately: they are a
+        property of the citation the finding already carries, and storing a
+        second copy would let a reloaded report disagree with the fresh one it
+        was written from. `locate_finding` is the single derivation both paths
+        use, so no migration was needed and none can drift (ADR-0054).
+        """
+        by_id = {item.evidence_id: item for item in evidence}
         rows = self._connection.execute(
             "SELECT * FROM change_findings WHERE analysis_id = ? ORDER BY rank",
             (analysis_id,),
         ).fetchall()
-        return [
-            Finding(
-                code=row["code"],
-                severity=Severity(row["severity"]),
-                title=row["title"],
-                description=row["description"],
-                derivation=Derivation(row["derivation"]),
-                confidence=row["confidence"],
-                evidence_ids=json.loads(row["evidence_ids_json"]),
-                remediation=row["remediation"],
-                limitations=json.loads(row["limitations_json"]),
+        findings: list[Finding] = []
+        for row in rows:
+            evidence_ids = json.loads(row["evidence_ids_json"])
+            subject, file_path = locate_finding(evidence_ids, by_id)
+            findings.append(
+                Finding(
+                    code=row["code"],
+                    severity=Severity(row["severity"]),
+                    title=row["title"],
+                    description=row["description"],
+                    derivation=Derivation(row["derivation"]),
+                    confidence=row["confidence"],
+                    evidence_ids=evidence_ids,
+                    remediation=row["remediation"],
+                    limitations=json.loads(row["limitations_json"]),
+                    subject=subject,
+                    file_path=file_path,
+                )
             )
-            for row in rows
-        ]
+        return findings
 
     def _evidence(self, analysis_id: str) -> list[ChangeEvidenceItem]:
         rows = self._connection.execute(

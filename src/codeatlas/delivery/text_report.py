@@ -112,6 +112,17 @@ def _one_finding(
     label = _clean(finding.severity.value.upper()).ljust(8)
     lines = [
         f"{_INDENT}{label}{_clean(finding.title)}  {_clean(finding.code)}",
+    ]
+    if finding.subject:
+        # Two findings can share a code and a title; only the subject and its
+        # file tell them apart (ADR-0054). The CLI verdict is the surface that
+        # silently dropped limitations until ADR-0045, so it is updated here
+        # rather than assumed to follow.
+        lines.append(
+            f"{_INDENT}{_DETAIL}{_clean(finding.subject)}"
+            + (f" in {_clean(finding.file_path)}" if finding.file_path else "")
+        )
+    lines += [
         f"{_INDENT}{_DETAIL}{_clean(finding.description)}",
         # Derivation and confidence are separate facts: a high-confidence
         # heuristic is still a heuristic, and a score never promotes it.

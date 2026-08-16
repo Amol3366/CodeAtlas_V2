@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from enum import StrEnum
 from pathlib import PurePosixPath
@@ -227,6 +228,16 @@ class Finding(ContractModel):
     evidence_ids: list[OpaqueId] = Field(min_length=1)
     remediation: str | None = None
     limitations: list[str] = Field(default_factory=list)
+    # What the finding is *about*, and where it lives. Two legitimate findings
+    # can share a code and a title — the same change made in two files — and
+    # without these they render identically on every surface and collide on the
+    # web list's React key (ADR-0042 follow-up 1, ADR-0054).
+    #
+    # Optional so every stored report stays valid unread, and `contract_version`
+    # stays `1.1`: this is additive, and a client that ignores both fields is
+    # unaffected.
+    subject: NonEmptyText | None = None
+    file_path: RepositoryRelativePath | None = None
 
 
 class RelationStep(ContractModel):
@@ -497,6 +508,36 @@ class ChangeEvidenceItem(ContractModel):
         if self.end_line < self.start_line:
             raise ValueError("end_line must not precede start_line")
         return self
+
+
+def locate_finding(
+    evidence_ids: Sequence[str],
+    evidence_by_id: Mapping[str, ChangeEvidenceItem],
+) -> tuple[str | None, str | None]:
+    """The subject a finding is about, and the file it lives in.
+
+    **Derived from the evidence the finding cites, never stored beside it.**
+    `change_findings` has no such columns, and adding them would create a second
+    copy of a fact the citation already carries — two copies that can disagree,
+    which is the `_SEVERITY_ORDER` lesson applied to data rather than to code.
+    Deriving instead means a fresh analysis and a reloaded one cannot differ,
+    and no migration is needed.
+
+    The citation always identifies the subject, because that is what it was
+    built to cite: `_cite` labels a symbol finding's evidence with the changed
+    symbol's qualified name, and `_cite_file` gives a file-level finding an
+    unlabelled citation of the path that *is* its subject. So `symbol or
+    file_path` reproduces the draft's subject in both cases.
+
+    Returns `(None, None)` when the citation is missing rather than inventing a
+    location — a finding whose evidence cannot be resolved must not gain a
+    confident-looking subject.
+    """
+    for evidence_id in evidence_ids:
+        item = evidence_by_id.get(evidence_id)
+        if item is not None:
+            return (item.symbol or item.file_path), item.file_path
+    return None, None
 
 
 class GapReasonCode(StrEnum):

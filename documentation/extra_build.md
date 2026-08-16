@@ -203,43 +203,42 @@ mutation on 2026-08-16. Treat them as a checklist when writing or trusting a cas
    `expected_symbols[0]` in as the query and checks it comes back.
 3. **No name-based metric separates two same-named symbols** (ADR-0050).
 
-## Task 3 — Subject and file path on `Finding` (WS-2)
+## Task 3 — Subject and file path on `Finding` ✅ DONE 2026-08-17 (ADR-0054)
 
-**Cost:** ½–1 day. **Blocked by:** nothing.
+**The recorded task was the symptom.** It described a rendering problem: two
+legitimate findings sharing a code render identically and collide on
+`FindingsList`'s React key. Reproducing it found an **engine defect** underneath.
 
-**Why.** A `Finding` carries no subject and no file path, so two *legitimate*
-findings sharing a code and title render identically and collide on
-`FindingsList`'s React key. Recorded as ADR-0042 follow-up 1.
+**`_finding_citations` keyed changed symbols on `qualified_name` alone.** Two
+modules each defining `total` collapsed to whichever the dict comprehension saw
+last, so **the finding about `billing.py` cited lines in `orders.py`** — a §4.1
+violation, and **ADR-0042's own rule ("pair within the file first") reaching a
+surface that ruling did not touch**. The ambiguity started earlier still:
+`FindingDraft.subject` was a bare string.
 
-**Where to work**
+**Two corrections to what this file said.** Construction is in
+`application/change_analysis.py`, not `analysis/findings.py`. And "no migration
+is needed" was right for the wrong reason — findings *are* persisted, in
+`change_findings`, which has no such columns. The fields are **derived from the
+citation** by one helper both the fresh and rehydration paths call, so storing
+them was unnecessary *and* would have created a second copy that can disagree.
 
-- `src/codeatlas/contracts.py` — the `Finding` model
-- `src/codeatlas/analysis/findings.py` — populate the new fields
-- `src/codeatlas/delivery/` — the JSON, Markdown, PR and SARIF renderers
-- `apps/web/src/features/change-analysis/` — `FindingsList`
-- `tests/contract/` — cross-adapter coverage of every renderer
+> **Look for what already carries the fact before adding a field to hold it.**
+> Every finding cites exactly one evidence item, and `_cite` had labelled it
+> with the subject since Phase 4. The data was there the whole time.
 
-**Approach.** Additive optional fields only, so `contract_version` stays `1.1`
-and no migration is needed. Populate from the `SymbolChange` the finding was
-derived from. Surface in every renderer and the web list, and key the React list
-on subject + path.
+**Six surfaces, and SARIF needed nothing** — it already carries the location in
+`artifactLocation`, so mapping to the standard was satisfied by fixing the
+citation. Markdown, PR and the CLI verdict gained a subject line; JSON follows
+from the model; the web list renders the pair and keys on it.
 
-**Traps**
+**The web test had no teeth, and only a mutation showed it.** Asserting both
+findings *render* stayed green when the key was reverted — React renders both
+children whatever the key, and a duplicate surfaces only as a console warning.
+Rewritten to spy on `console.error`, it fails.
 
-- **SARIF has its own location model.** Map to it rather than inventing a
-  parallel field.
-- Do not let this grow into a `Finding` redesign.
-- Regenerate the frontend API types with `scripts/generate_web_types.ps1`; never
-  hand-edit them.
-- **There are four renderers, not three.** `text_report.py` is the CLI verdict
-  and was the one that silently dropped limitations until 2026-08-15 (ADR-0045).
-  Check it explicitly.
-
-**Done when** two same-code findings in different files render distinguishably
-in JSON, Markdown, PR, SARIF and the web app, with cross-adapter tests covering
-each.
-
----
+> **Assert on the mechanism the defect produces, not on what you hope it
+> disturbs.** The rendered output was never going to show a key collision.
 
 ## Task 4 — Lexical intents populate relation paths (WS-6)
 

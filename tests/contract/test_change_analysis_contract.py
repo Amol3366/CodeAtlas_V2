@@ -98,6 +98,10 @@ def valid_report_data() -> dict[str, object]:
                 "evidence_ids": ["cev_1"],
                 "remediation": None,
                 "limitations": [],
+                # ADR-0054. Additive and optional, so an older stored report
+                # still validates; the canonical dump carries the keys.
+                "subject": "PaymentService.capture",
+                "file_path": "src/payments/service.py",
             }
         ],
         "evidence": [
@@ -380,6 +384,11 @@ def test_constructed_report_round_trips() -> None:
                 derivation=Derivation.HIGH_CONFIDENCE_HEURISTIC,
                 confidence=0.7,
                 evidence_ids=["cev_1"],
+                # ADR-0054: the pair the citation identifies. Stated here rather
+                # than left defaulted, because this test exists to prove the
+                # typed models compose without surprise defaults.
+                subject="PaymentService.capture",
+                file_path="src/payments/service.py",
             )
         ],
         evidence=[
