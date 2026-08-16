@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-16
+Last updated: 2026-08-17
 
 ## Current Phase
 
@@ -2224,6 +2224,22 @@ Carried into gate approvals as declared work rather than dropped:
       `renderWithProviders` known issue was false. See Known Issues.
 
 ## Next Up
+
+**Current, as of 2026-08-17.** `extra_build.md` is the execution order and the
+Deferred Register in `docs/plans/PLAN.md` is the authority; this is a pointer,
+not a third copy.
+
+- **Startable now: Task 7** (RRF coarse-chunk measurement). A *measurement*, not
+  a fix — ADR-0046 ruled the penalty stays unimplemented, so the only question
+  is whether the bias costs anything at the larger corpus.
+- **Blocked on a ruling: Task 4** (what a lexical answer carries). Ask for this
+  one first — **ADR-0055 just answered the same question shape for `trace`**,
+  and Task 4 asks it for lexical answers. Three cases, not two: q024 joined
+  after ADR-0053 made `CONCEPTUAL` measurable.
+- **Blocked on a different ruling: the rest of Task 6** — whether a corpus
+  expectation should declare transitive (depth-2) results.
+
+Everything below is the older list, kept as written.
 
 Two follow-ups were raised by the ADR-0016 whole-branch review and deliberately
 **not** folded into that branch, so they are recorded here rather than lost:

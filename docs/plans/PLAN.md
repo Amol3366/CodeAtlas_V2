@@ -53,10 +53,10 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Active task     | **none - closed.** The 2026-08-10 closeout settled the four remaining substantial items (ADR-0037 to ADR-0040) and dispositioned every other open item in the Deferred Register below. **This project has a terminal state; it is not an open tail.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Task status     | `complete` - Phase 7 stays approved. Everything since is post-gate work, not a reopened phase task. `SCHEMA_VERSION` is **14** (migration `0014`); `contract_version` remains `1.1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Started UTC     | 2026-08-10T08:00:00Z (project closeout; all earlier work is in the handoff log)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Git state       | Branch`main`, clean at closeout. Five branches merged: `closeout-pid-reuse`, `closeout-relation-path-recall`, `closeout-imports-target`, `closeout-ephemeral-scope`, `closeout-terminal-state`. Changed: `indexing/ownership.py`, `evaluation/runner.py`, one CLI docstring, one corpus endpoint. No schema, contract, migration, or generated artifact changed                                                                                                                                                                                                                                                                                                                                                                                 |
+| Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
+| Git state       | Branch `main`, clean, synced with `origin/main`. **Post-gate session 2026-08-16/17 merged eight branches**: ADR-0050 (q035), ADR-0051 (q006), ADR-0052 (depth-2 claims), ADR-0053 (`CONCEPTUAL` measurable), ADR-0054 (finding subject/path), ADR-0055 (route cites its handler), plus two artifact regenerations and one documentation pass. **No migration; `SCHEMA_VERSION` stays 14 and `contract_version` stays `1.1` throughout** |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout is recorded.**New work requires an explicit user decision**, and the Deferred Register names what each candidate would cost                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** Of `extra_build.md`'s seven tasks, **1, 2, 3 and 5 are closed**; **Task 7 is startable now**; **Task 4 and the remainder of Task 6 are blocked on rulings** named in the register |
 
 ## Deferred Register
 
@@ -271,6 +271,69 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-17T16:00:00Z — Session close: state verified, next steps named
+
+- Agent: Claude Code `claude-opus-5`, branch `main`, synced with `origin/main`.
+- Transition: no phase task. Documentation only — no source, corpus, contract or
+  baseline change in this entry.
+
+**Verified now, after ADR-0055 rather than assumed from before it.** The two
+gate scripts had not been re-run since Task 5's changes; only `pytest` had. They
+were re-run for this entry:
+
+| Check | Result |
+| --- | --- |
+| `check_phase4.ps1 -SkipSync` | **exit 0** |
+| `check_phase7.ps1 -SkipSync -Semantic` | **exit 0** |
+| `uv run pytest -q` | 2254 passed, 3 skipped |
+| ruff, mypy (352 files) | clean |
+| `tests/end_to_end/test_packaged_build.py` | 6 passed — package rebuilt |
+
+**Six records this session, ADR-0050 → ADR-0055**, and the split is worth
+stating: **two were genuine engine defects** (ADR-0052, a depth-2 claim
+asserting a direct call; ADR-0055, a route's claim dropped when it shared a
+line) against **four instrument or corpus corrections**. The standing "instrument
+not engine" prior held nine times and then broke twice — which is the outcome
+that argues for keeping the prior *and* keeping the scrutiny.
+
+**No migration all session.** `SCHEMA_VERSION` stays **14**, `contract_version`
+stays **`1.1`**, and the one contract addition (ADR-0054) is additive and
+optional with its values derived rather than stored.
+
+**Where the corpus stands:** `exact_symbol_resolution` **1.0000 over 50** cases,
+`containing_evidence_recall_at_10` **1.0000** — every case now scores —
+`unmet_targets` still `['changed_symbol_precision']`, the accepted structural
+miss. **ADR-0053 lowered six reported numbers to the truth**; a figure that looks
+worse than one you remember from before 2026-08-17 is probably that.
+
+**`extra_build.md` tasks: 1, 2, 3 and 5 closed. Remaining:**
+
+- **Task 7 — startable without a decision.** A measurement, not a fix: ADR-0046
+  ruled the coarse-chunk penalty stays unimplemented, so the only open question
+  is whether the bias costs anything at the larger corpus.
+- **Task 4 — blocked, and the ruling to ask for first.** ADR-0055 just answered
+  the same question shape for `trace`; Task 4 asks it for *lexical* answers.
+  Three cases now, not two — q024 joined once ADR-0053 made `CONCEPTUAL`
+  measurable.
+- **Task 6 remainder — blocked on a different ruling**: whether a corpus
+  expectation should declare transitive (depth-2) results.
+
+**Five ways something looked like coverage and was not**, all found by mutation
+and none by review, three of them only after a *first* mutation came back green.
+They are written up under their tasks in `extra_build.md` and are the most
+reusable output of the session:
+
+1. a whole-file evidence item satisfies any line in that file;
+2. `exact_symbol_resolution` feeds the expected symbol in as the query, so it
+   cannot detect a *wrong* expectation;
+3. no name-based metric separates two same-named symbols;
+4. asserting on rendered output cannot see a React key collision;
+5. **a mutation that cannot apply is indistinguishable from a test that cannot
+   catch it.**
+
+- Next: **nothing assigned.** Two rulings are outstanding and Task 7 is free.
+
 
 ### 2026-08-17T14:00:00Z — Task 5 closed: a route cites its handler (ADR-0055)
 

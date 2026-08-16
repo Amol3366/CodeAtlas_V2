@@ -164,7 +164,18 @@ at the activation gate). Evidence: ADR-0009, migrations `0010`–`0011`,
 ## Post-Gate Work (no phase)
 
 Delivered after Phase 7's gate, recorded in the handoff log rather than as
-reopened tasks:
+reopened tasks.
+
+> **2026-08-16/17 session, ADR-0050 to ADR-0055.** Six records: q035's subject
+> and reference site, q006 re-typed (**not** an engine defect), depth-2 claims
+> no longer asserting a direct call, `CONCEPTUAL` made measurable, a finding
+> carrying its subject and file, and a route citing the handler it reaches.
+> **Two were genuine engine defects** — ADR-0052 and ADR-0055 — against four
+> instrument or corpus corrections. No migration; `SCHEMA_VERSION` stays 14 and
+> `contract_version` stays `1.1`. `containing_evidence_recall_at_10` reached
+> **1.0000** and `exact_symbol_resolution` holds **1.0000 over 50** cases.
+> ADR-0053 *lowered* six reported metrics to the truth, which is the entry to
+> read first if a number here looks worse than one you remember.
 
 - Configurable embedding models (ADR-0011) and `.env`-based provider
   configuration.

@@ -30,15 +30,34 @@ independent, so the order below is a suggestion rather than a dependency chain.
 
 ## Start here tomorrow
 
-1. ~~**Task 1 — q035**~~ (ADR-0050) and ~~**Task 2 — q006**~~ (ADR-0051) are
-   **done**. The gate margin is restored at 50/50 and q006 turned out **not** to
-   be an engine defect.
-2. **Read the two boxed findings under Tasks 1 and 2 before writing any corpus
-   case.** Between them they record three ways a case can pass without measuring
-   what it claims — each found by mutation, none by review.
-3. Tasks 3–7 are independent. **Task 6 now has the most leverage**, because it is
-   the one that would make the corpus ranking-sensitive, and both closed tasks
-   ran into that gap from different directions.
+**Tasks 1, 2, 3 and 5 are done** (ADR-0050, 0051, 0054, 0055). Two remaining
+tasks are blocked on a ruling and one is free.
+
+1. **Task 7 is the only one you can start without a decision.** It is a
+   *measurement*, not a fix: ADR-0046 already ruled the coarse-chunk penalty
+   stays unimplemented, so the question is only whether the bias costs anything
+   at the larger corpus.
+2. **Task 4 needs a ruling and is the natural next one to ask for**, because
+   ADR-0055 just answered the same question shape for `trace`: what does a
+   traversal-derived answer carry? Task 4 asks it for *lexical* answers. Three
+   cases, not two — q024 joined after ADR-0053.
+3. **The rest of Task 6 needs a different ruling** — whether a corpus
+   expectation should declare transitive (depth-2) results.
+
+**Before writing or trusting any test, read the boxed findings under Tasks 1, 2,
+3 and 5.** Between them they record five ways something can look like coverage
+and not be:
+
+- a whole-file evidence item satisfies any line in that file (Task 2);
+- `exact_symbol_resolution` feeds the expected symbol in as the query, so it
+  cannot detect a *wrong* expectation (Task 2);
+- no name-based metric separates two same-named symbols (Task 1);
+- asserting on rendered output cannot see a React key collision (Task 3);
+- **a mutation that cannot apply is indistinguishable from a test that cannot
+  catch it** (Task 5) — two of four looked green for that reason alone.
+
+None of these was found by review. All five were found by mutation, and three
+were found only after a *first* mutation attempt came back green.
 
 ---
 
@@ -47,13 +66,14 @@ independent, so the order below is a suggestion rather than a dependency chain.
 Phases 0–7 complete with user-approved gates; the project was closed out
 2026-08-10 and everything since is post-gate work. Of the post-closeout program,
 **WS-0, WS-1, WS-3 and WS-4 are closed**, along with both process defects (gate
-exit codes, test isolation). **WS-2, WS-5 and WS-6 remain.**
+exit codes, test isolation). **WS-2 closed 2026-08-17 (ADR-0054). WS-5 and WS-6
+remain**, WS-6 blocked on the Task 4 ruling.
 
 Corpus: **64 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
 
-**All gates pass, and both gate scripts now run to completion:**
-`uv run pytest -q` **2240 passed / 3 skipped**, ruff, mypy on 352 files,
+**All gates pass, and both gate scripts run to completion:**
+`uv run pytest -q` **2254 passed / 3 skipped**, ruff, mypy on 352 files,
 `check_phase4.ps1 -SkipSync` **exit 0**, `check_phase7.ps1 -SkipSync -Semantic`
 **exit 0** — the latter including the semantic suites, the uplift baseline, the
 rerank artifact and Playwright (15 passed, 7 Chromium skips). Exit codes read
