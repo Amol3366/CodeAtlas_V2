@@ -1,6 +1,6 @@
 # Extra Build — the remaining work, in the order to do it
 
-Status: current as of 2026-08-16, after WS-3, WS-4 and **Task 1 (q035)** closed.
+Status: current as of 2026-08-17, after WS-3, WS-4 and **Tasks 1 and 2** closed.
 
 **Authority note.** This file is a **work plan**, not a status list. The single
 authoritative record of what is open is the **Deferred Register in
@@ -23,20 +23,22 @@ was scoped this way and what its decision gates were; this file is the current
 disagree about scope or rationale, the program plan wins.** When the program is
 finished, delete this file rather than leaving it to rot.
 
-Ordering is execution order. Task 1 is first because a release gate currently
-has no margin and Task 1 is what is consuming it.
+Ordering is execution order. **Tasks 1 and 2 are done**; the remaining tasks are
+independent, so the order below is a suggestion rather than a dependency chain.
 
 ---
 
 ## Start here tomorrow
 
-1. ~~**Task 1 — q035.**~~ **DONE 2026-08-16 — ADR-0050.** The gate margin is
-   back: `exact_symbol_resolution` **1.0000 (50/50)**. Two corpus lines, no
-   source change. Read the finding under Task 1 below before starting anything
-   else — the obvious half of the fix **passed its own mutation-check**.
-2. **Task 2 — q006** is now first, and it is the only candidate *engine* finding
-   this project has produced in nine investigations. ADR-0050 does not touch it.
-3. After that the order is open: Tasks 3–7 are independent.
+1. ~~**Task 1 — q035**~~ (ADR-0050) and ~~**Task 2 — q006**~~ (ADR-0051) are
+   **done**. The gate margin is restored at 50/50 and q006 turned out **not** to
+   be an engine defect.
+2. **Read the two boxed findings under Tasks 1 and 2 before writing any corpus
+   case.** Between them they record three ways a case can pass without measuring
+   what it claims — each found by mutation, none by review.
+3. Tasks 3–7 are independent. **Task 6 now has the most leverage**, because it is
+   the one that would make the corpus ranking-sensitive, and both closed tasks
+   ran into that gap from different directions.
 
 ---
 
@@ -47,7 +49,7 @@ Phases 0–7 complete with user-approved gates; the project was closed out
 **WS-0, WS-1, WS-3 and WS-4 are closed**, along with both process defects (gate
 exit codes, test isolation). **WS-2, WS-5 and WS-6 remain.**
 
-Corpus: **63 query cases / 28 change cases** over **7 fixtures**, with a scored
+Corpus: **64 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
 
 **All gates pass, and both gate scripts now run to completion:**
@@ -68,14 +70,14 @@ from the process.
 > reproduce solo (2240 passed, exit 0). The packaged e2e tests bind a loopback
 > port and share one `dist/`. Unconfirmed mechanism — see the register.
 
-### Phase 4 baseline, refreshed 2026-08-16 after ADR-0050
+### Phase 4 baseline, refreshed 2026-08-17 after ADR-0051
 
 | Metric | Value | Target | State |
 | --- | ---: | ---: | --- |
 | `exact_symbol_resolution` | **1.0000** | 0.98 | met — 50/50; **margin restored, and it is exactly one miss wide** |
-| `containing_evidence_recall_at_10` | 0.9824 | 0.90 | met |
-| `primary_evidence_recall_at_10` | 0.9353 | 0.90 | met |
-| `containing_evidence_rate` | 0.7520 | — | **ungated** (ADR-0048); reported |
+| `containing_evidence_recall_at_10` | 0.9941 | 0.90 | met |
+| `primary_evidence_recall_at_10` | 0.9471 | 0.90 | met |
+| `containing_evidence_rate` | 0.7600 | — | **ungated** (ADR-0048); reported |
 | `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural — **still the only unmet target** |
 | `abstention_correctness` | 1.0000 | — | ungated |
 | `mean_reciprocal_rank` | 1.0000 | — | ungated |
@@ -110,8 +112,14 @@ findings:
   internally consistent the whole time.
 
 **A prior confirmed eight times gets applied as a reflex, and a reflex is how a
-real engine defect eventually gets waved past.** Task 2 exists because that was
-avoided once, narrowly.
+real engine defect eventually gets waved past.**
+
+**It is now nine, and Task 2 was the test of it.** q006 was carried as the one
+candidate engine finding and investigated on the assumption it might be real —
+the engine's claim text read against the lines it cites, the evidence
+construction traced to its source, the product's classifier actually run. It
+still ended at the instrument. *Nine is not permission to stop checking; it is
+nine chances to have stopped and been wrong.*
 
 **The corollary, learned twice on 2026-08-16:** derive an expectation from the
 claim, never from the engine's output. Both WS-4 step predictions failed
@@ -164,33 +172,36 @@ the way the case is meant to catch**, not one that merely undoes the edit.
 
 ---
 
-## Task 2 — q006: the engine cites a line that does not prove the claim
+## Task 2 — q006 ✅ DONE 2026-08-16 (ADR-0051)
 
-**Cost:** ½ day to investigate. **Blocked by:** nothing.
+**It was not an engine defect.** Nine investigations, nine instruments.
 
-**Why it matters out of proportion to its size.** This is the **only candidate
-engine finding** produced by nine investigations. Every other one was the
-instrument. It surfaced only because the WS-4 corrections were derived from the
-claim rather than copied from the engine, and the reflex would have buried it.
+**Both halves of what this file recorded were false.** `claim` *does* have an
+outgoing edge — `CALLS add` at line 8 — and evidence is built one per edge from
+`edge.start_line` (`graph_queries.py:305-318`), so nothing "falls back to a
+chunk or lexical hit". And the engine's claim is *"IdempotencyStore.claim calls
+add at idempotency.py:8"*, which line 8 proves exactly. It does not *answer the
+question*, which is a different thing and not an §4.1 violation.
 
-**The finding.** q006 asks "How are duplicate keys handled?" and names
-`IdempotencyStore.claim`. The line that proves duplicate handling is
-`return "duplicate"` — `idempotency.py:7`. **The engine cites line 8**,
-`self._keys.add(key)`, which records a key rather than handling a repeat.
+Line 7, `return "duplicate"`, holds **no relation**, so under ADR-0047 no
+correct `TRACE_FLOW` can cite it. The product's own `classify()` routes that
+question to **`text`**, and the lexical result `5-9` contains line 7. Re-typed
+to `CONCEPTUAL`; `containing_evidence_recall_at_10` 0.9824 → **0.9941**.
 
-**Not proven to be a defect.** `claim` has no outgoing resolved relation, so the
-trace has no edge to cite and the evidence is falling back to something else —
-plausibly a chunk or lexical hit. Establish *why* line 8 is selected before
-calling it wrong.
+> **q064 had to be added in the same change.** `TRACE_FLOW` is a symbol intent,
+> so re-typing q006 alone drops the `exact_symbol_resolution` denominator
+> **50 → 49**, where one miss scores 0.9796 and **fails**. Check the denominator
+> before changing any case's intent — not just before adding one.
 
-**Where to work:** `src/codeatlas/conversations/pipeline.py`,
-`src/codeatlas/application/graph_queries.py`, and the retrieval channels behind
-a `TRACE_FLOW` with no traversable edge.
+**Three ways a case scores without measuring what it claims**, all found by
+mutation on 2026-08-16. Treat them as a checklist when writing or trusting a case:
 
-**Done when** the selection of line 8 has a stated cause, labelled *faulty
-instrument* or *absent decision* or — for the first time — *engine defect*.
-
----
+1. **A whole-file evidence item satisfies any line in that file.** q006's
+   expected line moved 7 → 1 with **no metric change**, because lexical also
+   returns `idempotency.py:1-9`.
+2. **`exact_symbol_resolution` cannot detect a wrong expectation** — it feeds
+   `expected_symbols[0]` in as the query and checks it comes back.
+3. **No name-based metric separates two same-named symbols** (ADR-0050).
 
 ## Task 3 — Subject and file path on `Finding` (WS-2)
 

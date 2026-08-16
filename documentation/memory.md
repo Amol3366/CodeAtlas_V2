@@ -1789,6 +1789,42 @@ minutes to redo.
       Python: the script **exited 0 while writing nothing where expected**, and
       the comparison that followed diffed a real file against a missing one.
 
+- [x] q006 closed — **not an engine defect** (ADR-0051), 2026-08-16. The case
+      carried as *the only candidate engine finding in nine investigations* is a
+      **mis-typed corpus case**. Re-typed `TRACE_FLOW` → `CONCEPTUAL`, with
+      **q064 added in the same change**. `containing_evidence_recall_at_10`
+      0.9824 → **0.9941**, `primary` 0.9353 → 0.9471, denominator held at 50.
+      No source file changed.
+
+      **Both halves of the recorded hypothesis were false**, which is the
+      reminder that a written-down diagnosis is not evidence. `claim` *does*
+      have an outgoing edge (`CALLS add`, line 8), and evidence is built one per
+      edge from `edge.start_line` — nothing "falls back to a chunk or lexical
+      hit". And the engine's claim is *"claim calls add at idempotency.py:8"*,
+      which line 8 proves exactly; it just does not *answer the question*.
+      Line 7 holds no relation, so under ADR-0047 no correct trace can cite it,
+      while the product's own `classify()` sends that question to `text` —
+      whose result `5-9` contains line 7.
+
+      **Check the denominator before changing an intent, not just before adding
+      a case.** `TRACE_FLOW` is a symbol intent, so re-typing q006 alone would
+      have dropped `exact_symbol_resolution` 50 → 49, where one miss scores
+      0.9796 and **fails** — spending the margin ADR-0050 restored hours before.
+
+      **Three ways a case scores without measuring what it claims**, all found
+      by mutation the same day and worth treating as a checklist:
+      a **whole-file evidence item satisfies any line in that file** (moving
+      q006's expected line 7 → 1 changed nothing, because lexical also returns
+      the `1-9` module chunk); **`exact_symbol_resolution` cannot detect a wrong
+      expectation**, because `_query_term` feeds `expected_symbols[0]` in as the
+      query and checks it comes back; and **no name-based metric separates two
+      same-named symbols** (ADR-0050). None of the three was visible to review.
+
+      Left open deliberately: **all three `TRACE_FLOW` cases examined classify
+      as `text`**, so the label may be systemically wrong across all six. q003
+      and q035 were not touched — q035 had been settled hours earlier and
+      reopening it the same day on a different axis would discard that evidence.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

@@ -173,7 +173,7 @@
                       "repository_fixture":  "python_app",
                       "snapshot_id":  "python-v1",
                       "question":  "How are duplicate keys handled?",
-                      "intent":  "TRACE_FLOW",
+                      "intent":  "CONCEPTUAL",
                       "expected_abstention":  false,
                       "expected_symbols":  [
                                                "IdempotencyStore.claim"
@@ -2146,6 +2146,39 @@
                                       ],
                       "forbidden_claims":  [
                                                "mount renders on the server."
+                                           ]
+                  },
+                  {
+                      "id":  "q064",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "Where is OrderPipeline declared?",
+                      "intent":  "EXACT_SYMBOL",
+                      "expected_abstention":  false,
+                      "expected_symbols":  [
+                                               "OrderPipeline"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "OrderPipeline",
+                                                    "start_line":  17,
+                                                    "end_line":  24,
+                                                    "evidence_id":  "q064-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "OrderPipeline persists orders to storage."
                                            ]
                   }
               ]
