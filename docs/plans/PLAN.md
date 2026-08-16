@@ -1,4 +1,3 @@
-
 # CodeAtlas Shared Execution Plan
 
 Status: active
@@ -85,8 +84,11 @@ with verification.
 | **The change corpus cannot express an ADR-0044-shaped defect**                                             | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Someone gives the corpus a Git-backed change case, which is a new fixture shape rather than a new case                                                                      |
 | ~~Grow the symbol corpus toward 50 cases~~                                                                      | **CLOSED 2026-08-15.** Scored symbol-intent cases 27 -> **50**, so `exact_symbol_resolution`'s 0.98 finally tolerates one miss (0.9800) rather than silently requiring 27/27 - the condition ADR-0033 left open. **Both assumptions in the estimate were wrong.** It needed **23** cases, not "13+": 27 + 13 = 40, where one miss still scores 0.9750 and the target is as inexpressible as before. And it needed a **new fixture**, because the five existing ones hold only ~20 distinct symbol-shaped targets between them, already queried by the existing 27 - more cases against those would have padded a denominator to loosen a release target, the mirror image of ADR-0032/0033. `symbol_breadth` adds 25 symbols and 69 relations; the other five fixtures stay byte-identical. **`exact_symbol_resolution` held at 1.0000 across all 50**                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | -                                                                                                                                                                           |
 | **A claim beyond the first hop asserted a direct relationship**                                            | **CLOSED 2026-08-17 — ADR-0052. An ENGINE defect**, found while investigating Task 6 and not while looking for it. `max_depth` is 2, so a graph answer routinely holds edges touching **neither end of the root**, and `_claims` rendered them against the root's name: *"test_capture_uses_idempotency_store calls IdempotencyStore.claim at tests/test_service.py:5"* — where line 5 is `assert service.capture(...)`. The test calls `capture`, not `claim`. A §4.1 violation: the citation shows a different call from the one asserted. `relation_paths` was **correct throughout**, carrying the real two-step path, so this is prose only. Now reads *"reaches Y indirectly, through Z"*, mirroring ADR-0016. **Not the first engine defect** — ADR-0019 was one, and its shape is nearly identical (*evidence named one symbol and showed another*); here the *claim* does. Every baseline reproduces byte-for-byte, which also means the corpus cannot see it                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                                                          |
-| ~~**A `Finding` carries no subject or file path** (ADR-0042 follow-up 1)~~ | **CLOSED 2026-08-17 — ADR-0054, and the rendering problem was the symptom.** `_finding_citations` keyed changed symbols on `qualified_name` **alone**, so two modules each defining `total` collapsed to whichever the dict comprehension saw last: **the finding about `billing.py` cited lines in `orders.py`**. A §4.1 violation — the citation does not support the claim — and **ADR-0042's own rule ("pair within the file first") reaching a surface that ruling did not touch**. `FindingDraft` now carries `subject_file`, and a symbol draft resolves **only** by location, with no name fallback, because a wrong citation still renders as a valid finding. `Finding` gains optional `subject`/`file_path` **derived from the citation, never stored** — `change_findings` has no such columns, storing them would be a second copy that can disagree, and deriving means no migration and no drift. Surfaced in JSON, Markdown, PR, the CLI verdict and the web list; SARIF needed nothing, already carrying the location in `artifactLocation`. `contract_version` stays `1.1`, `SCHEMA_VERSION` stays 14 | — |
-| **A gated intent left the denominator, flattering six metrics** | **CLOSED 2026-08-17 — ADR-0053.** `CONCEPTUAL` was absent from `SUPPORTED_INTENTS`, so `predict_exact_symbols` emitted `_abstention(measured=False)` and the case **never reached the engine**. **q024 had never been measured**; ADR-0051 put q006 in the same state hours earlier. This is ADR-0017 on the neighbouring constant, failing the **opposite** way — a gated *fixture* scores `False` and stays in the denominator as a miss, a gated *intent* **leaves** it, so the omission removed a failing case from the average instead of reporting capability as failure. Under-reporting is loud and gets found; flattering is silent. Corrected: `relation_path_recall` 0.9130 → **0.8750**, `relation_path_correctness` 0.8261 → 0.7917, `primary_evidence_recall_at_10` 0.9471 → 0.9310, `exact_evidence_rate` 0.6880 → 0.6591, `ndcg_at_10` and `symbol_recall_at_10` down; `exact_symbol_resolution` **1.0000 unchanged** and `unmet_targets` unchanged. **ADR-0051's conclusion survives** — q006 measured through lexical gives 0.9943, confirming it does pass containment — **but its evidence did not establish it**, and that is recorded as the correction | — |
+| ~~**q032: a two-hop trace carries no evidence for its far end**~~ | **CLOSED 2026-08-17 — ADR-0055.** Ruled by the user: a resolved `ROUTES_TO` edge additionally cites the **handler's definition**, an explicit exception to ADR-0047 on ADR-0019's `EXPORTS` precedent — a route *names* its target, and its literal and target sit in different files and usually different languages, so the near side alone cannot show what the flow reaches. q032 **0.50 → 1.00**, and `containing_evidence_recall_at_10` reaches **1.0000** — every case in the corpus now scores. `containing_evidence_rate` 0.7576 → 0.7537, ungated. **This settles the last of ADR-0034's four causes for `trace`**; the lexical half is Task 4 | — |
+| **A route's claim was dropped when it shared a line** | **CLOSED 2026-08-17 — ADR-0055, found while reproducing q032.** Evidence is deduplicated by region — correctly, since one region is one citation — but `_claims` was built from the *surviving pairs*, so the second edge at a shared line lost its claim entirely. `loadOrder ROUTES_TO get_order` and `loadOrder CALLS fetch` both sit on `frontend.ts:2`, so **the engine dropped its only resolved, cross-language edge and kept two unresolved browser globals, decided purely by iteration order.** `relation_paths` carried it and the prose did not — ADR-0020's gap inverted. Fixed as a consequence of the citation ruling: a route that cites its own destination no longer shares a region. `_verb` also had no `ROUTES_TO` entry, so the claim would have read *"relates to"* — unseen because the claim never rendered | — |
+| **The per-edge claim merge is not exercised by any fixture** | **OPEN — a stated limit of what the suite measures, not a defect.** ADR-0055 merges a route's two citations into one claim. Deleting that merge leaves every test green, because a route literal and the call carrying it are the same expression and therefore share a line: the near-side candidate is deduplicated away and only one citation survives, so the merge never fires here. **It is not dead code** — it fires whenever the near side survives. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it, and two of ADR-0055's four mutations looked green for exactly that reason | Someone adds a fixture whose route literal sits alone on its line |
+| ~~**A `Finding` carries no subject or file path** (ADR-0042 follow-up 1)~~                              | **CLOSED 2026-08-17 — ADR-0054, and the rendering problem was the symptom.** `_finding_citations` keyed changed symbols on `qualified_name` **alone**, so two modules each defining `total` collapsed to whichever the dict comprehension saw last: **the finding about `billing.py` cited lines in `orders.py`**. A §4.1 violation — the citation does not support the claim — and **ADR-0042's own rule ("pair within the file first") reaching a surface that ruling did not touch**. `FindingDraft` now carries `subject_file`, and a symbol draft resolves **only** by location, with no name fallback, because a wrong citation still renders as a valid finding. `Finding` gains optional `subject`/`file_path` **derived from the citation, never stored** — `change_findings` has no such columns, storing them would be a second copy that can disagree, and deriving means no migration and no drift. Surfaced in JSON, Markdown, PR, the CLI verdict and the web list; SARIF needed nothing, already carrying the location in `artifactLocation`. `contract_version` stays `1.1`, `SCHEMA_VERSION` stays 14                                                                                                                                                                                | —                                                                                                                                                                          |
+| **A gated intent left the denominator, flattering six metrics**                                            | **CLOSED 2026-08-17 — ADR-0053.** `CONCEPTUAL` was absent from `SUPPORTED_INTENTS`, so `predict_exact_symbols` emitted `_abstention(measured=False)` and the case **never reached the engine**. **q024 had never been measured**; ADR-0051 put q006 in the same state hours earlier. This is ADR-0017 on the neighbouring constant, failing the **opposite** way — a gated *fixture* scores `False` and stays in the denominator as a miss, a gated *intent* **leaves** it, so the omission removed a failing case from the average instead of reporting capability as failure. Under-reporting is loud and gets found; flattering is silent. Corrected: `relation_path_recall` 0.9130 → **0.8750**, `relation_path_correctness` 0.8261 → 0.7917, `primary_evidence_recall_at_10` 0.9471 → 0.9310, `exact_evidence_rate` 0.6880 → 0.6591, `ndcg_at_10` and `symbol_recall_at_10` down; `exact_symbol_resolution` **1.0000 unchanged** and `unmet_targets` unchanged. **ADR-0051's conclusion survives** — q006 measured through lexical gives 0.9943, confirming it does pass containment — **but its evidence did not establish it**, and that is recorded as the correction                                                                                                     | —                                                                                                                                                                          |
 | **Ranking sensitivity needs distractors, not larger answer sets**                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
 | **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone adds cases whose answer sets are large enough for order to matter                                                                                                   |
 | `relation_path_recall` has no gate target                                                                      | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
@@ -270,76 +272,83 @@ Every handoff entry contains:
 
 ## Handoff Log
 
-### 2026-08-17T11:00:00Z — Task 3 done: the rendering problem was an engine defect (ADR-0054)
+### 2026-08-17T14:00:00Z — Task 5 closed: a route cites its handler (ADR-0055)
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.
-- Transition: no phase task. Post-gate. `extra_build.md` Task 3 **complete**.
-- New record: **ADR-0054**.
-- Files: `contracts.py`, `analysis/findings.py`, `application/change_analysis.py`,
-  `storage/sqlite/stores.py`, all three prose renderers, `FindingsList.tsx`,
-  four test modules, the generated web types and contract schema. **No
-  migration, no baseline change.**
+- Transition: no phase task. Post-gate. `extra_build.md` Task 5 **complete**.
+- New record: **ADR-0055**. Ruled by the user 2026-08-17.
+- Files: `application/graph_queries.py`, `tests/integration/test_trace_flow_paths.py`,
+  baselines `-3`/`-4`, the ADR and its index, the three documentation files.
+  **No corpus, contract, schema or migration change.**
 
-**The recorded task was the symptom.** It described two legitimate findings
-sharing a code rendering identically and colliding on a React key. Reproducing
-it — one repository, `orders.py` and `billing.py` each defining `total`, both
-changed the same way — produced two findings **citing the same evidence item**.
+**Ruled: a resolved `ROUTES_TO` edge additionally cites the handler's
+definition** — an **explicit exception** to ADR-0047, recorded as one rather
+than smuggled in as an interpretation. Its precedent is ADR-0019's `EXPORTS`
+carve-out, which ADR-0047 preserved: a route *names* its target the way an
+export does, and unlike an export its literal and target sit in different files
+and usually different languages, so the near side alone cannot show what the
+flow reaches. Unresolved routes cite nothing extra.
 
-`_finding_citations` resolved drafts through
-`{item.qualified_name: item for item in report.changed_symbols}`. A qualified
-name is not unique, so the two `total`s collapsed to whichever the comprehension
-saw last, and **the finding about `billing.py` cited lines in `orders.py`**.
-That is a §4.1 violation: the citation does not support the claim, it is about
-different code in a different file.
+**Reproducing it found a defect the row did not mention.** `trace(loadOrder)`
+had three edges and two claims:
 
-**It is ADR-0042's own rule reaching a surface that ruling did not touch.**
-ADR-0042 fixed this class in `symbol_diff` — "a config key name in N files was
-an N-versus-N ambiguous match" — and its remedy was to pair within the file
-first. The same file-less keying survived one layer up.
+```
+loadOrder CALLS     fetch      line=2  unresolved   -> claim kept
+loadOrder ROUTES_TO get_order  line=2  RESOLVED     -> claim DROPPED
+loadOrder CALLS     json       line=3  unresolved   -> claim kept
+```
 
-**Two things this file had wrong**, neither serious once checked: construction
-is in `application/change_analysis.py`, not `analysis/findings.py`; and "no
-migration is needed" was right for the wrong reason — findings *are* persisted,
-in `change_findings`, which has no such columns.
+Evidence is deduplicated by region — correctly, one region is one citation — but
+`_claims` was built from the *surviving pairs*, so the second edge on a shared
+line lost its claim entirely. **The engine dropped its only resolved,
+cross-language edge and kept two unresolved browser globals, decided purely by
+iteration order.** `relation_paths` carried the route and the prose did not,
+which is ADR-0020's gap inverted. The citation ruling fixes it as a consequence:
+a route that cites its own destination no longer shares a region.
 
-**The fields are derived, not stored.** Every finding cites exactly one evidence
-item, and `_cite` has labelled it with the changed symbol's qualified name since
-Phase 4 — so the pair was already there. `locate_finding` derives it, and both
-the fresh and rehydration paths call that one helper, so no migration was needed
-*and* a reloaded report cannot disagree with the fresh one it came from.
+`_verb` also had no `ROUTES_TO` entry, so the claim would have read *"loadOrder
+relates to get_order"* — the generic fallback on the one relation whose point is
+the boundary it crosses. **Nobody had seen it because the claim was never
+rendered: a defect can hide behind another defect.**
 
-> **Look for what already carries the fact before adding a field to hold it.**
+| Metric | Before | After |
+| --- | ---: | ---: |
+| `containing_evidence_recall_at_10` | 0.9943 | **1.0000** |
+| `primary_evidence_recall_at_10` | 0.9310 | 0.9368 |
+| `symbol_recall_at_10` | 0.8833 | 0.8917 |
+| `ndcg_at_10` | 0.9109 | 0.9173 |
+| `containing_evidence_rate` | 0.7576 | 0.7537 |
 
-**Six surfaces. SARIF needed no change** — it already carries the location in
-`artifactLocation`, so fixing the citation satisfied "map to its own location
-model" outright. Markdown, PR and the CLI verdict gained a subject line, JSON
-follows from the model, and the web list renders the pair and keys on it.
+q032 reaches **1.00** and containment recall reaches **1.0000** — every case in
+the corpus now scores. `unmet_targets` stays `['changed_symbol_precision']`;
+`baseline-phase-7` and `rerank-phase-7` reproduce byte-for-byte. **This settles
+the last of ADR-0034's four causes for `trace`**; the lexical half (q024, q027,
+q029) is Task 4 and still needs its own ruling.
 
-**The web test had no teeth, and only a mutation showed it.** The first version
-asserted both findings were *rendered*; reverting the key to `code-title` left it
-**green**, because React renders both children whatever the key and a duplicate
-surfaces only as a console warning. The test's name described a property it did
-not check. Rewritten to spy on `console.error` for "same key", the mutation
-fails.
+**Two of four mutations could not be exercised by the fixture, and both looked
+like passing guards.** Over-applying the carve-out to every relation kind was a
+no-op, because every non-route edge in `mixed_app` targets a browser global and
+resolves to nothing — replaced with a `python_app` test over
+`PaymentService.capture`, whose `CALLS` *is* resolved, and that mutation now
+fails. Deleting the per-edge claim merge is **still** not caught: a route literal
+and the call carrying it are the same expression and share a line, so the near
+side is deduplicated away and the merge never fires here. It is not dead code,
+and it is recorded in the register as a stated limit rather than counted as
+coverage.
 
-> **Assert on the mechanism the defect produces, not on what you hope it
-> disturbs.**
+> **A mutation that cannot apply is indistinguishable from a test that cannot
+> catch it.** Confirm the mutation changed behaviour before reading a green
+> suite as coverage.
 
-**A derived field breaks round-trip equality, said out loud rather than smoothed
-away.** A finding saved without a subject reads back with one. That is
-normalisation from data already stored, not invention — and it is pinned by its
-own test rather than handled by loosening the round-trip assertion it broke.
-
-Five mutations, all failing: the name-only citation lookup, the fresh-path
-population, the rehydration derivation, the web subject render, and the web key.
-
-- Verification: `uv run pytest -q` **2251 passed, 3 skipped**; ruff and mypy
-  clean on 352 files; eslint, `tsc --noEmit` and vitest clean in `apps/web`;
-  `check_phase4.ps1 -SkipSync` **exit 0**. Every changed file confirmed LF.
-  Two generated artifacts regenerated rather than hand-edited — the web API
-  types and `contract-v1.schema.json`, the latter caught by the gate.
-- Next: **nothing assigned.** Tasks 5 and 7 untouched; Task 4 and the remainder
-  of Task 6 wait on their rulings.
+- Verification: `uv run pytest -q` **2254 passed, 3 skipped, 1 failed**; ruff
+  and mypy clean on 352 files; baselines `-0`/`-3`/`-4` regenerated,
+  `baseline-phase-7 --check` exit 0. All changed files confirmed LF.
+- **The one failure is `test_the_packaged_web_assets_match_the_source_build`,
+  and this time it is mine**: Task 3 changed `FindingsList.tsx`, and the Phase 7
+  gate's `vite build` refreshed `apps/web/dist`, leaving the packaged bundle
+  stale. Rebuilt with `-SemanticLocal` to match the artifact's existing flavour.
+- Next: **nothing assigned.** Task 7 untouched; Task 4 and the remainder of
+  Task 6 wait on their rulings.
 
 
 ### 2026-08-17T07:00:00Z — Task 4 blocked on its ruling; a gated intent was flattering six metrics (ADR-0053)
@@ -367,10 +376,10 @@ written — and **ADR-0051 moved q006 into the same state hours earlier**.
 ADR-0017's own text says `SUPPORTED_INTENTS` "*was* maintained". It was, for the
 widenings it received; `CONCEPTUAL` never entered it.
 
-| Gate | A gated case scores | Effect |
-| --- | --- | --- |
-| `SUPPORTED_FIXTURES` | `False` | stays in the denominator as a **miss** |
-| `SUPPORTED_INTENTS` | `measured=False` | **leaves** the denominator |
+| Gate                   | A gated case scores | Effect                                      |
+| ---------------------- | ------------------- | ------------------------------------------- |
+| `SUPPORTED_FIXTURES` | `False`           | stays in the denominator as a**miss** |
+| `SUPPORTED_INTENTS`  | `measured=False`  | **leaves** the denominator            |
 
 **Under-reporting is loud — someone eventually asks why a working feature scores
 zero, which is how ADR-0017 was found. Removing a failing case is silent,
@@ -388,14 +397,14 @@ checks. I did not check `measured`.
 **Six metrics fall to the truth. No gate breaks**, `exact_symbol_resolution`
 stays **1.0000** and `unmet_targets` stays `['changed_symbol_precision']`.
 
-| Metric | Reported | Measured |
-| --- | ---: | ---: |
-| `relation_path_recall` | 0.9130 | **0.8750** |
-| `relation_path_correctness` | 0.8261 | 0.7917 |
-| `primary_evidence_recall_at_10` | 0.9471 | 0.9310 |
-| `exact_evidence_rate` / `valid_evidence_rate` | 0.6880 | 0.6591 |
-| `ndcg_at_10` | 0.9145 | 0.9109 |
-| `symbol_recall_at_10` | 0.8879 | 0.8833 |
+| Metric                                            | Reported |         Measured |
+| ------------------------------------------------- | -------: | ---------------: |
+| `relation_path_recall`                          |   0.9130 | **0.8750** |
+| `relation_path_correctness`                     |   0.8261 |           0.7917 |
+| `primary_evidence_recall_at_10`                 |   0.9471 |           0.9310 |
+| `exact_evidence_rate` / `valid_evidence_rate` |   0.6880 |           0.6591 |
+| `ndcg_at_10`                                    |   0.9145 |           0.9109 |
+| `symbol_recall_at_10`                           |   0.8879 |           0.8833 |
 
 `baseline-phase-7` and `rerank-phase-7` reproduce byte-for-byte —
 `predict_conceptual` does not read this constant.
@@ -421,7 +430,6 @@ byte level, it is detected.
   `tests/evaluation` 120 passed. Guard mutation-checked twice — reverting the
   constant, and renaming a corpus intent to one nothing supports.
 - Next: **nothing assigned.** Task 4 needs its ruling; Tasks 3, 5, 7 untouched.
-
 
 ### 2026-08-17T04:00:00Z — Task 6 found an engine defect (ADR-0052); its own premise was wrong
 
