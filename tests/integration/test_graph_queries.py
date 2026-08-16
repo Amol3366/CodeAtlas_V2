@@ -378,3 +378,55 @@ def test_no_response_leaks_an_absolute_repository_path(harness: Harness) -> None
     for item in response.evidence:
         assert not item.file_path.startswith("/")
         assert ":" not in item.file_path[:3]
+
+
+# --- ADR-0052: prose may not outrun the citation ------------------------------
+
+
+def test_a_second_hop_claim_does_not_assert_a_direct_relationship(
+    harness: Harness,
+) -> None:
+    """`client` imports `total`; `total` references `Order`. Not `client -> Order`.
+
+    Traversal runs to `max_depth` 2, so the answer legitimately contains the
+    `Order` edge — whose citation is a line in *orders.ts*, showing `total`
+    referencing `Order`. Wording that as "src.client references Order" asserts a
+    relationship that line disproves.
+
+    This is deliberately an engine-level test. `test_claim_text.py` passes
+    `intermediate` in by hand, so it cannot see whether `_claims` ever computes
+    one; both mutations of that detection passed the whole suite before this
+    existed.
+    """
+    response = harness.services.graph.dependencies(_request(harness, "src.client"))
+
+    # Assert against the ONE claim that mentions `Order`, not the concatenation.
+    # Checking "total" in the joined text passed even when the intermediate was
+    # computed from the wrong endpoint, because the first-hop claim
+    # ("src.client imports total") supplies that word on its own.
+    order_claims = [
+        claim.text for claim in response.answer.claims if "Order" in claim.text
+    ]
+    assert len(order_claims) == 1, f"expected one Order claim: {order_claims}"
+    text = order_claims[0]
+
+    assert "src.client references Order" not in text
+    assert "reaches Order indirectly" in text
+    assert "through total," in text
+
+
+def test_a_first_hop_claim_is_still_stated_directly(harness: Harness) -> None:
+    """The other half, and the one that fails if every claim is hedged.
+
+    Without this, always reporting an intermediate would satisfy the test above
+    while making every direct answer read as though it were second-hand.
+    """
+    response = harness.services.graph.callers(_request(harness, "total"))
+
+    direct = [
+        claim.text
+        for claim in response.answer.claims
+        if claim.text.startswith("render calls total")
+    ]
+    assert direct, f"expected a direct claim, got: {_claim_texts(response)}"
+    assert "indirectly" not in direct[0]

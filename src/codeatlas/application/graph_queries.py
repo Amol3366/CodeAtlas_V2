@@ -415,6 +415,20 @@ class GraphQueryService:
             if not other:
                 other = edge.target_hint or edge.source_symbol_id
 
+            # …except beyond the first hop, where that premise fails: traversal
+            # runs to `max_depth` 2, so an edge may touch neither end of the
+            # root. Rendering such an edge against the root's name asserts a
+            # direct relationship its own cited line disproves — the line shows
+            # a call to the *intermediate*. `relation_paths` always carried the
+            # true path; only this prose overstated it (ADR-0052).
+            intermediate = None
+            if root.symbol_id not in (edge.source_symbol_id, edge.target_symbol_id):
+                intermediate = (
+                    _label(edge.target_symbol_id, symbols_by_id)
+                    if inbound
+                    else _label(edge.source_symbol_id, symbols_by_id)
+                ) or edge.target_hint
+
             claims.append(
                 Claim(
                     claim_id=f"c{index + 1}",
@@ -425,6 +439,7 @@ class GraphQueryService:
                         file_path=evidence.file_path,
                         start_line=evidence.start_line,
                         inbound=inbound,
+                        intermediate=intermediate,
                     ),
                     derivation=edge.derivation,
                     confidence=edge.confidence,
@@ -552,6 +567,7 @@ def claim_text(
     file_path: str,
     start_line: int,
     inbound: bool,
+    intermediate: str | None = None,
 ) -> str:
     """The sentence one claim renders.
 
@@ -560,6 +576,14 @@ def claim_text(
     its citation is the mediating line, which never mentions the target. So it
     is reported and cited, and worded so it does not assert what it cannot
     support.
+
+    `intermediate` applies the same rule to distance. Traversal runs to
+    `max_depth` 2, so an answer routinely contains an edge touching *neither*
+    end of the root; its citation is that edge's own line, which shows a call
+    to the intermediate and not to the root. Naming the root as though the edge
+    reached it directly asserts a relationship the cited line cannot support
+    (ADR-0052). `None` means the edge is incident to the root and the direct
+    wording is correct -- which is the common case, and is left untouched.
     """
     citation = f" at {file_path}:{start_line}."
     mediation = (
@@ -572,6 +596,13 @@ def claim_text(
         return (
             f"{subject} may exercise {obj} indirectly,"
             f" through {mediation},{citation}"
+        )
+
+    if intermediate is not None:
+        subject, obj = (other, root_name) if inbound else (root_name, other)
+        return (
+            f"{subject} reaches {obj} indirectly,"
+            f" through {intermediate},{citation}"
         )
 
     if inbound:
