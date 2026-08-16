@@ -111,6 +111,12 @@ def _report(analysis_id: str = "analysis_1") -> ChangeAnalysisReport:
                 confidence=0.7,
                 evidence_ids=["ev_1"],
                 limitations=["Statement classification is syntactic."],
+                # The pair `ev_1` identifies. Stated so the round trip stays an
+                # equality: they are derived on read (ADR-0054), so a fixture
+                # omitting them would come back *more* populated than it went
+                # in — which the test below pins deliberately.
+                subject="total",
+                file_path="src/orders.py",
             )
         ],
         evidence=[evidence],
@@ -156,6 +162,29 @@ def test_a_report_round_trips_with_every_field_intact(
     assert read.test_gaps == written.test_gaps
     assert read.warnings == written.warnings
     assert read.timing_ms == written.timing_ms
+
+
+def test_a_findings_subject_is_derived_on_read_not_stored(
+    connection: Connection,
+) -> None:
+    """`change_findings` has no such columns, and deliberately so.
+
+    Storing the pair beside the citation that already implies it would be two
+    copies that can disagree; deriving it means a reloaded report cannot differ
+    from the fresh one, and no migration was needed (ADR-0054). The visible
+    consequence is that a finding saved *without* a subject reads back *with*
+    one — normalisation from data already stored, not invention.
+    """
+    store = ChangeAnalysisStore(connection)
+    written = _report()
+    bare = written.findings[0].model_copy(update={"subject": None, "file_path": None})
+    store.save(written.model_copy(update={"findings": [bare]}))
+
+    read = store.get(written.analysis_id)
+
+    assert read is not None
+    assert read.findings[0].subject == "total"
+    assert read.findings[0].file_path == "src/orders.py"
 
 
 def test_an_unknown_analysis_reads_as_none(connection: Connection) -> None:

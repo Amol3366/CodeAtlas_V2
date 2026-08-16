@@ -421,3 +421,142 @@ def test_the_markdown_states_what_the_analysis_does_not_know(
     assert "## Findings" in markdown
     if report.test_gaps:
         assert "does not prove absence of coverage" in markdown
+
+
+# --- ADR-0054: a finding says what it is about, on every surface --------------
+
+
+def _two_file_fixture(tmp_path: Path) -> Fixture:
+    """Two files changed the same way, so both findings share a code and title.
+
+    That is the case the register recorded as ADR-0042 follow-up 1: the findings
+    are *legitimate* and distinct, and nothing rendered told them apart.
+    """
+    root = tmp_path / "repo2"
+    root.mkdir()
+    _git(root, "init", "-b", "main")
+    (root / "orders.py").write_text(BASE_PY, encoding="utf-8")
+    (root / "billing.py").write_text(BASE_PY, encoding="utf-8")
+    _git(root, "add", ".")
+    _git(root, "commit", "-m", "base")
+    (root / "orders.py").write_text(TARGET_PY, encoding="utf-8")
+    (root / "billing.py").write_text(TARGET_PY, encoding="utf-8")
+
+    database = tmp_path / "db2.sqlite"
+    with connect(database) as connection:
+        apply_migrations(connection)
+        services = build_services(connection)
+        repository = services.registration.register(
+            RegisterRepositoryRequest(path=str(root))
+        )
+        return Fixture(
+            database=database, root=root, repository_id=repository.repository_id
+        )
+
+
+def test_a_finding_names_its_subject_and_file(tmp_path: Path) -> None:
+    fixture = _two_file_fixture(tmp_path)
+    report = _service_report(fixture)
+
+    findings = report["findings"]
+    assert findings, "the fixture must produce findings"
+    for finding in findings:
+        assert finding["subject"], f"no subject: {finding['code']}"
+        assert finding["file_path"], f"no file_path: {finding['code']}"
+
+
+def test_two_findings_sharing_a_code_are_distinguishable(tmp_path: Path) -> None:
+    """The bug itself: same code and title, different files, identical render."""
+    fixture = _two_file_fixture(tmp_path)
+    report = _service_report(fixture)
+
+    by_code: dict[str, list[dict[str, Any]]] = {}
+    for finding in report["findings"]:
+        by_code.setdefault(finding["code"], []).append(finding)
+    shared = {code: items for code, items in by_code.items() if len(items) > 1}
+    assert shared, "the fixture must produce at least one repeated code"
+
+    for code, items in shared.items():
+        keys = {(item["subject"], item["file_path"]) for item in items}
+        assert len(keys) == len(items), (
+            f"{code}: {len(items)} findings collapse to {len(keys)} keys — the"
+            " React key collision, reproduced in the contract"
+        )
+
+
+def test_a_reloaded_analysis_keeps_the_subject_and_file(tmp_path: Path) -> None:
+    """The persisted path derives them; it does not store them.
+
+    `change_findings` has no such columns, so a stored report rebuilds the pair
+    from the evidence each finding cites. If that derivation is ever dropped,
+    the fields would survive a fresh analysis and vanish on reload — the
+    one-surface defect this codebase keeps paying for.
+    """
+    fixture = _two_file_fixture(tmp_path)
+    client = TestClient(create_app(fixture.database))
+    created = client.post(
+        "/v1/change-analysis/working-tree",
+        json={"repository_id": fixture.repository_id, "base_ref": "HEAD"},
+    )
+    assert created.status_code == 200, created.text
+    analysis_id = created.json()["analysis_id"]
+
+    reloaded = client.get(f"/v1/change-analysis/{analysis_id}")
+    assert reloaded.status_code == 200, reloaded.text
+
+    fresh_keys = {
+        (item["subject"], item["file_path"]) for item in created.json()["findings"]
+    }
+    stored_keys = {
+        (item["subject"], item["file_path"]) for item in reloaded.json()["findings"]
+    }
+    assert stored_keys == fresh_keys
+    assert all(subject and path for subject, path in stored_keys)
+
+
+def test_every_renderer_tells_two_same_code_findings_apart(tmp_path: Path) -> None:
+    """All four renderers, not three, and not "the JSON has it so they all do".
+
+    Shipping to one surface and assuming the rest followed is the recurring
+    shape here — the `--format pr` guards and the ADR-0016 gap reasons both.
+    `text_report` is included explicitly because it is the CLI verdict, and the
+    one that silently dropped limitations until ADR-0045.
+    """
+    from codeatlas.delivery.pr_report import render_pr_markdown
+    from codeatlas.delivery.text_report import render_text
+
+    fixture = _two_file_fixture(tmp_path)
+    with connect(fixture.database) as connection:
+        services = build_services(connection)
+        report = services.change_analysis.analyze_working_tree(
+            ChangeAnalysisRequest(repository_id=fixture.repository_id)
+        )
+
+    repeated = [
+        item
+        for item in report.findings
+        if sum(1 for other in report.findings if other.code == item.code) > 1
+    ]
+    assert len(repeated) >= 2, "the fixture must produce a repeated code"
+    paths = {item.file_path for item in repeated if item.file_path}
+    assert len(paths) >= 2, "the repeated findings must be in different files"
+
+    for name, rendered in (
+        ("markdown", render_markdown(report)),
+        ("pr", render_pr_markdown(report)),
+        ("text", render_text(report)),
+    ):
+        for path in paths:
+            assert path in rendered, f"{name} does not name {path}"
+
+    # SARIF carries the location in its own model rather than a parallel field,
+    # so it is checked through `artifactLocation` — mapping to the standard is
+    # the requirement, not inventing a `file_path` property beside it.
+    sarif = render_sarif(report)
+    uris = {
+        location["physicalLocation"]["artifactLocation"]["uri"]
+        for result in sarif["runs"][0]["results"]
+        for location in result["locations"]
+    }
+    for path in paths:
+        assert path in uris, f"sarif does not locate {path}"

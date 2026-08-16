@@ -251,6 +251,20 @@ def _one_finding(
         f"{escape_inline(finding.title)}** "
         f"(`{escape_inline(finding.code)}`)",
         "",
+    ]
+    if finding.subject:
+        # Two findings can share a code and a title; only the subject and its
+        # file tell them apart (ADR-0054).
+        lines += [
+            f"Subject: `{escape_inline(finding.subject)}`"
+            + (
+                f" in `{escape_inline(finding.file_path)}`"
+                if finding.file_path
+                else ""
+            ),
+            "",
+        ]
+    lines += [
         escape_inline(finding.description),
         "",
         # Derivation and confidence are separate facts: a high-confidence

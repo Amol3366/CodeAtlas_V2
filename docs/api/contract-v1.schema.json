@@ -371,6 +371,19 @@
               "title": "Evidence Ids",
               "type": "array"
             },
+            "file_path": {
+              "anyOf": [
+                {
+                  "maxLength": 4096,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "File Path"
+            },
             "limitations": {
               "items": {
                 "type": "string"
@@ -392,6 +405,19 @@
             },
             "severity": {
               "$ref": "#/$defs/Severity"
+            },
+            "subject": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Subject"
             },
             "title": {
               "minLength": 1,
@@ -1004,6 +1030,19 @@
           "title": "Evidence Ids",
           "type": "array"
         },
+        "file_path": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File Path"
+        },
         "limitations": {
           "items": {
             "type": "string"
@@ -1025,6 +1064,19 @@
         },
         "severity": {
           "$ref": "#/$defs/Severity"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject"
         },
         "title": {
           "minLength": 1,

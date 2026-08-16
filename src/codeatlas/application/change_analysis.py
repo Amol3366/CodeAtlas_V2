@@ -44,6 +44,7 @@ from codeatlas.contracts import (
     Derivation,
     Finding,
     SnapshotFreshness,
+    locate_finding,
 )
 from codeatlas.contracts import ImpactEdge as ContractImpactEdge
 from codeatlas.domain.change import SymbolChange
@@ -380,12 +381,33 @@ def _build_evidence(
     finding nobody can check is exactly the kind of claim this product exists to
     refuse.
     """
+    # Keyed by name *and* file. A qualified name is not unique across a
+    # repository, and keying on the name alone let two changed symbols called
+    # `total`, in different modules, collapse to whichever the dict saw last —
+    # so both findings cited one file's lines and the other file's finding
+    # pointed at code it was not about. That is a Section 4.1 violation, not a
+    # rendering problem, and it is ADR-0042's rule ("pair within the file
+    # first") reaching a surface that ruling did not touch.
+    by_location = {
+        (item.qualified_name, item.file_path): item
+        for item in report.changed_symbols
+    }
     by_name = {item.qualified_name: item for item in report.changed_symbols}
     evidence: dict[str, ChangeEvidenceItem] = {}
     findings: list[Finding] = []
 
     for draft in report.findings:
-        change = by_name.get(draft.subject)
+        # A symbol draft resolves *only* by location. Falling back to the name
+        # would restore the ambiguity this key exists to remove, and silently:
+        # the wrong citation still renders as a valid finding. A file-level or
+        # architecture draft carries no file and keeps the name lookup, which
+        # for those subjects — a path, a rule source — misses and falls through
+        # to `_cite_file`, as it always did.
+        change = (
+            by_location.get((draft.subject, draft.subject_file))
+            if draft.subject_file is not None
+            else by_name.get(draft.subject)
+        )
         item = _cite(
             analysis_id=analysis_id,
             draft_side=draft.side,
@@ -397,6 +419,14 @@ def _build_evidence(
         if item is None:
             continue
         evidence.setdefault(item.evidence_id, item)
+        # Derived through the same helper the stored path uses, so a fresh
+        # report and a reloaded one cannot disagree (ADR-0054). `draft.subject`
+        # is not read directly here for exactly that reason: the rehydration
+        # path has no draft, and two derivations would be two things to keep in
+        # step.
+        subject, file_path = locate_finding(
+            [item.evidence_id], {item.evidence_id: item}
+        )
         findings.append(
             Finding(
                 code=draft.code,
@@ -408,6 +438,8 @@ def _build_evidence(
                 evidence_ids=[item.evidence_id],
                 remediation=draft.remediation,
                 limitations=list(draft.limitations),
+                subject=subject,
+                file_path=file_path,
             )
         )
 

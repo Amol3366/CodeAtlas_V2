@@ -40,10 +40,23 @@ export function FindingsList({
               .filter((item) => item.severity === severity)
               .map((item) => (
                 <li
-                  key={`${item.code}-${item.title}`}
+                  // Code and title alone collide: the same change made in two
+                  // files is two legitimate findings that share both. The
+                  // subject and its file are what tell them apart (ADR-0054),
+                  // with the cited evidence id as the last resort for a finding
+                  // the analysis could not locate.
+                  key={`${item.code}-${item.subject ?? ""}-${
+                    item.file_path ?? item.evidence_ids[0]
+                  }`}
                   className="rounded-[var(--radius-md)] border border-border p-[var(--space-3)]"
                 >
                   <p className="text-sm font-medium">{item.title}</p>
+                  {item.subject ? (
+                    <p className="mt-[var(--space-1)] text-xs text-text-muted">
+                      <code>{item.subject}</code>
+                      {item.file_path ? <> in <code>{item.file_path}</code></> : null}
+                    </p>
+                  ) : null}
                   <p className="mt-[var(--space-1)] text-sm text-text-muted">
                     {item.description}
                   </p>

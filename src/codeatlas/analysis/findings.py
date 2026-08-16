@@ -92,6 +92,16 @@ class FindingDraft:
     derivation: Derivation
     confidence: float
     subject: str
+    # The file the subject lives in, for symbol drafts. A qualified name is not
+    # unique across a repository -- two modules may each define `total` -- so a
+    # subject alone cannot identify which changed symbol this draft is about,
+    # and the citation step resolved both to whichever one it saw last
+    # (ADR-0054). `None` for file-level and architecture drafts, whose subject is
+    # already a path or a rule source.
+    #
+    # This is ADR-0042's rule reaching a surface it did not: pair within the
+    # file first.
+    subject_file: str | None = None
     side: AnalysisSide = AnalysisSide.TARGET
     remediation: str | None = None
     limitations: tuple[str, ...] = ()
@@ -632,6 +642,7 @@ def _draft(
         derivation=derivation,
         confidence=confidence,
         subject=change.qualified_name,
+        subject_file=change.file_path,
         side=side,
         remediation=remediation,
         limitations=limitations,
