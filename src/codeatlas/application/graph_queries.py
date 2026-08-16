@@ -303,10 +303,13 @@ class GraphQueryService:
             for symbol in self._symbols.list_for_snapshot(snapshot.snapshot_id)
         }
         started = time.perf_counter()
-        built = self._evidence.build(
-            repository_root=repository_root,
-            snapshot=snapshot,
-            candidates=[
+        # One candidate per edge, plus a second for a route's destination.
+        # `owners` keeps the edge each candidate belongs to, because the two
+        # lists stop being 1:1 once a `ROUTES_TO` edge contributes both.
+        candidates: list[EvidenceCandidate] = []
+        owners: list[RelationRecord] = []
+        for edge in result.edges:
+            candidates.append(
                 EvidenceCandidate(
                     file_id=edge.file_id,
                     start_line=edge.start_line,
@@ -315,8 +318,34 @@ class GraphQueryService:
                     derivation=edge.derivation,
                     confidence=edge.confidence,
                 )
-                for edge in result.edges
-            ],
+            )
+            owners.append(edge)
+
+            destination = _route_destination(edge, symbols_by_id)
+            if destination is not None:
+                # ADR-0055. A route is the one relation whose reference site
+                # alone cannot show what the flow reaches: the literal sits in
+                # the caller's file and names a handler in another language's.
+                # ADR-0034 added `ROUTES_TO` to `trace` precisely to cross that
+                # boundary, so citing only the near side answers half the
+                # question. This is the ADR-0019 `EXPORTS` carve-out applied to
+                # the other relation that *names* its target.
+                candidates.append(
+                    EvidenceCandidate(
+                        file_id=destination.file_id,
+                        start_line=destination.start_line,
+                        end_line=destination.end_line,
+                        symbol=destination.qualified_name,
+                        derivation=edge.derivation,
+                        confidence=edge.confidence,
+                    )
+                )
+                owners.append(edge)
+
+        built = self._evidence.build(
+            repository_root=repository_root,
+            snapshot=snapshot,
+            candidates=candidates,
         )
         timing["evidence"] = (time.perf_counter() - started) * 1000
 
@@ -328,7 +357,7 @@ class GraphQueryService:
                 f"The {noun} answer is incomplete: the {reason} bound was reached."
             )
 
-        pairs = [(result.edges[index], item) for index, item in built.items]
+        pairs = [(owners[index], item) for index, item in built.items]
         if not pairs:
             return self._empty(
                 request,
@@ -397,7 +426,19 @@ class GraphQueryService:
     ) -> list[Claim]:
         inbound = direction == "incoming"
         claims: list[Claim] = []
-        for index, (edge, evidence) in enumerate(pairs):
+        # One claim per *edge*, not per citation. A route contributes two
+        # citations — the literal and the handler it names — and they support
+        # the same single assertion, so emitting a claim each would state that
+        # assertion twice (ADR-0055).
+        merged: list[tuple[RelationRecord, list[Evidence]]] = []
+        for edge, evidence in pairs:
+            if merged and merged[-1][0] is edge:
+                merged[-1][1].append(evidence)
+            else:
+                merged.append((edge, [evidence]))
+
+        for index, (edge, evidence_items) in enumerate(merged):
+            evidence = evidence_items[0]
             if edge.kind is RelationKind.DOCUMENTS:
                 # Advisory discovery only. It travels as evidence, never as the
                 # sole support for a claim.
@@ -443,7 +484,7 @@ class GraphQueryService:
                     ),
                     derivation=edge.derivation,
                     confidence=edge.confidence,
-                    evidence_ids=[evidence.evidence_id],
+                    evidence_ids=[item.evidence_id for item in evidence_items],
                 )
             )
         return claims
@@ -559,6 +600,21 @@ _MEDIATION: dict[str, str] = {
 }
 
 
+def _route_destination(
+    edge: RelationRecord,
+    symbols_by_id: dict[str, SymbolRecord],
+) -> SymbolRecord | None:
+    """The handler a route reaches, when the edge is a resolved route.
+
+    `None` for every other relation kind, and for an unresolved route — a route
+    to a handler nothing resolved has no definition to cite, and inventing one
+    is the failure this product exists to refuse (ADR-0055).
+    """
+    if edge.kind is not RelationKind.ROUTES_TO or edge.target_symbol_id is None:
+        return None
+    return symbols_by_id.get(edge.target_symbol_id)
+
+
 def claim_text(
     *,
     edge: RelationRecord,
@@ -622,4 +678,9 @@ def _verb(kind: RelationKind) -> str:
         RelationKind.TESTS: "tests",
         RelationKind.DOCUMENTS: "documents",
         RelationKind.CONTAINS: "contains",
+        # Without this a route read "loadOrder relates to get_order" — the
+        # fallback, on the one relation whose whole point is that it crosses an
+        # HTTP boundary. It was never reached before ADR-0055, because the
+        # route's claim was being dropped entirely.
+        RelationKind.ROUTES_TO: "routes to",
     }.get(kind, "relates to")

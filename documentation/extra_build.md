@@ -1,6 +1,6 @@
 # Extra Build — the remaining work, in the order to do it
 
-Status: current as of 2026-08-17, after WS-3, WS-4 and **Tasks 1 and 2** closed.
+Status: current as of 2026-08-17, after WS-3, WS-4 and **Tasks 1, 2, 3 and 5** closed.
 
 **Authority note.** This file is a **work plan**, not a status list. The single
 authoritative record of what is open is the **Deferred Register in
@@ -70,19 +70,19 @@ from the process.
 > reproduce solo (2240 passed, exit 0). The packaged e2e tests bind a loopback
 > port and share one `dist/`. Unconfirmed mechanism — see the register.
 
-### Phase 4 baseline, refreshed 2026-08-17 after ADR-0053
+### Phase 4 baseline, refreshed 2026-08-17 after ADR-0055
 
 | Metric | Value | Target | State |
 | --- | ---: | ---: | --- |
 | `exact_symbol_resolution` | **1.0000** | 0.98 | met — 50/50; **margin restored, and it is exactly one miss wide** |
-| `containing_evidence_recall_at_10` | 0.9943 | 0.90 | met |
-| `primary_evidence_recall_at_10` | 0.9310 | 0.90 | met |
-| `containing_evidence_rate` | 0.7576 | — | **ungated** (ADR-0048); reported |
+| `containing_evidence_recall_at_10` | **1.0000** | 0.90 | met — every case scores |
+| `primary_evidence_recall_at_10` | 0.9368 | 0.90 | met |
+| `containing_evidence_rate` | 0.7537 | — | **ungated** (ADR-0048); reported |
 | `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural — **still the only unmet target** |
 | `abstention_correctness` | 1.0000 | — | ungated |
 | `mean_reciprocal_rank` | 1.0000 | — | ungated |
-| `symbol_recall_at_10` | 0.8833 | 0.90 | ungated on this profile (ADR-0023) |
-| `ndcg_at_10` | 0.9109 | — | ungated |
+| `symbol_recall_at_10` | 0.8917 | 0.90 | ungated on this profile (ADR-0023) |
+| `ndcg_at_10` | 0.9173 | — | ungated |
 | `relation_path_recall` | **0.8750** | — | deliberately ungated until Task 4; was reported 0.9130 before ADR-0053 |
 
 > **`exact_symbol_resolution` has one miss of headroom, and that is all.** ADR-0033
@@ -286,22 +286,38 @@ what a lexical answer emits before deciding what the corpus should declare.
 **Done when** q024, q027 and q029 emit their stored edges, and ADR-0034's cause
 list is fully discharged.
 
-## Task 5 — q032: a two-hop trace carries no evidence for its far end
+## Task 5 — q032 ✅ DONE 2026-08-17 (ADR-0055)
 
-**Cost:** hours once ruled. **Blocked by:** a product decision.
+**Ruled:** a resolved `ROUTES_TO` edge additionally cites the **handler's
+definition** — an explicit exception to ADR-0047, on ADR-0019's `EXPORTS`
+precedent. A route *names* its target, and unlike an export its literal and its
+target sit in different files and usually different languages, so the near side
+alone cannot show what the flow reaches. q032 **0.50 → 1.00**, and
+`containing_evidence_recall_at_10` reaches **1.0000** — every case now scores.
 
-**Why.** q032 traces frontend → backend. After ADR-0047 the frontend hop matches;
-`backend.py:1-2` — the endpoint the flow actually reaches — is **never cited**,
-so the case caps at **0.50**.
+**Reproducing it found a defect the row did not mention.** Evidence is
+deduplicated by region, correctly, but claims were built from the *surviving
+pairs* — so the second edge on a shared line lost its claim. `ROUTES_TO` and the
+`fetch` call carrying it both sit on `frontend.ts:2`, so **the engine dropped
+its only resolved, cross-language edge and kept two unresolved browser globals,
+by iteration order.** Fixed as a consequence: a route that cites its own
+destination no longer shares a region.
 
-Either a trace answer should carry evidence at its far end, or a two-hop
-expectation should not declare one. **A product question, not a defect**, and
-adjacent to Task 4: both are about what a traversal-derived answer carries.
+> `_verb` had no `ROUTES_TO` entry either, so the claim would have read
+> *"loadOrder relates to get_order"* — the generic fallback on the one relation
+> whose point is the boundary it crosses. Nobody had seen it because the claim
+> was never rendered.
 
-**Where to work:** `src/codeatlas/application/graph_queries.py` (the `trace`
-path), `tests/evaluation/cases/queries.json` (q032).
+**This settles the last of ADR-0034's four causes for `trace`.** The lexical
+half — q024, q027, q029 — is Task 4 and still needs its own ruling.
 
----
+> **Two of four mutations could not be exercised by the fixture**, and both
+> looked like passing guards. Over-applying the carve-out was a no-op because
+> every non-route edge in `mixed_app` is unresolved; it now has a `python_app`
+> test where a `CALLS` *is* resolved. Deleting the claim merge is still not
+> caught, and that is recorded in the register rather than counted as coverage.
+> **A mutation that cannot apply is indistinguishable from a test that cannot
+> catch it.**
 
 ## Task 6 — Ranking sensitivity: the premise was wrong (partly done)
 

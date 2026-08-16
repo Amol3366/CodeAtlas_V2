@@ -1951,6 +1951,43 @@ minutes to redo.
       pinned by its own test instead of being smoothed away by loosening the
       round-trip assertion.
 
+- [x] Task 5: a route cites the handler it reaches (ADR-0055), 2026-08-17.
+      Ruled by the user, and it settles **the last of ADR-0034's four causes for
+      `trace`**. q032 **0.50 → 1.00**; `containing_evidence_recall_at_10`
+      reaches **1.0000** — every case in the corpus now scores.
+
+      A resolved `ROUTES_TO` edge additionally cites the **handler's
+      definition** — an **explicit exception** to ADR-0047, on ADR-0019's
+      `EXPORTS` precedent. A route *names* its target, and unlike an export its
+      literal and its target sit in different files and usually different
+      languages, so the near side alone cannot show what the flow reaches.
+      Unresolved routes cite nothing extra.
+
+      **Reproducing it found a defect nobody had recorded.** Evidence is
+      deduplicated by region — correctly, one region is one citation — but
+      `_claims` was built from the *surviving pairs*, so the second edge on a
+      shared line lost its claim. `ROUTES_TO` and the `fetch` call carrying it
+      share `frontend.ts:2`, so **the engine dropped its only resolved,
+      cross-language edge and kept two unresolved browser globals, by iteration
+      order.** `relation_paths` had it, the prose did not — ADR-0020 inverted.
+      Fixed as a consequence of the ruling rather than as a separate patch.
+
+      `_verb` had no `ROUTES_TO` entry either, so the claim would have read
+      *"relates to"* — unseen because the claim never rendered. **A defect can
+      hide behind another defect.**
+
+      **Two of four mutations could not be exercised by the fixture, and both
+      looked like passing guards.** Over-applying the carve-out was a no-op
+      because every non-route edge in `mixed_app` is unresolved — replaced with
+      a `python_app` test where a `CALLS` is resolved. Deleting the claim merge
+      is still not caught, because a route literal and its call are the same
+      expression and share a line, so the merge never fires here; recorded in
+      the register as a stated limit rather than counted as coverage.
+
+      > **A mutation that cannot apply is indistinguishable from a test that
+      > cannot catch it.** Check that the mutation actually changed behaviour
+      > before reading a green suite as coverage.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
