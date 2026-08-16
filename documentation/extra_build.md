@@ -50,30 +50,23 @@ exit codes, test isolation). **WS-2, WS-5 and WS-6 remain.**
 Corpus: **63 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
 
-ruff and mypy (352 files) are clean. pytest is **2239 passed / 1 failed / 3
-skipped**, and **that one failure aborts both `check_phase4` and `check_phase7`
-at their first step**, so their later stages were run directly instead — dataset
-validation, the phase-0/3/4 baseline `--check`s, the contract schema, and the
-ADR-0016 invariants all exit 0.
+**All gates pass, and both gate scripts now run to completion:**
+`uv run pytest -q` **2240 passed / 3 skipped**, ruff, mypy on 352 files,
+`check_phase4.ps1 -SkipSync` **exit 0**, `check_phase7.ps1 -SkipSync -Semantic`
+**exit 0** — the latter including the semantic suites, the uplift baseline, the
+rerank artifact and Playwright (15 passed, 7 Chromium skips). Exit codes read
+from the process.
 
-> **Two pre-existing failures, neither caused by Task 1. Do not read either as a
-> regression, and do not let them mask a real one.**
->
-> 1. `test_the_packaged_web_assets_match_the_source_build` — `apps/web/dist` and
->    the packaged bundle are both **gitignored build output**. Source built
->    2026-08-16 02:02, package 2026-08-11 19:14, so the packaged executable
->    would serve a five-day-old UI — the 2026-08-05 Settings incident's exact
->    shape. The guard is correct. Fix: `scripts/build_package.ps1`. A fresh
->    clone skips it.
-> 2. **`baseline-phase-7 --check` exits 5**, stale since **2026-08-14**. The
->    whole diff is one *added* key, `finding_count_correctness`; no value
->    differs. Unseen because the semantic block is `-Semantic`-gated and opt-in.
->    Left unregenerated on ADR-0022's rule — a gated artifact that stops
->    reproducing is reviewed, not absorbed.
->
-> **When quoting "all gates pass", say which flags.** `-SkipSync` without
-> `-Semantic` never reaches the Phase 7 semantic baseline, which is how a stale
-> artifact survived two days of green runs.
+> **Quote the flags whenever you claim a gate passed.** `-SkipSync` without
+> `-Semantic` never reaches the Phase 7 semantic baseline or the rerank
+> artifact — which is exactly how **two** stale artifacts survived two days of
+> green runs on 2026-08-16. A gated artifact behind an opt-in flag is not gated.
+
+> **Do not run two gate scripts at once.** The 2026-08-15 `.test-tmp` fix made
+> temp *directories* safe and the one-at-a-time rule was retired **generally**;
+> that looks too broad. Two concurrent full suites gave 3 failures that did not
+> reproduce solo (2240 passed, exit 0). The packaged e2e tests bind a loopback
+> port and share one `dist/`. Unconfirmed mechanism — see the register.
 
 ### Phase 4 baseline, refreshed 2026-08-16 after ADR-0050
 
@@ -349,8 +342,8 @@ Not scheduled. Each has a named condition in the register that reopens it.
 | --- | --- |
 | **Preflight takes >15 min on a 664-file repository.** The engine parses *both* full states per analysis — O(repository), not O(change) — and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented | Someone measures it properly, or a user reports it |
 | **A `check_phase7` run once exited 1 while printing every step as passing.** Exit 1 is the uncaught-throw signature; the trailing `exit 0` added 2026-08-15 can neither cause nor prevent it. Has **not** recurred in the three gate runs since | It recurs — chase it before trusting a green |
-| **`baseline-phase-7.json` has not reproduced since 2026-08-14** — one *added* metric key, `finding_count_correctness`, no value change. Hidden by the `-Semantic` opt-in | Someone regenerates it as its own reviewed commit, or makes the semantic step non-optional |
-| **The packaged web bundle is five days behind `apps/web/dist`**, which aborts both gate scripts at step one. Gitignored build output; a fresh clone skips the test | `scripts/build_package.ps1` is run |
+| **Concurrent gate runs fail; the same tree passes solo.** 3 failed / 2237 passed run together, 2240 passed alone. Which three was not captured, so the mechanism (loopback port + shared `dist/` in the packaged e2e tests) is a hypothesis | Someone reproduces it with full output captured |
+| **The `-Semantic` step is opt-in, so two artifacts went stale unnoticed for two days** | Someone makes the semantic block non-optional, or accepts that `-SkipSync` alone is not a full gate |
 | **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under it | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
 | **`relation_path_recall` has no gate target** | Task 4 settles ADR-0034's last cause |
 
