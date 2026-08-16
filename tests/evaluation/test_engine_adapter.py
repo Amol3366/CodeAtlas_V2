@@ -222,4 +222,47 @@ def test_the_adapter_and_the_corpus_agree_on_which_intents_are_which() -> None:
     assert set(GRAPH_INTENTS) <= SYMBOL_INTENTS
     assert SUPPORTED_INTENT in SYMBOL_INTENTS
     assert not (SYMBOL_INTENTS & LEXICAL_INTENTS)
-    assert set(SUPPORTED_INTENTS) == SYMBOL_INTENTS | LEXICAL_INTENTS
+
+    # Every scored intent must be measurable. The converse does *not* hold:
+    # `CONCEPTUAL` is measured but scored by neither top-1 metric (ADR-0023,
+    # ADR-0053), so equality here would force it into one of those gates and
+    # change what they mean.
+    assert set(SUPPORTED_INTENTS) >= SYMBOL_INTENTS | LEXICAL_INTENTS
+    assert set(SUPPORTED_INTENTS) - (SYMBOL_INTENTS | LEXICAL_INTENTS) == {
+        "CONCEPTUAL"
+    }
+
+
+def test_every_intent_on_a_measurable_fixture_is_itself_measurable() -> None:
+    """A case on a supported fixture must not be silently skipped by its intent.
+
+    ADR-0017 fixed this for `SUPPORTED_FIXTURES` and explicitly noted that the
+    constant beside it "*was* maintained". It was not. `CONCEPTUAL` never
+    entered `SUPPORTED_INTENTS`, so q024 was never measured at all — and unlike
+    a gated *fixture*, which scores `False` and lands in the denominator as a
+    miss, a gated *intent* scores `measured=False` and is dropped from the
+    denominator entirely. That direction is worse: it does not report capability
+    as failure, it removes a failing case from the average and flatters every
+    metric it touches.
+
+    Derived from the corpus, never from the constant — the neighbouring
+    assertion compares `SUPPORTED_INTENTS` against `SYMBOL_INTENTS |
+    LEXICAL_INTENTS`, so it agrees with itself no matter what the corpus does.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+
+    # Scoped to fixtures that are measured at all. A case on
+    # `malicious_unsupported` is excluded by fixture regardless of its intent,
+    # so requiring `POLICY` here would demand support for something deliberately
+    # out of scope.
+    needed = {
+        case.intent
+        for case in dataset.query_cases
+        if case.repository_fixture in SUPPORTED_FIXTURES
+    }
+
+    gated = sorted(needed - set(SUPPORTED_INTENTS))
+    assert not gated, (
+        "these intents appear on measurable fixtures but are gated out, so"
+        f" their cases are dropped from every metric: {gated}"
+    )
