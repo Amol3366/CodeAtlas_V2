@@ -89,7 +89,26 @@ GRAPH_ANSWER_END: dict[str, str] = {
 # set itself lives in `dataset.py` with the rest of the corpus vocabulary, so
 # the adapter and the metric that scores it cannot disagree about which intents
 # are lexical (ADR-0023).
-SUPPORTED_INTENTS = (SUPPORTED_INTENT, *LEXICAL_INTENTS, *GRAPH_INTENTS)
+# `CONCEPTUAL` is answered through the same lexical channel as the two
+# `LEXICAL_INTENTS`, but is deliberately *not* one of them: ADR-0023 scopes
+# `lexical_resolution` to configuration and document lookups, where "did the
+# right thing rank first" is the question posed. A conceptual question is not
+# top-1 shaped, so it is measured on recall and evidence and scored by neither
+# top-1 metric.
+#
+# It was missing here until 2026-08-17 (ADR-0053), which meant q024 was never
+# measured at all. A gated *fixture* scores `False` and stays in the
+# denominator; a gated *intent* scores `measured=False` and leaves it — so this
+# omission removed a failing case from the average rather than reporting
+# capability as failure. The guard
+# `test_every_intent_on_a_measurable_fixture_is_itself_measurable` derives the
+# requirement from the corpus, so the constant cannot drift again.
+SUPPORTED_INTENTS = (
+    SUPPORTED_INTENT,
+    *LEXICAL_INTENTS,
+    *GRAPH_INTENTS,
+    "CONCEPTUAL",
+)
 # Every corpus fixture except the deliberately hostile one. This list is a
 # measurement gate, not a capability flag: a fixture missing here has its cases
 # scored `False`, not skipped, so leaving it stale reports working capability as

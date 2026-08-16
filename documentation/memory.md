@@ -1869,6 +1869,47 @@ minutes to redo.
       Every baseline reproduced byte-for-byte, confirming "prose only" and its
       flip side: the corpus cannot see this fix.
 
+- [x] A gated intent was flattering six metrics (ADR-0053), 2026-08-17. Found
+      while verifying Task 4's premise, and it **corrects the previous entry**.
+
+      `CONCEPTUAL` was missing from `SUPPORTED_INTENTS`, so those cases were
+      emitted as `_abstention(measured=False)` and **never reached the engine**.
+      **q024 had never been measured**; ADR-0051 put q006 in the same state
+      hours earlier.
+
+      **ADR-0017 on the neighbouring constant — the one ADR-0017 said "*was*
+      maintained" — failing the opposite way.** A gated *fixture* scores `False`
+      and stays in the denominator as a miss; a gated *intent* scores
+      `measured=False` and **leaves** it. **Under-reporting is loud and gets
+      found; removing a failing case is silent, because every number it touches
+      moves the right way.** That asymmetry is the thing to remember.
+
+      **The correction to ADR-0051.** Its conclusion survives — measured through
+      lexical, q006 gives 0.9943 against the 0.9941 reported, so it does pass
+      containment as argued. **But the number was obtained with q006 not
+      measured at all.** A conclusion that happens to be true, verified by a
+      measurement that could not have shown it, is indistinguishable from a
+      wrong one until someone checks. **Check `measured` before quoting a metric
+      that moved after a corpus edit.**
+
+      Six metrics fell to the truth (`relation_path_recall` 0.9130 → **0.8750**);
+      `exact_symbol_resolution` stayed 1.0000 and no gate broke. Guard derives
+      from the **corpus**, not the constant, and is mutation-checked against a
+      *future* intent as well as the stale one.
+
+      **Task 4 is three cases, not two**, and still blocked on the ruling
+      ADR-0034 asked for. A probe found why it cannot be implemented blind:
+      `Order flow` carries eight `DOCUMENTS` edges where the corpus declares
+      one, so emitting all stored paths trades recall 1.0 for precision 0.5 —
+      ADR-0038's shape.
+
+      **Two self-inflicted failures worth keeping.** `pathlib.write_text`
+      rewrote two *source* files to CRLF on Windows — the ADR-0022 hazard on
+      files the corpus LF guard does not cover. And **a mutation whose anchor
+      failed to apply reported "NOT DETECTED"** for a guard that was never
+      mutated: a mutation that does not apply looks exactly like a test that
+      does not catch it. Assert the anchor matched, and prefer byte-level edits.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

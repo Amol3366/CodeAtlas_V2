@@ -70,20 +70,20 @@ from the process.
 > reproduce solo (2240 passed, exit 0). The packaged e2e tests bind a loopback
 > port and share one `dist/`. Unconfirmed mechanism — see the register.
 
-### Phase 4 baseline, refreshed 2026-08-17 after ADR-0051
+### Phase 4 baseline, refreshed 2026-08-17 after ADR-0053
 
 | Metric | Value | Target | State |
 | --- | ---: | ---: | --- |
 | `exact_symbol_resolution` | **1.0000** | 0.98 | met — 50/50; **margin restored, and it is exactly one miss wide** |
-| `containing_evidence_recall_at_10` | 0.9941 | 0.90 | met |
-| `primary_evidence_recall_at_10` | 0.9471 | 0.90 | met |
-| `containing_evidence_rate` | 0.7600 | — | **ungated** (ADR-0048); reported |
+| `containing_evidence_recall_at_10` | 0.9943 | 0.90 | met |
+| `primary_evidence_recall_at_10` | 0.9310 | 0.90 | met |
+| `containing_evidence_rate` | 0.7576 | — | **ungated** (ADR-0048); reported |
 | `changed_symbol_precision` | 0.9464 | 0.95 | unmet, closed as structural — **still the only unmet target** |
 | `abstention_correctness` | 1.0000 | — | ungated |
 | `mean_reciprocal_rank` | 1.0000 | — | ungated |
-| `symbol_recall_at_10` | 0.8879 | 0.90 | ungated on this profile (ADR-0023) |
-| `ndcg_at_10` | 0.9145 | — | ungated |
-| `relation_path_recall` | 0.9130 | — | deliberately ungated until Task 4 |
+| `symbol_recall_at_10` | 0.8833 | 0.90 | ungated on this profile (ADR-0023) |
+| `ndcg_at_10` | 0.9109 | — | ungated |
+| `relation_path_recall` | **0.8750** | — | deliberately ungated until Task 4; was reported 0.9130 before ADR-0053 |
 
 > **`exact_symbol_resolution` has one miss of headroom, and that is all.** ADR-0033
 > predicted 0.98 would become expressible at 50 cases, because 50 is the first
@@ -243,38 +243,49 @@ each.
 
 ## Task 4 — Lexical intents populate relation paths (WS-6)
 
-**Cost:** ½–1 day. **Blocked by:** nothing.
+**Cost:** ½–1 day of work, but **blocked on a design decision**. **Investigated
+2026-08-17**; the premise checked out — the first time this session that it did.
 
-**Why.** The last of ADR-0034's four causes. q027 and q029 emit no relation
-paths although their edges are stored, because lexical intents do not populate
-them. This is what keeps `relation_path_recall` (0.9130) deliberately ungated —
-ADR-0023's rule is that a threshold over an unsettled cause cannot be reasoned
-about.
+**Why.** The last of ADR-0034's four causes. The declared edges **are stored and
+resolved** (`Order flow DOCUMENTS get_order`, `healthPath REFERENCES health`,
+`Sample Service DOCUMENTS service.port`), and the lexical answers return
+`relation_paths: []`. Verified by probe, not assumed.
+
+**It is three cases, not two.** q024 joins q027 and q029: it was **never
+measured** until ADR-0053 added `CONCEPTUAL` to `SUPPORTED_INTENTS`, so it could
+not appear in this list. `relation_path_recall` is **0.8750**, not the 0.9130
+this file used to quote.
+
+**ADR-0034 named it a design decision, not a defect:** "Whether a lexical answer
+should carry stored relations is a design decision, not a defect to fix
+quietly." That ruling has not been given, and it is what blocks the work.
+
+**The complication a probe found, and the reason this cannot be a blind
+implementation.** `Order flow` carries **eight** `DOCUMENTS` edges — two
+resolved (`loadOrder`, `get_order`), six unresolved. The corpus declares one. So
+emitting every stored path gives q027 recall 1.0 and precision 0.5, which is
+ADR-0038's shape exactly: *precision penalising a second, true edge*. Decide
+what a lexical answer emits before deciding what the corpus should declare.
 
 **Where to work**
 
 - `src/codeatlas/application/graph_queries.py`
 - `src/codeatlas/conversations/pipeline.py` — where the answer is assembled
-- `tests/evaluation/cases/queries.json` — q027, q029
-
-**Approach.** ADR-0020 already requires every graph answer to populate
-`relation_paths`; extend that to lexical intents where edges exist. Then, and
-only then, propose a gate target for `relation_path_recall` with all four
-ADR-0034 causes settled.
+- `tests/evaluation/cases/queries.json` — q024, q027, q029
 
 **Traps**
 
 - A lexical hit is evidence of *wording*, not behaviour. Emitting relation paths
-  must not upgrade a lexical match's derivation.
+  must not upgrade a lexical match's derivation. The contract keeps
+  `answer.claims` and `relation_paths` in separate fields with their own
+  derivations, so this is achievable — but only if the claims are left alone.
 - Adding the gate target is a **separate** decision from populating the paths.
   Do not bundle them.
-- Watch `containing_evidence_rate`: more emitted evidence lowers it. It is
-  ungated now (ADR-0048), so this is worth noting in a handoff, not avoiding.
+- Watch `containing_evidence_rate`: more emitted evidence lowers it. Ungated
+  (ADR-0048), so note it in a handoff rather than avoiding it.
 
-**Done when** q027 and q029 emit their stored edges, and ADR-0034's cause list is
-fully discharged.
-
----
+**Done when** q024, q027 and q029 emit their stored edges, and ADR-0034's cause
+list is fully discharged.
 
 ## Task 5 — q032: a two-hop trace carries no evidence for its far end
 
