@@ -137,3 +137,62 @@ def test_an_outbound_claim_leads_with_the_root() -> None:
     )
 
     assert text == "total calls helper at a.py:3."
+
+
+# --- ADR-0052: a claim beyond the first hop ---------------------------------
+#
+# `max_depth` is 2 by default, so a graph answer routinely contains edges that
+# touch neither end of the root. `_claims` used to render those with the root's
+# name anyway, producing "A calls ROOT" for an A that calls something else
+# entirely — and citing A's call to the intermediate as proof. The structured
+# `relation_paths` always carried the real path; only the prose overstated it.
+
+
+def test_an_indirect_inbound_claim_does_not_assert_a_direct_call() -> None:
+    text = claim_text(
+        edge=_edge(kind=RelationKind.CALLS),
+        other="test_capture",
+        root_name="IdempotencyStore.claim",
+        file_path="tests/test_service.py",
+        start_line=5,
+        inbound=True,
+        intermediate="PaymentService.capture",
+    )
+
+    # The thing it must never say: the test does not call `claim`.
+    assert "test_capture calls IdempotencyStore.claim" not in text
+    assert "indirectly" in text
+    assert "PaymentService.capture" in text
+    assert text.endswith(" at tests/test_service.py:5.")
+
+
+def test_an_indirect_outbound_claim_names_the_symbol_it_went_through() -> None:
+    text = claim_text(
+        edge=_edge(kind=RelationKind.REFERENCES),
+        other="Order",
+        root_name="src.client",
+        file_path="src/orders.ts",
+        start_line=5,
+        inbound=False,
+        intermediate="total",
+    )
+
+    assert "src.client references Order" not in text
+    assert "indirectly" in text
+    assert "total" in text
+
+
+def test_a_direct_claim_is_unchanged_when_no_intermediate_is_given() -> None:
+    # The regression this pairs with: hedging every claim would satisfy both
+    # tests above while destroying the direct wording.
+    text = claim_text(
+        edge=_edge(kind=RelationKind.CALLS),
+        other="render",
+        root_name="total",
+        file_path="a.py",
+        start_line=3,
+        inbound=True,
+        intermediate=None,
+    )
+
+    assert text == "render calls total at a.py:3."

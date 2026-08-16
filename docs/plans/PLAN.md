@@ -83,6 +83,8 @@ with verification.
 | Packaged semantic tree 1.05 GB                                                             | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | A deterministic-only second artifact is wanted                                                                                                                              |
 | **The change corpus cannot express an ADR-0044-shaped defect**                       | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Someone gives the corpus a Git-backed change case, which is a new fixture shape rather than a new case                                                                      |
 | ~~Grow the symbol corpus toward 50 cases~~ | **CLOSED 2026-08-15.** Scored symbol-intent cases 27 -> **50**, so `exact_symbol_resolution`'s 0.98 finally tolerates one miss (0.9800) rather than silently requiring 27/27 - the condition ADR-0033 left open. **Both assumptions in the estimate were wrong.** It needed **23** cases, not "13+": 27 + 13 = 40, where one miss still scores 0.9750 and the target is as inexpressible as before. And it needed a **new fixture**, because the five existing ones hold only ~20 distinct symbol-shaped targets between them, already queried by the existing 27 - more cases against those would have padded a denominator to loosen a release target, the mirror image of ADR-0032/0033. `symbol_breadth` adds 25 symbols and 69 relations; the other five fixtures stay byte-identical. **`exact_symbol_resolution` held at 1.0000 across all 50** | - |
+| **A claim beyond the first hop asserted a direct relationship** | **CLOSED 2026-08-17 — ADR-0052. An ENGINE defect**, found while investigating Task 6 and not while looking for it. `max_depth` is 2, so a graph answer routinely holds edges touching **neither end of the root**, and `_claims` rendered them against the root's name: *"test_capture_uses_idempotency_store calls IdempotencyStore.claim at tests/test_service.py:5"* — where line 5 is `assert service.capture(...)`. The test calls `capture`, not `claim`. A §4.1 violation: the citation shows a different call from the one asserted. `relation_paths` was **correct throughout**, carrying the real two-step path, so this is prose only. Now reads *"reaches Y indirectly, through Z"*, mirroring ADR-0016. **Not the first engine defect** — ADR-0019 was one, and its shape is nearly identical (*evidence named one symbol and showed another*); here the *claim* does. Every baseline reproduces byte-for-byte, which also means the corpus cannot see it | — |
+| **Ranking sensitivity needs distractors, not larger answer sets** | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design | The convention for declaring transitive results is ruled |
 | **The new symbol cases are not ranking-sensitive** | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage | Someone adds cases whose answer sets are large enough for order to matter |
 | `relation_path_recall` has no gate target                                                | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
 | RRF coarse-chunk bias | **DEFERRED — reframed 2026-08-15 by ADR-0046.** Its stated trigger ("the module-granularity ruling lands") is now satisfied, and the ruling was **not** to implement the penalty. So this is no longer "fix the bias" but **"measure whether it costs anything"** at the larger corpus. ADR-0030's finding stands: the obvious lever demotes the chunk currently providing a rank-1 containment hit | Someone measures it corpus-wide |
@@ -264,6 +266,94 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-17T04:00:00Z — Task 6 found an engine defect (ADR-0052); its own premise was wrong
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: no phase task. Post-gate. `extra_build.md` Task 6, **partly done**
+  — the ruling it needs is now stated and open.
+- New record: **ADR-0052**. Ruled by the user 2026-08-17.
+- Files: `application/graph_queries.py` (**the first source change in three
+  tasks**), `tests/unit/test_claim_text.py`, `tests/integration/test_graph_queries.py`,
+  the ADR and its index, `PLAN.md`, `extra_build.md`, `memory.md`. **No corpus,
+  contract, schema or baseline change.**
+
+**An engine defect, found while investigating ranking sensitivity rather than by
+looking for it.** `max_depth` is 2 — "the product's normal answer size" — so a
+graph answer routinely holds edges touching **neither end of the root**.
+`_claims` rendered them against the root's name anyway, and its own comment
+states the premise that fails: *"the other party is whichever end of the edge is
+not the root."*
+
+```
+CLAIM : test_capture_uses_idempotency_store calls IdempotencyStore.claim
+        at tests/test_service.py:5
+CITES : tests/test_service.py:5 -> assert service.capture("order-1") == ...
+```
+
+The test calls `capture`, not `claim`. **A §4.1 violation**: the citation shows a
+different call from the one asserted. `relation_paths` carried the true two-step
+path throughout, so the fix is **prose only** — *"reaches Y indirectly, through
+Z"*, mirroring ADR-0016's mediation wording, which exists for the same problem
+one dimension over (that branch handles an edge whose *derivation* cannot support
+the claim; this one, an edge whose *distance* cannot).
+
+**It is not the first engine defect, and saying so matters.** ADR-0019 was one,
+and nearly the same shape — *the evidence named one symbol and showed another*;
+here the **claim** does. The "instrument, not engine" prior had just held a ninth
+time in ADR-0051, and a prior confirmed nine times is precisely the one that
+waves the tenth past.
+
+**Task 6's own premise was wrong, and it is corrected rather than worked
+around.** The row asked for "cases whose answer sets are large enough for order
+to matter". Size is not the mechanism — **q060 returns five symbols and is not
+ranking-sensitive**, because all five are expected. Sensitivity requires a
+**distractor**, and measurement shows distractor presence and reversal
+sensitivity are *the same 9 cases*, exactly (3 symbol-intent, 6 lexical, **0 of
+the 24 newer cases**). The only source of distractors is second-hop traversal.
+
+> **For a correctly-specified direct graph case, ranking sensitivity is
+> structurally unavailable.** ADR-0020 has the corpus declare every edge
+> endpoint, leaving nothing to mis-rank. So `exact_symbol_resolution` is a
+> **resolution** gate, not a ranking gate, and cannot be made into one by adding
+> well-specified symbol cases. Ranking genuinely lives in the lexical intents,
+> where ADR-0026 already rules on order.
+
+The three sensitive symbol cases are sensitive because they are
+**under-specified** — q005 expects the subject as an answer and omits a real
+transitive caller; q015 expects `render`, which `client.js` defines rather than
+imports. Fixing them takes symbol-intent ranking coverage to zero. Whether an
+expectation should declare transitive results is **unruled**, and that is what
+blocks the rest of Task 6. New register row.
+
+**Two mutation lessons, and the second one is new.**
+
+The first tests were **worthless**. Two mutations of the detection — never
+detect an intermediate, and hedge every claim — **both passed the entire unit,
+integration and contract suite**, because `test_claim_text.py` passes the new
+argument in by hand and so never exercises the code that computes it. Fix and
+test in different places with nothing covering the join: the `--format pr`
+shape, again.
+
+An engine-level test was added for both directions — and a **third** mutation,
+computing the intermediate from the wrong endpoint, then exposed a flaw in *that*
+test. It asserted `"total" in` the **concatenation** of all claims, which the
+unrelated first-hop claim ("src.client imports total") satisfied by itself.
+Tightened to assert against the single claim naming `Order`, all three mutations
+are caught.
+
+> **Assert against the one claim under test, never the joined text.** A
+> concatenation is satisfied by any claim in the answer, so it passes for reasons
+> unrelated to the behaviour being pinned.
+
+- Verification: `uv run pytest -q` **2245 passed, 3 skipped** (2240 + 5 new);
+  ruff and mypy (352 files) clean; `check_phase4.ps1 -SkipSync` **exit 0**;
+  `check_phase7.ps1 -SkipSync -Semantic` **exit 0**; phase-0/3/4 and invariant
+  artifacts all reproduce **byte-for-byte**. Gates run sequentially. That
+  byte-identity confirms "prose only" **and** its flip side — the corpus cannot
+  see this fix, the same blind spot ADR-0016's wording change had.
+- Next: **nothing assigned.** Tasks 3, 4, 5 and 7 remain untouched; Task 6's
+  remainder waits on the transitive-declaration ruling.
 
 ### 2026-08-17T01:00:00Z — Task 2 (q006) closed: ADR-0051, and it is not an engine defect
 

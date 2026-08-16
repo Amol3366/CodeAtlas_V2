@@ -1825,6 +1825,50 @@ minutes to redo.
       and q035 were not touched — q035 had been settled hours earlier and
       reopening it the same day on a different axis would discard that evidence.
 
+- [x] Task 6 investigated; an **engine defect** found on the way (ADR-0052),
+      2026-08-17. Not the outcome the task expected, and the more valuable half.
+
+      **A claim beyond the first hop asserted a direct relationship.** Traversal
+      runs to `max_depth` 2, so a graph answer routinely holds edges touching
+      **neither end of the root**, and `_claims` rendered them against the
+      root's name: *"test_capture_uses_idempotency_store calls
+      IdempotencyStore.claim at tests/test_service.py:5"*, where line 5 is
+      `assert service.capture(...)`. The test calls `capture`, not `claim` — a
+      §4.1 violation, the citation showing a different call from the one
+      asserted. `relation_paths` was **correct throughout**, so the fix is prose
+      only: *"reaches Y indirectly, through Z"*, mirroring ADR-0016.
+
+      **Not the first engine defect** — ADR-0019 was one, and nearly the same
+      shape (*evidence named one symbol and showed another*); here the *claim*
+      does. Worth saying because the "instrument, not engine" prior had just
+      held a ninth time, and a prior confirmed nine times is the one that waves
+      the tenth past.
+
+      **Task 6's own premise was wrong.** It asked for "answer sets large enough
+      for order to matter". Size is not the mechanism — q060 returns five
+      symbols and is not ranking-sensitive, because all five are expected.
+      Sensitivity needs a **distractor**, and distractor presence and reversal
+      sensitivity are *the same 9 cases*, exactly. The only source of
+      distractors is second-hop traversal, so **for a correctly-specified direct
+      graph case ranking sensitivity is structurally unavailable** — ADR-0020
+      has the corpus declare every endpoint, leaving nothing to mis-rank.
+      `exact_symbol_resolution` is therefore a **resolution** gate, not a
+      ranking gate.
+
+      **Two mutation lessons, and the second is new.** The first tests were
+      worthless: two mutations of the detection passed the *entire* unit,
+      integration and contract suite, because the unit tests pass the new
+      argument in by hand and never exercise the code that computes it — fix and
+      test in different places with nothing covering the join, the `--format pr`
+      shape. Then a third mutation exposed a flaw in the *new* test: it asserted
+      a word appeared in the **concatenation** of all claims, which an unrelated
+      first-hop claim satisfied by itself. **Assert against the one claim under
+      test, never the joined text** — a concatenation passes for reasons that
+      have nothing to do with the behaviour being pinned.
+
+      Every baseline reproduced byte-for-byte, confirming "prose only" and its
+      flip side: the corpus cannot see this fix.
+
 ## Decisions Made
 
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:

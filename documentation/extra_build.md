@@ -293,35 +293,57 @@ path), `tests/evaluation/cases/queries.json` (q032).
 
 ---
 
-## Task 6 — Ranking sensitivity of the symbol corpus
+## Task 6 — Ranking sensitivity: the premise was wrong (partly done)
 
-**Cost:** hours. **Blocked by:** nothing.
+**Cost:** blocked on a ruling. **Investigated 2026-08-17.** It produced an engine
+defect (ADR-0052) and a correction to its own model; the cases it asks for
+cannot be written until a convention is ruled.
 
-**Why.** Mutation-checking the 23 cases added 2026-08-15 gave two answers:
-dropping the top hit fails **18 of 23**, but reversing the ranking fails **0 of
-23** — most return a single symbol, so a reversal is a no-op for them. The nine
-cases that *do* catch a reversal are all older. Corpus growth raised the count
-without adding ranking coverage.
+**The stated approach is wrong.** This section used to say "add cases whose
+answer sets are large enough for order to matter". **Size is not the
+mechanism** — q060 returns *five* symbols and is not ranking-sensitive, because
+all five are expected. `exact_symbol_resolution` checks
+`ranked_symbols[0] in set(expected_symbols)`, so if every returned symbol is
+expected, any order passes.
 
-**Approach.** Add cases whose answer sets are large enough for order to matter,
-and mutation-check them with a *ranking* mutation specifically — reversing
-`_ranked_symbols` in `src/codeatlas/evaluation/engine_adapter.py`.
+**Sensitivity requires a distractor** — a returned symbol *outside*
+`expected_symbols`. Measured over the whole corpus, distractor presence and
+reversal sensitivity are **the same 9 cases**, exactly:
 
-**Trap:** adding scored symbol-intent cases changes the
-`exact_symbol_resolution` denominator. Task 1 restored the margin to 1.0000, but
-that is **exactly one miss wide** — compute the new denominator before adding
-anything.
+| | Count |
+| --- | ---: |
+| Reversal-sensitive, all older (q003–q029) | 9 |
+| …symbol-intent (q003, q005, q015) | 3 |
+| …lexical-intent (CONFIG/DOCUMENT) | 6 |
+| Reversal-sensitive among the 24 newer cases | **0** |
+| Cases returning a distractor | **9 — the same 9** |
 
-**Second trap, added 2026-08-16 from Task 1 and it generalises this whole task.**
-A same-named-symbol case cannot be caught by any *name-based* metric. When
-mutation-checking a new case, check it against the metric that would actually
-have to move, not against the aggregate — q035 scored identically whether the
-right or the wrong symbol was traced, and only an evidence metric separated them.
+**And the only source of distractors is second-hop traversal** (`max_depth` 2).
+So for a correctly-specified *direct* graph case, ranking sensitivity is
+**structurally unavailable**: ADR-0020 has the corpus declare every edge
+endpoint, which leaves nothing to mis-rank. Two consequences worth stating:
 
-**Done when** a ranking reversal fails cases added after 2026-08-15, not only
-ones from before it.
+> **`exact_symbol_resolution` is a resolution gate, not a ranking gate.** It
+> cannot be made ranking-sensitive by adding well-specified symbol cases.
+> Ranking genuinely lives in the **lexical** intents, where retrieval returns
+> more than the corpus declares and ADR-0026 already rules on order.
 
----
+**The three sensitive symbol cases are sensitive because they are
+under-specified**, not by design. q005 expects the *subject* as an answer and
+omits a real transitive caller; q015 expects `render`, which `client.js` defines
+rather than imports. Fixing them would take symbol-intent ranking coverage to
+**zero**.
+
+**What is blocked:** whether a `CALLERS` / `DEPENDENCIES` expectation should
+declare transitive results. Until that is ruled, new cases cannot be written to
+be sensitive without declaring less than the truth.
+
+**Where to work:** `tests/evaluation/cases/queries.json` (q003, q005, q015),
+`src/codeatlas/retrieval/graph.py` (`TraversalLimits.max_depth`).
+
+**Done when** the convention is ruled and a ranking reversal fails cases added
+after 2026-08-15 — or it is recorded that symbol-intent ranking coverage is
+structurally unavailable and the lexical side carries it.
 
 ## Task 7 — RRF coarse-chunk measurement (WS-5) — reframed, not blocked
 
