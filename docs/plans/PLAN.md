@@ -125,7 +125,8 @@ with verification.
 | ~~**`.test-tmp` residue and concurrency void gate runs**~~                                                    | **CLOSED 2026-08-15. The cause was not residue and the fix was not a lockfile.** `--basetemp=.test-tmp` named a *shared* directory, and pytest **deletes the directory it is given** the moment the first `tmp_path` is requested — the directory itself, not a numbered subdirectory of it. A second run therefore **destroyed a running session's live files** rather than merely colliding with it, which is why the symptoms looked like both `FileExistsError` and "leftover state". Each session now gets `.test-tmp/s-<pid>-<uuid>`, pruned by age at start; the root stays repository-local because `development-windows.md` records that a locked-down Windows account may be unable to write system temp. **A lockfile was rejected**: it serializes runs instead of making them safe, and would need stale-lock detection — the pid-ownership problem ADR-0037 had to solve. Proven by running `tests/integration` and `tests/unit` concurrently: both passed (706 and 815) into two distinct session directories. **The "never run two gates at once" rule is retired**                                                                                                                                                                                                                                           | —                                                                                                                                                                          |
 | ~~**Preflight takes >15 minutes on a 664-file repository**~~                                                   | **MEASURED 2026-08-18 — ADR-0060. The observation is confirmed: 635.59 s (10.6 min)** on CodeAtlas itself over a commit range, stable across three runs. **99.5% of it is parsing** — `parse_base` 316.2 s + `parse_target` 316.0 s — against `file_diff` 2.4 s and `symbol_diff` 246 ms. `docs/operations/change-analysis.md` was right all along: "the engine parses both full states on every analysis; the cost is O(repository), not O(change)". A genuine quadratic was found and fixed on the way (`symbol_diff`, exponent 2.02 → 0.78, 39× at 800 modules) but it is worth **~2.7%** of the real number, and is recorded as not being the remedy. **This row closes as measured; the remedy is the row below** | —                                                                                                          |
 | ~~**Preflight parses every unchanged file, twice, on every analysis**~~                                             | **CLOSED 2026-08-18 — ADR-0061.** Parses are cached for the duration of one `analyze()` call, keyed on `(relative_path, language, content digest)`: **606 → 305 parser calls** on a 303-file preflight, against a theoretical minimum of ~304. **Scoped to the call, so the invalidation ruling this row asked for is not needed** — same process, same bytes, correct by construction. **No end-to-end speedup is claimed**: the machine moved 343 s → 549 s on an untouched path mid-session, so wall-clock comparison was worthless and the mechanism was confirmed by counting instead. **The remaining step — not parsing unchanged files at all, from the stored index — is the row below and still needs its ruling** | — |
-| **Resolution runs per side and is not cached**                                                                  | **OPEN — found 2026-08-18 by ADR-0061, and it corrects ADR-0060.** The `parse_base` / `parse_target` timers wrap `_analyze_state`, which parses **and then resolves the whole state**, so ADR-0060's "99.5% is parsing" is 99.5% *parse plus resolve*. Measured at **766 ms of 2137 ms** on a 300-module repository; the split on the real repository is unmeasured. This is why the pre-registered prediction that ADR-0061 would halve wall time was wrong — a timer named `parse_*` was assumed to time parsing | Someone measures the parse/resolve split on a real repository, or caches resolution |
+| ~~**Resolution runs per side and is not cached**~~                                                                  | **CLOSED 2026-08-18 — ADR-0062, measured and declined.** Three things had to hold and none does: resolution is **linear** (exponent 1.14), it is ~**127 ms of 477 ms** under the parse timers and ~**6% of preflight**, and it is **not cacheable in the shape parsing was** — `resolve()` takes the whole state, so the two sides differ by exactly the thing being analysed and a key over it cannot hit within a call. Incremental resolution would contradict a load-bearing property: adding a symbol can make a reference in an *unchanged* file resolve. **Also corrects ADR-0061's figure** — its "766 ms of 2137 ms" was taken under machine load and counted three resolve calls where only two are inside those timers; a preflight resolves three times because the indexing refresh resolves first | — |
+| ~~original entry~~                                                                  | **OPEN — found 2026-08-18 by ADR-0061, and it corrects ADR-0060.** The `parse_base` / `parse_target` timers wrap `_analyze_state`, which parses **and then resolves the whole state**, so ADR-0060's "99.5% is parsing" is 99.5% *parse plus resolve*. Measured at **766 ms of 2137 ms** on a 300-module repository; the split on the real repository is unmeasured. This is why the pre-registered prediction that ADR-0061 would halve wall time was wrong — a timer named `parse_*` was assumed to time parsing | Someone measures the parse/resolve split on a real repository, or caches resolution |
 | **Reuse stored symbols so unchanged files are not parsed at all**                                               | **OPEN — the remaining design question, unchanged by ADR-0061.** Caching within one call removes the duplicate pass, not the pass: preflight is still O(repository). Going below that means taking symbols from the stored index, which needs a ruling on when they may be trusted — parser version, normalisation version and content identity all become inputs. **`SnapshotStateView` is not the vehicle**: it is unused *and* still reads and hashes every file (ADR-0060) | Someone rules what invalidates a stored parse |
 | ~~original entry~~                                             | **OPEN — the real cost, now quantified (ADR-0060).** 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060 | Someone designs the parse-reuse path, with a ruling on what invalidates a cached parse                     |
 | **Cold-indexing this repository takes 343 s**                                                                   | **OPEN — found incidentally 2026-08-18 while measuring preflight, and absent from this register until now.** A different code path from preflight, and the same order of magnitude as one parse pass (316 s), which is consistent with indexing parsing everything once. 11,419 symbols, of which **2,430 are document sections** — this project's own Markdown is its largest symbol source, one file being 12,756 lines | Someone measures where index time goes, or a user reports first-index latency                              |
@@ -285,6 +286,62 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-18T12:00:00Z — Resolution measured and NOT cached (ADR-0062)
+
+- Agent: Claude Code `claude-opus-5`, branch `resolution-measured-not-cached`.
+- Transition: no phase task. Post-gate.
+- New record: **ADR-0062**, status `accepted`. It **corrects a measurement
+  claim in ADR-0061**.
+- Files: ADR-0062 (new), ADR-0061 (corrected), the ADR index, the register.
+  **No source, test, corpus, contract, schema, migration or baseline change.**
+
+**Asked to cache resolution; measured it; declined, with the reason recorded.**
+Three things had to hold and none does.
+
+1. **It is linear.** Swept 100/200/400/800 modules resolving in isolation:
+   19.1 / 39.4 / 86.6 / 204.4 ms, **fitted exponent 1.14**. No
+   `symbol_diff`-shaped defect underneath.
+2. **It is a modest share.** On a 300-module preflight, `parse_base` +
+   `parse_target` = 477 ms, of which ~**127 ms** is resolution and ~350 ms is
+   parsing. Against a 2128 ms wall clock that is roughly **6% of preflight**.
+3. **It is not cacheable in the shape parsing was.** Parsing is per file and the
+   two sides share every untouched file — that is what made a content-keyed
+   cache hit almost every time. `resolve()` takes the **whole state**, so the
+   two sides differ by exactly the thing being analysed and a whole-state key
+   **cannot hit within a call**. The only case where it would is a change that
+   changes nothing.
+
+**Incremental resolution would contradict a load-bearing property, not merely
+add risk.** `_analyze_state` says resolution runs over the whole state "rather
+than the changed files alone. An edge is only meaningful against a complete
+symbol table." Adding a symbol can make a reference in an **unchanged** file
+resolve; deleting one can break a reference nowhere near the diff. An
+incremental resolver would have to compute that blast radius — the problem the
+engine exists to answer — before it could answer it.
+
+**Correction to ADR-0061, and it is the second on this measurement.** That
+record said "of 2137 ms under those two timers, 766 ms is resolution". Both
+figures were wrong: taken under the machine load that record itself warns made
+every wall-clock number unusable, and summing **three** `resolve()` calls when
+only **two** are inside those timers — a preflight resolves three times, because
+the indexing refresh resolves before the engine runs. Re-measured unloaded:
+**477 ms / ~127 ms**. ADR-0061 is corrected in place with the original left
+visible.
+
+> **The narrower lesson.** ADR-0061 used that number to *explain a failed
+> prediction*. An explanation is where a wrong number does the most damage,
+> because it satisfies — the story closes and nobody re-measures. The
+> parse-count claim in that record was checked by counting and stands; the
+> resolution claim was not, and did not.
+
+- Verification: **no code changed**, so nothing to re-run. `git status` shows
+  four Markdown files and nothing else; the gate evidence recorded at `8e575c4`
+  still applies to this tree.
+- Next: **one register row carries the remainder** — do not parse unchanged
+  files at all, from the stored index. Still needs its trust ruling, and it is
+  where the cost actually is.
+
 
 ### 2026-08-18T10:00:00Z — An unchanged file is parsed once per analysis (ADR-0061)
 
