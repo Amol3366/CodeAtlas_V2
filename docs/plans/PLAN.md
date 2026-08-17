@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **Post-gate session 2026-08-16/17 merged eight branches**: ADR-0050 (q035), ADR-0051 (q006), ADR-0052 (depth-2 claims), ADR-0053 (`CONCEPTUAL` measurable), ADR-0054 (finding subject/path), ADR-0055 (route cites its handler), plus two artifact regenerations and one documentation pass. **No migration; `SCHEMA_VERSION` stays 14 and `contract_version` stays `1.1` throughout** |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** Of `extra_build.md`'s seven tasks, **1, 2, 3 and 5 are closed**; **Task 7 is startable now**; **Task 4 and the remainder of Task 6 are blocked on rulings** named in the register |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** Of `extra_build.md`'s seven tasks, **1, 2, 3, 5 and 7 are closed**; **Task 4 and the remainder of Task 6 are blocked on rulings** named in the register. **Nothing is startable without a ruling.** ADR-0056 is `proposed` and needs the user's word to reach `accepted` |
 
 ## Deferred Register
 
@@ -92,7 +92,8 @@ with verification.
 | **Ranking sensitivity needs distractors, not larger answer sets**                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
 | **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone adds cases whose answer sets are large enough for order to matter                                                                                                   |
 | `relation_path_recall` has no gate target                                                                      | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
-| RRF coarse-chunk bias                                                                                            | **DEFERRED — reframed 2026-08-15 by ADR-0046.** Its stated trigger ("the module-granularity ruling lands") is now satisfied, and the ruling was **not** to implement the penalty. So this is no longer "fix the bias" but **"measure whether it costs anything"** at the larger corpus. ADR-0030's finding stands: the obvious lever demotes the chunk currently providing a rank-1 containment hit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Someone measures it corpus-wide                                                                                                                                             |
+| ~~RRF coarse-chunk bias~~                                                                                            | **CLOSED 2026-08-17 — ADR-0056, measured corpus-wide at three penalty strengths. The answer is that the lever is a pure loss.** ADR-0030 predicted a *trade* — an evidence hit for a symbol hit. **It is not a trade:** `symbol_recall_at_10` falls **0.9286 → 0.8571** alongside `containing_evidence_recall_at_10` **1.0000 → 0.8667**, and **every metric that moves, moves down, at every strength**. The cause is a case ADR-0030 did not anticipate — **s013's expected answer `OrderStatus` is itself a class chunk**, so the penalty demotes the answer it exists to promote (7 → 28), while s001 loses its only containment hit (1 → 11) exactly as predicted. The single gain in the corpus is s007, 8 → 7 — already inside the top 10, so it cannot improve any Recall@10, and its ~0.001 of MRR is swamped by the losses. Incidence today: a coarse chunk outranks the declared evidence in **2 of 14 cases**, both still inside the top 10, so the bias costs **zero** recall. Result is monotone against the lever — both losses occur because the *expected* chunk is coarse, so widening the definition can only demote them further. Instrument validated against three figures recorded before it existed (s013 rank 7, s001 symbol rank 12, `symbol_recall_at_10` 0.9286) and agrees with all three                                                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                             |
+| **The corpus that fusion runs on never grew, and the task premise said it had**                                  | **OPEN — a stated limit of what any fusion measurement can show, found 2026-08-17 by ADR-0056.** Task 7 was scoped as measuring the bias "now the corpus is larger". It is not larger. `_fuse` is gated on `SEMANTIC_INTENTS` (`{PROJECT_OVERVIEW, TEXT}`) and the Phase 4 path `predict_exact_symbols` attaches no fusion at all, so **WS-1's growth of `tests/evaluation/cases` 27 → 50 reached a corpus fusion never touches.** The only corpus that reaches it is `tests/evaluation/semantic_cases` — **14 cases over one fixture**, `queries.json` and `changes.json` byte-identical since `38cc393` (2026-07-31), the sole change anywhere in that tree being ADR-0023's two-line `target_profile`. **Another stale premise** — recorded under Tasks 1, 2, 3, 6 and both WS-1 sub-tasks, with **Task 4 still the only one that checked out**. ADR-0056's conclusion is unaffected but rests on 14 cases, not 50, and must not be quoted as though the corpus had grown | Someone gives the semantic corpus a second fixture — a fixture shape, not a case |
 | ~~Phase 4 `containing_evidence_rate` and `containing_evidence_recall_at_10`~~                               | **INVESTIGATED 2026-08-15, RULED 2026-08-16 — superseded by the four rows below.** The per-case run found the recall shortfall is **exactly 10 of 85 cases scoring 0.00** while the other 75 score 1.00, from **two unrelated causes** — and that the rate metric's 1.00 target is unreachable while the engine obeys ADR-0020. Each cause is now its own row with its own ruling                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | ~~**q035: an under-specified expectation, now consuming the entire `exact_symbol_resolution` margin**~~ | **CLOSED 2026-08-16 — ADR-0050.** Ruled by the user. Two corrections on different authorities: q035 declares `query_subject: "target.processor.process"` (additive, the field's own comment sanctions it), and its `expected_evidence` becomes the reference site `4-4` — a **ninth instance of ADR-0047**, which q035 could not be part of on 2026-08-16 because it was abstaining and emitted nothing to compare. `exact_symbol_resolution` **0.9800 → 1.0000 (50/50)**, so the gate tolerates one future miss again; `containing_evidence_recall_at_10` 0.9706 → **0.9824**; `abstention_correctness` and `mean_reciprocal_rank` → 1.0000; `containing_evidence_rate` 0.7561 → 0.7520, ungated (ADR-0048). No engine, `_contains`, or metric-definition change. **The subject fix alone passed its own wrong-side mutation** — see the row below                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | —                                                                                                                                                                          |
 | **The stated blocker for q035 was wrong, and the ambiguity message is why**                                | **OPEN — a small live-path usability defect, recorded not fixed.** `extra_build.md` carried "`find_exact` resolves by name and there is no file-scoped selector, so this may not be expressible" as a constraint on the option set. **There is one:** `find_exact` (`storage/sqlite/stores.py:463`) tries four tiers and tier 2 is `module_path \|\| '.' \|\| qualified_name`; `target.processor.process` resolves to exactly one symbol. The belief was never tested against the store. **Why it survived: the abstention message does not disambiguate** — it reads "matches 2 symbols: process, process. Ask again with a qualified name", printing `qualified_name`, which is *identical* for both candidates. A caller is told to qualify and shown two identical names. The fix is to print the tier-2 form, in `GraphQueryService._answer` (`application/graph_queries.py:236-249`). Not done here because ADR-0050 is a corpus ruling and this is an engine change                                                                                                                                                                                                                                                                                                                                                                | Someone fixes the message, or a user reports being unable to disambiguate                                                                                                   |
@@ -271,6 +272,113 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-17T19:00:00Z — Task 7 closed: the coarse-chunk penalty is a pure loss (ADR-0056)
+
+- Agent: Claude Code `claude-opus-5`, branch `adr-0056-coarse-chunk-penalty-measured`.
+- Transition: no phase task. Post-gate. `extra_build.md` Task 7 / **WS-5 complete**.
+- New record: **ADR-0056**, status **`proposed`** — it recommends a closure; the
+  ruling is the user's.
+- Files: `docs/adr/0056-*.md` and the ADR index, `scripts/measure_rrf_penalty.py`
+  (new), the Deferred Register, `extra_build.md`, `documentation/memory.md`.
+  **No source, corpus, contract, schema, migration or baseline change.**
+
+**The measurement ADR-0030 demanded, and the answer is don't.** A granularity
+penalty was applied corpus-wide at three strengths — `scale 0.50`, `scale 0.25`,
+and a strict fine-before-coarse partition — because ADR-0028 rejected channel
+weighting as "a constant nobody can later justify" and a result holding at one
+arbitrary constant would repeat that.
+
+| Metric | baseline | scale 0.50 | scale 0.25 | fine-first |
+| --- | ---: | ---: | ---: | ---: |
+| `containing_evidence_recall_at_10` | **1.0000** | 0.9333 | 0.8667 | 0.8667 |
+| `primary_evidence_recall_at_10` | **0.8000** | 0.7333 | 0.7333 | 0.7333 |
+| `symbol_recall_at_10` | **0.9286** | 0.8571 | 0.8571 | 0.8571 |
+| `mean_reciprocal_rank` | **0.6977** | 0.6888 | 0.6888 | 0.6888 |
+| `ndcg_at_10` | **0.7530** | 0.7304 | 0.7304 | 0.7304 |
+| `containing_evidence_rate` / `exact_evidence_rate` | 0.1116 / 0.0605 | unchanged | unchanged | unchanged |
+
+**Every metric that moves, moves down, at every strength.** ADR-0030 predicted a
+*trade* — an evidence hit for a symbol hit. **There is no trade:**
+`symbol_recall_at_10` falls too, so the lever loses on both sides of the exchange
+it was meant to balance.
+
+**The reason is a case ADR-0030 did not anticipate.** s013's expected answer
+`OrderStatus` (`models.py:6-12`) **is itself a class chunk**, so the penalty
+demotes the answer it exists to promote, **7 → 28**. s001 loses its only
+containment hit **1 → 11**, exactly as predicted. The single gain in the corpus
+is s007, **8 → 7** — already inside the top 10, so it cannot improve any
+Recall@10, and its ~0.001 of MRR is swamped by the losses.
+The result is monotone against the lever: both losses happen because the
+*expected* chunk is coarse, so widening the definition can only demote further.
+
+**Incidence: a coarse chunk outranks the declared evidence in 2 of 14 cases**
+(s007, s013), both inside the top 10, so **the bias costs zero recall today.**
+
+**The task premise was false, and Task 4 stays the only one that checked out.** It was scoped as
+measuring the bias "now the corpus is larger". It is not. `_fuse` is gated on
+`SEMANTIC_INTENTS` (`{PROJECT_OVERVIEW, TEXT}`) and the Phase 4 path
+`predict_exact_symbols` attaches no fusion at all, so **WS-1's 27 → 50 growth
+landed on a corpus fusion never touches.** The only corpus reaching it is
+`semantic_cases` — 14 cases, one fixture, `queries.json` and `changes.json`
+byte-identical since `38cc393` (2026-07-31), the sole change in that tree being
+ADR-0023's two-line `target_profile`. Recorded as its own register row.
+
+**The "cheaper" widening option is not available either.** ADR-0046 permits
+widening only on the ADR-0031/0036 justification. **s001 names
+`InventoryLedger.reserve`, which the engine does produce, at symbol rank 12** —
+neither impossible nor self-contradictory, so widening it would be editing the
+corpus to move a number (ADR-0003). s001 stays as written.
+
+**Why the instrument can be believed.** It was checked against three figures
+recorded before it existed and agrees with all three: s013 fused rank **7**
+(ADR-0028 recorded 4 → 7), s001 symbol rank **12** (ADR-0030), and
+`symbol_recall_at_10` **0.9286** (ADR-0030). The penalty demonstrably changed
+behaviour at every strength, so this is **not** ADR-0055's failure mode where a
+mutation that cannot apply is indistinguishable from a test that cannot catch it.
+
+**One correction to ADR-0028.** Its second recorded cost, s004, **no longer
+reproduces** — `tax_for` is rank 1 and `pricing.py:1-42` is rank 5. Deliberately
+**not attributed**: ADR-0026 and ADR-0029 are both plausible and separating them
+needs a bisect this did not do. Its first, s013 at rank 7, is unchanged.
+
+`scripts/measure_rrf_penalty.py` makes this a command rather than a day's work
+if the corpus ever grows. **It is not in any gate and must not be added to one** —
+it needs `semantic-local`, and §4.3 forbids a gate depending on an optional
+provider, the same reason the explanation A/B was removed from `check_phase7`.
+
+- Verification, exit codes read from the process rather than printed output:
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest -q` | **exit 0** — 2255 passed, 3 skipped |
+| `ruff check src tests scripts apps` | **exit 0** |
+| `mypy --no-incremental src tests scripts apps` | **exit 0** — 353 files |
+| `check_phase4.ps1 -SkipSync` | **exit 0** |
+| `check_phase7.ps1 -SkipSync -Semantic` | **exit 0** — Playwright 15 passed / 7 Chromium skips, semantic suites 25 passed, uplift baseline reproduced |
+
+  **The first `check_phase7` attempt was killed at 60% of its test stage** with
+  no `FAILED` line and only two steps reached. That is the terminated-process
+  signature `memory.md` already records, not a red gate — it was re-run whole
+  rather than reported, and the row above is the re-run.
+
+  **`pytest` reports 2255 passed where 2026-08-17T16:00Z recorded 2254.** This
+  branch adds **no test**: `pytest --collect-only` is byte-identical between it
+  and `main` at 2264 collected. So the difference is not attributable to this
+  change, and it was **not** chased further — recorded rather than explained.
+
+- **The Task 4 ruling was given by the user immediately after this entry:** a
+  lexical or conceptual answer **does** emit relation paths, restricted to
+  **edges that resolve to a real target**, on ADR-0055's precedent that an
+  unresolved edge cites nothing extra — an unresolved edge has no far endpoint
+  and so cannot form a path. Claims keep their lexical derivation. The
+  `relation_path_recall` gate target is **deliberately deferred** until the new
+  number is measured, per the ADR-0032/0033 lesson that a threshold chosen
+  before its denominator is known is meaningless.
+- Next: **Task 4 / WS-6 is now unblocked and is the next task.** The rest of
+  Task 6 still waits on a different ruling — whether a corpus expectation should
+  declare transitive (depth-2) results.
+
 
 ### 2026-08-17T16:00:00Z — Session close: state verified, next steps named
 

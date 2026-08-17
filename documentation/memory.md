@@ -2055,6 +2055,20 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   change to `EmbeddingMigrationService`. Two resolution sites could disagree
   about which model is current, and a namespace whose label disagrees with its
   contents fails silently.
+- **The RRF coarse-chunk penalty stays unimplemented, and now on measurement
+  rather than on caution** (ADR-0056). Applied corpus-wide at three strengths,
+  **every metric that moves moves down** — including the `symbol_recall_at_10`
+  it was supposed to raise. **s013's expected answer is itself a class chunk**,
+  so the penalty demotes the answer it exists to promote (7 → 28); s001 loses
+  its only containment hit (1 → 11); the one gain is s007, 8 → 7, already
+  inside the top 10 so it cannot improve any Recall@10.
+- **Check which corpus a metric is computed over before believing it grew**
+  (ADR-0056). `_fuse` is gated on `SEMANTIC_INTENTS` and `predict_exact_symbols`
+  attaches no fusion, so **WS-1 taking `cases` 27 → 50 never reached the
+  fusion measurement**, which still runs on `semantic_cases` — 14 cases, one
+  fixture, byte-identical since 2026-07-31. The task premise said "now the
+  corpus is larger"; it was another stale one, and Task 4 remains the only
+  premise in this program that checked out.
 - **CodeAtlas does not download models.** Settings names the model and shows the
   `ollama pull …` command; the user runs it. `pull_ollama_model` was deleted on
   2026-08-05 as unreachable, and the ADR-0014 branch — written a day earlier —
@@ -2229,9 +2243,11 @@ Carried into gate approvals as declared work rather than dropped:
 Deferred Register in `docs/plans/PLAN.md` is the authority; this is a pointer,
 not a third copy.
 
-- **Startable now: Task 7** (RRF coarse-chunk measurement). A *measurement*, not
-  a fix — ADR-0046 ruled the penalty stays unimplemented, so the only question
-  is whether the bias costs anything at the larger corpus.
+- ~~**Startable now: Task 7**~~ **DONE 2026-08-17 (ADR-0056).** Measured
+  corpus-wide at three penalty strengths: **the lever is a pure loss, every
+  metric that moves moves down**, and ADR-0030's predicted *trade* is not a
+  trade — `symbol_recall_at_10` falls too. **Nothing is now startable without a
+  ruling.**
 - **Blocked on a ruling: Task 4** (what a lexical answer carries). Ask for this
   one first — **ADR-0055 just answered the same question shape for `trace`**,
   and Task 4 asks it for lexical answers. Three cases, not two: q024 joined
