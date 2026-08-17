@@ -61,9 +61,21 @@ split was never measured.** The `parse_base` and `parse_target` timers wrap
 `_analyze_state`, which parses **and then calls `self._resolver.resolve(...)`
 over the whole state**. Resolution runs per side regardless of any parse cache.
 
-Measured on a 300-module repository: of 2137 ms under those two timers,
-**766 ms is resolution** and 1372 ms is parsing. Extrapolating that split to the
-real repository would be guesswork and is not done here.
+Measured on a 300-module repository: of **477 ms** under those two timers,
+roughly **127 ms is resolution** and **350 ms is parsing** — resolution is about
+**27%**. Extrapolating that split to the real repository would be guesswork and
+is not done here.
+
+> **This paragraph first said "766 ms of 2137 ms", and both numbers were
+> wrong.** They were taken on a machine under heavy load — the same instability
+> that made wall-clock comparison useless everywhere else in this record — and
+> the 766 ms counted **three** `resolve()` calls when only **two** are inside
+> these timers. A preflight resolves three times: the indexing refresh, then
+> base, then target, and the refresh is not part of `parse_base`/`parse_target`.
+> Corrected on re-measurement (ADR-0062). The mistake is left visible because
+> the first version of it was used to explain a failed prediction, and an
+> explanation resting on a wrong number is worth flagging rather than quietly
+> replacing.
 
 This is why the fix does not halve the wall clock even though it halves the
 parse count, and why the prediction stated before the measurement — "roughly
