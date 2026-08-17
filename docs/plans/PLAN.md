@@ -124,7 +124,10 @@ with verification.
 | **One `check_phase7` run exited 1 while printing every step as passing**                                 | **OPEN — still unattributed, and explicitly *not* closed by the `exit 0` work above.** Exit 1 is the **uncaught-throw** signature, so something threw; the trailing `exit 0` cannot produce or prevent it. Observed once on 2026-08-14, did not reproduce on a clean `main` or on a re-run with the same changes. Split out from the exit-code row on 2026-08-15 so that closing the fixable half did not carry this away with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | It recurs — chase it before trusting a green                                                                                                                               |
 | ~~**`.test-tmp` residue and concurrency void gate runs**~~                                                    | **CLOSED 2026-08-15. The cause was not residue and the fix was not a lockfile.** `--basetemp=.test-tmp` named a *shared* directory, and pytest **deletes the directory it is given** the moment the first `tmp_path` is requested — the directory itself, not a numbered subdirectory of it. A second run therefore **destroyed a running session's live files** rather than merely colliding with it, which is why the symptoms looked like both `FileExistsError` and "leftover state". Each session now gets `.test-tmp/s-<pid>-<uuid>`, pruned by age at start; the root stays repository-local because `development-windows.md` records that a locked-down Windows account may be unable to write system temp. **A lockfile was rejected**: it serializes runs instead of making them safe, and would need stale-lock detection — the pid-ownership problem ADR-0037 had to solve. Proven by running `tests/integration` and `tests/unit` concurrently: both passed (706 and 815) into two distinct session directories. **The "never run two gates at once" rule is retired**                                                                                                                                                                                                                                           | —                                                                                                                                                                          |
 | ~~**Preflight takes >15 minutes on a 664-file repository**~~                                                   | **MEASURED 2026-08-18 — ADR-0060. The observation is confirmed: 635.59 s (10.6 min)** on CodeAtlas itself over a commit range, stable across three runs. **99.5% of it is parsing** — `parse_base` 316.2 s + `parse_target` 316.0 s — against `file_diff` 2.4 s and `symbol_diff` 246 ms. `docs/operations/change-analysis.md` was right all along: "the engine parses both full states on every analysis; the cost is O(repository), not O(change)". A genuine quadratic was found and fixed on the way (`symbol_diff`, exponent 2.02 → 0.78, 39× at 800 modules) but it is worth **~2.7%** of the real number, and is recorded as not being the remedy. **This row closes as measured; the remedy is the row below** | —                                                                                                          |
-| **Preflight parses every unchanged file, twice, on every analysis**                                             | **OPEN — the real cost, now quantified (ADR-0060).** 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060 | Someone designs the parse-reuse path, with a ruling on what invalidates a cached parse                     |
+| ~~**Preflight parses every unchanged file, twice, on every analysis**~~                                             | **CLOSED 2026-08-18 — ADR-0061.** Parses are cached for the duration of one `analyze()` call, keyed on `(relative_path, language, content digest)`: **606 → 305 parser calls** on a 303-file preflight, against a theoretical minimum of ~304. **Scoped to the call, so the invalidation ruling this row asked for is not needed** — same process, same bytes, correct by construction. **No end-to-end speedup is claimed**: the machine moved 343 s → 549 s on an untouched path mid-session, so wall-clock comparison was worthless and the mechanism was confirmed by counting instead. **The remaining step — not parsing unchanged files at all, from the stored index — is the row below and still needs its ruling** | — |
+| **Resolution runs per side and is not cached**                                                                  | **OPEN — found 2026-08-18 by ADR-0061, and it corrects ADR-0060.** The `parse_base` / `parse_target` timers wrap `_analyze_state`, which parses **and then resolves the whole state**, so ADR-0060's "99.5% is parsing" is 99.5% *parse plus resolve*. Measured at **766 ms of 2137 ms** on a 300-module repository; the split on the real repository is unmeasured. This is why the pre-registered prediction that ADR-0061 would halve wall time was wrong — a timer named `parse_*` was assumed to time parsing | Someone measures the parse/resolve split on a real repository, or caches resolution |
+| **Reuse stored symbols so unchanged files are not parsed at all**                                               | **OPEN — the remaining design question, unchanged by ADR-0061.** Caching within one call removes the duplicate pass, not the pass: preflight is still O(repository). Going below that means taking symbols from the stored index, which needs a ruling on when they may be trusted — parser version, normalisation version and content identity all become inputs. **`SnapshotStateView` is not the vehicle**: it is unused *and* still reads and hashes every file (ADR-0060) | Someone rules what invalidates a stored parse |
+| ~~original entry~~                                             | **OPEN — the real cost, now quantified (ADR-0060).** 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060 | Someone designs the parse-reuse path, with a ruling on what invalidates a cached parse                     |
 | **Cold-indexing this repository takes 343 s**                                                                   | **OPEN — found incidentally 2026-08-18 while measuring preflight, and absent from this register until now.** A different code path from preflight, and the same order of magnitude as one parse pass (316 s), which is consistent with indexing parsing everything once. 11,419 symbols, of which **2,430 are document sections** — this project's own Markdown is its largest symbol source, one file being 12,756 lines | Someone measures where index time goes, or a user reports first-index latency                              |
 | **A synthetic corpus measures scaling honestly and proportions dishonestly**                                    | **OPEN — a stated limit of `measure_phase4_perf.py`'s generated profile, found 2026-08-18.** Its modules are ~15 lines each, so at 800 modules `file_diff` looked like the largest stage (1339 ms of 3367 ms) and parsing looked secondary. On the real repository parsing is **99.5%** and `file_diff` is **0.4%**. The *exponents* it produced held up — that is what it is good for — but **an earlier draft of ADR-0060 repeated its proportions as fact** before the real measurement corrected them | Someone gives the perf harness a profile with realistic file sizes and a Markdown-heavy tree               |
 | ~~original entry~~                                                   | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone measures it properly, or a user reports it                                                                                                                          |
@@ -282,6 +285,94 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-18T10:00:00Z — An unchanged file is parsed once per analysis (ADR-0061)
+
+- Agent: Claude Code `claude-opus-5`, branch `parse-reuse-within-analysis`.
+- Transition: no phase task. Post-gate. Second Deferred Register item since
+  `extra_build.md` closed.
+- New record: **ADR-0061**, status `accepted`. It **corrects a measurement
+  claim in ADR-0060**.
+- Files: `analysis/engine.py`, `tests/integration/test_engine_parse_reuse.py`
+  (new), ADR-0061, ADR-0060 (corrected), the ADR index, the register.
+  **No corpus, contract, schema, migration or baseline change.**
+
+**The fix.** The two sides of a change share every file it did not touch, and
+every field of the engine's `ParseRequest` derives from `(relative_path,
+language, content)` — `repository_id` and `snapshot_id` are the **same
+constant** on both sides, `file_id` comes from the path. So an unchanged file
+built a byte-identical request twice and one of two identical answers was
+thrown away. Parses are now cached for the duration of one `analyze()` call.
+
+**Scoped to the call deliberately, and that is what removes the blocker.** The
+register's remedy row asked for a ruling on what invalidates a cached parse.
+Within one call there is nothing to rule: same process, same parser instance,
+same bytes. A cache that outlived the call *would* need that ruling, and is
+left as its own row.
+
+**Confirmed by counting, not by a clock: 606 → 305 parser calls** on a 303-file
+preflight, against a theoretical minimum of ~304 — the +1 being the one
+genuinely changed file, correctly parsed on both sides.
+
+> **Wall clock was unusable this session and counting is why the result
+> survives.** `cold index` — a path this change does not touch — moved
+> **343 s → 549 s** between two runs, and a real-repository preflight read
+> 1036 s against the earlier 635 s. Nothing can be attributed through that. The
+> parse count is deterministic and immune to it.
+
+**The prediction was wrong, and the reason is the correction.** Before
+measuring I predicted wall time would roughly halve, 632 s → ~316 s. It did
+not, because **the `parse_base` / `parse_target` timers wrap resolution too**:
+`_analyze_state` parses *and then* resolves the whole state, and resolution runs
+per side regardless of any cache. Measured at **766 ms of 2137 ms** on a
+300-module repository. So **ADR-0060's "99.5% is parsing" is 99.5% *parse plus
+resolve***, and ADR-0060 has been corrected in place with a note rather than
+left to be quoted. A timer named `parse_*` was assumed to time parsing.
+
+**`parse_target` no longer means what it used to.** Whichever side runs first
+absorbs the shared files, so the split now reports *order*, not effort; their
+sum is the only meaningful figure. Said at the call site so the next reader is
+not misled.
+
+**No end-to-end speedup is claimed.** The mechanism is confirmed; the payoff is
+unquantified, because the machine was not stable enough to measure it. Anyone
+quoting a speedup from this work is quoting something it does not contain.
+
+**Guarded by three call-counting tests**, written first and failing on the old
+code at **6 parses for 4 distinct inputs**. One guards the opposite direction
+and is the important one: a file whose content genuinely differs must still be
+parsed on both sides, because keying reuse on the path alone would hand the base
+parse back for the target and report a changed file as **unchanged** — a silent
+wrong answer rather than a slow one.
+
+- Verification, exit codes read from the process:
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest -q` | **exit 0** — 2268 passed, 3 skipped |
+| `ruff` / `mypy --no-incremental` | **exit 0** — 356 files |
+| `baseline-phase-0/-3/-4 --check` | **exit 0** each, empty `git diff` |
+| `check_phase4.ps1 -SkipSync` | **exit 0** |
+| Contract schema freshness | **exit 0** |
+| Phase 7 rerank A/B `--check` | **exit 0** |
+| Phase 7 semantic uplift `--check` | **exit 0** |
+| Semantic suites | **25 passed** |
+
+  `check_phase7.ps1` was again not run whole — killed three times earlier in the
+  session — so its engine-affected stages were run directly, above. **Web
+  stages were not re-run: no web file changed.** Playwright's
+  `settings.spec.ts:248` remains a pre-existing failure that reproduces on
+  `main`.
+
+  Two self-inflicted breakages worth recording: placing the `ParseKey` alias
+  between imports tripped **E402 seventeen times**, and moving it orphaned the
+  `@dataclass(frozen=True)` above `ChangeReport` — caught by ruff and by reading
+  the result, not by assuming the edit landed.
+
+- Next: **two register rows carry the remainder** — cache resolution, and reuse
+  stored symbols so unchanged files are not parsed at all. The second still
+  needs its ruling.
+
 
 ### 2026-08-18T06:00:00Z — Preflight cost measured; a quadratic fixed that is not the cause (ADR-0060)
 

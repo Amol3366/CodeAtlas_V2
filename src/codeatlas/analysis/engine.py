@@ -19,6 +19,7 @@ from a test with two temporary directories.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -53,6 +54,7 @@ from codeatlas.extraction.resolution import SnapshotResolver
 from codeatlas.parsing.registry import (
     ParseDiagnostic,
     ParseRequest,
+    ParseResult,
     ParserRegistry,
     default_registry,
 )
@@ -68,6 +70,16 @@ class AnalyzedState:
     documents: Mapping[str, str]
     diagnostics: tuple[ParseDiagnostic, ...] = ()
     unparsed: tuple[str, ...] = ()
+
+
+ParseKey = tuple[str, str, bytes]
+"""Key for one parse: what the parse actually depends on.
+
+`(relative_path, language, content digest)` -- and nothing else, because
+nothing else varies. Every remaining field of the `ParseRequest` the engine
+builds is derived from these: `repository_id` and `snapshot_id` are the same
+constant on both sides, and `file_id` comes from the path.
+"""
 
 
 @dataclass(frozen=True)
@@ -112,10 +124,26 @@ class ChangeAnalysisEngine:
         with _timed(timings, "file_diff"):
             files = compute_file_changes(base, target)
 
+        # One cache for both sides. The two states share every file the change
+        # did not touch, and an unchanged file builds a byte-identical parse
+        # request on each side -- so without this, ~all of the work is done
+        # twice and one of two identical answers is discarded. Measured at 316 s
+        # per side on this repository (ADR-0061).
+        #
+        # Scoped to this call deliberately: same process, same parser instance,
+        # same bytes, so reuse is correct by construction and there is no
+        # invalidation question to get wrong. A cache that outlived the call
+        # would have one.
+        #
+        # **`parse_target` is no longer comparable to `parse_base`.** Whichever
+        # side runs first pays for the shared files, so the split now reports
+        # order rather than effort. Their sum is the number that means
+        # something.
+        parses: dict[ParseKey, ParseResult] = {}
         with _timed(timings, "parse_base"):
-            base_state = self._analyze_state(base)
+            base_state = self._analyze_state(base, parses)
         with _timed(timings, "parse_target"):
-            target_state = self._analyze_state(target)
+            target_state = self._analyze_state(target, parses)
 
         for state, side in ((base_state, "base"), (target_state, "target")):
             if state.unparsed:
@@ -206,7 +234,9 @@ class ChangeAnalysisEngine:
             timing_ms=timings,
         )
 
-    def _analyze_state(self, state: StateView) -> AnalyzedState:
+    def _analyze_state(
+        self, state: StateView, parses: dict[ParseKey, ParseResult] | None = None
+    ) -> AnalyzedState:
         """Parse every file of one state and resolve its references.
 
         Resolution runs over the whole state rather than the changed files
@@ -246,16 +276,29 @@ class ChangeAnalysisEngine:
                 unparsed.append(entry.relative_path)
                 continue
 
-            result = parser.parse(
-                ParseRequest(
-                    repository_id=_ANALYSIS_REPOSITORY_ID,
-                    snapshot_id=_ANALYSIS_REPOSITORY_ID,
-                    file_id=identifier,
-                    relative_path=entry.relative_path,
-                    language=entry.language,
-                    content=content,
-                )
+            # The digest, not the state's declared `content_hash`: this must key
+            # on the bytes actually handed to the parser. ADR-0043 normalises
+            # line endings on the way here, and a key taken from the state's own
+            # accounting could drift from what was parsed.
+            cache_key: ParseKey = (
+                entry.relative_path,
+                entry.language,
+                hashlib.blake2b(content, digest_size=16).digest(),
             )
+            result = None if parses is None else parses.get(cache_key)
+            if result is None:
+                result = parser.parse(
+                    ParseRequest(
+                        repository_id=_ANALYSIS_REPOSITORY_ID,
+                        snapshot_id=_ANALYSIS_REPOSITORY_ID,
+                        file_id=identifier,
+                        relative_path=entry.relative_path,
+                        language=entry.language,
+                        content=content,
+                    )
+                )
+                if parses is not None:
+                    parses[cache_key] = result
             diagnostics.extend(result.diagnostics)
             symbols.extend(result.symbols)
             references.extend(result.references)
