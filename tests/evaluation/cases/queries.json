@@ -478,7 +478,6 @@
                       "expected_abstention":  false,
                       "query_subject":  "client",
                       "expected_symbols":  [
-                                               "render",
                                                "total"
                                            ],
                       "expected_relations":  [
@@ -2179,6 +2178,40 @@
                                       ],
                       "forbidden_claims":  [
                                                "OrderPipeline persists orders to storage."
+                                           ]
+                  },
+                  {
+                      "id":  "q065",
+                      "repository_fixture":  "symbol_breadth",
+                      "snapshot_id":  "breadth-v1",
+                      "question":  "What calls run_pipeline?",
+                      "intent":  "CALLERS",
+                      "expected_abstention":  false,
+                      "query_subject":  "run_pipeline",
+                      "expected_symbols":  [
+                                               "start_pipeline"
+                                           ],
+                      "expected_relations":  [
+                                                 "start_pipeline CALLS run_pipeline"
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/orders/pipeline.py",
+                                                    "symbol":  "start_pipeline",
+                                                    "start_line":  39,
+                                                    "end_line":  39,
+                                                    "evidence_id":  "q065-e1",
+                                                    "snapshot_id":  "breadth-v1"
+                                                }
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+
+                                      ],
+                      "forbidden_claims":  [
+                                               "run_pipeline is called by test_pipeline_advances."
                                            ]
                   }
               ]

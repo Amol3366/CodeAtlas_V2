@@ -1,6 +1,13 @@
 # Extra Build — the remaining work, in the order to do it
 
-Status: current as of 2026-08-17, after WS-3, WS-4, WS-5, WS-6 and **Tasks 1, 2, 3, 4, 5 and 7** closed, and `relation_path_recall` gated (ADR-0058).
+Status: **COMPLETE as of 2026-08-17.** Every task is closed (ADR-0050 to
+ADR-0059) and `relation_path_recall` is gated (ADR-0058).
+
+> **This file has done its job and should be deleted.** Its own preamble says
+> so: "When the program is finished, delete this file rather than leaving it to
+> rot." The Deferred Register in `docs/plans/PLAN.md` remains the authority on
+> what is open; nothing here is load-bearing any more. It is left in this commit
+> so the closing state is reviewable, and deleting it is a one-line follow-up.
 
 **Authority note.** This file is a **work plan**, not a status list. The single
 authoritative record of what is open is the **Deferred Register in
@@ -33,8 +40,9 @@ independent, so the order below is a suggestion rather than a dependency chain.
 **Tasks 1, 2, 3, 4, 5 and 7 are done** (ADR-0050, 0051, 0054, 0055, 0056,
 0057). **WS-6 is closed and ADR-0034's four causes are fully discharged.**
 
-1. **Only the rest of Task 6 remains**, and it needs a ruling — whether a corpus
-   expectation should declare transitive (depth-2) results.
+1. ~~**Only the rest of Task 6 remains**~~ **DONE — ADR-0059.** Ruled: a graph
+   expectation declares **direct results only**. q053 is now the first
+   post-2026-08-15 case to be reversal-sensitive. **No tasks remain.**
 2. ~~Choosing the `relation_path_recall` gate target~~ **DONE — ADR-0058.**
    Gated at **1.0, absolutely**, on the `retrieval` profile only. Mutation-checked:
    regressing ADR-0057 drove recall 1.0 → 0.875 and the gate caught it.
@@ -73,8 +81,8 @@ exit codes, test isolation). **WS-2 closed 2026-08-17 (ADR-0054), WS-5 the same
 day (ADR-0056), WS-6 the same day (ADR-0057). Only the ranking-convention half
 of Task 6 remains**, blocked on its own ruling.
 
-Corpus: **64 query cases / 28 change cases** over **7 fixtures**, with a scored
-symbol-intent denominator of **50**.
+Corpus: **65 query cases / 28 change cases** over **7 fixtures**, with a scored
+symbol-intent denominator of **51** (ADR-0059).
 
 **All gates pass, and both gate scripts run to completion:**
 `uv run pytest -q` **2254 passed / 3 skipped**, ruff, mypy on 352 files,

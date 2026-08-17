@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **Post-gate session 2026-08-16/17 merged eight branches**: ADR-0050 (q035), ADR-0051 (q006), ADR-0052 (depth-2 claims), ADR-0053 (`CONCEPTUAL` measurable), ADR-0054 (finding subject/path), ADR-0055 (route cites its handler), plus two artifact regenerations and one documentation pass. **No migration; `SCHEMA_VERSION` stays 14 and `contract_version` stays `1.1` throughout** |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** Of `extra_build.md`'s seven tasks, **1, 2, 3, 5 and 7 are closed**; **Task 4 and the remainder of Task 6 are blocked on rulings** named in the register. **Only the ranking-convention half of Task 6 remains**, blocked on whether a corpus expectation should declare transitive (depth-2) results. ADR-0056 was **accepted 2026-08-17**; ADR-0057 and ADR-0058 landed the same day |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** **All seven `extra_build.md` tasks are now closed** (ADR-0050 to ADR-0059), so that file has no live content and its own preamble says to delete it rather than let it rot - left as a one-line follow-up for the user. ADR-0056 was **accepted 2026-08-17**; ADR-0057, ADR-0058 and ADR-0059 landed the same day. The Deferred Register below remains the authority on what is open, and every row in it is closed or deferred with a named trigger |
 
 ## Deferred Register
 
@@ -89,7 +89,10 @@ with verification.
 | **The per-edge claim merge is not exercised by any fixture** | **OPEN — a stated limit of what the suite measures, not a defect.** ADR-0055 merges a route's two citations into one claim. Deleting that merge leaves every test green, because a route literal and the call carrying it are the same expression and therefore share a line: the near-side candidate is deduplicated away and only one citation survives, so the merge never fires here. **It is not dead code** — it fires whenever the near side survives. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it, and two of ADR-0055's four mutations looked green for exactly that reason | Someone adds a fixture whose route literal sits alone on its line |
 | ~~**A `Finding` carries no subject or file path** (ADR-0042 follow-up 1)~~                              | **CLOSED 2026-08-17 — ADR-0054, and the rendering problem was the symptom.** `_finding_citations` keyed changed symbols on `qualified_name` **alone**, so two modules each defining `total` collapsed to whichever the dict comprehension saw last: **the finding about `billing.py` cited lines in `orders.py`**. A §4.1 violation — the citation does not support the claim — and **ADR-0042's own rule ("pair within the file first") reaching a surface that ruling did not touch**. `FindingDraft` now carries `subject_file`, and a symbol draft resolves **only** by location, with no name fallback, because a wrong citation still renders as a valid finding. `Finding` gains optional `subject`/`file_path` **derived from the citation, never stored** — `change_findings` has no such columns, storing them would be a second copy that can disagree, and deriving means no migration and no drift. Surfaced in JSON, Markdown, PR, the CLI verdict and the web list; SARIF needed nothing, already carrying the location in `artifactLocation`. `contract_version` stays `1.1`, `SCHEMA_VERSION` stays 14                                                                                                                                                                                | —                                                                                                                                                                          |
 | **A gated intent left the denominator, flattering six metrics**                                            | **CLOSED 2026-08-17 — ADR-0053.** `CONCEPTUAL` was absent from `SUPPORTED_INTENTS`, so `predict_exact_symbols` emitted `_abstention(measured=False)` and the case **never reached the engine**. **q024 had never been measured**; ADR-0051 put q006 in the same state hours earlier. This is ADR-0017 on the neighbouring constant, failing the **opposite** way — a gated *fixture* scores `False` and stays in the denominator as a miss, a gated *intent* **leaves** it, so the omission removed a failing case from the average instead of reporting capability as failure. Under-reporting is loud and gets found; flattering is silent. Corrected: `relation_path_recall` 0.9130 → **0.8750**, `relation_path_correctness` 0.8261 → 0.7917, `primary_evidence_recall_at_10` 0.9471 → 0.9310, `exact_evidence_rate` 0.6880 → 0.6591, `ndcg_at_10` and `symbol_recall_at_10` down; `exact_symbol_resolution` **1.0000 unchanged** and `unmet_targets` unchanged. **ADR-0051's conclusion survives** — q006 measured through lexical gives 0.9943, confirming it does pass containment — **but its evidence did not establish it**, and that is recorded as the correction                                                                                                     | —                                                                                                                                                                          |
-| **Ranking sensitivity needs distractors, not larger answer sets**                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
+| ~~**Ranking sensitivity needs distractors, not larger answer sets**~~                                          | **CLOSED 2026-08-17 — ADR-0059. Ruled: a graph expectation declares direct results only**, which is what makes `exact_symbol_resolution` a ranking gate rather than only a resolution gate — a true indirect result left undeclared means the metric asks whether the *direct* answer ranks first. **The row's own model was wrong twice over.** Sensitivity is **not** structurally unavailable for a correctly-specified direct case: it needs a **two-hop chain**, and `symbol_breadth` had none — nothing called `run_pipeline` or `test_pipeline_advances`. A fixture-shape limit, not a structural one. And the counts had drifted from the recorded "9 sensitive, 9 distractors, the same 9" to **11, 12, and not the same set**, partly through ADR-0051, ADR-0053 and ADR-0057. Fixed: q015 corrected on ADR-0036 grounds, `start_pipeline` added for a two-hop chain, q065 added to query it. **q053 is now the first post-2026-08-15 case to be reversal-sensitive**; the symbol-intent sensitive set is q003, q005, q015, q053 | —                                                                                                                                                    |
+| **Chromium Playwright tests now FAIL, not just skip — and it reproduces on `main`**                             | **OPEN — environmental, found 2026-08-18, and explicitly not caused by the change that found it.** The register has recorded seven Chromium *skips* since 2026-08-11; these are **failures**. Two full runs of the same tree gave **different failure sets** — 3 failed / 12 passed, then 2 failed / 13 passed — which is a flake signature, and `stream-reconnection.spec.ts:140` passes when run alone. But **`settings.spec.ts:248` ("a repository whose policy transmits shows the warning, the budget, and its coverage") fails reproducibly in isolation**, and **fails identically on `main` with this branch's changes stashed** — so it is pre-existing, not a regression. It also passed in a full `check_phase7 -Semantic` run earlier the same day (15 passed / 7 skipped / 0 failed), so it is state- or load-dependent rather than constant. Prime suspect is residue: the suite starts a backend on a loopback port and the failing test is about a repository *policy*, which is persisted. **Not diagnosed further here**, because the change under test touched no source and the failure predates it | Someone reproduces it from a clean state and names the mechanism, or it starts failing on a tree where it previously passed twice |
+| **A `CALLERS` expectation may name its own subject**                                                        | **OPEN — narrower than what ADR-0059 ruled, and deliberately left.** q005 expects `IdempotencyStore.claim` among the callers of `IdempotencyStore.claim`, and q053 expects `OrderPipeline.advance` among its own; nothing calls itself here, so both lose recall for declaring it. **This is not the ADR-0018 violation it first appears to be** — that record explicitly allows a self-referential case ("absent means `expected_symbols[0]`, which is correct for every exact, lexical, and self-referential case") and separately records that module-scoped queries *do* return the subject first. **A first reading that nine cases contradicted ADR-0018 was wrong and is corrected here rather than acted on** | Someone rules whether a caller/dependency expectation may name its own subject                                                                       |
+| ~~original entry~~                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
 | **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone adds cases whose answer sets are large enough for order to matter                                                                                                   |
 | ~~`relation_path_recall` has no gate target~~                                                                      | **CLOSED 2026-08-17 — ADR-0058. Gated at 1.0, absolutely.** Absolute for ADR-0032's reason: a deterministic emission question, not a ranking one, and **no tolerance has a named cause** — a bounded traversal or `MAX_RELATION_PATHS` truncation that lost a declared edge would be a defect to fail on, not luck to absorb. The denominator is **24 and not uniform** (21 declare one edge; one each two, three, five), so reachable values below 1.0 are 0.9917 / 0.9861 / 0.9792 / 0.9583 — 0.99 would privilege q060 by accident of its edge count and 0.95 would buy a tolerance nobody can justify. **Registered on the `retrieval` profile only, and that is load-bearing:** the semantic corpus declares zero relations, so its aggregate is `None` and `_unmet_targets` counts `None` as a miss — a shared entry would have failed the Phase 7 gate on a metric that corpus cannot express (ADR-0023's mistake). **Mutation-checked:** regressing ADR-0057 drove recall 1.0 → 0.875 and the gate caught it. `baseline-phase-0` gains the entry, correctly — a gate the null baseline does not miss asks nothing | —                                                                                             |
 | ~~original entry~~                                                                      | **STILL OPEN, but its blocker is discharged (ADR-0057, 2026-08-17).** ADR-0038 deferred the threshold because one of ADR-0034's four causes was unsettled; that cause is now ruled and implemented, and **`relation_path_recall` reads 1.0000** over a denominator of **24** measured cases that declare a relation. The user deliberately deferred choosing the threshold until the number was known, so this is now a live decision rather than a blocked one. **Compute what one miss is worth before picking it:** at 24 cases a single miss scores 0.9583, so a 0.98 target would be as inexpressible as the ones ADR-0032 and ADR-0033 had to correct | Someone chooses the threshold against the 24-case denominator                                                                                                             |
@@ -275,6 +278,116 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-18T02:00:00Z — Task 6 closed: an expectation declares direct results (ADR-0059)
+
+- Agent: Claude Code `claude-opus-5`, branch `adr-0059-expectations-declare-direct-results`.
+- Transition: no phase task. Post-gate. `extra_build.md` Task 6 **complete** —
+  **and with it every task in that file.**
+- New record: **ADR-0059**, status `accepted` — ruled by the user 2026-08-17.
+- Files: `tests/evaluation/cases/queries.json` (q015 corrected, q065 added),
+  `dataset.json` (count 64 → 65), the `symbol_breadth` fixture
+  (`start_pipeline`), six cardinality guards, baselines `-0`/`-3`/`-4`, the ADR
+  and its index, the register, `extra_build.md`, `documentation/memory.md`.
+  **No source change. No contract, schema or migration change.**
+
+**Ruled: a graph expectation declares direct results only.** Indirect results
+may still be returned — ADR-0052 already has the engine label them — and leaving
+them undeclared is precisely what makes `exact_symbol_resolution` a **ranking**
+gate rather than only a resolution gate: with a true indirect result present,
+the metric asks whether the *direct* answer ranks first.
+
+**Two of the task's three premises were wrong, and the third was refuted.**
+
+- The counts had drifted. The row recorded "distractor presence and reversal
+  sensitivity are the same 9 cases, exactly". Measured: **11 sensitive, 12 with
+  a distractor, and not the same set** — q026 has one without being sensitive.
+  Partly this project's own doing, via ADR-0051, ADR-0053 and ADR-0057.
+- "Fixing them would take symbol-intent ranking coverage to zero" is false.
+  Correcting q015 leaves `['total']` against a returned `['total', 'Order']`,
+  and the depth-2 `Order` keeps it sensitive.
+- **"Ranking sensitivity is structurally unavailable for a correctly-specified
+  direct graph case" is refuted.** Under direct-only it needs a **two-hop
+  chain**, and `symbol_breadth` had none — nothing called `run_pipeline` or
+  `test_pipeline_advances`. A fixture-shape limit, not a structural one.
+
+**Three changes.** q015 corrected on ADR-0036 grounds — `client.js` **defines**
+`render` and imports only `total`, so `render` was a factually wrong answer to
+"what does client import?" and the engine was right never to return it. The
+fixture gains `start_pipeline`, a caller of `run_pipeline`, giving the two-hop
+chain. q065 queries it, so the new symbol is not left untested.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| `symbol_recall_at_10` | 0.8917 | **0.9016** |
+| `ndcg_at_10` | 0.9173 | **0.9250** |
+| `primary_evidence_recall_at_10` | 0.9368 | 0.9375 |
+| `containing_evidence_rate` | 0.7537 | 0.7500 |
+| `exact_evidence_rate` / `valid_evidence_rate` | 0.6567 | 0.6544 |
+| `relation_path_correctness` | 0.8646 | 0.8633 |
+| `exact_symbol_resolution` | 1.0000 | **1.0000** |
+| `relation_path_recall` | 1.0000 | **1.0000** |
+
+`unmet_targets` stays `['changed_symbol_precision']`, and ADR-0058's new
+absolute gate still passes. The four precision dips are the declared cost:
+`start_pipeline CALLS run_pipeline` is a true edge most cases do not declare.
+
+**q053 is now reversal-sensitive — the first case added after 2026-08-15 to be
+so**, which is exactly what Task 6 asked for. The symbol-intent sensitive set is
+q003, q005, q015, q053. q065 is deliberately *not* sensitive: everything it
+returns is expected, which is correct for a direct one-hop question.
+
+**The denominator was checked before the case was added and again after.**
+`exact_symbol_resolution` scores **51**, up from 50; one miss is 0.9804 and
+still clears 0.98, two are 0.9608 and fail. Margin unchanged at exactly one
+miss. **Six hardcoded cardinality guards then failed** — the corpus-count
+tripwire working as designed — and were updated rather than weakened; a seventh
+`64`, the id-uniqueness check, was missed by the first grep and caught by the
+suite.
+
+**A wrong reading of my own is recorded rather than buried.** Nine cases declare
+their own subject in `expected_symbols`, and I first read that as contradicting
+ADR-0018. It does not: that record explicitly allows a self-referential case and
+separately notes that module-scoped queries return the subject first. The
+narrower question — whether a `CALLERS` expectation may name its own subject,
+which costs q005 and q053 recall — is its own register row, unruled.
+
+- Verification. **`check_phase7.ps1` was killed a third time** — at 57% of its
+  test stage, zero `FAILED` lines, one step completed. Rather than retry a
+  fourth time, **every remaining stage was run directly**, and each result below
+  is its own process exit code:
+
+| Stage | Result |
+| --- | --- |
+| Contract schema freshness | **exit 0** — completed inside the killed run |
+| `uv run pytest -q` | **exit 0** — 2263 passed, 3 skipped |
+| `ruff check src tests scripts apps` | **exit 0** |
+| `mypy --no-incremental src tests scripts apps` | **exit 0** — 354 files |
+| Dataset validation, Phase 0 / 3 / 4 baselines, ADR-0016 invariants | **exit 0** — all via `check_phase4.ps1 -SkipSync` |
+| Phase 7 rerank A/B artifact `--check` | **exit 0** |
+| Phase 7 semantic uplift baseline `--check` | **exit 0** |
+| Semantic suites | **25 passed** |
+| Web lint / types / build | **exit 0** each |
+| Web tests | **205 passed** (22 files) |
+| End-to-end suites (Playwright) | **NOT clean — see below** |
+
+  **The Playwright suite is the one stage that does not pass, and it is not this
+  change.** Two full runs of the identical tree gave *different* failure sets —
+  3 failed / 12 passed, then 2 failed / 13 passed — and
+  `stream-reconnection.spec.ts:140` passes when run alone, which is a flake
+  signature. `settings.spec.ts:248` fails reproducibly in isolation, so it was
+  tested against `main` with this branch stashed: **it fails there identically.**
+  Pre-existing, not a regression, and now its own register row. It also passed
+  in a full gate run earlier the same day, so it is state- or load-dependent.
+
+  **`check_phase7 -Semantic` is therefore NOT claimed to pass on this tree.**
+  Every stage it runs was verified individually except the Playwright one, which
+  is recorded as failing for a reason that predates this branch.
+
+- Next: **nothing assigned. `extra_build.md` is complete and its own preamble
+  says to delete it** rather than let it rot; that is a one-line follow-up left
+  for the user's call.
+
 
 ### 2026-08-17T23:30:00Z — ADR-0056 accepted by the user
 

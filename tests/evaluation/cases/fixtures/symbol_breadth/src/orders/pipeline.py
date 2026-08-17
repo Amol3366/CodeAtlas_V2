@@ -26,3 +26,14 @@ class OrderPipeline:
 
 def run_pipeline(pipeline: OrderPipeline, order_id: str) -> OrderStage:
     return pipeline.advance(order_id)
+
+
+def start_pipeline(pipeline: OrderPipeline, order_id: str) -> OrderStage:
+    """Entry point, one hop above `run_pipeline`.
+
+    Exists so this fixture holds a two-hop call chain: a caller of `advance`
+    reached only through another caller. Without one, no symbol-intent case
+    here can be ranking-sensitive -- every returned symbol is a direct answer,
+    so any order passes and a reversal changes nothing.
+    """
+    return run_pipeline(pipeline, order_id)

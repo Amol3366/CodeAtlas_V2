@@ -7,7 +7,7 @@
 
 | Metric | Value |
 | --- | ---: |
-| Query cases | 64 |
+| Query cases | 65 |
 | Change cases | 28 |
 | Exact symbol resolution | 0.0000 |
 | Primary evidence Recall@10 | 0.0000 |
