@@ -65,7 +65,7 @@ def test_the_replaced_threshold_selected_the_same_cases() -> None:
 
 
 def test_the_exact_symbol_gate_now_expresses_its_stated_target() -> None:
-    """Section 19.3 declares >= 98%, and at 50 cases it finally means that.
+    """Section 19.3 declares >= 98%, and from 50 cases on it finally means that.
 
     **This assertion is the inverse of the one it replaces**, and the change is
     the point rather than a relaxation. At 27 cases `ceil(0.98 * 27) == 27`, so
@@ -77,12 +77,19 @@ def test_the_exact_symbol_gate_now_expresses_its_stated_target() -> None:
     The corpus reached 50 on 2026-08-15 and the two values separated. The old
     assertion failed at that moment, exactly as the pair of tripwires below it
     was written to do.
+
+    It is **51** since ADR-0059 added q065, and the margin is unchanged: one
+    miss scores 0.9804 and still clears 0.98, two score 0.9608 and fail. The
+    exact counts are asserted rather than only the inequality, because a
+    denominator that moves without anyone noticing is how ADR-0017 hid 16
+    unscored cases for four phases -- so a change here should have to be
+    deliberate.
     """
     scored = _scored(SYMBOL_INTENTS)
     required = math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9)
 
-    assert scored == 50
-    assert required == 49
+    assert scored == 51
+    assert required == 50
     assert required < scored, "0.98 must now tolerate exactly one miss"
 
 

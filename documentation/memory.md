@@ -2055,6 +2055,14 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   change to `EmbeddingMigrationService`. Two resolution sites could disagree
   about which model is current, and a namespace whose label disagrees with its
   contents fails silently.
+- **Ranking sensitivity needs a two-hop chain, not a bigger answer set**
+  (ADR-0059). It is *not* structurally unavailable for a correctly-specified
+  direct case, as the plan claimed — `symbol_breadth` simply had no two-hop
+  call chain, which is a fixture-shape limit. Adding one made q053 sensitive.
+- **Check a denominator before adding a scored case, and again after.**
+  Adding q065 moved `exact_symbol_resolution` 50 → 51; one miss still scores
+  0.9804 and clears 0.98. Six hardcoded cardinality guards then failed, which
+  is the corpus-count tripwire working as designed.
 - **`relation_path_recall` is gated at 1.0, absolutely** (ADR-0058), and on the
   `retrieval` profile **only** — the semantic corpus declares zero relations, so
   its aggregate is `None`, and `_unmet_targets` counts `None` as a miss. A
@@ -2278,8 +2286,10 @@ not a third copy.
   one first — **ADR-0055 just answered the same question shape for `trace`**,
   and Task 4 asks it for lexical answers. Three cases, not two: q024 joined
   after ADR-0053 made `CONCEPTUAL` measurable.~~
-- **Blocked on a ruling: the rest of Task 6** — whether a corpus expectation
-  should declare transitive (depth-2) results. **The only task left.**
+- ~~**Blocked on a ruling: the rest of Task 6**~~ **DONE 2026-08-17
+  (ADR-0059).** Ruled: a graph expectation declares **direct results only**,
+  which is what makes `exact_symbol_resolution` a ranking gate. **No tasks
+  remain**; `extra_build.md` is complete and should be deleted.
 
 Everything below is the older list, kept as written.
 
