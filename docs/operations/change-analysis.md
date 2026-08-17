@@ -235,11 +235,33 @@ preflight (target p95 ≤ 10 s). Git blob states prefetch the whole tree with
 one `git archive` call (byte-identical to per-blob reads, asserted by test)
 instead of two subprocesses per file.
 
+> **Both targets are measured on a *generated* profile, and it is not
+> representative of a real repository.** Measured 2026-08-18 (ADR-0060): a
+> commit-range preflight over CodeAtlas itself — 715 tracked files, 11,419
+> symbols — takes **635 s**, against a ≤ 10 s target met comfortably on the
+> fixture profile. **99.5% of that is parsing** (`parse_base` 316 s +
+> `parse_target` 316 s); `file_diff` is 2.4 s and `symbol_diff` 0.2 s.
+>
+> The generated modules are ~15 lines each, so the profile reports *scaling*
+> faithfully — the exponents it produces hold — and *proportions* misleadingly:
+> on it, `file_diff` looks like the largest stage, which is false anywhere
+> real. **Quote the fixture numbers as gate evidence, never as an estimate of
+> what a real repository costs.**
+
 ## What Phase 4 does not do
 
 - The engine parses **both full states** on every analysis. Resolution needs
   a complete symbol table; the cost is O(repository), not O(change), and the
-  snapshot-reuse path decision 2 describes is not implemented.
+  `SnapshotStateView` reuse path ADR-0005 **decision 1** describes is not
+  wired in. Two corrections to what this line used to say: the design is in
+  decision 1 ("stored rows + disk reads, used for a fresh target"), not
+  decision 2, which is the Git security posture; and the class is not
+  unimplemented but **unused** — it exists at `analysis/states.py:315` with
+  four integration tests and **zero production callers**, the same shape as
+  the `prune` that existed from Phase 2 until P6-08 found nothing called it.
+  Wiring it in would **not** remove this cost on its own: `read_file` still
+  reads every file's bytes from disk and hashes them, so only the directory
+  scan is avoided, not the parse.
 - Commit-range analysis never reuses the active snapshot, even when a side's
   commit matches it.
 - Statement classification says nothing about runtime behavior, and TS/JS
@@ -260,11 +282,15 @@ instead of two subprocesses per file.
   from a deletion: an unmodified checkout of this project reported 26
   `SYMBOL_DELETED` findings at **high** severity. A reviewer who cares about
   committed build output must look at Git.
-- **A tracked file larger than `max_file_bytes` (2 MB) fails the analysis
-  outright**, rather than being skipped the way the directory scan skips it.
-  One committed 3 MB CSV therefore makes a repository impossible to preflight.
-  This is open and recorded in the Deferred Register; today's behaviour is
-  pinned by a test so it cannot change silently while the ruling is pending.
+- ~~A tracked file larger than `max_file_bytes` (2 MB) fails the analysis
+  outright.~~ **Closed 2026-08-15 by ADR-0045, and this paragraph was stale
+  until 2026-08-18.** It now behaves as the directory scan always did:
+  `archive` **skips the oversized entry and names it**, `StateView.excluded_files()`
+  carries the names, and the engine emits a `FILE_TOO_LARGE` warning plus a
+  limitation naming the files. `read_blob` still raises, deliberately — it is
+  asked for one specific blob, and answering "here is nothing" would be worse.
+  Only oversize is declared; an *ignored* file stays unreported, because
+  ADR-0044 already ruled it outside the index.
 - **An analysis over a working tree is not an atomic observation.** The engine
   parses both full states, which on a large repository takes minutes; a file
   rewritten during that window is reported as it was *when it was read*. A file
