@@ -123,7 +123,7 @@ with verification.
 | ~~**`check_phase7.ps1` can exit non-zero while reporting success**~~                                          | **CLOSED 2026-08-15, with the diagnosis corrected.** The recorded mechanism — "the process exit code is whatever the last native command left" — **does not reproduce.** Under `powershell -File` a trailing `cmd /c "exit 3"` still exits **0**, so the success path was never leaking; and a failing step already exited non-zero, because `Invoke-Checked` throws under `$ErrorActionPreference = "Stop"`. The real exposure is one invocation-form narrower: a **caller** that reads `$LASTEXITCODE` after invoking a gate sees the stale code, measured at **3** through a wrapper `.ps1`. Worth fixing anyway — a release gate should state its verdict rather than leave it to how it was called. **All eight** gate scripts lacked the line, not just Phase 7; all eight now end `exit 0`, guarded with no exemption list. The risk that this masks a red gate is covered twice: a dynamic test asserting a throwing step still exits 1 with `exit 0` below it, and a deliberate breakage of the real Phase 4 gate, which exited **1** naming `Dataset validation failed with exit code 2`                                                                                                                                                                                                             | —                                                                                                                                                                          |
 | **One `check_phase7` run exited 1 while printing every step as passing**                                 | **OPEN — still unattributed, and explicitly *not* closed by the `exit 0` work above.** Exit 1 is the **uncaught-throw** signature, so something threw; the trailing `exit 0` cannot produce or prevent it. Observed once on 2026-08-14, did not reproduce on a clean `main` or on a re-run with the same changes. Split out from the exit-code row on 2026-08-15 so that closing the fixable half did not carry this away with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | It recurs — chase it before trusting a green                                                                                                                               |
 | ~~**`.test-tmp` residue and concurrency void gate runs**~~                                                    | **CLOSED 2026-08-15. The cause was not residue and the fix was not a lockfile.** `--basetemp=.test-tmp` named a *shared* directory, and pytest **deletes the directory it is given** the moment the first `tmp_path` is requested — the directory itself, not a numbered subdirectory of it. A second run therefore **destroyed a running session's live files** rather than merely colliding with it, which is why the symptoms looked like both `FileExistsError` and "leftover state". Each session now gets `.test-tmp/s-<pid>-<uuid>`, pruned by age at start; the root stays repository-local because `development-windows.md` records that a locked-down Windows account may be unable to write system temp. **A lockfile was rejected**: it serializes runs instead of making them safe, and would need stale-lock detection — the pid-ownership problem ADR-0037 had to solve. Proven by running `tests/integration` and `tests/unit` concurrently: both passed (706 and 815) into two distinct session directories. **The "never run two gates at once" rule is retired**                                                                                                                                                                                                                                           | —                                                                                                                                                                          |
-| ~~**Preflight takes >15 minutes on a 664-file repository**~~                                                   | **MEASURED 2026-08-18 — ADR-0060. The observation is confirmed: 635.59 s (10.6 min)** on CodeAtlas itself over a commit range, stable across three runs. **99.5% of it is parsing** — `parse_base` 316.2 s + `parse_target` 316.0 s — against `file_diff` 2.4 s and `symbol_diff` 246 ms. `docs/operations/change-analysis.md` was right all along: "the engine parses both full states on every analysis; the cost is O(repository), not O(change)". A genuine quadratic was found and fixed on the way (`symbol_diff`, exponent 2.02 → 0.78, 39× at 800 modules) but it is worth **~2.7%** of the real number, and is recorded as not being the remedy. **This row closes as measured; the remedy is the row below**. **CORRECTED 2026-08-18 by ADR-0064: "99.5% of it is parsing" is wrong.** Those timers wrap `_analyze_state`, which resolves too; parsing the whole repository takes **8.14 s** and resolution took **310.24 s** of the 319.69 s side. The confirmed *observation* stands; the attribution does not | —                                                                                                          |
+| ~~**Preflight takes >15 minutes on a 664-file repository**~~                                                   | **MEASURED 2026-08-18 — ADR-0060. The observation is confirmed: 635.59 s (10.6 min)** on CodeAtlas itself over a commit range, stable across three runs. **99.5% of it is parsing** — `parse_base` 316.2 s + `parse_target` 316.0 s — against `file_diff` 2.4 s and `symbol_diff` 246 ms. `docs/operations/change-analysis.md` was right all along: "the engine parses both full states on every analysis; the cost is O(repository), not O(change)". A genuine quadratic was found and fixed on the way (`symbol_diff`, exponent 2.02 → 0.78, 39× at 800 modules) but it is worth **~2.7%** of the real number, and is recorded as not being the remedy. **This row closes as measured; the remedy is the row below**. **CORRECTED 2026-08-18 by ADR-0064: "99.5% of it is parsing" is wrong.** Those timers wrap `_analyze_state`, which resolves too; parsing the whole repository takes **8.14 s** and resolution took **310.24 s** of the 319.69 s side. The confirmed *observation* stands; the attribution does not - and the **observation itself is now obsolete: same script, same commit range, clean tree, 635.59 s -> 21.56 s median** (21.56 / 21.56 / 21.30), with cold index ~343 s -> 32.64 s. ">15 minutes" is now **~22 seconds** | —                                                                                                          |
 | ~~**Preflight parses every unchanged file, twice, on every analysis**~~                                             | **CLOSED 2026-08-18 — ADR-0061.** Parses are cached for the duration of one `analyze()` call, keyed on `(relative_path, language, content digest)`: **606 → 305 parser calls** on a 303-file preflight, against a theoretical minimum of ~304. **Scoped to the call, so the invalidation ruling this row asked for is not needed** — same process, same bytes, correct by construction. **No end-to-end speedup is claimed**: the machine moved 343 s → 549 s on an untouched path mid-session, so wall-clock comparison was worthless and the mechanism was confirmed by counting instead. **The remaining step — not parsing unchanged files at all, from the stored index — is the row below and still needs its ruling** | — |
 | ~~**Resolution runs per side and is not cached**~~                                                                  | **CLOSED 2026-08-18 — ADR-0062, measured and declined.** Three things had to hold and none does: resolution is **linear** (exponent 1.14), it is ~**127 ms of 477 ms** under the parse timers and ~**6% of preflight**, and it is **not cacheable in the shape parsing was** — `resolve()` takes the whole state, so the two sides differ by exactly the thing being analysed and a key over it cannot hit within a call. Incremental resolution would contradict a load-bearing property: adding a symbol can make a reference in an *unchanged* file resolve. **Also corrects ADR-0061's figure** — its "766 ms of 2137 ms" was taken under machine load and counted three resolve calls where only two are inside those timers; a preflight resolves three times because the indexing refresh resolves first. **CORRECTED 2026-08-18 by ADR-0064 - both numbers in it are wrong.** Resolution was **97% of a side, not 6%**, and **not linear**: the exponent 1.14 was fitted on a generated corpus of ~15-line Python modules containing **no Markdown**, hence no mentions and no routes, so the quadratic term was structurally absent from the sweep. The *design* conclusion survives intact - resolution still is not cached, and did not need to be | — |
 | ~~original entry~~                                                                  | **CLOSED 2026-08-18 - ADR-0064, measured and FIXED.** The split the row asked for, timed on a real `GitBlobStateView`: `list_files` **1.25 s**, `read_file` **0.07 s**, `parse` **8.14 s (2.5%)**, `resolve` **310.24 s (97.0%)**. **Parsing the whole repository takes 8 seconds** - so ADR-0060's "99.5% is parsing" was never close, and the remedies three records spent themselves on targeted 2.5% of the cost. Cause: `resolution.py` claimed O(references) in its own docstring while three call sites scanned `symbols_by_id.values()` **per reference** - `_resolve_mention` (112,265 mentions x 11,502 symbols = **1.29 billion**, `str.lower` called **880 million** times), `_RouteIndex.handlers` (`name_tokens`, a regex split, **10.5 million** calls) and `_derive_config_edges`. Fixed by indexing every symbol-only predicate: **313.97 s -> 3.55 s, 88x**, verified **identical across all 168,605 relations** on this repository | - |
@@ -356,9 +356,25 @@ plural rule and turns the match into a dictionary hit.
 
 **Verification.**
 
-- `ruff check src/ tests/` — clean. `mypy src/codeatlas` — 145 files, no issues.
-- `pytest tests/unit tests/integration -q` — **1569 passed, 3 skipped** (the
-  three are pre-existing `semantic-local` environment skips).
+- **Phase 3 and Phase 4 gates: every stage passes.** Run stage by stage rather
+  than through the wrapper, because `check_phase3.ps1` was **killed at 57% of
+  the test run** by the environment — the fifth such kill this session. Nothing
+  had failed when it died, and a killed run is not reported as a pass.
+  - Contract schema freshness — exit 0.
+  - Tests, split so no single command runs long enough to be killed:
+    `tests/unit tests/integration` **1572 passed**; `tests/contract
+    tests/security tests/semantic` **520 passed**; `tests/evaluation
+    tests/end_to_end` **160 passed**. **2252 total, zero failures.**
+  - `ruff check src tests scripts apps` — clean.
+  - `mypy --no-incremental src tests scripts apps` — **357 source files, no
+    issues**.
+  - Dataset validation — `valid`, 65 query / 28 change cases, 7 fixtures.
+  - `baseline-phase-0 --check`, `baseline-phase-3 --check`,
+    `baseline-phase-4 --check`, `check_invariants --check` — all exit 0.
+  - **The baselines regenerated byte-for-byte identical** — `git status` shows
+    no change to any of the four files afterwards. That is independent
+    confirmation of the equivalence result below: if resolution's output had
+    moved at all, the evaluation metrics would have moved with it.
 - **Equivalence on the real repository, which is the evidence that matters
   here.** Both implementations run over the same 706 files in one process,
   comparing every relation field by field: **IDENTICAL across all 168,605
@@ -368,20 +384,43 @@ plural rule and turns the match into a dictionary hit.
   resolver too, as it should, so only a real repository has the duplicate symbol
   IDs, name collisions and repeated route literals that would expose a bucket
   key subtly narrower than the predicate it replaced.
+- **End to end, on a clean tree, same script and commit range as ADR-0060:**
+  **preflight 635.59 s → 21.56 s median** (21.56 / 21.56 / 21.30, stable), and
+  **cold index ~343 s → 32.64 s**. The register's ">15 minutes on a 664-file
+  repository" is now **~22 seconds**. Stage medians:
+  `parse_base` 11907.5 ms, `parse_target` 6053.5 ms, `file_diff` 2509.2 ms,
+  `symbol_diff` 438.7 ms, `findings` 114.1 ms, `impact` 48.4 ms. Two things
+  worth noting: `file_diff` was 0.4% of preflight and is now ~12%, purely
+  because the dominant term was removed; and `parse_target` is now **half** of
+  `parse_base`, which is ADR-0061's within-call parse cache becoming visible —
+  that record correctly claimed no end-to-end speedup because the machine made
+  it unmeasurable, and its saving was real and hidden behind this defect.
 - **Mutation check.** With the pre-change resolver dropped in from a file copy
-  (not `git checkout --`), the two growth guards **fail** — scan count
-  53 → 403 when references grow 8x — and the three behaviour tests **pass**,
-  which is correct for tests asserting behaviour did not change.
+  (not `git checkout --`), **two of the five new tests fail** — the ceiling and
+  the reference-axis growth guard, whose scan count goes 53 → 403 when
+  references grow 8x. Those two are the regression witnesses. The other three
+  pass on the old resolver, and only two of them should be counted as
+  intentional: the behaviour tests **must** pass on both sides, since they
+  assert conclusions did not change. The **symbol-axis** growth test also
+  passes on the old code — the old scan grew with references, not symbols — so
+  it is a forward guard against indexing only one direction of the product, not
+  evidence about this defect. Recorded rather than counted as coverage.
+- `matching_forms` carries its own guard, being the one change that could be
+  silently wrong in either direction (one form too few drops route edges, one
+  too many invents them, and neither raises). `test_route_literals.py` asserts
+  it agrees with `tokens_match` on every pair of a vocabulary covering stems,
+  `-s` and `-es` plurals, words merely ending in those letters, and the single
+  characters where stripping a suffix leaves nothing.
 
 **Blockers and limitations, stated rather than smoothed over.**
 
-- **End-to-end preflight is not yet re-measured.** The first attempt died in
-  `SnapshotValidationError: A staged symbol has a line range outside its file`,
-  because `measure_real_repo.py` cold-indexes the **working tree** while the
-  commit-range analysis reads Git blobs — and I was editing the tree during the
-  run. That is the standing "do not edit the tree you are measuring" rule, and I
-  broke it. Re-run against a clean tree before quoting any end-to-end number.
-  **No end-to-end figure is claimed in ADR-0064.**
+- **The first end-to-end attempt was invalid and is reported rather than
+  quietly re-run.** It died in `SnapshotValidationError: A staged symbol has a
+  line range outside its file`, because `measure_real_repo.py` cold-indexes the
+  **working tree** even though the commit-range analysis reads Git blobs — and I
+  was editing the tree during the run. That is the standing "do not edit the
+  tree you are measuring" rule, and I broke it. Re-run on a clean tree after
+  committing, which is the number below.
 - **Resolution is not now known to be cheap**, only to no longer be the
   bottleneck. 3.55 s is unprofiled; new register row.
 - `tokens_match` now has **no production caller**. Kept deliberately as the

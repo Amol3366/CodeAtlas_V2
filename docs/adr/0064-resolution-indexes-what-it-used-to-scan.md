@@ -12,7 +12,7 @@
 
 ## The measurement everything else was built on was wrong
 
-Preflight on this repository takes 635 s. ADR-0060 said **99.5% of it is
+Preflight on this repository took 635 s. ADR-0060 said **99.5% of it is
 parsing**. ADR-0061 corrected that to *parse plus resolve* and left the split
 unmeasured. ADR-0062 measured resolution at ~**6% of preflight** and declared it
 **linear**.
@@ -54,9 +54,12 @@ the sweep that fitted exponent **1.14** was fitting a curve on the one reference
 class that was never quadratic. The exponent was correct for what it measured
 and meaningless for the repository it was used to describe.
 
-Register row 135 already says a synthetic corpus "measures scaling honestly and
-proportions dishonestly". It measured *scaling* dishonestly too, whenever the
-term that dominates is carried by a file type the generator does not emit.
+The register already carried a row saying that corpus "measures scaling honestly
+and proportions dishonestly". That was too generous, and the row is retitled
+here: it measures *scaling* dishonestly too, whenever the term that dominates is
+carried by a file type the generator does not emit. A clean exponent from a
+corpus missing the dominant reference class is not weak evidence — it is no
+evidence.
 
 ## What was actually wrong
 
@@ -108,7 +111,44 @@ comparison against every identifier into a handful of dictionary hits.
 
 **Measured on this repository, both implementations over the same 706 files in
 one process: 313.97 s → 3.55 s, an 88x reduction.** Resolution goes from 97% of
-a preflight side to roughly a quarter of a much smaller total.
+a preflight side to under a third of a much smaller one (3.55 s of the 11.9 s
+`parse_base` now reports).
+
+### End to end, which is the number the register row was about
+
+Same script and same commit range as ADR-0060, on a clean tree:
+
+| | ADR-0060 | now |
+| --- | ---: | ---: |
+| preflight, median of 3 | **635.59 s** | **21.56 s** |
+| cold index | ~343 s | **32.64 s** |
+
+Runs of 21.56 / 21.56 / 21.30 s — stable, unlike the wall-clock that made
+ADR-0061 unmeasurable. **The register's ">15 minutes on a 664-file repository"
+is now ~22 seconds.** Cold indexing improves too, and for the same reason: it
+resolves.
+
+The stage breakdown is worth recording because the proportions have moved
+completely:
+
+```
+parse_base    11907.5 ms      parse_target   6053.5 ms
+file_diff      2509.2 ms      symbol_diff     438.7 ms
+findings        114.1 ms      impact           48.4 ms
+```
+
+Two things fall out of it. `file_diff` was 0.4% of preflight and is now ~12%,
+purely because the dominant term was removed. It is worth being precise about
+what that does and does not vindicate: the perf harness's generated corpus
+called `file_diff` the *largest* stage, and it still is not — `parse_base`
+is, by five times. The corpus was wrong then and is wrong now; it has merely
+become less wrong for reasons that have nothing to do with why it said it.
+
+And `parse_target` is
+now **half** of `parse_base`, which is ADR-0061's within-call parse cache
+finally visible: that record honestly claimed no end-to-end speedup because the
+machine made it unmeasurable, and the saving was real and hidden behind this
+one.
 
 ## Equivalence, because speed is worthless if the edges changed
 
@@ -138,6 +178,11 @@ cannot distinguish a correct index from one whose bucket key is subtly narrower
 than the predicate it replaced. Only a real repository has the duplicate symbol
 IDs, name collisions and repeated route literals that would expose that.
 
+A second, independent confirmation came free: the Phase 0, 3 and 4 baselines and
+the ADR-0016 invariant report all regenerate **byte-for-byte identical**. Those
+are computed from the graph resolution produces, so any movement in its output
+would have moved them.
+
 `RESOLVER_VERSION` is deliberately **not** bumped. It marks changes in what
 resolution concludes, and this record changes only how long it takes to conclude
 it; bumping it would invalidate stored resolutions for no reason.
@@ -149,15 +194,24 @@ table, not elapsed time. That distinction is load-bearing here specifically:
 wall-clock is what sent three records to the wrong conclusion, on a machine that
 moved an untouched path from 343 s to 549 s mid-session.
 
-Two assertions rather than one, following `test_symbol_diff_complexity.py`: a
-ceiling, and a direct growth comparison that survives someone raising the
-ceiling. Growth is asserted on **both** axes of the product, so a fix that
-indexed only one direction cannot pass.
+More than one assertion, following `test_symbol_diff_complexity.py`: a ceiling,
+and a direct growth comparison that survives someone raising the ceiling.
 
-Checked against the pre-change resolver: the two growth guards **fail** on it
-(scan count 53 → 403 when references grow 8x), and the three behaviour tests
-**pass** on it, which is the correct outcome for tests asserting that behaviour
-did not change.
+Checked against the pre-change resolver, dropped in from a file copy. Of the
+five tests, **two fail** on it — the ceiling and the reference-axis growth
+guard, whose scan count goes 53 → 403 when references grow 8x. Those two are the
+regression witnesses.
+
+The other three pass on the old resolver, and each for a reason worth naming
+rather than counting as coverage:
+
+- the two behaviour tests **must** pass on both, since they assert that
+  resolution's conclusions did not change;
+- the **symbol-axis** growth test also passes on the old code, because the old
+  scan grew with *references*, not symbols. It is a forward guard against a
+  future implementation that indexes only one direction of the product — not
+  evidence about the defect this record fixes, and it would be dishonest to
+  present it as such.
 
 `matching_forms` carries a second guard of its own, because it is the one change
 here that could be silently wrong in either direction: one form too few drops
@@ -173,19 +227,24 @@ the property test is what stops the index and the rule from drifting apart.
 
 ## What this does not fix
 
-**Preflight is still O(repository).** 12.59 s per side is a much better constant
-on the same shape, not a different shape. The register's parse-reuse rows stay
-closed on their own arithmetic (ADR-0063) — but their premise, that parsing was
-worth attacking, is now known to have been false when they were written.
+**Preflight is still O(repository).** 21.56 s is a much better constant on the
+same shape, not a different shape: both states are still built in full, and a
+one-line change still costs what a thousand-line change costs. The register's
+parse-reuse rows stay closed on their own arithmetic (ADR-0063) — but their
+premise, that parsing was worth attacking, is now known to have been false when
+they were written.
 
 **The persisted parse cache row should close as not worth building.** It targets
 the 8 s stage. Its best case was ~1.3% of preflight, and content-keying misses
 the most expensive file every run — `docs/plans/PLAN.md` is 26.4% of parse cost
 and was touched by all 50 of the last 50 commits.
 
-**Resolution is now worth re-measuring rather than re-reasoned about.** 12.59 s
-across 160,560 references is not obviously optimal, and the remaining shape is
-unprofiled. That is a register row, not a claim made here.
+**Resolution is now worth re-measuring rather than reasoned about.** 3.55 s
+across 161,343 references is not obviously optimal, and after the fix
+`_derive_config_edges` and `_RouteIndex.handlers` are still the two largest
+items in the profile. Neither has been examined since. That is a register row,
+not a claim made here — and given that this measurement has now been wrong four
+times, the next person should re-profile rather than trust this paragraph.
 
 ## Alternatives
 
@@ -193,7 +252,7 @@ unprofiled. That is a register row, not a claim made here.
 rejecting it survives its wrong numbers intact: `resolve()` takes the whole
 state, so the two sides differ by exactly the thing being analysed, and adding a
 symbol can make a reference in an unchanged file resolve. Making the existing
-pass 24.6x cheaper does not need that ruling.
+pass 88x cheaper does not need that ruling.
 
 **Cap mentions harder.** `MAX_MENTIONS_PER_SECTION` is already 60. Lowering it
 would have cut the cost by dropping edges — buying speed with recall, silently.
@@ -207,11 +266,18 @@ quietly dropped.
 - Three records carry a correction. ADR-0060's headline, ADR-0061's inherited
   framing, and ADR-0062's 6%-and-linear finding are all superseded on the facts
   while their *design* conclusions stand.
+- **Preflight is ~29x faster end to end**, and cold indexing ~10x, which was
+  never the goal of the three records that preceded this one — they were all
+  aimed at a stage worth 2.5%.
 - The general lesson, since this is the fourth correction on one measurement:
   **a timer is named by its author, not by what it wraps.** Every number in
   ADR-0060 through ADR-0062 traces to reading `parse_base` as parse time. The
   cheap check — time the four operations separately — was available the whole
   time and was not run until the fourth attempt.
+- A second lesson, narrower and more uncomfortable: **the docstring said the
+  right thing and was believed instead of checked.** `resolution.py` asserted
+  `O(references), not O(references x symbols)` at the top of a file whose three
+  hottest functions violated it. A complexity claim in a comment is a claim.
 
 ## Security and Privacy
 
