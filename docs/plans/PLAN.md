@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **Post-gate session 2026-08-16/17 merged eight branches**: ADR-0050 (q035), ADR-0051 (q006), ADR-0052 (depth-2 claims), ADR-0053 (`CONCEPTUAL` measurable), ADR-0054 (finding subject/path), ADR-0055 (route cites its handler), plus two artifact regenerations and one documentation pass. **No migration; `SCHEMA_VERSION` stays 14 and `contract_version` stays `1.1` throughout** |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** Of `extra_build.md`'s seven tasks, **1, 2, 3, 5 and 7 are closed**; **Task 4 and the remainder of Task 6 are blocked on rulings** named in the register. **Nothing is startable without a ruling.** ADR-0056 is `proposed` and needs the user's word to reach `accepted` |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** Of `extra_build.md`'s seven tasks, **1, 2, 3, 5 and 7 are closed**; **Task 4 and the remainder of Task 6 are blocked on rulings** named in the register. **Only the ranking-convention half of Task 6 remains**, blocked on whether a corpus expectation should declare transitive (depth-2) results. ADR-0056 was **accepted 2026-08-17**; ADR-0057 and ADR-0058 landed the same day |
 
 ## Deferred Register
 
@@ -275,6 +275,38 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-17T23:30:00Z — ADR-0056 accepted by the user
+
+- Agent: Claude Code `claude-opus-5`, branch `adr-0056-accepted`.
+- Transition: no phase task. Post-gate. **Status change only.**
+- Files: `docs/adr/0056-*.md` (status and Approval), the Active Work table,
+  `extra_build.md`, `documentation/memory.md`. **No source, corpus, contract,
+  schema, migration or baseline change.**
+
+**ADR-0056 moves `proposed` → `accepted`.** The user accepted it after the
+corpus-wide numbers at three penalty strengths, the per-case ranks, and the
+three record corrections were reported. The coarse-chunk penalty **stays
+unimplemented**, and the RRF row in the Deferred Register is closed rather than
+re-deferred.
+
+**The 2026-08-17T19:00Z entry is deliberately left as written**, recording the
+record as `proposed`, because that is what it was when the work was done. Rule 8
+is append-only, and a status that changed later is a new fact rather than a
+correction to an old one.
+
+The acceptance does not change what the ADR measured, and the stated limit
+travels with it: **the conclusion rests on 14 cases over one fixture.** The
+Approval section now says to re-run
+`uv run python scripts/measure_rrf_penalty.py --ab` if the semantic corpus ever
+gains a second fixture, so the limit is attached to the decision rather than
+only to its context.
+
+- Verification: no executable change. `git diff --stat` touches five files, all
+  Markdown; `git status` clean afterwards.
+- Next: **only the ranking-convention half of Task 6 remains**, blocked on
+  whether a corpus expectation should declare transitive (depth-2) results.
+
 
 ### 2026-08-17T22:00:00Z — Task 4 closed (ADR-0057), and its gate target set (ADR-0058)
 

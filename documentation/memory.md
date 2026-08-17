@@ -2077,7 +2077,7 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   `relation_scores` filters on `case.expected_relations` being non-empty, so a
   case declaring none contributes nothing — which is why q006 and q031 could
   start emitting true undeclared edges with **no number moving anywhere**.
-- **The RRF coarse-chunk penalty stays unimplemented, and now on measurement
+- **ADR-0056 accepted 2026-08-17.** The RRF coarse-chunk penalty stays unimplemented, and now on measurement
   rather than on caution** (ADR-0056). Applied corpus-wide at three strengths,
   **every metric that moves moves down** — including the `symbol_recall_at_10`
   it was supposed to raise. **s013's expected answer is itself a class chunk**,

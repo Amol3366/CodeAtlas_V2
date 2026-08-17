@@ -1,8 +1,8 @@
 # ADR-0056: The coarse-chunk penalty is a pure loss, measured
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-08-17
-- Decision owners: user/product (ruling required) and implementing agent
+- Decision owners: user/product (accepted 2026-08-17) and implementing agent
 - Supersedes: none — it *discharges* the measurement ADR-0030 demanded
 - Related: ADR-0028 (rank fusion, which recorded the bias), ADR-0030 (s001 is a
   granularity disagreement), ADR-0046 (a module can answer a conceptual
@@ -219,6 +219,12 @@ removes a document and a manual script.
 
 ## Approval
 
-**Not yet approved.** This ADR records a measurement and recommends closing the
-item; the ruling is the user's. The measurement itself is reproducible with
-`uv run python scripts/measure_rrf_penalty.py --ab`.
+**Approved by the user on 2026-08-17**, after the corpus-wide numbers at three
+penalty strengths, the per-case ranks, and the three record corrections were
+reported. The coarse-chunk penalty stays unimplemented, and the RRF row in the
+Deferred Register is closed rather than re-deferred.
+
+The measurement is reproducible with
+`uv run python scripts/measure_rrf_penalty.py --ab`. Re-run it if the semantic
+corpus ever gains a second fixture — the conclusion rests on 14 cases over one,
+and that limit is recorded above rather than left implicit.
