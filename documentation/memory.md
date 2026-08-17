@@ -2055,6 +2055,26 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   change to `EmbeddingMigrationService`. Two resolution sites could disagree
   about which model is current, and a namespace whose label disagrees with its
   contents fails silently.
+- **Preflight on a real repository is 635 s, and 99.5% of it is parsing**
+  (ADR-0060). The register's ">15 minutes on a 664-file repository" is
+  confirmed, not anecdotal. `parse_base` 316 s + `parse_target` 316 s against
+  `file_diff` 2.4 s and `symbol_diff` 0.2 s. The remedy is not re-parsing
+  unchanged files; **`SnapshotStateView` is not that remedy** — it is unused
+  *and* still reads and hashes every file.
+- **A synthetic profile measures scaling honestly and proportions
+  dishonestly** (ADR-0060). `measure_phase4_perf.py` generates ~15-line
+  modules, so `file_diff` looked like the biggest stage and parsing looked
+  secondary; on a real tree it is the reverse by two orders of magnitude. Its
+  *exponents* held — that is what it is good for. **An earlier draft of
+  ADR-0060 repeated its proportions as fact.**
+- **A true speedup can still be the wrong fix.** The `symbol_diff` quadratic
+  was real (exponent 2.02, 39x at 800 modules) and is worth **2.7%** of the
+  real-world number. Quote a speedup with the share of total it moves, or it
+  misleads.
+- **Guard complexity with a scan-counting test, not a timing test.** Counting
+  traversals is deterministic and gate-safe; before the fix it read 51
+  traversals for 50 symbols and 401 for 400. Assert *growth* across two sizes
+  as well as a ceiling, or raising the constant defeats the guard.
 - **Ranking sensitivity needs a two-hop chain, not a bigger answer set**
   (ADR-0059). It is *not* structurally unavailable for a correctly-specified
   direct case, as the plan claimed — `symbol_breadth` simply had no two-hop

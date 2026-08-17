@@ -85,6 +85,8 @@ def compute_symbol_changes(
         lifecycle_names=lifecycle_names,
         base_bindings=_import_bindings(base.relations),
         target_bindings=_import_bindings(target.relations),
+        base_by_source=_group_by_source(base.relations),
+        target_by_source=_group_by_source(target.relations),
         target_binding_lines=_import_binding_lines(target.relations),
     )
 
@@ -132,7 +134,36 @@ class _DependencyContext:
     lifecycle_names: set[str]
     base_bindings: dict[tuple[str, str], str]
     target_bindings: dict[tuple[str, str], str]
+    # Relations indexed by the symbol they leave, grouped once per analysis.
+    #
+    # `_dependency_changed` and `_binding_span` need one symbol's outgoing
+    # edges, and both used to find them by filtering the whole list. Both run
+    # once per surviving symbol pair, so the cost was O(symbols x relations) --
+    # a measured log-log exponent of 2.02 while every other engine stage sat at
+    # ~1.0. Grouping here is the same move `_group_by_key` already makes for
+    # symbols, and it makes the lookup O(1).
+    base_by_source: dict[str, tuple[RelationRecord, ...]] = field(
+        default_factory=dict
+    )
+    target_by_source: dict[str, tuple[RelationRecord, ...]] = field(
+        default_factory=dict
+    )
     target_binding_lines: dict[tuple[str, str], int] = field(default_factory=dict)
+
+
+def _group_by_source(
+    relations: Sequence[RelationRecord],
+) -> dict[str, tuple[RelationRecord, ...]]:
+    """Index relations by the symbol they leave, preserving their order.
+
+    Order is preserved because `_binding_span` takes a min and max over the
+    lines it collects; a reordering could not change that result, but relying
+    on it would be an accident rather than a decision.
+    """
+    grouped: dict[str, list[RelationRecord]] = {}
+    for relation in relations:
+        grouped.setdefault(relation.source_symbol_id, []).append(relation)
+    return {source: tuple(items) for source, items in grouped.items()}
 
 
 def _import_bindings(
@@ -299,13 +330,7 @@ def _classify_one_to_one(
 
     if base_symbol.file_id == target_symbol.file_id:
         if base_symbol.content_hash == target_symbol.content_hash:
-            if _dependency_changed(
-                base_symbol,
-                target_symbol,
-                base.relations,
-                target.relations,
-                context,
-            ):
+            if _dependency_changed(base_symbol, target_symbol, context):
                 return (
                     _dependency(
                         key,
@@ -313,9 +338,7 @@ def _classify_one_to_one(
                         target_symbol,
                         base_path,
                         target_path,
-                        span=_binding_span(
-                            base_symbol, target_symbol, target.relations, context
-                        ),
+                        span=_binding_span(base_symbol, target_symbol, context),
                     ),
                 )
             return ()
@@ -447,7 +470,6 @@ def _dependency(
 def _binding_span(
     base_symbol: SymbolRecord,
     target_symbol: SymbolRecord,
-    target_relations: Sequence[RelationRecord],
     context: _DependencyContext,
 ) -> tuple[int, int] | None:
     """The citation for a binding-driven dependency change.
@@ -458,9 +480,7 @@ def _binding_span(
     no single span that proves it, and the whole symbol speaks instead.
     """
     lines: list[int] = []
-    for relation in target_relations:
-        if relation.source_symbol_id != target_symbol.symbol_id:
-            continue
+    for relation in context.target_by_source.get(target_symbol.symbol_id, ()):
         key = (relation.file_id, relation.target_hint)
         if context.base_bindings.get(
             (base_symbol.file_id, relation.target_hint)
@@ -478,8 +498,6 @@ def _binding_span(
 def _dependency_changed(
     base_symbol: SymbolRecord,
     target_symbol: SymbolRecord,
-    base_relations: Sequence[RelationRecord],
-    target_relations: Sequence[RelationRecord],
     context: _DependencyContext,
 ) -> bool:
     """Whether this symbol's stated references resolve differently.
@@ -518,15 +536,13 @@ def _dependency_changed(
 
     base_edges = {
         edge_key(relation, context.base_bindings)
-        for relation in base_relations
-        if relation.source_symbol_id == base_symbol.symbol_id
-        and considered(relation, context.base_names)
+        for relation in context.base_by_source.get(base_symbol.symbol_id, ())
+        if considered(relation, context.base_names)
     }
     target_edges = {
         edge_key(relation, context.target_bindings)
-        for relation in target_relations
-        if relation.source_symbol_id == target_symbol.symbol_id
-        and considered(relation, context.target_names)
+        for relation in context.target_by_source.get(target_symbol.symbol_id, ())
+        if considered(relation, context.target_names)
     }
     return base_edges != target_edges
 

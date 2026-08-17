@@ -123,7 +123,11 @@ with verification.
 | ~~**`check_phase7.ps1` can exit non-zero while reporting success**~~                                          | **CLOSED 2026-08-15, with the diagnosis corrected.** The recorded mechanism — "the process exit code is whatever the last native command left" — **does not reproduce.** Under `powershell -File` a trailing `cmd /c "exit 3"` still exits **0**, so the success path was never leaking; and a failing step already exited non-zero, because `Invoke-Checked` throws under `$ErrorActionPreference = "Stop"`. The real exposure is one invocation-form narrower: a **caller** that reads `$LASTEXITCODE` after invoking a gate sees the stale code, measured at **3** through a wrapper `.ps1`. Worth fixing anyway — a release gate should state its verdict rather than leave it to how it was called. **All eight** gate scripts lacked the line, not just Phase 7; all eight now end `exit 0`, guarded with no exemption list. The risk that this masks a red gate is covered twice: a dynamic test asserting a throwing step still exits 1 with `exit 0` below it, and a deliberate breakage of the real Phase 4 gate, which exited **1** naming `Dataset validation failed with exit code 2`                                                                                                                                                                                                             | —                                                                                                                                                                          |
 | **One `check_phase7` run exited 1 while printing every step as passing**                                 | **OPEN — still unattributed, and explicitly *not* closed by the `exit 0` work above.** Exit 1 is the **uncaught-throw** signature, so something threw; the trailing `exit 0` cannot produce or prevent it. Observed once on 2026-08-14, did not reproduce on a clean `main` or on a re-run with the same changes. Split out from the exit-code row on 2026-08-15 so that closing the fixable half did not carry this away with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | It recurs — chase it before trusting a green                                                                                                                               |
 | ~~**`.test-tmp` residue and concurrency void gate runs**~~                                                    | **CLOSED 2026-08-15. The cause was not residue and the fix was not a lockfile.** `--basetemp=.test-tmp` named a *shared* directory, and pytest **deletes the directory it is given** the moment the first `tmp_path` is requested — the directory itself, not a numbered subdirectory of it. A second run therefore **destroyed a running session's live files** rather than merely colliding with it, which is why the symptoms looked like both `FileExistsError` and "leftover state". Each session now gets `.test-tmp/s-<pid>-<uuid>`, pruned by age at start; the root stays repository-local because `development-windows.md` records that a locked-down Windows account may be unable to write system temp. **A lockfile was rejected**: it serializes runs instead of making them safe, and would need stale-lock detection — the pid-ownership problem ADR-0037 had to solve. Proven by running `tests/integration` and `tests/unit` concurrently: both passed (706 and 815) into two distinct session directories. **The "never run two gates at once" rule is retired**                                                                                                                                                                                                                                           | —                                                                                                                                                                          |
-| **Preflight takes >15 minutes on a 664-file repository**                                                   | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone measures it properly, or a user reports it                                                                                                                          |
+| ~~**Preflight takes >15 minutes on a 664-file repository**~~                                                   | **MEASURED 2026-08-18 — ADR-0060. The observation is confirmed: 635.59 s (10.6 min)** on CodeAtlas itself over a commit range, stable across three runs. **99.5% of it is parsing** — `parse_base` 316.2 s + `parse_target` 316.0 s — against `file_diff` 2.4 s and `symbol_diff` 246 ms. `docs/operations/change-analysis.md` was right all along: "the engine parses both full states on every analysis; the cost is O(repository), not O(change)". A genuine quadratic was found and fixed on the way (`symbol_diff`, exponent 2.02 → 0.78, 39× at 800 modules) but it is worth **~2.7%** of the real number, and is recorded as not being the remedy. **This row closes as measured; the remedy is the row below** | —                                                                                                          |
+| **Preflight parses every unchanged file, twice, on every analysis**                                             | **OPEN — the real cost, now quantified (ADR-0060).** 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060 | Someone designs the parse-reuse path, with a ruling on what invalidates a cached parse                     |
+| **Cold-indexing this repository takes 343 s**                                                                   | **OPEN — found incidentally 2026-08-18 while measuring preflight, and absent from this register until now.** A different code path from preflight, and the same order of magnitude as one parse pass (316 s), which is consistent with indexing parsing everything once. 11,419 symbols, of which **2,430 are document sections** — this project's own Markdown is its largest symbol source, one file being 12,756 lines | Someone measures where index time goes, or a user reports first-index latency                              |
+| **A synthetic corpus measures scaling honestly and proportions dishonestly**                                    | **OPEN — a stated limit of `measure_phase4_perf.py`'s generated profile, found 2026-08-18.** Its modules are ~15 lines each, so at 800 modules `file_diff` looked like the largest stage (1339 ms of 3367 ms) and parsing looked secondary. On the real repository parsing is **99.5%** and `file_diff` is **0.4%**. The *exponents* it produced held up — that is what it is good for — but **an earlier draft of ADR-0060 repeated its proportions as fact** before the real measurement corrected them | Someone gives the perf harness a profile with realistic file sizes and a Markdown-heavy tree               |
+| ~~original entry~~                                                   | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone measures it properly, or a user reports it                                                                                                                          |
 | ~~**An oversized tracked file fails the whole comparison**~~                                              | **CLOSED 2026-08-15 — ADR-0045.** Ruled by the user: **skip it like the scanner does, and declare the omission**. One committed 3 MB CSV used to make a repository impossible to preflight while the directory scan merely skipped the same file. `archive` now skips and names oversized entries; `read_blob` still raises, because it is asked for one specific blob and answering "here is nothing" would be worse; `StateView.excluded_files()` carries the names and the engine emits a `FILE_TOO_LARGE` warning plus a limitation naming the files. **The directory side was silently omitting them too** — the scanner had recorded `TOO_LARGE` since Phase 1 and nothing ever surfaced it. Only oversize is declared; an *ignored* file stays unreported, because ADR-0044 already ruled it outside the index                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | ~~ADR-0030 module-granularity ruling~~                                                                          | **CLOSED 2026-08-15 — ADR-0046.** Ruled by the user: **a module-level answer satisfies a conceptual question**, and **no ranking change is made**. ADR-0030 had already found no defect; ruling the other way would have declared one, spent real risk on a metric ungated on the retrieval profile (ADR-0023), and traded an evidence hit for a symbol hit. A conceptual expectation naming only the implementing symbol may be *widened*, never replaced, and only on the ADR-0031/0036 justification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                                                                                          |
 | **Duplicate findings, and false findings on a clean tree**                                                 | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                                                                          |
@@ -278,6 +282,112 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-18T06:00:00Z — Preflight cost measured; a quadratic fixed that is not the cause (ADR-0060)
+
+- Agent: Claude Code `claude-opus-5`, branch `preflight-cost-measured`.
+- Transition: no phase task. Post-gate. Not an `extra_build.md` task — that
+  file is complete; this is the first Deferred Register item picked up since.
+- New record: **ADR-0060**, status `accepted`.
+- Files: `analysis/symbol_diff.py`, `tests/unit/test_symbol_diff_complexity.py`
+  (new), `docs/operations/change-analysis.md`, the ADR and its index, the
+  register, `documentation/memory.md`. **No corpus, contract, schema, migration
+  or baseline change.**
+
+**The register's observation is confirmed and is not an anecdote.** A
+commit-range preflight over CodeAtlas itself — 715 tracked files, 11,419
+symbols — takes **635.59 s (10.6 min)**, stable across three runs
+(635.62 / 635.59 / 632.21).
+
+| Stage | Real repository | Share |
+| --- | ---: | ---: |
+| `parse_base` | 316,210 ms | 49.8% |
+| `parse_target` | 316,040 ms | 49.7% |
+| `file_diff` | 2,414 ms | 0.4% |
+| `symbol_diff` | 246 ms | 0.04% |
+
+**99.5% is parsing, so `change-analysis.md` was right all along** — "the engine
+parses both full states on every analysis; the cost is O(repository), not
+O(change)" names the whole problem. The measurement's contribution is a number,
+not a correction.
+
+**A genuine quadratic was found on the way, and fixed.** `_dependency_changed`
+and `_binding_span` each filtered the *whole* relation list for one symbol's
+edges, and both run once per surviving symbol pair — O(symbols × relations),
+fitted exponent **2.02** while every other stage sat at ~1.0. Relations are now
+grouped by `source_symbol_id` once, as `_group_by_key` already does for
+symbols: **768.8 ms → 19.7 ms at 800 modules (39×), exponent 2.02 → 0.78**,
+share of engine time 18.8% → 0.6%.
+
+**The worst case is an unchanged repository**, not a large diff: the dependency
+check runs precisely when a content hash is *un*changed, so the cost was paid
+in full on every preflight and a bigger diff made it cheaper.
+
+> **It is not the fix that matters, and the record says so.** Extrapolated to
+> 11,419 symbols the old quadratic was worth ~17 s of ~652 s — about **2.7%**.
+> A 39× speedup on a stage worth 2.7% is a true number that misleads anyone who
+> reads it alone.
+
+**The synthetic profile mis-weights stages, and an earlier draft of ADR-0060
+repeated the error as fact.** It said "`file_diff` is the largest single stage,
+ahead of both parses" — true at 800 generated modules (1339 ms of 3367 ms),
+**false on a real repository**, where `file_diff` is 0.4%. The generated
+modules are ~15 lines; this repository has 2,430 document sections and one
+Markdown file of 12,756 lines. **Exponents from that harness hold; proportions
+do not.**
+
+**Behaviour is byte-for-byte unchanged** — `baseline-phase-0`, `-3` and `-4`
+all reproduce at `--check` exit 0 with an empty `git diff`, which is the only
+acceptable evidence for a pure optimisation.
+
+**Guarded by a scan-counting test, not a timing test**, so it is deterministic
+and gate-safe. Before the fix it recorded **51 traversals for 50 symbols and
+401 for 400** — the quadratic as a number. A second test pins *growth* across
+an 8× jump so raising the ceiling constant cannot defeat it. Mutating
+`_group_by_source` to return `{}` fails five tests including corpus-level ones.
+
+**Three corrections to the record**, all verified before being written: the
+"snapshot-reuse path" was attributed to ADR-0005 **decision 2** (that is the
+Git security posture; the design is decision 1); `SnapshotStateView` is
+**unused, not unimplemented** — `analysis/states.py:315`, four integration
+tests, zero production callers, the `prune` shape again; and **wiring it in
+would not have fixed this**, because its `read_file` still reads and hashes
+every file. A fourth: the oversized-file paragraph still described pre-ADR-0045
+behaviour as "open".
+
+**One hypothesis refuted before it reached a conclusion.** The working tree
+holds 329,785 files (262,774 in `.test-tmp`), which looked like an obvious
+cause. The scanner **prunes ignored directories** before recursing, so they are
+never walked.
+
+- Verification, exit codes read from the process:
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest -q` | **exit 0** — 2265 passed, 3 skipped |
+| `ruff` / `mypy --no-incremental` | **exit 0** — 355 files |
+| `check_phase4.ps1 -SkipSync` | **exit 0** |
+| `baseline-phase-0/-3/-4 --check` | **exit 0** each, empty `git diff` |
+| Contract schema freshness | **exit 0** |
+| Phase 7 rerank A/B `--check` | **exit 0** |
+| Phase 7 semantic uplift baseline `--check` | **exit 0** |
+| Semantic suites | **25 passed** |
+
+  **`check_phase7.ps1` was not re-run as a whole**, and its web stages were not
+  re-run at all. The change touches one Python module, one test and four
+  Markdown files — **no web file — so `apps/web` lint, types, tests and build
+  cannot be affected**, and they passed at `2f967f3`. The engine-affected
+  stages, which a `symbol_diff` change genuinely could break, were each run
+  directly and are in the table above.
+
+  **Playwright is still not clean, and still not this change**:
+  `settings.spec.ts:248` fails reproducibly and fails identically on `main`,
+  recorded in its own register row on 2026-08-18.
+
+- Next: **the remedy is its own register row** — do not re-parse unchanged
+  files, keyed by content hash. That needs a ruling on what invalidates a
+  cached parse and is deliberately not folded into ADR-0060.
+
 
 ### 2026-08-18T02:00:00Z — Task 6 closed: an expectation declares direct results (ADR-0059)
 
