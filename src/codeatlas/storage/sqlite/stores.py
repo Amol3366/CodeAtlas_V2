@@ -505,6 +505,27 @@ class SymbolStore:
         ).fetchall()
         return tuple(_symbol_from_row(row) for row in rows)
 
+    def get_many(
+        self, snapshot_id: str, symbol_ids: Sequence[str]
+    ) -> dict[str, SymbolRecord]:
+        """Hydrate just the named symbols, keyed by ID.
+
+        `list_for_snapshot` is the right call when the whole set is genuinely
+        needed, and the wrong one on a per-query path: it is O(repository) on
+        every request, which Section 10.3 asks callers to avoid. Labelling a
+        handful of relation endpoints needs a handful of rows.
+        """
+        if not symbol_ids:
+            return {}
+        unique = list(dict.fromkeys(symbol_ids))
+        placeholders = ",".join("?" for _ in unique)
+        rows = self._connection.execute(
+            "SELECT * FROM symbols"
+            f" WHERE snapshot_id = ? AND symbol_id IN ({placeholders})",
+            (snapshot_id, *unique),
+        ).fetchall()
+        return {row["symbol_id"]: _symbol_from_row(row) for row in rows}
+
     def copy_from_snapshot(
         self,
         source_snapshot_id: str,
