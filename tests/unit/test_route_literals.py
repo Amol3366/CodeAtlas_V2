@@ -21,6 +21,7 @@ from codeatlas.extraction.python_relations import extract_python_references
 from codeatlas.extraction.routes import (
     MENTION_HINT,
     ROUTE_HINT,
+    matching_forms,
     name_tokens,
     normalize_route,
     route_tokens,
@@ -153,6 +154,51 @@ def test_matching_is_singular_tolerant_in_both_directions() -> None:
 def test_matching_requires_a_shared_token_not_a_shared_prefix() -> None:
     assert not tokens_match(("orders",), ("ordinal",))
     assert not tokens_match(("health",), ("get", "order"))
+
+
+def test_matching_forms_enumerates_exactly_what_tokens_match_accepts() -> None:
+    """The index and the predicate must agree on every pair, in both directions.
+
+    Resolution stopped calling `tokens_match` against every symbol and now looks
+    route words up in a token index keyed by `matching_forms`. That is only
+    sound while the enumeration is *exactly* as wide as the predicate: one form
+    too few silently drops route edges, one too many silently invents them, and
+    neither shows up as an error -- only as a graph that is quietly wrong.
+
+    So this is checked exhaustively over a vocabulary built to include every
+    shape the plural rule can take: bare stems, `-s` plurals, `-es` plurals,
+    words that merely end in those letters without being plurals, and the
+    single characters where stripping a suffix would leave nothing.
+    """
+    vocabulary = [
+        "order",
+        "orders",
+        "box",
+        "boxes",
+        "boxe",
+        "status",
+        "statuses",
+        "address",
+        "addresses",
+        "health",
+        "ordinal",
+        "s",
+        "es",
+        "e",
+        "a",
+        "id",
+        "ids",
+    ]
+
+    for left in vocabulary:
+        forms = set(matching_forms(left))
+        for right in vocabulary:
+            expected = tokens_match((left,), (right,))
+            assert (right in forms) is expected, (
+                f"`{left}` vs `{right}`: the predicate says {expected} but the"
+                f" index {'would' if right in forms else 'would not'} match."
+                " A route edge would be invented or dropped"
+            )
 
 
 # --- TypeScript and JavaScript ------------------------------------------------

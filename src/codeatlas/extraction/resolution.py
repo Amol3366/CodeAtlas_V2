@@ -7,7 +7,11 @@ edge is ever carried forward. ``CLAUDE.md`` Section 9's "necessary reverse
 relations" requirement holds by construction rather than by bookkeeping.
 
 The work is a pass over an in-memory name index built once per snapshot, so it
-is O(references), not O(references x symbols).
+is O(references), not O(references x symbols). That property is a claim this
+module has to keep earning: every lookup a reference performs must go through
+:class:`_Index`, because a bare scan of ``symbols_by_id`` inside a per-reference
+loop reintroduces the product silently and only shows up on a real repository.
+ADR-0064 records the three places that had done exactly that.
 
 The resolution order below is a *trust* ordering, not merely a search order.
 Earlier steps use information the file itself states; later ones reach further
@@ -37,7 +41,7 @@ from codeatlas.domain.relations import (
 )
 from codeatlas.domain.repository import FileClassification, FileRecord
 from codeatlas.domain.symbols import SymbolRecord
-from codeatlas.extraction.routes import name_tokens, route_tokens, tokens_match
+from codeatlas.extraction.routes import matching_forms, name_tokens, route_tokens
 
 # Symbols that can answer a request. A route names a handler, never a module or
 # a document heading that happens to share a word with it.
@@ -122,6 +126,28 @@ class _Index:
     )
     module_to_file: dict[str, str] = field(default_factory=dict)
     path_stem_to_file: dict[str, str] = field(default_factory=dict)
+    # Every dotted tail of every module path, so an unqualified specifier under
+    # a source root is a lookup rather than a walk of the module table.
+    module_suffix_to_file: dict[str, str] = field(default_factory=dict)
+    directory_of_file: dict[str, str] = field(default_factory=dict)
+
+    # The three projections below each replace a scan of every symbol in the
+    # snapshot from inside a loop over references or sections; see the module
+    # docstring. They are built from ``symbols_by_id.values()`` rather than from
+    # the input sequence, so a symbol ID appearing twice is counted once here
+    # exactly as it was when the scan was inline -- building them from
+    # ``symbols`` would turn a resolved mention into an ambiguous one.
+    mentionable_by_lower_name: dict[str, list[SymbolRecord]] = field(
+        default_factory=dict
+    )
+    # Handler symbols bucketed by each word their name contains. `name_tokens`
+    # is a regex split, and it was being recomputed for every symbol on every
+    # route -- 10.5 million calls on this repository.
+    handlers_by_token: dict[str, list[SymbolRecord]] = field(default_factory=dict)
+    # Config-key symbols with their dotted paths already split. `_dotted_paths`
+    # is a pure function of the symbol and was being recomputed once per
+    # (document section x config key) pair.
+    config_key_paths: tuple[tuple[SymbolRecord, tuple[str, ...]], ...] = ()
 
 
 class SnapshotResolver:
@@ -205,11 +231,21 @@ def _build_index(
     index = _Index()
     for record in files:
         index.files_by_id[record.file_id] = record
+        index.directory_of_file[record.file_id] = _directory(record.relative_path)
         stem = _path_stem(record.relative_path)
         index.path_stem_to_file.setdefault(stem, record.file_id)
         if record.language == "python":
             index.module_to_file.setdefault(
                 _python_module(record.relative_path), record.file_id
+            )
+
+    # `setdefault` in insertion order reproduces "the first module path that
+    # ends with this specifier wins", which is what the linear scan returned.
+    for module_path, file_id in index.module_to_file.items():
+        segments = module_path.split(".")
+        for start in range(len(segments)):
+            index.module_suffix_to_file.setdefault(
+                ".".join(segments[start:]), file_id
             )
 
     for symbol in symbols:
@@ -231,6 +267,19 @@ def _build_index(
         *index.name_in_file.values(),
     ):
         bucket.sort(key=lambda symbol: (symbol.qualified_name, symbol.symbol_id))
+
+    config_keys: list[tuple[SymbolRecord, tuple[str, ...]]] = []
+    for symbol in index.symbols_by_id.values():
+        if symbol.kind not in _UNMENTIONABLE_KINDS:
+            index.mentionable_by_lower_name.setdefault(
+                symbol.name.lower(), []
+            ).append(symbol)
+        if symbol.kind in _HANDLER_KINDS:
+            for token in name_tokens(symbol.name):
+                index.handlers_by_token.setdefault(token, []).append(symbol)
+        elif symbol.kind is SymbolKind.CONFIG_KEY:
+            config_keys.append((symbol, _dotted_paths(symbol)))
+    index.config_key_paths = tuple(config_keys)
     return index
 
 
@@ -380,12 +429,9 @@ def _candidate_levels(
             symbol
             for symbol in index.by_name.get(hint, ())
             if symbol.file_id != file_id
-            and _directory(
-                index.files_by_id[symbol.file_id].relative_path
-                if symbol.file_id in index.files_by_id
-                else ""
-            )
-            == package
+            # A symbol whose file is unknown has no directory, matching the
+            # `_directory("")` the inline recomputation produced for it.
+            and index.directory_of_file.get(symbol.file_id, "") == package
         )
         levels.append(_Candidates(siblings))
 
@@ -400,6 +446,12 @@ class _RouteIndex:
     """Who states each route, and who could be answering it."""
 
     owners: dict[str, list[SymbolRecord]] = field(default_factory=dict)
+    # Which handlers a route literal matches, before the caller's own file is
+    # excluded. Both inputs to that match -- the route's tokens and the set of
+    # symbols that state it -- depend only on the route, so the answer is shared
+    # by every reference naming the same path. A repository states far fewer
+    # distinct routes than it has route references.
+    _matched: dict[str, tuple[SymbolRecord, ...]] = field(default_factory=dict)
 
     @classmethod
     def build(
@@ -432,20 +484,33 @@ class _RouteIndex:
         caller and its handler are indistinguishable, and both would be reported
         as ambiguous rather than one being reported as the answer.
         """
-        tokens = route_tokens(route)
-        if not tokens:
-            return ()
-        stated = {symbol.symbol_id for symbol in self.owners.get(route, ())}
-        found = [
-            symbol
-            for symbol in index.symbols_by_id.values()
-            if symbol.kind in _HANDLER_KINDS
-            and symbol.file_id != exclude_file_id
-            and symbol.symbol_id not in stated
-            and tokens_match(tokens, name_tokens(symbol.name))
-        ]
-        found.sort(key=lambda symbol: (symbol.qualified_name, symbol.symbol_id))
-        return tuple(found)
+        matched = self._matched.get(route)
+        if matched is None:
+            tokens = route_tokens(route)
+            if not tokens:
+                self._matched[route] = ()
+                return ()
+            stated = {symbol.symbol_id for symbol in self.owners.get(route, ())}
+            # A handler qualifies if *any* of its words matches *any* of the
+            # route's, so gather the buckets rather than testing every symbol.
+            # One handler can arrive through several tokens, hence the seen set.
+            seen: set[str] = set()
+            found: list[SymbolRecord] = []
+            for token in tokens:
+                for form in matching_forms(token):
+                    for symbol in index.handlers_by_token.get(form, ()):
+                        if symbol.symbol_id in stated or symbol.symbol_id in seen:
+                            continue
+                        seen.add(symbol.symbol_id)
+                        found.append(symbol)
+            # Sorted before caching, so excluding the caller's file below is a
+            # filter over an already-ordered list and cannot change the order.
+            found.sort(key=lambda symbol: (symbol.qualified_name, symbol.symbol_id))
+            matched = tuple(found)
+            self._matched[route] = matched
+        return tuple(
+            symbol for symbol in matched if symbol.file_id != exclude_file_id
+        )
 
 
 def _resolve_route(
@@ -496,15 +561,16 @@ def _resolve_mention(reference: SymbolReference, index: _Index) -> RelationRecor
     the model is used, because "the document contains this word" is genuinely
     weak evidence. Modules, configuration keys, and headings are excluded: they
     are named by ordinary English far too often for a word to mean anything.
+    That exclusion, and the lowercasing, are applied when
+    ``mentionable_by_lower_name`` is built — once per snapshot rather than once
+    per mention, which is the whole point of the index.
     """
     word = reference.target_hint.lower()
     candidates = _Candidates(
         tuple(
             symbol
-            for symbol in index.symbols_by_id.values()
-            if symbol.kind not in _UNMENTIONABLE_KINDS
-            and symbol.file_id != reference.file_id
-            and symbol.name.lower() == word
+            for symbol in index.mentionable_by_lower_name.get(word, ())
+            if symbol.file_id != reference.file_id
         )
     )
     resolved = candidates.state is ResolutionState.RESOLVED
@@ -591,19 +657,16 @@ def _derive_config_edges(
     # `service.port` meant impact from the documented key could only be reached
     # through the parent, and folding the parent away lost the link entirely.
     leaves: dict[tuple[str, str], SymbolRecord] = {}
-    for candidate in index.symbols_by_id.values():
-        if candidate.kind is SymbolKind.CONFIG_KEY:
-            leaves.setdefault((candidate.file_id, candidate.qualified_name), candidate)
+    for candidate, _paths in index.config_key_paths:
+        leaves.setdefault((candidate.file_id, candidate.qualified_name), candidate)
 
     edges: list[RelationRecord] = []
     for section_id, words in words_by_section.items():
         section = index.symbols_by_id.get(section_id)
         if section is None or section.kind is not SymbolKind.DOCUMENT_SECTION:
             continue
-        for symbol in index.symbols_by_id.values():
-            if symbol.kind is not SymbolKind.CONFIG_KEY:
-                continue
-            for path in _dotted_paths(symbol):
+        for symbol, paths in index.config_key_paths:
+            for path in paths:
                 segments = path.lower().split(".")
                 if len(segments) < 2 or any(part not in words for part in segments):
                     continue
@@ -1037,10 +1100,7 @@ def _resolve_module(
         return direct
 
     # A dotted Python module may sit under a source root such as `src/`.
-    for module_path, file_id in index.module_to_file.items():
-        if module_path == specifier or module_path.endswith(f".{specifier}"):
-            return file_id
-    return None
+    return index.module_suffix_to_file.get(specifier)
 
 
 def _resolve_python_relative(
