@@ -2130,6 +2130,29 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 ## Known Issues
 
+- **A timer is named by its author, not by what it wraps** — the single mistake
+  behind ADR-0060, ADR-0061 and ADR-0062, corrected by **ADR-0064 (2026-08-18)**.
+  `parse_base` and `parse_target` wrap `_analyze_state`, which lists, reads,
+  parses **and resolves**. Reading them as parse time produced, in order:
+  "99.5% of preflight is parsing", then a corrected-but-still-wrong
+  "parse plus resolve", then "resolution is ~6% and linear". Timed separately
+  on a real repository: **parse 8.14 s (2.5%), resolve 310.24 s (97.0%)**.
+  Parsing this entire repository takes **eight seconds**.
+
+  Three records' worth of remedies — a within-call parse cache, stored-index
+  reuse, a persisted parse cache — were all aimed at that 2.5%. Two were
+  declined on their own arithmetic and one shipped; none was wrong to
+  investigate, but all three were chosen because of a mis-read timer.
+
+  The actual defect was in `resolution.py`, which claimed
+  `O(references), not O(references x symbols)` **in its own module docstring**
+  while three call sites scanned every symbol per reference. Fixed by indexing
+  them: **313.97 s → 3.55 s, 88x**, verified identical across all 168,605
+  relations. Two lessons worth carrying: a docstring's complexity claim is a
+  claim, not a guarantee, and a generated corpus can hide a quadratic completely
+  — ADR-0062's clean exponent of 1.14 was fitted on a corpus with no Markdown,
+  hence no mentions, hence none of the references carrying the quadratic term.
+
 - ~~**`CODEATLAS_EPHEMERAL` governs `serve` only — the CLI always writes the real
   database.**~~ **Made visible 2026-08-09**, not changed. Every command that
   opens a database now prints `Using database: <path>` to **stderr**, and

@@ -30,6 +30,7 @@ __all__ = [
     "MENTION_HINT",
     "MIN_MENTION_LENGTH",
     "ROUTE_HINT",
+    "matching_forms",
     "mention_words",
     "name_tokens",
     "normalize_route",
@@ -148,6 +149,13 @@ def tokens_match(route: tuple[str, ...], name: tuple[str, ...]) -> bool:
 
     ``/orders`` and ``get_order`` are about the same thing; a prefix rule would
     also match ``ordinal``, so only whole words and their simple plurals count.
+
+    Resolution does not call this: it looks the route's words up in a token
+    index built from :func:`matching_forms`, because testing this predicate
+    against every symbol is what made resolution quadratic. This stays as the
+    readable statement of the rule, and
+    ``test_route_literals.py`` asserts the two agree on every pair they can
+    disagree on. Change one and the test will tell you to change the other.
     """
     return any(
         _same_word(route_word, name_word) for route_word in route for name_word in name
@@ -161,6 +169,29 @@ def _same_word(left: str, right: str) -> bool:
         if longer in (f"{shorter}s", f"{shorter}es"):
             return True
     return False
+
+
+def matching_forms(word: str) -> tuple[str, ...]:
+    """Every spelling of `word` that :func:`tokens_match` would accept.
+
+    The plural rule is small and closed, so the set of words that match a given
+    one can be enumerated instead of searched for. That turns "does this route
+    share a word with this identifier" from a comparison against every
+    identifier into a lookup, which is the difference between a scan of the
+    whole symbol table per route and a handful of dictionary hits.
+
+    The enumeration must stay exactly as wide as :func:`_same_word`, in both
+    directions: `orders` matches `order` because the *name* may be the plural,
+    and `order` matches `orders` because the *route* may be.
+    """
+    forms = [word, f"{word}s", f"{word}es"]
+    # The other direction: `word` is itself the plural of a shorter name.
+    for suffix in ("es", "s"):
+        if word.endswith(suffix):
+            stem = word[: -len(suffix)]
+            if stem and stem not in forms:
+                forms.append(stem)
+    return tuple(forms)
 
 
 def routes_in_text(text: str) -> tuple[str, ...]:
