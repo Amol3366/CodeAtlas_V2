@@ -1,6 +1,6 @@
 # Extra Build — the remaining work, in the order to do it
 
-Status: current as of 2026-08-17, after WS-3, WS-4 and **Tasks 1, 2, 3 and 5** closed.
+Status: current as of 2026-08-17, after WS-3, WS-4, WS-5 and **Tasks 1, 2, 3, 5 and 7** closed.
 
 **Authority note.** This file is a **work plan**, not a status list. The single
 authoritative record of what is open is the **Deferred Register in
@@ -30,19 +30,20 @@ independent, so the order below is a suggestion rather than a dependency chain.
 
 ## Start here tomorrow
 
-**Tasks 1, 2, 3 and 5 are done** (ADR-0050, 0051, 0054, 0055). Two remaining
-tasks are blocked on a ruling and one is free.
+**Tasks 1, 2, 3, 5 and 7 are done** (ADR-0050, 0051, 0054, 0055, 0056).
+**Everything still open is blocked on a ruling** — there is no longer a task
+you can start without a decision.
 
-1. **Task 7 is the only one you can start without a decision.** It is a
-   *measurement*, not a fix: ADR-0046 already ruled the coarse-chunk penalty
-   stays unimplemented, so the question is only whether the bias costs anything
-   at the larger corpus.
-2. **Task 4 needs a ruling and is the natural next one to ask for**, because
-   ADR-0055 just answered the same question shape for `trace`: what does a
-   traversal-derived answer carry? Task 4 asks it for *lexical* answers. Three
-   cases, not two — q024 joined after ADR-0053.
-3. **The rest of Task 6 needs a different ruling** — whether a corpus
+1. **Task 4 is the ruling to ask for first**, because ADR-0055 just answered the
+   same question shape for `trace`: what does a traversal-derived answer carry?
+   Task 4 asks it for *lexical* answers. Three cases, not two — q024 joined
+   after ADR-0053.
+2. **The rest of Task 6 needs a different ruling** — whether a corpus
    expectation should declare transitive (depth-2) results.
+
+**ADR-0056 is `proposed`, not `accepted`.** It recommends closing the RRF item
+on the measurement below; per the ADR workflow only the user moves it to
+`accepted`.
 
 **Before writing or trusting any test, read the boxed findings under Tasks 1, 2,
 3 and 5.** Between them they record five ways something can look like coverage
@@ -59,6 +60,11 @@ and not be:
 None of these was found by review. All five were found by mutation, and three
 were found only after a *first* mutation attempt came back green.
 
+**And one about measurement rather than testing, from Task 7:** *check which
+corpus a metric is computed over before believing that corpus grew.* WS-1 took
+`cases` from 27 to 50 and the fusion measurement still runs on 14, because
+`_fuse` is gated on `SEMANTIC_INTENTS` and never sees the corpus that grew.
+
 ---
 
 ## Where things stand
@@ -66,8 +72,8 @@ were found only after a *first* mutation attempt came back green.
 Phases 0–7 complete with user-approved gates; the project was closed out
 2026-08-10 and everything since is post-gate work. Of the post-closeout program,
 **WS-0, WS-1, WS-3 and WS-4 are closed**, along with both process defects (gate
-exit codes, test isolation). **WS-2 closed 2026-08-17 (ADR-0054). WS-5 and WS-6
-remain**, WS-6 blocked on the Task 4 ruling.
+exit codes, test isolation). **WS-2 closed 2026-08-17 (ADR-0054), WS-5 the same
+day (ADR-0056). Only WS-6 remains**, blocked on the Task 4 ruling.
 
 Corpus: **64 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
@@ -391,25 +397,54 @@ be sensitive without declaring less than the truth.
 after 2026-08-15 — or it is recorded that symbol-intent ranking coverage is
 structurally unavailable and the lexical side carries it.
 
-## Task 7 — RRF coarse-chunk measurement (WS-5) — reframed, not blocked
+## Task 7 — RRF coarse-chunk measurement (WS-5) ✅ DONE 2026-08-17 (ADR-0056)
 
-**Cost:** 1–2 days. **Blocked by:** nothing; the shape changed.
+**Measured corpus-wide at three penalty strengths. The lever is a pure loss —
+every metric that moves, moves down.** Reproduce with
+`uv run python scripts/measure_rrf_penalty.py --ab` (needs `semantic-local`;
+**never add it to a gate**, §4.3).
 
-Gate B was ruled **B1: a module-level answer satisfies a conceptual question**,
-with **no ranking change** (ADR-0046). So this is no longer "fix the RRF
-coarse-chunk bias" — the penalty stays unimplemented and s001's rank-1
-containment hit is preserved.
+| Metric | baseline | scale 0.50 | scale 0.25 | fine-first |
+| --- | ---: | ---: | ---: | ---: |
+| `containing_evidence_recall_at_10` | **1.0000** | 0.9333 | 0.8667 | 0.8667 |
+| `primary_evidence_recall_at_10` | **0.8000** | 0.7333 | 0.7333 | 0.7333 |
+| `symbol_recall_at_10` | **0.9286** | 0.8571 | 0.8571 | 0.8571 |
+| `mean_reciprocal_rank` | **0.6977** | 0.6888 | 0.6888 | 0.6888 |
+| `ndcg_at_10` | **0.7530** | 0.7304 | 0.7304 | 0.7304 |
 
-What remains is a **measurement**: does the bias cost anything now the corpus is
-larger? ADR-0030's finding stands — the obvious lever demotes the chunk
-providing that rank-1 hit — so any proposal to change ranking must show
-corpus-wide numbers, not one case.
+**ADR-0030 predicted a trade. There is no trade** — `symbol_recall_at_10` falls
+*too*, so the lever loses on both sides of the exchange it was meant to balance.
 
-**Also permitted by the ruling, and cheaper:** a conceptual expectation naming
-only the implementing symbol may be **widened** to accept the module that
-documents the concept. Widening only, never replacement, and only on the
-ADR-0031/0036 justification. ADR-0003 still forbids editing the corpus to move a
-number.
+**The finding ADR-0030 did not anticipate:** s013's expected answer
+`OrderStatus` (`models.py:6-12`) **is itself a class chunk**, so the penalty
+demotes the answer it exists to promote, **7 → 28**. s001 loses its only
+containment hit **1 → 11**, as predicted. The one gain in the whole corpus is
+s007, **8 → 7** — already inside the top 10, so it cannot improve any Recall@10,
+and its ~0.001 of MRR is swamped by the losses.
+
+Incidence today: a coarse chunk outranks the declared evidence in **2 of 14
+cases**, both still inside the top 10, so **the bias costs zero recall.**
+
+> **The premise was false, and this is the sixth time.** The task said "now the
+> corpus is larger". It is not. `_fuse` is gated on `SEMANTIC_INTENTS`
+> (`{PROJECT_OVERVIEW, TEXT}`) and `predict_exact_symbols` attaches no fusion,
+> so **WS-1's 27 → 50 growth landed on a corpus fusion never touches.** The only
+> corpus that reaches it is `semantic_cases` — **14 cases, one fixture,
+> byte-identical since 2026-07-31**. Check which corpus a change is measured on
+> before believing it grew. **Task 4 is still the only premise in this program
+> that checked out.**
+
+> **The "cheaper" widening option is not available.** ADR-0046 permits widening
+> only on the ADR-0031/0036 justification — the expectation named something the
+> engine cannot produce, or contradicted itself. **s001 names
+> `InventoryLedger.reserve`, which the engine does produce, at symbol rank 12.**
+> Neither test is met, so widening it would be editing the corpus to move a
+> number (ADR-0003). s001 stays as written.
+
+**Also corrected:** ADR-0028's second recorded cost, s004, **no longer
+reproduces** — `tax_for` is rank 1 and `pricing.py:1-42` is rank 5. Deliberately
+not attributed; ADR-0026 and ADR-0029 are both plausible and separating them
+needs a bisect this did not do. Its first, s013 at rank 7, is unchanged.
 
 ---
 
@@ -425,6 +460,7 @@ Not scheduled. Each has a named condition in the register that reopens it.
 | **The `-Semantic` step is opt-in, so two artifacts went stale unnoticed for two days** | Someone makes the semantic block non-optional, or accepts that `-SkipSync` alone is not a full gate |
 | **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under it | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
 | **`relation_path_recall` has no gate target** | Task 4 settles ADR-0034's last cause |
+| **The corpus fusion runs on is 14 cases over one fixture**, byte-identical since 2026-07-31. Every fusion and ranking number — ADR-0028's, ADR-0030's, ADR-0056's — rests on it, and WS-1's growth never reached it | Someone gives `semantic_cases` a second fixture — a fixture shape, not a case |
 
 ---
 
