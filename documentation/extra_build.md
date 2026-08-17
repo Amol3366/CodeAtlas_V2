@@ -39,9 +39,8 @@ independent, so the order below is a suggestion rather than a dependency chain.
    Gated at **1.0, absolutely**, on the `retrieval` profile only. Mutation-checked:
    regressing ADR-0057 drove recall 1.0 → 0.875 and the gate caught it.
 
-**ADR-0056 is `proposed`, not `accepted`.** It recommends closing the RRF item
-on the measurement below; per the ADR workflow only the user moves it to
-`accepted`.
+**ADR-0056 was accepted by the user on 2026-08-17.** The coarse-chunk penalty
+stays unimplemented on the measurement below, and the RRF row is closed.
 
 **Before writing or trusting any test, read the boxed findings under Tasks 1, 2,
 3 and 5.** Between them they record five ways something can look like coverage
