@@ -800,6 +800,38 @@ def _unmet_targets(
         # lookups, and a config key or document heading either resolves or it
         # does not.
         minimums["lexical_resolution"] = (metrics.lexical_resolution, 1.0)
+        # 1.0, absolute, for the reason `lexical_resolution` above is absolute:
+        # this is a deterministic emission question, not a ranking one. An edge
+        # the corpus declares, the store holds, and resolution has already
+        # bound to a real target either appears in the answer or it does not.
+        # There is no fuzziness for a tolerance to absorb.
+        #
+        # ADR-0038 deferred this threshold because one of ADR-0034's four
+        # causes was unsettled and "a threshold over an unsettled cause cannot
+        # be reasoned about". ADR-0057 settled the last one, so the number is
+        # now chosen against a known denominator rather than a moving one.
+        #
+        # **The denominator is 24** -- measured cases whose `expected_relations`
+        # is non-empty -- and it is not uniform: 21 declare one edge, and one
+        # each declare two, three and five. So the reachable values just below
+        # 1.0 are 0.9917, 0.9861, 0.9792 and then 0.9583. A 0.95 target would
+        # tolerate exactly one whole-case miss and a 0.99 target would tolerate
+        # only q060 losing one of its five -- privileging one case by accident
+        # of how many edges it happens to declare.
+        #
+        # Neither tolerance has a named cause. Nothing is known that can drop a
+        # declared, stored, resolved edge for a legitimate reason: a bounded
+        # traversal or a `MAX_RELATION_PATHS` truncation that lost one would be
+        # a defect or a mis-set bound, not bad luck. A threshold picked to
+        # absorb a failure nobody can name is the thing ADR-0048 refused --
+        # "a number chosen to be passed says less than it appears to".
+        #
+        # Unlike ADR-0033's 0.98, this is **not** a Section 19.3 release
+        # commitment whose wording has to be preserved. It is an internal gate
+        # over a measured behaviour, which is exactly the case where ADR-0032
+        # ruled that stating what the gate does beats stating something looser
+        # that selects the same pass/fail set.
+        minimums["relation_path_recall"] = (metrics.relation_path_recall, 1.0)
     else:
         # Top-1 is the wrong instrument for a conceptual question, so the
         # ranked measure replaces it: did the right answer surface at all.

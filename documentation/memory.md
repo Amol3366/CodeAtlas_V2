@@ -2055,6 +2055,28 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   change to `EmbeddingMigrationService`. Two resolution sites could disagree
   about which model is current, and a namespace whose label disagrees with its
   contents fails silently.
+- **`relation_path_recall` is gated at 1.0, absolutely** (ADR-0058), and on the
+  `retrieval` profile **only** — the semantic corpus declares zero relations, so
+  its aggregate is `None`, and `_unmet_targets` counts `None` as a miss. A
+  shared entry would have failed the Phase 7 gate on a metric that corpus cannot
+  express. **A threshold the corpus already satisfies is decoration until you
+  make it fail:** regressing ADR-0057 drove recall to 0.875 and the gate caught
+  it.
+- **A lexical answer carries the resolved edges of what it matched** (ADR-0057).
+  Resolved only, because `target_symbol_id` is set for no state except
+  `RESOLVED` — an unresolved edge has no far endpoint and cannot form a path.
+  Eight of `Order flow`'s ten `DOCUMENTS` edges point at prose words. Claims are
+  untouched and a step cites evidence **already returned**, so no evidence row
+  is added and `containing_evidence_rate` does not move.
+- **`_precision` returns 0.0, not 1.0, when nothing is predicted and something
+  is expected** (ADR-0057). Predicting that emitting more would *lower*
+  precision was wrong for that reason — the three cases were already scoring
+  zero on both. **Model the baseline, not just the change**, before predicting a
+  metric's direction.
+- **A relation-metric aggregate only counts cases that declare a relation.**
+  `relation_scores` filters on `case.expected_relations` being non-empty, so a
+  case declaring none contributes nothing — which is why q006 and q031 could
+  start emitting true undeclared edges with **no number moving anywhere**.
 - **The RRF coarse-chunk penalty stays unimplemented, and now on measurement
   rather than on caution** (ADR-0056). Applied corpus-wide at three strengths,
   **every metric that moves moves down** — including the `symbol_recall_at_10`
@@ -2248,12 +2270,16 @@ not a third copy.
   metric that moves moves down**, and ADR-0030's predicted *trade* is not a
   trade — `symbol_recall_at_10` falls too. **Nothing is now startable without a
   ruling.**
-- **Blocked on a ruling: Task 4** (what a lexical answer carries). Ask for this
+- ~~**Blocked on a ruling: Task 4**~~ **DONE 2026-08-17 (ADR-0057).** Ruled:
+  a lexical or conceptual answer emits relation paths, **resolved edges only**.
+  `relation_path_recall` **0.8750 → 1.0000**; **ADR-0034's four causes are fully
+  discharged.** The gate target was then **set at 1.0, absolutely** (ADR-0058).
+- ~~Original entry: **Blocked on a ruling: Task 4** (what a lexical answer carries). Ask for this
   one first — **ADR-0055 just answered the same question shape for `trace`**,
   and Task 4 asks it for lexical answers. Three cases, not two: q024 joined
-  after ADR-0053 made `CONCEPTUAL` measurable.
-- **Blocked on a different ruling: the rest of Task 6** — whether a corpus
-  expectation should declare transitive (depth-2) results.
+  after ADR-0053 made `CONCEPTUAL` measurable.~~
+- **Blocked on a ruling: the rest of Task 6** — whether a corpus expectation
+  should declare transitive (depth-2) results. **The only task left.**
 
 Everything below is the older list, kept as written.
 

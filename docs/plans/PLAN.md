@@ -91,7 +91,10 @@ with verification.
 | **A gated intent left the denominator, flattering six metrics**                                            | **CLOSED 2026-08-17 — ADR-0053.** `CONCEPTUAL` was absent from `SUPPORTED_INTENTS`, so `predict_exact_symbols` emitted `_abstention(measured=False)` and the case **never reached the engine**. **q024 had never been measured**; ADR-0051 put q006 in the same state hours earlier. This is ADR-0017 on the neighbouring constant, failing the **opposite** way — a gated *fixture* scores `False` and stays in the denominator as a miss, a gated *intent* **leaves** it, so the omission removed a failing case from the average instead of reporting capability as failure. Under-reporting is loud and gets found; flattering is silent. Corrected: `relation_path_recall` 0.9130 → **0.8750**, `relation_path_correctness` 0.8261 → 0.7917, `primary_evidence_recall_at_10` 0.9471 → 0.9310, `exact_evidence_rate` 0.6880 → 0.6591, `ndcg_at_10` and `symbol_recall_at_10` down; `exact_symbol_resolution` **1.0000 unchanged** and `unmet_targets` unchanged. **ADR-0051's conclusion survives** — q006 measured through lexical gives 0.9943, confirming it does pass containment — **but its evidence did not establish it**, and that is recorded as the correction                                                                                                     | —                                                                                                                                                                          |
 | **Ranking sensitivity needs distractors, not larger answer sets**                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
 | **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone adds cases whose answer sets are large enough for order to matter                                                                                                   |
-| `relation_path_recall` has no gate target                                                                      | **DEFERRED, deliberately** (ADR-0038). One of ADR-0034's four causes remains: q027/q029 emit no relation paths though their edges are stored, because lexical intents do not populate them. A threshold over an unsettled cause cannot be reasoned about (ADR-0023)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | That design decision is settled                                                                                                                                             |
+| ~~`relation_path_recall` has no gate target~~                                                                      | **CLOSED 2026-08-17 — ADR-0058. Gated at 1.0, absolutely.** Absolute for ADR-0032's reason: a deterministic emission question, not a ranking one, and **no tolerance has a named cause** — a bounded traversal or `MAX_RELATION_PATHS` truncation that lost a declared edge would be a defect to fail on, not luck to absorb. The denominator is **24 and not uniform** (21 declare one edge; one each two, three, five), so reachable values below 1.0 are 0.9917 / 0.9861 / 0.9792 / 0.9583 — 0.99 would privilege q060 by accident of its edge count and 0.95 would buy a tolerance nobody can justify. **Registered on the `retrieval` profile only, and that is load-bearing:** the semantic corpus declares zero relations, so its aggregate is `None` and `_unmet_targets` counts `None` as a miss — a shared entry would have failed the Phase 7 gate on a metric that corpus cannot express (ADR-0023's mistake). **Mutation-checked:** regressing ADR-0057 drove recall 1.0 → 0.875 and the gate caught it. `baseline-phase-0` gains the entry, correctly — a gate the null baseline does not miss asks nothing | —                                                                                             |
+| ~~original entry~~                                                                      | **STILL OPEN, but its blocker is discharged (ADR-0057, 2026-08-17).** ADR-0038 deferred the threshold because one of ADR-0034's four causes was unsettled; that cause is now ruled and implemented, and **`relation_path_recall` reads 1.0000** over a denominator of **24** measured cases that declare a relation. The user deliberately deferred choosing the threshold until the number was known, so this is now a live decision rather than a blocked one. **Compute what one miss is worth before picking it:** at 24 cases a single miss scores 0.9583, so a 0.98 target would be as inexpressible as the ones ADR-0032 and ADR-0033 had to correct | Someone chooses the threshold against the 24-case denominator                                                                                                             |
+| **A lexical answer can broaden with no metric moving**                                                          | **OPEN — a stated limit of the instrument, found 2026-08-17 by ADR-0057.** q006 and q031 now emit **true** edges the corpus does not declare, so their per-case precision falls 1.00 → 0.00 — and **the aggregate cannot see it**, because `relation_scores` is built only from cases where `case.expected_relations` is non-empty. A case declaring nothing cannot measure relation accuracy, which is defensible, but it means this change made two answers broader with **no number moving anywhere**, and a future change making them broader still would be equally invisible. **Deliberately not fixed:** declaring relations on q006/q031 to make them visible would be editing the corpus in response to an engine change (ADR-0003) | Someone rules whether a case declaring no relations should score relation precision at all                                                                                 |
+| **ADR-0057's withheld-step branch is unreachable from the fixtures**                                            | **OPEN — a stated limit of what the suite exercises, not a defect.** A step whose edge falls outside every returned chunk is withheld rather than shown with a gap. Mutating that branch to cite a fabricated id leaves the suite green, because in every corpus fixture each edge lands inside a returned chunk. **It is not dead code** — a bounded result set or a chunk dropped by evidence validation reaches it. `_containing` is pinned by a direct unit test instead, including both rejection cases the fixtures cannot produce. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it (ADR-0055) | Someone adds a fixture where a matched symbol's edge sits outside every returned chunk                                                                                     |
 | ~~RRF coarse-chunk bias~~                                                                                            | **CLOSED 2026-08-17 — ADR-0056, measured corpus-wide at three penalty strengths. The answer is that the lever is a pure loss.** ADR-0030 predicted a *trade* — an evidence hit for a symbol hit. **It is not a trade:** `symbol_recall_at_10` falls **0.9286 → 0.8571** alongside `containing_evidence_recall_at_10` **1.0000 → 0.8667**, and **every metric that moves, moves down, at every strength**. The cause is a case ADR-0030 did not anticipate — **s013's expected answer `OrderStatus` is itself a class chunk**, so the penalty demotes the answer it exists to promote (7 → 28), while s001 loses its only containment hit (1 → 11) exactly as predicted. The single gain in the corpus is s007, 8 → 7 — already inside the top 10, so it cannot improve any Recall@10, and its ~0.001 of MRR is swamped by the losses. Incidence today: a coarse chunk outranks the declared evidence in **2 of 14 cases**, both still inside the top 10, so the bias costs **zero** recall. Result is monotone against the lever — both losses occur because the *expected* chunk is coarse, so widening the definition can only demote them further. Instrument validated against three figures recorded before it existed (s013 rank 7, s001 symbol rank 12, `symbol_recall_at_10` 0.9286) and agrees with all three                                                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                             |
 | **The corpus that fusion runs on never grew, and the task premise said it had**                                  | **OPEN — a stated limit of what any fusion measurement can show, found 2026-08-17 by ADR-0056.** Task 7 was scoped as measuring the bias "now the corpus is larger". It is not larger. `_fuse` is gated on `SEMANTIC_INTENTS` (`{PROJECT_OVERVIEW, TEXT}`) and the Phase 4 path `predict_exact_symbols` attaches no fusion at all, so **WS-1's growth of `tests/evaluation/cases` 27 → 50 reached a corpus fusion never touches.** The only corpus that reaches it is `tests/evaluation/semantic_cases` — **14 cases over one fixture**, `queries.json` and `changes.json` byte-identical since `38cc393` (2026-07-31), the sole change anywhere in that tree being ADR-0023's two-line `target_profile`. **Another stale premise** — recorded under Tasks 1, 2, 3, 6 and both WS-1 sub-tasks, with **Task 4 still the only one that checked out**. ADR-0056's conclusion is unaffected but rests on 14 cases, not 50, and must not be quoted as though the corpus had grown | Someone gives the semantic corpus a second fixture — a fixture shape, not a case |
 | ~~Phase 4 `containing_evidence_rate` and `containing_evidence_recall_at_10`~~                               | **INVESTIGATED 2026-08-15, RULED 2026-08-16 — superseded by the four rows below.** The per-case run found the recall shortfall is **exactly 10 of 85 cases scoring 0.00** while the other 75 score 1.00, from **two unrelated causes** — and that the rate metric's 1.00 target is unreachable while the engine obeys ADR-0020. Each cause is now its own row with its own ruling                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
@@ -272,6 +275,141 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-17T22:00:00Z — Task 4 closed (ADR-0057), and its gate target set (ADR-0058)
+
+- Agent: Claude Code `claude-opus-5`, branch `adr-0057-lexical-answers-carry-resolved-paths`.
+- Transition: no phase task. Post-gate. `extra_build.md` Task 4 / **WS-6 complete**.
+- New record: **ADR-0057**, status **`accepted`** — ruled by the user 2026-08-17.
+- Files: `retrieval/lexical.py`, `storage/sqlite/stores.py` (`SymbolStore.get_many`),
+  `application/container.py`, `tests/integration/test_lexical_relation_paths.py`
+  (new, 8 tests), baselines `-3`/`-4`, the ADR and its index, the register,
+  `extra_build.md`, `documentation/memory.md`.
+  **No corpus, contract, schema or migration change.**
+
+**Ruled: a lexical or conceptual answer emits relation paths, restricted to
+edges that resolve to a real target.** The restriction is ADR-0055's precedent
+and is **structural, not stylistic** — `RelationRecord` sets `target_symbol_id`
+for no state except `RESOLVED`, so an unresolved edge has no far endpoint and
+cannot form a path. `Order flow` is the demonstration: **eight of its ten
+`DOCUMENTS` edges point at prose words** — "order", "flow", "requests",
+"orders", "frontend", "status", "backend", "returns" — that name no symbol.
+
+Three properties pinned by tests: claims stay `high_confidence_heuristic`; a
+step carries the **edge's** derivation rather than the hit's; and a step cites
+evidence the answer **already returned**, so no evidence row is added and
+`containing_evidence_rate` holds at 0.7537.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| `relation_path_recall` | 0.8750 | **1.0000** |
+| `relation_path_correctness` | 0.7917 | **0.8646** |
+| every other metric | — | **unchanged** |
+
+**ADR-0034's four causes are now fully discharged.** The `relation_path_recall`
+gate target was deliberately deferred by the user until the number was known; it
+is now a live decision over a denominator of **24**, where one miss scores
+0.9583 — compute before choosing, or it repeats ADR-0032 and ADR-0033.
+
+**The precision prediction failed, and that is the reusable part.** Precision
+was predicted to *fall*, because q027 emits two true edges where the corpus
+declares one. That half held — q027 scores 0.50. The **baseline** was
+mis-modelled: `_precision` returns **0.0**, not 1.0, when nothing is predicted
+and something is expected, so all three cases were scoring zero on precision
+*and* recall beforehand. Emitting anything containing the declared edge is a
+strict improvement and the anticipated cost never existed. Both deltas then
+reconcile exactly:
+
+```
+recall       3 cases 0.00 -> 1.00        = 3.00 / 24 = +0.1250   observed +0.1250
+correctness  (1.00 + 0.50 + 0.25) - 0    = 1.75 / 24 = +0.0729   observed +0.0729
+```
+
+**What the metric cannot see, recorded as its own register row.** q006 and q031
+now emit **true** edges the corpus does not declare, so their per-case precision
+falls 1.00 → 0.00 — and the aggregate excludes them, because `relation_scores`
+counts only cases whose `expected_relations` is non-empty. Two answers got
+broader with **no number moving anywhere**. Deliberately not fixed: declaring
+relations on them would be editing the corpus in response to an engine change
+(ADR-0003).
+
+**Two of five mutations could not be exercised**, both recorded rather than
+counted as coverage. Deleting the resolved filter is a **no-op**, because an
+unresolved edge fails the label lookup immediately after — the mutation with
+teeth is the **rejected design** (emit unresolved edges naming `target_hint`),
+which fails two tests. And the withheld-step branch is unreachable from the
+fixtures, so `_containing` is pinned by a direct unit test including both
+rejection cases the fixtures cannot produce.
+
+> **Pick the mutation that matches the claim, not the one that undoes the
+> edit.** Reverting the filter proved nothing; implementing the alternative the
+> ruling rejected proved the guard.
+
+`SymbolStore.get_many` was added so labelling a handful of endpoints reads a
+handful of rows — `list_for_snapshot` is O(repository) and text search is the
+most common intent, which Section 10.3 asks callers not to do per query.
+
+**The gate target was then set in the same session, as its own record
+(ADR-0058)** — asked for by the user after the number existed, and kept a
+separate decision from the change that moved it, which is the trap
+`extra_build.md` names.
+
+**Gated at 1.0, absolutely, on the `retrieval` profile only.** Absolute for
+ADR-0032's reason: a *deterministic emission* question rather than a ranking
+one — an edge the corpus declares, the store holds, and resolution has bound
+either appears or it does not. **No tolerance has a named cause**; a bounded
+traversal or a `MAX_RELATION_PATHS` truncation that dropped a declared edge
+would be a defect to fail on.
+
+The denominator is **24 and not uniform** — 21 cases declare one edge, and one
+each declare two, three and five — so the reachable values below 1.0 are 0.9917,
+0.9861, 0.9792, then 0.9583. **0.99 would privilege q060** by accident of how
+many edges it happens to declare, and 0.95 would buy a tolerance nobody can
+justify.
+
+**Retrieval profile only, and that is load-bearing.** The semantic corpus
+declares **zero** relations across all 14 cases, so its aggregate is `None` and
+`_unmet_targets` counts `None` as a miss. A shared entry would have failed the
+Phase 7 conceptual gate on a metric that corpus cannot express — ADR-0023's
+mistake exactly.
+
+**The gate was mutation-checked, because a threshold the corpus already
+satisfies is decoration.** Regressing ADR-0057 — lexical answers stop emitting
+paths — drove `relation_path_recall` **1.0 → 0.875** and put it into
+`unmet_targets`. Source restored from a file copy, and all three baselines then
+reproduced byte-for-byte with `--check` exit 0.
+
+`baseline-phase-0` gains `relation_path_recall` in `unmet_targets`, which is
+correct rather than incidental: a gate the null baseline does not miss is a gate
+that asks nothing. `-3` and `-4` are unchanged beyond what ADR-0057 moved, and
+`unmet_targets` there stays `['changed_symbol_precision']`.
+
+- Verification, exit codes read from the process rather than printed output:
+
+| Check | Result |
+| --- | --- |
+| `uv run pytest -q` | **exit 0** — 2263 passed, 3 skipped |
+| `ruff check src tests scripts apps` | **exit 0** |
+| `mypy --no-incremental src tests scripts apps` | **exit 0** — 354 files |
+| `check_phase4.ps1 -SkipSync` | **exit 0** |
+| `check_phase7.ps1 -SkipSync -Semantic` | **exit 0** — every step reached, 0 `FAILED` lines; web tests 205 passed, Playwright 15 passed / 7 Chromium skips, semantic suites 25 passed |
+| `baseline-phase-0/-3/-4 --check` | **exit 0** each, byte-for-byte after the mutation was reverted |
+
+  **`check_phase7` was killed twice before this run** — once at 60% of its test
+  stage, once during `Types` — both with zero `FAILED` lines and only the first
+  few steps reached. That is the terminated-process signature `memory.md`
+  records, **not** a red gate, and neither was reported as a result. The row
+  above is the third attempt, which ran to completion. A killed gate is not
+  evidence in either direction.
+
+  The suite is 2263 where 2026-08-17T19:00Z recorded 2255: **+8 is exactly the
+  new `tests/integration/test_lexical_relation_paths.py`.**
+
+- Next: **only the ranking-convention half of Task 6 remains**, blocked on
+  whether a corpus expectation should declare transitive (depth-2) results.
+  With that ruled, `extra_build.md` is finished and its own instruction is to
+  delete the file rather than let it rot.
+
 
 ### 2026-08-17T19:00:00Z — Task 7 closed: the coarse-chunk penalty is a pure loss (ADR-0056)
 

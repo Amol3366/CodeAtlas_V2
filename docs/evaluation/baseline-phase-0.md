@@ -3,7 +3,7 @@
 - Contract version: `1.0`
 - Implementation status: `not_implemented`
 - Targets met: `false`
-- Unmet targets: changed_symbol_precision, changed_symbol_recall, direct_impact_recall, containing_evidence_recall_at_10, exact_symbol_resolution, lexical_resolution
+- Unmet targets: changed_symbol_precision, changed_symbol_recall, direct_impact_recall, containing_evidence_recall_at_10, exact_symbol_resolution, lexical_resolution, relation_path_recall
 
 | Metric | Value |
 | --- | ---: |

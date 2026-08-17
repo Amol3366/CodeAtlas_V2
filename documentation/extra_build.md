@@ -1,6 +1,6 @@
 # Extra Build — the remaining work, in the order to do it
 
-Status: current as of 2026-08-17, after WS-3, WS-4, WS-5 and **Tasks 1, 2, 3, 5 and 7** closed.
+Status: current as of 2026-08-17, after WS-3, WS-4, WS-5, WS-6 and **Tasks 1, 2, 3, 4, 5 and 7** closed, and `relation_path_recall` gated (ADR-0058).
 
 **Authority note.** This file is a **work plan**, not a status list. The single
 authoritative record of what is open is the **Deferred Register in
@@ -30,16 +30,14 @@ independent, so the order below is a suggestion rather than a dependency chain.
 
 ## Start here tomorrow
 
-**Tasks 1, 2, 3, 5 and 7 are done** (ADR-0050, 0051, 0054, 0055, 0056).
-**Everything still open is blocked on a ruling** — there is no longer a task
-you can start without a decision.
+**Tasks 1, 2, 3, 4, 5 and 7 are done** (ADR-0050, 0051, 0054, 0055, 0056,
+0057). **WS-6 is closed and ADR-0034's four causes are fully discharged.**
 
-1. **Task 4 is the ruling to ask for first**, because ADR-0055 just answered the
-   same question shape for `trace`: what does a traversal-derived answer carry?
-   Task 4 asks it for *lexical* answers. Three cases, not two — q024 joined
-   after ADR-0053.
-2. **The rest of Task 6 needs a different ruling** — whether a corpus
+1. **Only the rest of Task 6 remains**, and it needs a ruling — whether a corpus
    expectation should declare transitive (depth-2) results.
+2. ~~Choosing the `relation_path_recall` gate target~~ **DONE — ADR-0058.**
+   Gated at **1.0, absolutely**, on the `retrieval` profile only. Mutation-checked:
+   regressing ADR-0057 drove recall 1.0 → 0.875 and the gate caught it.
 
 **ADR-0056 is `proposed`, not `accepted`.** It recommends closing the RRF item
 on the measurement below; per the ADR workflow only the user moves it to
@@ -73,7 +71,8 @@ Phases 0–7 complete with user-approved gates; the project was closed out
 2026-08-10 and everything since is post-gate work. Of the post-closeout program,
 **WS-0, WS-1, WS-3 and WS-4 are closed**, along with both process defects (gate
 exit codes, test isolation). **WS-2 closed 2026-08-17 (ADR-0054), WS-5 the same
-day (ADR-0056). Only WS-6 remains**, blocked on the Task 4 ruling.
+day (ADR-0056), WS-6 the same day (ADR-0057). Only the ranking-convention half
+of Task 6 remains**, blocked on its own ruling.
 
 Corpus: **64 query cases / 28 change cases** over **7 fixtures**, with a scored
 symbol-intent denominator of **50**.
@@ -109,7 +108,7 @@ from the process.
 | `mean_reciprocal_rank` | 1.0000 | — | ungated |
 | `symbol_recall_at_10` | 0.8917 | 0.90 | ungated on this profile (ADR-0023) |
 | `ndcg_at_10` | 0.9173 | — | ungated |
-| `relation_path_recall` | **0.8750** | — | deliberately ungated until Task 4; was reported 0.9130 before ADR-0053 |
+| `relation_path_recall` | **1.0000** | **1.0** | met — gated absolutely by ADR-0058; any dropped declared edge fails |
 
 > **`exact_symbol_resolution` has one miss of headroom, and that is all.** ADR-0033
 > predicted 0.98 would become expressible at 50 cases, because 50 is the first
@@ -266,7 +265,47 @@ Rewritten to spy on `console.error`, it fails.
 > **Assert on the mechanism the defect produces, not on what you hope it
 > disturbs.** The rendered output was never going to show a key collision.
 
-## Task 4 — Lexical intents populate relation paths (WS-6)
+## Task 4 — Lexical intents populate relation paths (WS-6) ✅ DONE 2026-08-17 (ADR-0057)
+
+**Ruled by the user:** a lexical or conceptual answer emits relation paths,
+restricted to **edges that resolve to a real target**. Claims stay
+`high_confidence_heuristic`; a step carries the *edge's* derivation and cites
+evidence the answer **already returned**, so no evidence row is added and
+`containing_evidence_rate` holds at 0.7537.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| `relation_path_recall` | 0.8750 | **1.0000** |
+| `relation_path_correctness` | 0.7917 | **0.8646** |
+| everything else | — | **unchanged** |
+
+**ADR-0034's cause list is fully discharged.** The gate target is now a live
+decision, deliberately deferred until the number was known — **compute what one
+miss is worth first:** the denominator is **24**, so a single miss scores 0.9583
+and a 0.98 target would be as inexpressible as ADR-0032's and ADR-0033's were.
+
+> **The precision prediction failed, and that is the reusable part.** This file
+> predicted precision would fall because q027 emits two true edges where the
+> corpus declares one. That much held — q027 scores 0.50. But the *baseline* was
+> mis-modelled: `_precision` returns **0.0**, not 1.0, when nothing is predicted
+> and something is expected, so all three cases were scoring zero on precision
+> *and* recall beforehand. Emitting anything containing the declared edge is a
+> strict improvement, and the anticipated cost never existed. Both deltas then
+> reconcile exactly against the 24-case denominator.
+
+> **Two mutations could not be exercised.** Deleting the resolved filter is a
+> **no-op** — an unresolved edge fails the label lookup immediately after, so
+> both guards implement the same rule. The mutation that has teeth is the
+> **rejected design** (emit unresolved edges naming `target_hint`), which fails
+> two tests. And the withheld-step branch is unreachable from the fixtures, so
+> `_containing` is pinned by a direct unit test instead. Both are register rows,
+> not coverage.
+
+> **What the metric cannot see:** q006 and q031 now emit *true* undeclared
+> edges, precision 1.00 → 0.00 each — and the aggregate excludes cases that
+> declare no relations, so **two answers got broader with no number moving.**
+
+**Original analysis, kept because the premise checking out was itself notable:**
 
 **Cost:** ½–1 day of work, but **blocked on a design decision**. **Investigated
 2026-08-17**; the premise checked out — the first time this session that it did.
@@ -459,7 +498,7 @@ Not scheduled. Each has a named condition in the register that reopens it.
 | **Concurrent gate runs fail; the same tree passes solo.** 3 failed / 2237 passed run together, 2240 passed alone. Which three was not captured, so the mechanism (loopback port + shared `dist/` in the packaged e2e tests) is a hypothesis | Someone reproduces it with full output captured |
 | **The `-Semantic` step is opt-in, so two artifacts went stale unnoticed for two days** | Someone makes the semantic block non-optional, or accepts that `-SkipSync` alone is not a full gate |
 | **The change corpus cannot express an ADR-0044-shaped defect.** `predict_changes` compares two `DirectoryStateView`s and never builds a Git repository, so `GitBlobStateView` never runs under it | Someone gives the corpus a Git-backed fixture shape — a workstream, not a case |
-| **`relation_path_recall` has no gate target** | Task 4 settles ADR-0034's last cause |
+
 | **The corpus fusion runs on is 14 cases over one fixture**, byte-identical since 2026-07-31. Every fusion and ranking number — ADR-0028's, ADR-0030's, ADR-0056's — rests on it, and WS-1's growth never reached it | Someone gives `semantic_cases` a second fixture — a fixture shape, not a case |
 
 ---

@@ -210,6 +210,7 @@ def build_services(
         files=files,
         symbols=symbols,
         search=search_store,
+        relations=relations,
         evidence=evidence,
     )
     if explainer is None:

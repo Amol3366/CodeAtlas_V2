@@ -25,7 +25,15 @@ from codeatlas.application.evidence import (
     EvidenceOutcome,
     snapshot_reference,
 )
-from codeatlas.contracts import Answer, Claim, Derivation, Evidence, QueryResponse
+from codeatlas.contracts import (
+    Answer,
+    Claim,
+    Derivation,
+    Evidence,
+    QueryResponse,
+    RelationPath,
+    RelationStep,
+)
 from codeatlas.domain.errors import RepositoryNotFoundError, SnapshotNotReadyError
 from codeatlas.domain.repository import Repository
 from codeatlas.domain.search import ChunkSearchHit
@@ -37,6 +45,7 @@ from codeatlas.retrieval.fts_query import (
 from codeatlas.storage.sqlite.stores import (
     EvidenceStore,
     FileStore,
+    RelationStore,
     RepositoryStore,
     SearchStore,
     SnapshotStore,
@@ -44,6 +53,15 @@ from codeatlas.storage.sqlite.stores import (
 )
 
 MAX_SEARCH_RESULTS = 25
+
+MAX_RELATION_PATHS = 10
+"""Ceiling on the edges one lexical answer reports (Section 10.3).
+
+A broad text query can match many chunks, and a chunk's symbol can carry many
+edges, so the product of the two is unbounded without this. Paths are built in
+the answer's own evidence order, so the ceiling drops the least relevant
+matches' edges rather than an arbitrary set.
+"""
 
 LEXICAL_CONFIDENCE = 0.7
 EXACT_CLAIM_CONFIDENCE = 0.99
@@ -74,12 +92,19 @@ class LexicalSearchService:
         files: FileStore,
         symbols: SymbolStore,
         search: SearchStore,
+        relations: RelationStore,
         evidence: EvidenceStore | None = None,
     ) -> None:
         self._repositories = repositories
         self._snapshots = snapshots
         self._symbols = symbols
         self._search = search
+        # Required rather than optional, unlike `evidence`. A lexical answer
+        # carries the resolved edges of what it matched (ADR-0057), and a store
+        # defaulted to `None` would turn that into a silent absence -- a caller
+        # would get an answer with no paths and no indication that the field
+        # had not been populated rather than found empty.
+        self._relations = relations
         self._evidence = EvidenceBuilder(files, evidence)
         self._files = files
 
@@ -316,7 +341,112 @@ class LexicalSearchService:
             outcome=outcome,
             elapsed=elapsed,
             relaxed=relaxed,
+            relation_paths=self._relation_paths(snapshot, hits, outcome),
         )
+
+    def _relation_paths(
+        self,
+        snapshot: Snapshot,
+        hits: Sequence[ChunkSearchHit],
+        outcome: EvidenceOutcome,
+    ) -> list[RelationPath]:
+        """The resolved edges leaving the symbols this answer matched.
+
+        Ruled by the user 2026-08-17, settling the question ADR-0034 left open
+        as "a design decision, not a defect to fix quietly": a lexical answer
+        *does* carry stored relations, and only those that **resolve to a real
+        target**.
+
+        The restriction follows ADR-0055, where an unresolved route cites
+        nothing extra, and it is structural rather than stylistic.
+        `RelationRecord` sets `target_symbol_id` for no state except
+        `RESOLVED`, so an unresolved edge has no far endpoint and cannot form a
+        path at all. `Order flow` shows why it matters: ten `DOCUMENTS` edges
+        leave it and eight point at ordinary prose words -- "order", "flow",
+        "requests" -- that name no symbol. Emitting those would turn a wording
+        coincidence into an apparent relationship.
+
+        A step cites evidence **this answer already returned**, never a new
+        row: the chunk whose range contains the edge's reference site. Building
+        fresh evidence would enlarge the cited set and move
+        `containing_evidence_rate` as a side effect of a field nobody asked to
+        change. A step with no containing chunk is withheld, which is the rule
+        `GraphQueryService._paths` already applies to a dropped step.
+
+        Nothing here touches the answer's claims. A lexical hit stays evidence
+        of wording; the *edge* keeps its own stored derivation and confidence,
+        because how an edge was derived and how a chunk was matched are
+        different questions.
+        """
+        cited: list[tuple[str, int, int, str]] = [
+            (
+                hits[index].file_id,
+                item.start_line,
+                item.end_line,
+                item.evidence_id,
+            )
+            for index, item in outcome.items
+            if index < len(hits)
+        ]
+        symbol_ids = [hit.symbol_id for hit in hits if hit.symbol_id is not None]
+        if not symbol_ids or not cited:
+            return []
+
+        edges = [
+            edge
+            for edge in self._relations.outgoing(snapshot.snapshot_id, symbol_ids)
+            if edge.target_symbol_id is not None
+        ]
+        if not edges:
+            return []
+
+        labels = self._symbols.get_many(
+            snapshot.snapshot_id,
+            [edge.source_symbol_id for edge in edges]
+            + [
+                edge.target_symbol_id
+                for edge in edges
+                if edge.target_symbol_id is not None
+            ],
+        )
+        # Edges are ordered by where their evidence ranked, so the ceiling drops
+        # the least relevant matches rather than whichever the store returned
+        # last.
+        position = {
+            entry[3]: rank for rank, entry in enumerate(cited)
+        }
+        paths: list[tuple[int, RelationPath]] = []
+        for edge in edges:
+            source = labels.get(edge.source_symbol_id)
+            target = (
+                labels.get(edge.target_symbol_id)
+                if edge.target_symbol_id is not None
+                else None
+            )
+            if source is None or target is None:
+                continue
+            evidence_id = _containing(cited, edge.file_id, edge.start_line)
+            if evidence_id is None:
+                continue
+            paths.append(
+                (
+                    position.get(evidence_id, len(cited)),
+                    RelationPath(
+                        steps=[
+                            RelationStep(
+                                source=source.qualified_name,
+                                kind=edge.kind,
+                                target=target.qualified_name,
+                                derivation=edge.derivation,
+                                confidence=edge.confidence,
+                                evidence_id=evidence_id,
+                            )
+                        ]
+                    ),
+                )
+            )
+        paths.sort(key=lambda entry: entry[0])
+        return [path for _, path in paths[:MAX_RELATION_PATHS]]
 
     def _respond(
         self,
@@ -328,6 +458,7 @@ class LexicalSearchService:
         outcome: EvidenceOutcome,
         elapsed: float,
         relaxed: bool = False,
+        relation_paths: Sequence[RelationPath] = (),
     ) -> QueryResponse:
         warnings = list(outcome.warnings)
         if not outcome.items:
@@ -343,10 +474,26 @@ class LexicalSearchService:
             snapshot=snapshot_reference(snapshot, stale=outcome.stale),
             answer=Answer(summary=summary, claims=list(claims)),
             evidence=list(outcome.evidence),
+            relation_paths=list(relation_paths),
             warnings=warnings,
             limitations=[PHASE_LIMITATION],
             timing_ms={"search": elapsed},
         )
+
+
+def _containing(
+    cited: Sequence[tuple[str, int, int, str]], file_id: str, line: int
+) -> str | None:
+    """The returned chunk whose range covers ``line`` in ``file_id``.
+
+    Containment rather than equality, for the reason ADR-0027 gave: a chunk is
+    a region and a reference site is a line inside it, so demanding the two
+    match exactly would reject the very citation that proves the edge.
+    """
+    for candidate_file, start, end, evidence_id in cited:
+        if candidate_file == file_id and start <= line <= end:
+            return evidence_id
+    return None
 
 
 def _exact_summary(query: str, evidence: Sequence[Evidence]) -> str:
