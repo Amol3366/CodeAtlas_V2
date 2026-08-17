@@ -157,6 +157,13 @@ anecdote.
 | `symbol_diff` (after this fix) | **246 ms** | **0.04%** |
 | `findings` / `impact` | 113 / 50 ms | ~0.03% |
 
+> **Corrected by ADR-0061: this is 99.5% *parse plus resolve*, not parsing.**
+> The `parse_base` and `parse_target` timers wrap `_analyze_state`, which
+> parses **and then resolves the whole state**. On a 300-module repository,
+> 766 ms of 2137 ms under those timers is `resolve()`. The split on this
+> repository was never measured, and the sentence below overstated what the
+> timers show.
+
 **Parsing is 99.5% of the cost.** Extrapolating the old quadratic to 11,419
 symbols puts `symbol_diff` at roughly 17 s — so **this change removes about
 2.7% of the real-world time.** The quadratic was real, the fix is correct, and
