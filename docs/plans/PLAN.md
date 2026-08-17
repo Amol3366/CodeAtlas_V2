@@ -127,7 +127,9 @@ with verification.
 | ~~**Preflight parses every unchanged file, twice, on every analysis**~~                                             | **CLOSED 2026-08-18 — ADR-0061.** Parses are cached for the duration of one `analyze()` call, keyed on `(relative_path, language, content digest)`: **606 → 305 parser calls** on a 303-file preflight, against a theoretical minimum of ~304. **Scoped to the call, so the invalidation ruling this row asked for is not needed** — same process, same bytes, correct by construction. **No end-to-end speedup is claimed**: the machine moved 343 s → 549 s on an untouched path mid-session, so wall-clock comparison was worthless and the mechanism was confirmed by counting instead. **The remaining step — not parsing unchanged files at all, from the stored index — is the row below and still needs its ruling** | — |
 | ~~**Resolution runs per side and is not cached**~~                                                                  | **CLOSED 2026-08-18 — ADR-0062, measured and declined.** Three things had to hold and none does: resolution is **linear** (exponent 1.14), it is ~**127 ms of 477 ms** under the parse timers and ~**6% of preflight**, and it is **not cacheable in the shape parsing was** — `resolve()` takes the whole state, so the two sides differ by exactly the thing being analysed and a key over it cannot hit within a call. Incremental resolution would contradict a load-bearing property: adding a symbol can make a reference in an *unchanged* file resolve. **Also corrects ADR-0061's figure** — its "766 ms of 2137 ms" was taken under machine load and counted three resolve calls where only two are inside those timers; a preflight resolves three times because the indexing refresh resolves first | — |
 | ~~original entry~~                                                                  | **OPEN — found 2026-08-18 by ADR-0061, and it corrects ADR-0060.** The `parse_base` / `parse_target` timers wrap `_analyze_state`, which parses **and then resolves the whole state**, so ADR-0060's "99.5% is parsing" is 99.5% *parse plus resolve*. Measured at **766 ms of 2137 ms** on a 300-module repository; the split on the real repository is unmeasured. This is why the pre-registered prediction that ADR-0061 would halve wall time was wrong — a timer named `parse_*` was assumed to time parsing | Someone measures the parse/resolve split on a real repository, or caches resolution |
-| **Reuse stored symbols so unchanged files are not parsed at all**                                               | **OPEN — the remaining design question, unchanged by ADR-0061.** Caching within one call removes the duplicate pass, not the pass: preflight is still O(repository). Going below that means taking symbols from the stored index, which needs a ruling on when they may be trusted — parser version, normalisation version and content identity all become inputs. **`SnapshotStateView` is not the vehicle**: it is unused *and* still reads and hashes every file (ADR-0060) | Someone rules what invalidates a stored parse |
+| ~~**Reuse stored symbols so unchanged files are not parsed at all**~~                                               | **CLOSED 2026-08-18 — ADR-0063, declined on arithmetic, not on the trust ruling.** Only the **target** is in the index — `analyze_working_tree` refreshes first — and the base is a Git commit that is not. Since ADR-0061 each unique file is parsed **exactly once** (305 for 303 files), and that parse serves both sides, so rehydrating the target removes its *use* of the parse, not the parse: **saving ~2**. Commit-range analysis gets exactly **zero**, since neither side is the active snapshot. The ruling three rows deferred to was never reached because the change it authorises saves nothing. **Good news buried in it:** there is no references table, but `GraphSide`'s four fields are all stored, so this needed **no migration** — and the risk avoided was re-keying IDs into the analysis space, where a synthetic-ID base against a real-ID target would pair nothing and report every symbol deleted-and-re-added | — |
+| **Persist the parse cache across runs**                                                                        | **OPEN — where the trust ruling actually belongs (ADR-0063).** The parse floor is one per unique file per analysis because one side always comes from Git. Going below it means a file parsed for yesterday's preflight is not parsed again today — a cache that **outlives the process** and therefore genuinely needs `PARSER_BUNDLE_VERSION`, normalisation-version and content-hash keys, the invalidation question ADR-0061 deliberately avoided by scoping to one call | Someone rules what invalidates a persisted parse, and where it is stored |
+| ~~original entry~~                                               | **OPEN — the remaining design question, unchanged by ADR-0061.** Caching within one call removes the duplicate pass, not the pass: preflight is still O(repository). Going below that means taking symbols from the stored index, which needs a ruling on when they may be trusted — parser version, normalisation version and content identity all become inputs. **`SnapshotStateView` is not the vehicle**: it is unused *and* still reads and hashes every file (ADR-0060) | Someone rules what invalidates a stored parse |
 | ~~original entry~~                                             | **OPEN — the real cost, now quantified (ADR-0060).** 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060 | Someone designs the parse-reuse path, with a ruling on what invalidates a cached parse                     |
 | **Cold-indexing this repository takes 343 s**                                                                   | **OPEN — found incidentally 2026-08-18 while measuring preflight, and absent from this register until now.** A different code path from preflight, and the same order of magnitude as one parse pass (316 s), which is consistent with indexing parsing everything once. 11,419 symbols, of which **2,430 are document sections** — this project's own Markdown is its largest symbol source, one file being 12,756 lines | Someone measures where index time goes, or a user reports first-index latency                              |
 | **A synthetic corpus measures scaling honestly and proportions dishonestly**                                    | **OPEN — a stated limit of `measure_phase4_perf.py`'s generated profile, found 2026-08-18.** Its modules are ~15 lines each, so at 800 modules `file_diff` looked like the largest stage (1339 ms of 3367 ms) and parsing looked secondary. On the real repository parsing is **99.5%** and `file_diff` is **0.4%**. The *exponents* it produced held up — that is what it is good for — but **an earlier draft of ADR-0060 repeated its proportions as fact** before the real measurement corrected them | Someone gives the perf harness a profile with realistic file sizes and a Markdown-heavy tree               |
@@ -286,6 +288,68 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-18T14:00:00Z — Index reuse cannot lower the parse count (ADR-0063)
+
+- Agent: Claude Code `claude-opus-5`, branch `index-reuse-declined`.
+- Transition: no phase task. Post-gate.
+- New record: **ADR-0063**, status `accepted`. It **closes** the remedy row
+  ADR-0060 opened and that ADR-0061 and ADR-0062 both deferred to.
+- Files: ADR-0063 (new), the ADR index, the register. **No source, test,
+  corpus, contract, schema, migration or baseline change.**
+
+**Asked to do the parse reuse from the stored index. It cannot help, and the
+reason is arithmetic rather than the trust ruling three records were waiting
+for.**
+
+**Only one side is ever in the index, and it is the wrong one.**
+`analyze_working_tree` refreshes before comparing (`change_analysis.py:117`), so
+the active snapshot is the **working tree — the target**. The base is a Git
+commit read through `GitBlobStateView`, and no commit is indexed.
+
+Since ADR-0061, each unique `(path, content)` is parsed **exactly once** —
+measured **305 parses for 303 files** — and that one parse serves both sides.
+Rehydrating the target from the index removes its *use* of the parse, not the
+parse, because the base still needs it.
+
+```
+today (after ADR-0061)       N parses, one per unique file, shared by both sides
+target from the index        N parses, base still parses every file
+saving                       ~2
+```
+
+**Commit-range analysis gets exactly zero**, since neither side is the active
+snapshot.
+
+**The ruling was never reached because the change it authorises saves nothing.**
+Asking for it would have been asking the user to decide something that does not
+matter.
+
+**Two things worth keeping from the investigation.**
+
+*The index supplies more than expected.* There is **no references table** — the
+schema stores `symbols` and `relations` but never the pre-resolution
+`SymbolReference` — so the obvious approach needs a migration. But it does not
+need one: `GraphSide`'s four fields are all stored, and references are only an
+*input* to resolution while the index stores its *output*.
+
+*And the risk avoided was large.* Rehydrating means **re-keying every identifier
+into the analysis ID space**: the engine builds `file_id` from
+`_ANALYSIS_REPOSITORY_ID` while stored records carry the real repository's IDs,
+and **ADR-0042 pairs occurrences within their file, by `file_id`**. A
+synthetic-ID base against a real-ID target would pair nothing — **every symbol
+reported deleted and re-added**, on the one workflow the product exists for. It
+would also have dropped `diagnostics` and `unparsed` for the rehydrated side,
+so `PARSE_FAILED_TARGET` would stop being emitted: a declared hole turned into a
+clean-looking result. Both in exchange for ~2 parses.
+
+- Verification: **no code changed**, so nothing to re-run. Three Markdown files;
+  the gate evidence at `8e575c4` still applies.
+- Next: **the parse floor is documented and one row carries the remainder** —
+  persist the parse cache across runs. That is where the trust ruling actually
+  belongs, because a cache outliving the process genuinely needs
+  `PARSER_BUNDLE_VERSION`, normalisation-version and content-hash keys.
+
 
 ### 2026-08-18T12:00:00Z — Resolution measured and NOT cached (ADR-0062)
 
