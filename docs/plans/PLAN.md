@@ -290,6 +290,83 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-19T09:00:00Z — Rust and Scala ship; ADR-0065 complete, with two limits declared
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: ADR-0065's **fourth and final slice**. All four approved languages
+  run on one shared query-backed engine.
+- **No version bump.** `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION` are already
+  `1.5.0`. `SCHEMA_VERSION` stays `14`, `contract_version` stays `1.1`.
+
+**Rust found a real defect in the SHARED engine, not in itself.** Its `tags.scm`
+matches an `impl` method as **both** `definition.method` (via the enclosing
+`declaration_list`) **and** `definition.function` (the bare `function_item`).
+`kind` is part of `symbol_id`, so every Rust method would have been stored
+**twice** -- once as a method, once as a free function. The engine now
+deduplicates by span, keeping whichever capture ranks earlier in
+`kind_by_capture`; that mapping's order now declares specificity. Java and Go
+have no overlapping patterns and are provably unaffected.
+
+**Rust needed `owner_hint` for a different reason than Go**, which is worth
+recording because it widens the case for the hook. Go's receiver is not a
+lexical ancestor at all. Rust's method *is* lexically inside its `impl`, but the
+owning type sits on `impl_item`'s **`type` field** and `impl_item` has no `name`
+field, so the engine's generic scope walk -- which reads
+`child_by_field_name("name")` -- finds nothing. Two languages, two different
+failures, one hook.
+
+**Rust is the first query-backed language whose IMPORTS resolve, and it confirms
+the Go diagnosis exactly.** `crate` is a Rust **keyword**, so stripping it from
+`use crate::payments::Service` is safe and leaves `payments::Service`, which the
+suffix index matches. Go's equivalent prefix comes from `go.mod` -- external
+configuration a single-file parse cannot know. The difference is not effort; it
+is where the information lives.
+
+**Scala is the Java-shaped case** -- declared `package`, lexical ownership, no
+`owner_hint` needed -- and its imports resolve. That one engine covers Scala and
+Go, whose ownership models have nothing in common, is the design's claim holding.
+
+**Two limits declared rather than smoothed over, both as `strict` xfails.**
+
+| Limit | Why it is not fixed here |
+| --- | --- |
+| A **Go import** resolves `external` | Needs a *matching policy* -- how many leading segments may be discarded. The cost is asymmetric: trimming to one segment would make a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing a relationship** §4.1 forbids. A miss is the safe direction |
+| **Scala captures only bare-identifier calls** | Its `tags.scm` carries only `(call_expression (identifier) @name)`, so `payments.charge(id)` -- most Scala calls -- is invisible. Closing it needs a supplementary references query, and the profile contract has one authored slot (`imports_query`). Widening the contract mid-slice is the scope creep this project forbids |
+
+Also declared: a **Go interface reads as `CLASS`**, and a **Scala method reads as
+`FUNCTION`**, because neither grammar's `tags.scm` distinguishes them.
+
+- Files: `languages/rust.py`, `languages/scala.py`,
+  `queries/rust.imports.scm`, `queries/scala.imports.scm`,
+  `tests/unit/test_rust_adapter.py`, `tests/unit/test_scala_adapter.py`,
+  `tests/integration/test_rust_resolution.py` (all new);
+  `query_backed/engine.py` (span deduplication), `parsing/registry.py`,
+  `extraction/resolution.py`, the security suite, ADR-0065, and the
+  documentation set.
+
+**Verification.**
+
+- **54 passed, 2 xfailed** across all four language slices (adapters,
+  integration, security).
+- `ruff check src tests scripts apps` -- clean.
+- `mypy --no-incremental src tests scripts apps` -- clean over **379 files**.
+- **Mutation-checked twice.** Disabling the engine's span deduplication fails two
+  Rust tests; blinding `owner_hint` to `impl_item` fails two more. Both restored
+  **from a file copy, never `git checkout --`**. Every Rust and Scala test passed
+  on its first run, which is exactly when a mutation check stops being optional.
+
+**Limitations.**
+
+- **No evaluation cases exist for any of the four languages**, so no metric
+  measures them. Everything proving them is unit, integration and security
+  tests -- real coverage, but not measurement. This is the largest remaining gap
+  in ADR-0065.
+- No test edges and no route detection for any of the four.
+
+- Next: the two declared limits above are **user decisions**; evaluation cases
+  are the standing follow-up.
+
+
 ### 2026-08-19T07:00:00Z — Go ships (ADR-0065); `owner_hint` carries it entirely
 
 - Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.

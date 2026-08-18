@@ -1,6 +1,6 @@
 # ADR-0065: Query-backed language support for Java, Go, Rust, and Scala
 
-- Status: **accepted** 2026-08-19 — **Java and Go implemented the same day**; Rust and Scala approved and not yet built
+- Status: **accepted** 2026-08-19 — **all four languages implemented the same day**
 - Date: 2026-08-19
 - Decision owners: user/product and implementing agent
 - Supersedes: none
