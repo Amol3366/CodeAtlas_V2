@@ -2160,6 +2160,19 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   is a multi-gigabyte network operation, and putting it behind a button in a
   settings form makes a slow or failed download look like a failed save.
 
+- **`$?` after a pipe is the pipe's exit code, not the command's.** `cmd | tail`
+  then `echo $?` reports `tail`, which always succeeds. This produced four false
+  `EXIT=0` readings on 2026-08-16, one of them for a step that was actually
+  failing. Capture into a variable first, or use `${PIPESTATUS[0]}`. It is the
+  same class as the gate-script exit-code defect, and it survives *because a
+  false green looks exactly like a real one*. **Rescued from `extra_build.md`
+  when that file was deleted on 2026-08-19; it was recorded nowhere else.**
+- **A gate script aborts at its first failing step, so a red step one hides
+  everything after it.** When the pytest step fails, nothing downstream in
+  `check_phase4` / `check_phase7` has run — do not report those gates as
+  anything until their later stages are run directly. **Also rescued from
+  `extra_build.md` on 2026-08-19.**
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
@@ -2344,9 +2357,13 @@ Carried into gate approvals as declared work rather than dropped:
 
 ## Next Up
 
-**Current, as of 2026-08-17.** `extra_build.md` is the execution order and the
-Deferred Register in `docs/plans/PLAN.md` is the authority; this is a pointer,
-not a third copy.
+**Current, as of 2026-08-19.** The Deferred Register in `docs/plans/PLAN.md` is
+the authority on what is open; this is a pointer, not a third copy.
+`extra_build.md` was the execution order until its last task closed
+(ADR-0050 to ADR-0059); it was **deleted 2026-08-19** on its own instruction,
+after its two uniquely-recorded working rules were moved into Decisions above.
+References to it in ADRs and handoff entries are historical evidence and were
+deliberately left alone.
 
 - ~~**Startable now: Task 7**~~ **DONE 2026-08-17 (ADR-0056).** Measured
   corpus-wide at three penalty strengths: **the lever is a pure loss, every

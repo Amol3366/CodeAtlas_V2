@@ -50,10 +50,12 @@ Both are product questions. Neither has a technically-correct answer, and each d
 | **WS-5** | Module granularity + RRF bias | 1–2 days | **Gate B** | The lever needs corpus-wide measurement, which WS-1 improves |
 | **WS-6** | Lexical intents and relation paths | ½–1 day | — | Last of ADR-0034's four causes; gates `relation_path_recall` |
 
-> **Execution order now lives in `documentation/extra_build.md`**, re-sequenced
-> after WS-0 and WS-1 closed, with per-task files, traps and acceptance criteria
-> this file does not carry. **This file stays the authority on scope, rationale
-> and the two decision gates**; that one is the authority on what to do next.
+> **Execution order lived in `documentation/extra_build.md`**, re-sequenced after
+> WS-0 and WS-1 closed, with per-task files, traps and acceptance criteria this
+> file does not carry. **That file was deleted 2026-08-19**, on its own
+> instruction, once every task it tracked had closed (ADR-0050 to ADR-0059).
+> This file stays the authority on scope, rationale and the two decision gates;
+> the Deferred Register in `docs/plans/PLAN.md` is the authority on what is open.
 > Neither carries status — the Deferred Register in `docs/plans/PLAN.md` does.
 
 ## Progress — updated 2026-08-14 (resume here)
