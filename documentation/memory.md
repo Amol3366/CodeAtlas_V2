@@ -2413,11 +2413,39 @@ Carried into gate approvals as declared work rather than dropped:
 **Current, as of 2026-08-19.** The Deferred Register in `docs/plans/PLAN.md` is
 the authority on what is open; this is a pointer, not a third copy.
 
-**Active: ADR-0065** (`accepted` 2026-08-19) — query-backed language support.
-**Java and Go are SHIPPED**; Rust and Scala are approved and not yet built.
-**One open decision:** a Go import resolves `external` and needs a matching
-policy — see the handoff, and note the cost is asymmetric, because an
-over-eager match invents a relationship rather than missing one. The design, the §25 scope change, and four required
+**ADR-0065 is DELIVERED — Java, Go, Rust and Scala all ship** (2026-08-19), on
+branch `query-backed-language-support`, **not merged to `main`**.
+
+**Start here tomorrow, in order:**
+
+1. **Re-run `scripts/check_phase4.ps1 -SkipSync` and read the whole log.** The
+   run started at the end of the session was still buffering when it ended, so
+   **its result is unknown — do not record it as a pass.** What *is* verified
+   for the Rust/Scala slice: 54 passed / 2 xfailed across the four slices, ruff
+   clean, mypy clean over 379 files, two mutation checks. The Java and Go slices
+   each passed a full gate (`2281` and `2293 passed`), so a failure now would
+   point at Rust/Scala.
+2. **Rule the two declared limits**, both `strict` xfails carrying full
+   diagnoses in their test files:
+   - **Go import matching policy.** A Go import resolves `external` because its
+     path carries the `go.mod` prefix. The cost is **asymmetric** — trimming to
+     one segment makes a third-party `github.com/foo/payments` resolve onto a
+     local `payments`, *inventing* a relationship §4.1 forbids. A miss is the
+     safe direction. Contrast: Rust's `crate` is a keyword, so Rust imports
+     resolve — that contrast is the diagnosis.
+   - **Scala member calls.** Its `tags.scm` has only
+     `(call_expression (identifier) @name)`, so `obj.method(x)` — most Scala
+     calls — is invisible. Closing it needs a supplementary references query;
+     the profile contract carries one authored slot (`imports_query`).
+3. **Decide whether to merge to `main`.** Both version bumps land in one
+   reindex; nothing is merged yet.
+
+**The largest gap: no evaluation case measures any of the four languages.**
+Unit, integration and security tests are coverage, not measurement, and the
+Section 19.3 target table still says nothing about Java, Go, Rust or Scala. No
+fixture was added to `SUPPORTED_FIXTURES`, deliberately — ADR-0017's guard
+requires scored cases, and gold data must be declared before the engine runs
+against it (ADR-0003, ADR-0036). The design, the §25 scope change, and four required
 grammar dependencies are all approved. **Approval is not implementation: no code
 exists, and no surface may claim these languages work until it lands.** Delivery
 is Java -> Go -> Rust -> Scala, and **slice one must verify that `resolution.py`
