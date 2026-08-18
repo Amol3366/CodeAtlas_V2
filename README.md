@@ -12,7 +12,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | --- | --- |
 | **Status** | Phases 0–7 complete, every gate user-approved; project closed out 2026-08-10, post-gate work ongoing |
 | **Platform** | Windows 11 primary (loopback only, single user) |
-| **Languages indexed** | Python, TypeScript, JavaScript, **Java**, Markdown, common config/schema formats. Go/Rust/Scala approved but not built (ADR-0065) |
+| **Languages indexed** | Python, TypeScript, JavaScript, **Java**, **Go**, Markdown, common config/schema formats. Rust/Scala approved but not built (ADR-0065) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Tests** | 2252 passing at the last full gate run |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
@@ -646,10 +646,12 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   lookup, no callers, and no impact analysis. A new language needs an approved
   ADR under §25.
 
-  **Java shipped 2026-08-19 (ADR-0065); Go, Rust and Scala are approved but
-  not built.** Java gets symbols, qualified names, `IMPORTS`, `CALLS`,
-  `IMPLEMENTS`, and changed-symbol detection through a shared query-backed
-  parser — and deliberately **no test edges and no route detection**, so
+  **Java and Go shipped 2026-08-19 (ADR-0065); Rust and Scala are approved but
+  not built.** Both get symbols, qualified names, `CALLS`, `REFERENCES`, and
+  changed-symbol detection through a shared query-backed parser — Java also gets
+  resolved `IMPORTS` and `IMPLEMENTS`. **A Go import currently resolves as
+  `external`**, because its path carries the module prefix declared in `go.mod`,
+  which a pure parse never reads; Go calls and references resolve normally — and deliberately **no test edges and no route detection**, so
   preflight on Java is thinner than on Python. Query captures carry no receiver
   context, so Java also resolves calls less completely than Python does; that
   is a declared limit of the mechanism, not a defect. A spike on 2026-08-19

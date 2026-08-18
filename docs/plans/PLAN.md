@@ -290,6 +290,101 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-19T07:00:00Z — Go ships (ADR-0065); `owner_hint` carries it entirely
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: ADR-0065 second slice. **Java and Go implemented**; Rust and Scala
+  approved and not built.
+- **No version bump.** `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION` are
+  already `1.5.0` from the Java slice, and Go adds a parser rather than changing
+  what an existing one concludes. `SCHEMA_VERSION` stays `14`,
+  `contract_version` stays `1.1`, no migration.
+
+**The design's central claim held.** `owner_hint` exists because Go's method
+receiver is a *field* of the method node rather than a lexical ancestor -- the
+measurement that killed a purely declarative design. Go now runs on it
+**entirely**: `scope_node_types` is `frozenset()` for Go, because there is no
+lexical scope to walk, and `OrderService.Capture` / `Service.Charge` are
+qualified by their receivers. The hook added for one measured case is the hook
+the second language depends on completely.
+
+Measured on a two-package Go repository:
+
+```
+SYMBOLS    OrderService          | internal.orders   | CLASS  | public
+           OrderService.Capture  | internal.orders   | METHOD | public
+           Service.Charge        | internal.payments | METHOD | public
+RELATIONS  CALLS      Charge  | resolved   | static_resolved
+           REFERENCES Service | resolved   | static_resolved
+           REFERENCES string  | unresolved | (a builtin, correctly not invented)
+           IMPORTS    payments (myapp.internal.payments) | external
+```
+
+**The open finding: a Go import resolves `external`, and it is recorded rather
+than fixed.** A Go import path carries the module prefix declared in `go.mod`
+-- `myapp/internal/payments` -- while the indexed module path is the
+repository-relative directory `internal.payments`. `_resolve_module` matches a
+specifier against tails of *module paths*, not tails of the *specifier*, so the
+longer specifier never matches.
+
+**This is not the Java fix again.** Java's was unambiguous: index the
+declaration the source already carries. Go's needs a **matching policy** -- how
+many leading segments may be discarded before a match counts -- and the cost is
+**asymmetric**. Trimming to a single segment would make a third-party
+`github.com/foo/payments` resolve onto a local `payments` package, **inventing a
+relationship**, which section 4.1 forbids outright. A miss is the safe
+direction; an invention is not. Left for a user decision.
+
+**Stated limits found while building.**
+
+- **A Go interface is reported as `CLASS`.** Go's `tags.scm` marks `type_spec`
+  generically and its separate struct/interface patterns capture a bare `@name`
+  with no definition capture to tell them apart. Refining it would mean the
+  shared engine inspecting a language-specific node type, so it is declared
+  instead.
+- **`(type_identifier) @name @reference.type` fires on every type identifier**,
+  so Go emits many `REFERENCES` edges -- ten in a fourteen-line file. They are
+  true, and Go builtins among them correctly stay unresolved.
+
+- Files: `src/codeatlas/parsing/query_backed/languages/go.py` (new),
+  `queries/go.imports.scm` (new), `tests/unit/test_go_adapter.py` (new),
+  `tests/integration/test_go_resolution.py` (new),
+  `src/codeatlas/parsing/registry.py`, `src/codeatlas/extraction/resolution.py`
+  (`go` added to `_DECLARED_MODULE_LANGUAGES`),
+  `tests/security/test_query_backed_parser_safety.py`, ADR-0065, and the
+  documentation set.
+
+**Verification.**
+
+- `tests/unit/test_go_adapter.py` -- 5 passed.
+- `tests/integration/test_go_resolution.py` -- 4 passed, **1 xfailed
+  (`strict`)**, the import finding above.
+- `tests/security/test_query_backed_parser_safety.py` -- **11 passed**, now
+  covering both adapters: malformed Go source never cites a line outside the
+  file, an import path is never followed on disk, and parsing spawns no
+  subprocess (no `go build`, no module download).
+- `ruff check src tests scripts apps` -- clean.
+- `mypy --no-incremental src tests scripts apps` -- clean over **374 files**,
+  after catching a bare `tuple` annotation.
+- **Mutation-checked.** Forcing `owner_hint` to return `None` fails **three**
+  tests -- the receiver qualification, the kind mapping, and the visibility
+  rule. Restored from a file copy, never `git checkout --`. All five Go adapter
+  tests had passed on their first run, which is exactly when a mutation check
+  stops being optional.
+
+**Limitations.**
+
+- **No Go evaluation cases**, as with Java: no metric measures either language.
+- **No test edges and no route detection** for Go, so `go test` conventions and
+  `net/http` / gin routes are invisible.
+- The Go slice reuses the Java precedent that a fixture is only added to
+  `SUPPORTED_FIXTURES` once it carries scored cases, so no corpus fixture was
+  added for Go at all.
+
+- Next: **user decision on the Go import matching policy**, then Rust or Scala,
+  each of which needs only an adapter, an import query, and its own measurement.
+
+
 ### 2026-08-19T05:00:00Z — Java ships (ADR-0065); the checkpoint fired and was right to
 
 - Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.

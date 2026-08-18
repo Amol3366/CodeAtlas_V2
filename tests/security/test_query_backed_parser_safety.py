@@ -17,7 +17,10 @@ from codeatlas.parsing.query_backed.languages.java import JavaAdapter
 from codeatlas.parsing.registry import ParseRequest, ParseResult
 
 ENGINE_SOURCE = Path("src/codeatlas/parsing/query_backed/engine.py")
-ADAPTER_SOURCE = Path("src/codeatlas/parsing/query_backed/languages/java.py")
+ADAPTER_SOURCES = (
+    Path("src/codeatlas/parsing/query_backed/languages/java.py"),
+    Path("src/codeatlas/parsing/query_backed/languages/go.py"),
+)
 
 
 def _parse(content: bytes, relative_path: str = "src/A.java") -> ParseResult:
@@ -103,7 +106,7 @@ def test_parsing_spawns_no_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_the_parser_modules_have_no_execution_primitives() -> None:
-    for source in (ENGINE_SOURCE, ADAPTER_SOURCE):
+    for source in (ENGINE_SOURCE, *ADAPTER_SOURCES):
         text = source.read_text(encoding="utf-8")
         for forbidden in (
             "exec(",
@@ -126,3 +129,58 @@ def test_an_import_is_never_followed_on_disk() -> None:
     )
 
     assert isinstance(result, ParseResult)
+
+
+
+# --- Go (ADR-0065) -------------------------------------------------------
+
+
+def _parse_go(content: bytes) -> ParseResult:
+    from codeatlas.parsing.query_backed.languages.go import GoAdapter
+
+    return TagsBackedParser(GoAdapter()).parse(
+        ParseRequest(
+            repository_id="repo_1",
+            snapshot_id="snap_1",
+            file_id="file_1",
+            relative_path="internal/a/service.go",
+            language="go",
+            content=content,
+        )
+    )
+
+
+def test_go_malformed_source_never_cites_a_line_outside_the_file() -> None:
+    broken = b"package a\n\nfunc ((( {{{ \n"
+
+    result = _parse_go(broken)
+
+    line_count = broken.count(b"\n") + 1
+    for symbol in result.symbols:
+        assert 1 <= symbol.start_line <= symbol.end_line <= line_count
+    for reference in result.references:
+        assert 1 <= reference.start_line <= reference.end_line <= line_count
+
+
+def test_a_go_import_path_is_never_followed_on_disk() -> None:
+    """An import path is untrusted text, and go.mod is never read."""
+    result = _parse_go(
+        b'package a\n\nimport "../../../../etc/passwd"\n\nfunc Safe() {}\n'
+    )
+
+    assert result.success is True
+    assert [s.name for s in result.symbols if s.name == "Safe"] == ["Safe"]
+
+
+def test_go_parsing_spawns_no_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No `go build`, no module download, no toolchain invocation."""
+
+    def fail(*args: object, **kwargs: object) -> None:
+        raise AssertionError("parsing must never spawn a process")
+
+    monkeypatch.setattr(subprocess, "Popen", fail)
+    monkeypatch.setattr(subprocess, "run", fail)
+
+    result = _parse_go(b"package a\n\nfunc Safe() {}\n")
+
+    assert result.success is True

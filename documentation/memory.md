@@ -2213,6 +2213,19 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   **false**, and the cost of finding out was one integration test rather than
   four languages of rework.
 
+- **A language's module identity may not be in any file you parse** (ADR-0065,
+  Go slice). Java declares `package com.shop.payments` in the source, so
+  indexing the declaration works. Go's import path carries the prefix from
+  `go.mod` — `myapp/internal/payments` — and a parse is a pure function of *one*
+  file, so that prefix is unknowable. The fix is not more parsing but a
+  **matching policy**, and its cost is asymmetric: trimming too far makes a
+  third-party import resolve onto local code, which invents a relationship
+  §4.1 forbids. **A miss is the safe direction.**
+- **`owner_hint` earned its place.** It was added because Go's receiver is a
+  field rather than an ancestor, and Go's whole slice needs no lexical scope at
+  all — `scope_node_types` is empty. The hook that justified rejecting a purely
+  declarative design is the hook the second language runs entirely on.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
@@ -2401,7 +2414,10 @@ Carried into gate approvals as declared work rather than dropped:
 the authority on what is open; this is a pointer, not a third copy.
 
 **Active: ADR-0065** (`accepted` 2026-08-19) — query-backed language support.
-**Java is SHIPPED**; Go, Rust and Scala are approved and not yet built. The design, the §25 scope change, and four required
+**Java and Go are SHIPPED**; Rust and Scala are approved and not yet built.
+**One open decision:** a Go import resolves `external` and needs a matching
+policy — see the handoff, and note the cost is asymmetric, because an
+over-eager match invents a relationship rather than missing one. The design, the §25 scope change, and four required
 grammar dependencies are all approved. **Approval is not implementation: no code
 exists, and no surface may claim these languages work until it lands.** Delivery
 is Java -> Go -> Rust -> Scala, and **slice one must verify that `resolution.py`

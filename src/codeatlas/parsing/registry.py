@@ -120,6 +120,7 @@ def default_registry() -> ParserRegistry:
     from codeatlas.parsing.document_parser import DocumentParser
     from codeatlas.parsing.python_parser import PythonParser
     from codeatlas.parsing.query_backed.engine import TagsBackedParser
+    from codeatlas.parsing.query_backed.languages.go import GoAdapter
     from codeatlas.parsing.query_backed.languages.java import JavaAdapter
     from codeatlas.parsing.tsjs_parser import TsJsParser
 
@@ -131,4 +132,5 @@ def default_registry() -> ParserRegistry:
     # existing language, so a collision surfaces here rather than depending
     # on import order.
     registry.register(TagsBackedParser(JavaAdapter()))
+    registry.register(TagsBackedParser(GoAdapter()))
     return registry

@@ -1,6 +1,6 @@
 # ADR-0065: Query-backed language support for Java, Go, Rust, and Scala
 
-- Status: **accepted** 2026-08-19 — **Java implemented the same day**; Go, Rust and Scala approved and not yet built
+- Status: **accepted** 2026-08-19 — **Java and Go implemented the same day**; Rust and Scala approved and not yet built
 - Date: 2026-08-19
 - Decision owners: user/product and implementing agent
 - Supersedes: none
@@ -214,3 +214,22 @@ scoped: **1.4.0 -> 1.5.0**, landed alongside `PARSER_BUNDLE_VERSION` 1.4.0 ->
 
 Planning Java alone is what made this cheap. The assumption cost one
 integration test to disprove instead of four languages of rework.
+
+**The Go slice then confirmed the design's central claim and found its own
+limit.** `owner_hint` -- the hook whose existence justified rejecting a purely
+declarative design -- carries Go entirely: `OrderService.Capture` and
+`Service.Charge` are qualified by their **receivers**, which are fields of the
+method node, and `scope_node_types` is empty for Go because there is no lexical
+scope to walk. Symbols, cross-package `CALLS`, and `REFERENCES` all resolve,
+and Go builtins (`string`, `error`) are correctly left unresolved rather than
+invented as local symbols.
+
+**A Go import, however, resolves as `external`, and this one is left for a
+decision rather than fixed.** A Go import path carries the module prefix
+declared in `go.mod` -- `myapp/internal/payments` -- while the indexed module
+path is the repository-relative directory `internal.payments`. Resolving it
+needs a *matching policy*: how many leading segments may be discarded before a
+match counts. The cost is asymmetric and that is why it is not chosen here --
+trimming to a single segment would make a third-party `github.com/foo/payments`
+resolve onto a local `payments` package, **inventing a relationship**, which
+section 4.1 forbids outright. A miss is the safe direction; an invention is not.

@@ -15,7 +15,7 @@ that file is the contract.
 | Pydantic | `>=2.12,<3` | Validation at the boundary; also drives settings |
 | SQLite (WAL) | stdlib | Single-user local product — one file, no daemon, real transactions |
 | Tree-sitter | `>=0.25,<0.27` | One parser family across Python/TS/JS/Java; error-tolerant on broken files |
-| `tree-sitter-java` / `-go` / `-rust` / `-scala` | pinned | Grammars for ADR-0065. Only Java is wired up; the other three are approved and not yet built |
+| `tree-sitter-java` / `-go` / `-rust` / `-scala` | pinned | Grammars for ADR-0065. Java and Go are wired up; Rust and Scala are approved and not yet built |
 | Python `ast` | stdlib | Enriches Tree-sitter output where Python semantics matter |
 | Typer | `>=0.27,<1` | Typed CLI over the same application services |
 | `mcp` | `>=1.2,<2` | Agent access surface |
@@ -98,7 +98,7 @@ CodeAtlas_V2/
 │   │       ├── engine.py                   #   runs tags.scm, builds SymbolRecords
 │   │       ├── profile.py                  #   LanguageProfile / LanguageAdapter
 │   │       ├── queries/                    #   imports.scm authored here
-│   │       └── languages/                  #   java.py (go/rust/scala pending)
+│   │       └── languages/                  #   java.py, go.py (rust/scala pending)
 │   ├── extraction/                         # symbols and relations
 │   ├── chunking/                           # logical chunk identity and versions
 │   ├── indexing/                           # snapshot lifecycle, jobs, watcher, reconcile
