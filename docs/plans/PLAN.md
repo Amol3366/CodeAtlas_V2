@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **Post-gate session 2026-08-16/17 merged eight branches**: ADR-0050 (q035), ADR-0051 (q006), ADR-0052 (depth-2 claims), ADR-0053 (`CONCEPTUAL` measurable), ADR-0054 (finding subject/path), ADR-0055 (route cites its handler), plus two artifact regenerations and one documentation pass. **No migration; `SCHEMA_VERSION` stays 14 and `contract_version` stays `1.1` throughout** |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** **All seven `extra_build.md` tasks are now closed** (ADR-0050 to ADR-0059), so that file has no live content and its own preamble says to delete it rather than let it rot - left as a one-line follow-up for the user. ADR-0056 was **accepted 2026-08-17**; ADR-0057, ADR-0058 and ADR-0059 landed the same day. The Deferred Register below remains the authority on what is open, and every row in it is closed or deferred with a named trigger |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** **All seven `extra_build.md` tasks are now closed** (ADR-0050 to ADR-0059), so that file had no live content and its own preamble said to delete it rather than let it rot. **Deleted 2026-08-19** on the user's instruction, after its two uniquely-recorded working rules were moved into `documentation/memory.md`; references to it in ADRs and earlier handoff entries are historical evidence and were deliberately left alone. ADR-0056 was **accepted 2026-08-17**; ADR-0057, ADR-0058 and ADR-0059 landed the same day. The Deferred Register below remains the authority on what is open, and every row in it is closed or deferred with a named trigger |
 
 ## Deferred Register
 
@@ -289,6 +289,76 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-19T01:00:00Z — `extra_build.md` deleted, after rescuing two rules recorded nowhere else
+
+- Agent: Claude Code `claude-opus-5`, branch `delete-extra-build`.
+- Transition: no phase task. Post-gate, documentation only. The user instructed
+  the deletion; the file's own preamble had asked for it since 2026-08-17.
+- No ADR. **No source, contract, schema, migration or corpus change.**
+  `SCHEMA_VERSION` stays `14`, `contract_version` stays `1.1`.
+
+**The file was not inert, and checking cost five minutes.** Its closing
+"Working rules" section carried two lessons that a repository-wide search found
+**nowhere else**, so deleting on the preamble's say-so would have discarded
+them:
+
+- **`$?` after a pipe is the pipe's exit code, not the command's.** `cmd | tail`
+  then `echo $?` reports `tail`, which always succeeds — four false `EXIT=0`
+  readings on 2026-08-16, one for a step that was actually failing.
+- **A gate script aborts at its first failing step**, so a red step one hides
+  every stage after it; those stages have not run and must not be reported.
+
+Both are now in `documentation/memory.md` under Decisions, each marked as
+rescued from this file. The third candidate — `baseline-phase-1`/`-2` stay
+frozen as history — was already recorded in this file and in two plan documents,
+so it needed no rescue. **The first rule is not theoretical: it was hit in this
+same session**, when `... | tail -6; echo "EXIT=$?"` printed `EXIT=0` for a
+command that had just failed with a usage error. The conclusion happened to be
+read from the visible output rather than the code, which is exactly the near
+miss the rule describes.
+
+**Live pointers updated; historical references deliberately left alone.** This
+is the `AGENTS.md` rename precedent applied to a deletion — rewriting the
+records a gate was approved on is not housekeeping.
+
+| Reference | Disposition |
+| --- | --- |
+| Active Work "Next gate" row, this file | **Updated** — the follow-up is done rather than pending |
+| `docs/superpowers/plans/2026-08-14-post-closeout-program.md:53` | **Updated** — it named the deleted file as "the authority on what to do next"; now points at the Deferred Register |
+| `documentation/memory.md` "Next Up" header | **Updated** — it called the file the execution order |
+| Deferred Register q035 row (this file) | **Left** — it quotes what the file carried, and the quotation is inline and self-contained |
+| ADR-0050 to ADR-0059, earlier handoff entries | **Left** — historical evidence, never rewritten |
+
+- Files: `documentation/extra_build.md` **(deleted, 584 lines)**,
+  `documentation/memory.md`, `docs/superpowers/plans/2026-08-14-post-closeout-program.md`,
+  this file.
+
+**Verification.**
+
+- `grep -rn 'extra_build'` across `*.md` before deleting, to classify every
+  reference as live pointer or historical record.
+- Targeted searches for each Working-rule lesson (`PIPESTATUS`,
+  "first failing step", "frozen as history") across `memory.md`, `PLAN.md`, the
+  plan documents and `AGENTS.md` — the first two returned **no hits outside the
+  deleted file**, which is what made the rescue necessary.
+- `git status --short` after deletion — one `D`, three `M`, no source touched.
+- Re-ran the reference search afterwards: every remaining mention is historical
+  narrative or the new rescue notes. **No dangling "read this file" pointer.**
+- **No gate was run and none is claimed.** Deleting a Markdown file with no
+  code, test or script referencing it cannot affect the suite.
+
+**Limitations.**
+
+- The file's per-task detail — traps, acceptance criteria, and the reasoning
+  behind each of the seven tasks — is **gone from the worktree** by design. It
+  survives in Git history and, for the substance, in ADR-0050 to ADR-0059, which
+  is where a reader should be sent. `git show 43462bb:documentation/extra_build.md`
+  retrieves it if ever wanted.
+
+- Next: **nothing assigned.** The two `AGENTS.md` §12 path divergences flagged in
+  the previous handoff remain open for a user decision.
+
 
 ### 2026-08-19T00:00:00Z — README rewritten; two documented commands could never have run
 
