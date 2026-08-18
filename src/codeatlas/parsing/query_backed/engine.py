@@ -81,14 +81,26 @@ class TagsBackedParser:
         carries no association between a definition and its name, which is
         exactly the pairing this needs.
         """
-        records: list[SymbolRecord] = []
+        # A span may match more than one definition pattern. Rust's tags.scm
+        # matches a method inside an `impl` as BOTH `definition.method` (via the
+        # enclosing declaration_list) and `definition.function` (the bare
+        # function_item), and `kind` is part of `symbol_id`, so keeping both
+        # would store two symbols for one function. The winner is whichever
+        # capture appears EARLIER in `kind_by_capture`: that mapping's order
+        # declares specificity, most specific first.
+        rank_of = {
+            name: rank for rank, name in enumerate(self._profile.kind_by_capture)
+        }
+        best: dict[tuple[int, int], tuple[int, SymbolRecord]] = {}
         for _pattern, captures in QueryCursor(self._profile.tags_query).matches(root):
             kind: SymbolKind | None = None
             definition_node: Any = None
+            rank = len(rank_of)
             for capture_name, nodes in captures.items():
                 if capture_name in self._profile.kind_by_capture and nodes:
                     kind = self._profile.kind_by_capture[capture_name]
                     definition_node = nodes[0]
+                    rank = rank_of[capture_name]
             name_nodes = captures.get("name") or ()
             if kind is None or definition_node is None or not name_nodes:
                 continue
@@ -104,12 +116,17 @@ class TagsBackedParser:
             qualified_name = self._adapter.qualified_name(
                 definition_node, name, scopes, request.content
             )
-            records.append(
+            span = (definition_node.start_byte, definition_node.end_byte)
+            existing = best.get(span)
+            if existing is not None and existing[0] <= rank:
+                continue
+            best[span] = (
+                rank,
                 self._record(
                     definition_node, request, kind, name, qualified_name, module_path
-                )
+                ),
             )
-        return records
+        return [record for _rank, record in best.values()]
 
     def _scopes(self, node: Any, source: bytes) -> list[str]:
         """Enclosing scope names, outermost first."""

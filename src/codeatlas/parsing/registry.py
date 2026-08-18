@@ -122,6 +122,8 @@ def default_registry() -> ParserRegistry:
     from codeatlas.parsing.query_backed.engine import TagsBackedParser
     from codeatlas.parsing.query_backed.languages.go import GoAdapter
     from codeatlas.parsing.query_backed.languages.java import JavaAdapter
+    from codeatlas.parsing.query_backed.languages.rust import RustAdapter
+    from codeatlas.parsing.query_backed.languages.scala import ScalaAdapter
     from codeatlas.parsing.tsjs_parser import TsJsParser
 
     registry = ParserRegistry()
@@ -133,4 +135,6 @@ def default_registry() -> ParserRegistry:
     # on import order.
     registry.register(TagsBackedParser(JavaAdapter()))
     registry.register(TagsBackedParser(GoAdapter()))
+    registry.register(TagsBackedParser(RustAdapter()))
+    registry.register(TagsBackedParser(ScalaAdapter()))
     return registry

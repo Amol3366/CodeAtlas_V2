@@ -20,6 +20,8 @@ ENGINE_SOURCE = Path("src/codeatlas/parsing/query_backed/engine.py")
 ADAPTER_SOURCES = (
     Path("src/codeatlas/parsing/query_backed/languages/java.py"),
     Path("src/codeatlas/parsing/query_backed/languages/go.py"),
+    Path("src/codeatlas/parsing/query_backed/languages/rust.py"),
+    Path("src/codeatlas/parsing/query_backed/languages/scala.py"),
 )
 
 
@@ -184,3 +186,82 @@ def test_go_parsing_spawns_no_subprocess(monkeypatch: pytest.MonkeyPatch) -> Non
     result = _parse_go(b"package a\n\nfunc Safe() {}\n")
 
     assert result.success is True
+
+
+# --- Rust and Scala (ADR-0065) -------------------------------------------
+
+
+def _parse_with(
+    adapter: object, content: bytes, path: str, language: str
+) -> ParseResult:
+    return TagsBackedParser(adapter).parse(  # type: ignore[arg-type]
+        ParseRequest(
+            repository_id="repo_1",
+            snapshot_id="snap_1",
+            file_id="file_1",
+            relative_path=path,
+            language=language,
+            content=content,
+        )
+    )
+
+
+def test_malformed_rust_never_cites_a_line_outside_the_file() -> None:
+    from codeatlas.parsing.query_backed.languages.rust import RustAdapter
+
+    broken = b"pub struct { impl fn (((\n\nfn ]]] {\n"
+    result = _parse_with(RustAdapter(), broken, "src/a.rs", "rust")
+
+    line_count = broken.count(b"\n") + 1
+    for symbol in result.symbols:
+        assert 1 <= symbol.start_line <= symbol.end_line <= line_count
+    for reference in result.references:
+        assert 1 <= reference.start_line <= reference.end_line <= line_count
+
+
+def test_a_rust_macro_is_recorded_not_expanded() -> None:
+    """Macro expansion would be executing repository code (section 4.4)."""
+    from codeatlas.parsing.query_backed.languages.rust import RustAdapter
+
+    result = _parse_with(
+        RustAdapter(),
+        b'fn main() { println!("{}", include_str!("/etc/passwd")); }\n',
+        "src/a.rs",
+        "rust",
+    )
+
+    assert result.success is True
+
+
+def test_malformed_scala_never_cites_a_line_outside_the_file() -> None:
+    from codeatlas.parsing.query_backed.languages.scala import ScalaAdapter
+
+    broken = b"package a\n\nclass { def (((\n"
+    result = _parse_with(ScalaAdapter(), broken, "src/A.scala", "scala")
+
+    line_count = broken.count(b"\n") + 1
+    for symbol in result.symbols:
+        assert 1 <= symbol.start_line <= symbol.end_line <= line_count
+    for reference in result.references:
+        assert 1 <= reference.start_line <= reference.end_line <= line_count
+
+
+def test_rust_and_scala_parsing_spawn_no_subprocess(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No cargo, no sbt, no Coursier, no toolchain invocation."""
+    from codeatlas.parsing.query_backed.languages.rust import RustAdapter
+    from codeatlas.parsing.query_backed.languages.scala import ScalaAdapter
+
+    def fail(*args: object, **kwargs: object) -> None:
+        raise AssertionError("parsing must never spawn a process")
+
+    monkeypatch.setattr(subprocess, "Popen", fail)
+    monkeypatch.setattr(subprocess, "run", fail)
+
+    assert _parse_with(
+        RustAdapter(), b"pub fn safe() {}\n", "src/a.rs", "rust"
+    ).success is True
+    assert _parse_with(
+        ScalaAdapter(), b"package a\nclass Safe {}\n", "src/A.scala", "scala"
+    ).success is True

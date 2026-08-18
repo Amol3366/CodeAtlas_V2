@@ -75,7 +75,9 @@ RESOLVER_VERSION: str = "1.5.0"
 # stored `module_path` is authoritative. Python and TypeScript/JavaScript are
 # deliberately absent: their module is their path, and indexing a second
 # opinion for them would change what already-correct resolution concludes.
-_DECLARED_MODULE_LANGUAGES: Final[frozenset[str]] = frozenset({"java", "go"})
+_DECLARED_MODULE_LANGUAGES: Final[frozenset[str]] = frozenset(
+    {"java", "go", "rust", "scala"}
+)
 
 # Tried in order for a TypeScript/JavaScript specifier that names no extension.
 _TSJS_EXTENSIONS: Final[tuple[str, ...]] = (
