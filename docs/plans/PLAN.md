@@ -290,6 +290,100 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-19T00:00:00Z — README rewritten; two documented commands could never have run
+
+- Agent: Claude Code `claude-opus-5`, branch `readme-front-door`.
+- Transition: no phase task. Post-gate, documentation only. The user asked that
+  someone opening the repository should understand the project thoroughly from
+  `README.md`.
+- No ADR. **No source, contract, schema, migration or corpus change.**
+  `SCHEMA_VERSION` stays `14`, `contract_version` stays `1.1`.
+
+**The defect found while writing.** The README's opening code block — the first
+thing a new user copies — carried two commands that cannot execute:
+
+| Documented | Reality |
+| --- | --- |
+| `codeatlas graph callers <id> <symbol>` | **There is no `graph` command group.** The graph verbs are top level: `callers`, `callees`, `deps`, `exports`, `tests`, `trace` |
+| `codeatlas search text <id> "idempotency key"` | `search` is `<repository_id> <query>` with `--kind text\|files\|symbols`. The documented form binds `repository_id="text"`, `query="<id>"`, then dies |
+
+Proven rather than reasoned about: `uv run codeatlas search text abc123
+"idempotency key"` returns `Got unexpected extra argument(s) (idempotency key)`.
+The corrected forms — `search abc123 "idempotency key" --kind text` and
+`callers abc123 PaymentService.capture` — reach the application layer and return
+`REPOSITORY_NOT_FOUND`, which is the right failure for an unregistered id.
+
+Both errors appeared **twice in the README and once each in
+`documentation/codeatlas-v2-working-guide.md`**, and are fixed in both files. A
+repository-wide search confirmed **no code, test, or script ever used the broken
+form** — it was documentation-only, which is why every gate stayed green over it.
+
+**This is ADR-0060's lesson on a different surface: a name was trusted instead
+of the thing it named.** `graph callers` reads exactly like a Typer sub-app, so
+nobody checked. Accordingly every command, route, tool name, exit code and
+version in the new README was read out of the source or a tracked artifact —
+`codeatlas --help`, the router prefixes, the MCP registry, `baseline-phase-4.json`
+— not copied from existing prose.
+
+**What the README now contains.** The problem; the five product questions; the
+trust contract and the derivation ladder; a quick start; a feature catalogue
+(repository truth, retrieval, the 18 relation kinds and derivation-tiered
+`TESTS`, change preflight, conversations, reports); the snapshot lifecycle,
+answer pipeline and preflight pipeline; the architecture, folder layout and
+stack; all four surfaces including a full CLI table, the verified `/v1` route
+list, the 21 MCP tools and the seven exit codes; provider configuration and
+credential handling; operations (watcher, doctor, backup/restore/upgrade,
+packaging, ephemeral); the security model; measured results with their caveats;
+contributor rules; troubleshooting; and a documentation map.
+
+- Files: `README.md` (357 → 798 lines),
+  `documentation/codeatlas-v2-working-guide.md` (two command lines),
+  `documentation/memory.md`, this file.
+
+**Verification.**
+
+- `uv run codeatlas --help` — the authoritative command list; the README table
+  is transcribed from it.
+- `uv run codeatlas search text abc123 "idempotency key"` — usage error,
+  reproducing the documented defect.
+- `uv run codeatlas search abc123 "idempotency key" --kind text` and
+  `uv run codeatlas callers abc123 PaymentService.capture` — both reach
+  `REPOSITORY_NOT_FOUND`, confirming the corrected forms parse.
+- Route list read from the `APIRouter` prefixes and decorators in
+  `src/codeatlas/api/routers/`; message retry/feedback paths cross-checked
+  against the web client rather than inferred from the prefix.
+- MCP tool names read from `build_registry()` in `src/codeatlas/mcp/tools.py`.
+- Metrics read from `docs/evaluation/baseline-phase-4.json`
+  (`exact_symbol_resolution` 1.0, `containing_evidence_recall_at_10` 1.0,
+  `relation_path_recall` 1.0, sole `unmet_targets` entry
+  `changed_symbol_precision`) and `baseline-phase-7.json` (evidence recall 0.80
+  strict / 1.0000 containment).
+- `git diff --stat` — two Markdown files, no source touched. **No gate was run
+  and none is claimed:** this change cannot affect the suite, and claiming a
+  green gate it did not need would be the kind of decorative evidence ADR-0058
+  warns about.
+
+**Limitations, stated rather than smoothed over.**
+
+- **`AGENTS.md` §12.2 and the implementation disagree on two paths.** The
+  contract lists `/v1/messages/{message_id}/retry` and `.../feedback`; the
+  router mounts them under the conversations prefix, so the live paths are
+  `/v1/conversations/messages/{message_id}/retry` and `.../feedback`. The README
+  documents **what exists**. Whether the contract or the implementation should
+  move is a decision for the user, not a docs fix, and it is **not** recorded in
+  the Deferred Register by this entry — flagged here only.
+- `AGENTS.md` §12.3 also lists `POST /v1/query/stream`, which **is not
+  implemented**; streaming is `GET /v1/conversations/{id}/stream`. Same
+  disposition: documented as it is, decision left open.
+- The README's measured-results table is a summary of tracked artifacts and will
+  drift if a baseline is regenerated without revisiting it. It deliberately
+  names the artifacts it came from so the check is cheap.
+
+- Next: **user decision.** Two candidates, neither started: reconcile the two
+  `AGENTS.md` §12 path divergences above, and delete
+  `documentation/extra_build.md`, whose own preamble says to.
+
+
 ### 2026-08-18T16:00:00Z — The bottleneck was resolution, not parsing (ADR-0064)
 
 - Agent: Claude Code `claude-opus-5`, branch `adr-0064-resolution-indexes-what-it-scanned`.
