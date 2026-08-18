@@ -93,8 +93,9 @@ def _relations(harness: JavaHarness) -> list[tuple[str, str, str, str | None]]:
     ]
 
 
-CHECKPOINT_REASON = (
-    "ADR-0065 checkpoint, measured 2026-08-19: resolution.py does NOT generalize. "
+CHECKPOINT_FINDING = (
+    "ADR-0065 checkpoint, measured 2026-08-19 and FIXED the same day. "
+    "Before the fix: resolution.py did not generalize. "
     "`_build_index` gates the module index on `record.language == \"python\"` "
     "(resolution.py:236) and derives the module from the FILE PATH via "
     "`_python_module`, so a Java package never enters `module_to_file` -- and "
@@ -107,7 +108,6 @@ CHECKPOINT_REASON = (
 )
 
 
-@pytest.mark.xfail(strict=True, reason=CHECKPOINT_REASON)
 def test_a_java_import_resolves_across_packages(java_harness: JavaHarness) -> None:
     relations = _relations(java_harness)
     imports = [r for r in relations if r[0] == "IMPORTS"]

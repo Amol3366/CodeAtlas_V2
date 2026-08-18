@@ -62,7 +62,20 @@ _UNMENTIONABLE_KINDS: Final[frozenset[SymbolKind]] = frozenset(
     {SymbolKind.MODULE, SymbolKind.CONFIG_KEY, SymbolKind.DOCUMENT_SECTION}
 )
 
-RESOLVER_VERSION: str = "1.4.0"
+# 1.5.0 (ADR-0065): a language that declares its module in source has that
+# declaration indexed, rather than a module derived from its file path. Java's
+# `package com.shop.payments` lives at `src/main/java/com/shop/payments/`, so
+# the path-derived module never matched the declaration and every cross-package
+# import resolved as `external`. What resolution concludes therefore changes,
+# and every snapshot built by 1.4.0 is stale.
+RESOLVER_VERSION: str = "1.5.0"
+
+# Languages whose module identity is *declared* in the source -- a `package`
+# statement -- rather than derived from the file path. For these the symbol's
+# stored `module_path` is authoritative. Python and TypeScript/JavaScript are
+# deliberately absent: their module is their path, and indexing a second
+# opinion for them would change what already-correct resolution concludes.
+_DECLARED_MODULE_LANGUAGES: Final[frozenset[str]] = frozenset({"java"})
 
 # Tried in order for a TypeScript/JavaScript specifier that names no extension.
 _TSJS_EXTENSIONS: Final[tuple[str, ...]] = (
@@ -238,6 +251,18 @@ def _build_index(
             index.module_to_file.setdefault(
                 _python_module(record.relative_path), record.file_id
             )
+
+    # A declared module is indexed from the symbol rather than the path. This
+    # runs before the suffix table below, which is derived from `module_to_file`
+    # and would otherwise not see these entries at all.
+    for symbol in symbols:
+        owning_file = index.files_by_id.get(symbol.file_id)
+        if (
+            owning_file is not None
+            and owning_file.language in _DECLARED_MODULE_LANGUAGES
+            and symbol.module_path
+        ):
+            index.module_to_file.setdefault(symbol.module_path, symbol.file_id)
 
     # `setdefault` in insertion order reproduces "the first module path that
     # ends with this specifier wins", which is what the linear scan returned.
