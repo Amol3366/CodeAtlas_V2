@@ -81,9 +81,9 @@ unless the user explicitly says otherwise, per repository.
 - **No network exposure beyond loopback.**
 - **No new languages beyond Python, TypeScript, and JavaScript** (plus Markdown
   and common config/schema formats) without an approved ADR. **ADR-0065 approved
-  Java, Go, Rust and Scala on 2026-08-19**, so the boundary moves to seven
-  languages *once that work ships*. It is not implemented, and until it is this
-  non-goal describes what the product actually does.
+  Java, Go, Rust and Scala on 2026-08-19; Java shipped the same day**, so the
+  boundary is now four languages plus Markdown and config. Go, Rust and Scala
+  are approved and not yet built.
 - **No PostgreSQL, message broker, microservices, or Kubernetes.** SQLite is the
   system of record.
 

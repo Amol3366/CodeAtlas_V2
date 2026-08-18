@@ -290,6 +290,107 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-19T05:00:00Z — Java ships (ADR-0065); the checkpoint fired and was right to
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: ADR-0065 `accepted` -> **Java implemented**. Go, Rust and Scala
+  remain approved and unbuilt.
+- **`PARSER_BUNDLE_VERSION` 1.4.0 -> 1.5.0 AND `RESOLVER_VERSION` 1.4.0 ->
+  1.5.0.** Every existing snapshot is stale and every user reindexes once.
+  `SCHEMA_VERSION` stays `14`, `contract_version` stays `1.1`, no migration.
+
+**The checkpoint disproved the ADR's own assumption, which is what it was for.**
+ADR-0065 section 7 recorded one belief read from the resolver rather than run:
+that `resolution.py` generalizes to a non-Python module system. Measured on a
+two-package Java repository:
+
+```
+SYMBOLS    OrderService          | com.shop.orders   | CLASS
+           OrderService.capture  | com.shop.orders   | METHOD
+           PaymentService.charge | com.shop.payments | METHOD
+RELATIONS  IMPORTS PaymentService | external | deterministic   <- wrong
+           CALLS   charge         | resolved | static_resolved <- already right
+```
+
+`_build_index` gated the module index on `record.language == "python"` **and**
+derived the module from the file path, so Java's declared `com.shop.payments`
+never matched the path-derived `src.main.java.com.shop.payments`. Fixed by
+indexing a declared `module_path` for languages that declare one; Python and
+TS/JS are deliberately excluded, because their module *is* their path and a
+second opinion would change conclusions that are already correct. After the fix
+the import reads `resolved` / `static_resolved` with a real `target_symbol_id`.
+
+**Planning Java alone is what made this cheap** — one integration test to
+disprove, rather than four languages of rework on a false premise.
+
+**A second defect, caught by a test before it shipped.** Java's `tags.scm` puts
+`@reference.call` on the **argument list**, not the method name, so the
+extractor emitted the target `"(orderId)"` instead of `"charge"`. `IMPLEMENTS`
+passed anyway and that was **luck**: `type_list` held a single identifier, and
+`implements A, B` would have produced the target `"A, B"`. The capture marks the
+*kind*; a sibling `@name` capture carries the target.
+
+**Three plan assumptions about this codebase were wrong**, and the code won each
+time:
+
+| Plan said | Reality |
+| --- | --- |
+| `detect_language` is the classification entry point | It is `classify()`, returning `(FileClassification, str)` |
+| The security suites are parameterised by extension | They are a safety file **per parser**; added `test_query_backed_parser_safety.py` with 8 assertions |
+| Adding a fixture to `SUPPORTED_FIXTURES` is enough | ADR-0017's guard asserts it equals the fixtures the **cases** use, so a fixture with no cases fails the suite |
+
+`java_app` is therefore declared and indexed but **not yet scored**, with the
+reason recorded at the constant: authoring gold data for a language whose
+resolution was unverified would have encoded behaviour the checkpoint went on to
+disprove, and deriving a gold range from engine output is what ADR-0003 and
+ADR-0036 forbid.
+
+- Files: `src/codeatlas/parsing/query_backed/` (new: `engine.py`, `profile.py`,
+  `queries/`, `languages/java.py`), `src/codeatlas/extraction/query_relations.py`
+  (new), `src/codeatlas/extraction/resolution.py`,
+  `src/codeatlas/parsing/registry.py`, `src/codeatlas/repositories/classification.py`,
+  `src/codeatlas/evaluation/engine_adapter.py`, `pyproject.toml`, `uv.lock`,
+  five new test files, the `java_app` fixture, ADR-0065, and the documentation
+  set.
+
+**Verification.** Every stage run individually and read from the process:
+
+- `tests/unit tests/integration` — **1593 passed** after both version bumps.
+- `tests/evaluation tests/security tests/contract tests/end_to_end` — **688
+  passed**.
+- `ruff check src tests scripts apps` — clean.
+- `mypy --no-incremental src tests scripts apps` — clean over **371 files**,
+  after it caught a real shadowing bug: the new loop reused `record`, already
+  bound to `FileRecord` by the loop above it.
+- Dataset validation — `valid`, 65 query cases.
+- **`baseline-phase-0`, `-3` and `-4` all `--check` byte-identical**, and
+  `git status docs/evaluation/` is empty afterwards. **No metric moved**, which
+  is the evidence the resolver change is surgical: it is gated on Java and no
+  scored case uses Java.
+- **Mutation-checked twice.** Emptying `_DECLARED_MODULE_LANGUAGES` fails the
+  import test; changing the import rule to keep the dotted path fails the
+  bound-symbol test. Both restored **from a file copy, never `git checkout --`**.
+
+**Limitations, stated rather than smoothed over.**
+
+- **Java resolves calls less completely than Python does.** A `tags.scm`
+  `reference.call` is a pattern match with no receiver context, where
+  `python_relations.py` walks a real `ast`. Declared in ADR-0065 in the same
+  form `tsjs_parser.py` uses for the absence of `tsc`.
+- **No test edges and no route detection for Java.** Preflight on a Java
+  repository is materially thinner than on Python, and no surface may imply
+  otherwise.
+- **`java_app` contributes no scored cases**, so no evaluation metric measures
+  Java at all. Adding them is the first follow-up, and the gold must be declared
+  before the engine is run against it.
+- The yield evidence behind the language choice came from **self-authored
+  samples**, which are cleaner than real code and flatter the result.
+
+- Next: **user decision.** Either add scored Java evaluation cases, or start the
+  Go slice — which now has a verified resolver seam and needs only an adapter
+  plus an import query.
+
+
 ### 2026-08-19T03:00:00Z — ADR-0065 proposed: query-backed language support, measured not assumed
 
 - Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.

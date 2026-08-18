@@ -500,9 +500,10 @@ These are not hidden:
 
 - Language coverage is focused on Python, TypeScript, JavaScript, Markdown, and
   common config/schema formats. A repository in any other language yields no
-  symbols and no relations. **ADR-0065 (accepted 2026-08-19) adds Java, Go,
-  Rust and Scala through a shared query-backed parser. Approved but not yet
-  implemented — the languages above are what works today.**
+  symbols and no relations. **Java shipped 2026-08-19 (ADR-0065)** through a shared
+  query-backed parser — symbols, imports, calls and changed-symbol detection,
+  but no test edges and no route detection. Go, Rust and Scala are approved and
+  not yet built.
 - The packaged executable is unsigned.
 - Some Chromium conversation-route Playwright tests are skipped because of a
   browser renderer crash; Firefox proves the workflow.

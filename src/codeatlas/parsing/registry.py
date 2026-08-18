@@ -34,7 +34,11 @@ from codeatlas.domain.symbols import SymbolRecord
 # `pyproject.toml` reported eight keys changed, seven of them falsely. The
 # range still cites; the hash now identifies. Symbol identity moves, so every
 # snapshot is stale until re-indexed.
-PARSER_BUNDLE_VERSION: str = "1.4.0"
+# 1.5.0 (ADR-0065): a query-backed parser emits Java symbols and references, so
+# every symbol version derived by the 1.4.0 bundle is stale. RESOLVER_VERSION
+# moves to 1.5.0 in the same change, deliberately: both make every snapshot
+# stale, and landing them together costs users one reindex rather than two.
+PARSER_BUNDLE_VERSION: str = "1.5.0"
 
 
 @dataclass(frozen=True)

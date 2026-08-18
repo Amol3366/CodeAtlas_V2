@@ -14,7 +14,8 @@ that file is the contract.
 | FastAPI | `>=0.140,<1` | Local HTTP plus SSE streaming without a second server |
 | Pydantic | `>=2.12,<3` | Validation at the boundary; also drives settings |
 | SQLite (WAL) | stdlib | Single-user local product — one file, no daemon, real transactions |
-| Tree-sitter | `>=0.25,<0.27` | One parser family across Python/TS/JS; error-tolerant on broken files |
+| Tree-sitter | `>=0.25,<0.27` | One parser family across Python/TS/JS/Java; error-tolerant on broken files |
+| `tree-sitter-java` / `-go` / `-rust` / `-scala` | pinned | Grammars for ADR-0065. Only Java is wired up; the other three are approved and not yet built |
 | Python `ast` | stdlib | Enriches Tree-sitter output where Python semantics matter |
 | Typer | `>=0.27,<1` | Typed CLI over the same application services |
 | `mcp` | `>=1.2,<2` | Agent access surface |
@@ -93,6 +94,11 @@ CodeAtlas_V2/
 │   ├── application/                        # use cases; the ONLY thing adapters may call
 │   ├── repositories/                       # registration, scanning, ignore rules, Git state
 │   ├── parsing/                            # Tree-sitter + ast
+│   │   └── query_backed/                   # ADR-0065: one engine + per-language adapters
+│   │       ├── engine.py                   #   runs tags.scm, builds SymbolRecords
+│   │       ├── profile.py                  #   LanguageProfile / LanguageAdapter
+│   │       ├── queries/                    #   imports.scm authored here
+│   │       └── languages/                  #   java.py (go/rust/scala pending)
 │   ├── extraction/                         # symbols and relations
 │   ├── chunking/                           # logical chunk identity and versions
 │   ├── indexing/                           # snapshot lifecycle, jobs, watcher, reconcile

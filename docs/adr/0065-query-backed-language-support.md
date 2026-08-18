@@ -1,6 +1,6 @@
 # ADR-0065: Query-backed language support for Java, Go, Rust, and Scala
 
-- Status: **accepted** 2026-08-19 — approved, not yet implemented
+- Status: **accepted** 2026-08-19 — **Java implemented the same day**; Go, Rust and Scala approved and not yet built
 - Date: 2026-08-19
 - Decision owners: user/product and implementing agent
 - Supersedes: none
@@ -197,6 +197,20 @@ because they are two different gates.
 detection, configuration and schema edges, C#, Kotlin, and the remaining five
 languages. Each needs its own record.
 
-**Not yet implemented.** Approval authorises the work; it does not describe
-shipped behaviour. No surface may claim these languages are supported until the
-implementation lands with its verification recorded.
+**Java implemented 2026-08-19**, the same day; Go, Rust and Scala remain
+approved and unbuilt. No surface may claim a language is supported until its
+implementation lands with verification recorded.
+
+### What implementation found, recorded against this ADR rather than buried
+
+**Section 7's assumption was false.** `resolution.py` did not generalize: it
+gated its module index on `record.language == "python"` and derived the module
+from the file path, so Java's declared `com.shop.payments` never matched the
+path-derived `src.main.java.com.shop.payments` and every cross-package import
+resolved `external`. Fixed by indexing a declared `module_path` for languages
+that declare one, which is the conditional `RESOLVER_VERSION` bump this record
+scoped: **1.4.0 -> 1.5.0**, landed alongside `PARSER_BUNDLE_VERSION` 1.4.0 ->
+1.5.0 so users reindex once rather than twice.
+
+Planning Java alone is what made this cheap. The assumption cost one
+integration test to disprove instead of four languages of rework.

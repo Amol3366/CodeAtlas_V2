@@ -2189,6 +2189,30 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   into a number that could be argued with, and turned one impossible task into a
   decomposed program with a spike at the front.
 
+- **A grammar's `tags.scm` marks the KIND; a sibling `@name` capture carries the
+  target** (ADR-0065, 2026-08-19). Java's puts `@reference.call` on the
+  *argument list*, so reading the reference node's own text gave `"(orderId)"`
+  where the method was `charge`. `IMPLEMENTS` passed anyway and was pure luck:
+  `type_list` held one identifier, and `implements A, B` would have emitted the
+  target `"A, B"`. Found by a test, before it shipped.
+- **`resolution.py` had a hardcoded Python-only module index** (ADR-0065). It
+  gated `module_to_file` on `record.language == "python"` *and* derived the
+  module from the file path, so Java's declared `com.shop.payments` never
+  matched `src.main.java.com.shop.payments` and every cross-package import
+  resolved `external`. Fixed by indexing the declared `module_path` for
+  languages that declare one. **Python and TS/JS are deliberately excluded:
+  their module IS their path, and a second opinion would change conclusions
+  that are already right.**
+- **Landing two staleness bumps together costs one reindex, not two.**
+  `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION` both went 1.4.0 -> 1.5.0 in the
+  same change for that reason. Sequencing them would have made users reindex
+  twice for one feature.
+- **A checkpoint is only worth having if you are willing to be wrong.** ADR-0065
+  recorded one assumption read from code rather than measured, and planned Java
+  alone so the other three languages were not built on it. The assumption was
+  **false**, and the cost of finding out was one integration test rather than
+  four languages of rework.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
@@ -2376,8 +2400,8 @@ Carried into gate approvals as declared work rather than dropped:
 **Current, as of 2026-08-19.** The Deferred Register in `docs/plans/PLAN.md` is
 the authority on what is open; this is a pointer, not a third copy.
 
-**Active: ADR-0065** (`accepted` 2026-08-19) — query-backed language support for
-Java, Go, Rust and Scala. The design, the §25 scope change, and four required
+**Active: ADR-0065** (`accepted` 2026-08-19) — query-backed language support.
+**Java is SHIPPED**; Go, Rust and Scala are approved and not yet built. The design, the §25 scope change, and four required
 grammar dependencies are all approved. **Approval is not implementation: no code
 exists, and no surface may claim these languages work until it lands.** Delivery
 is Java -> Go -> Rust -> Scala, and **slice one must verify that `resolution.py`
