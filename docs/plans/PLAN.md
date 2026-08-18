@@ -356,6 +356,15 @@ direction; an invention is not. Left for a user decision.
 
 **Verification.**
 
+- **`scripts/check_phase4.ps1 -SkipSync` ran to completion through the wrapper:
+  `Phase 4 verification completed.`, exit code `0`, **`2293 passed, 1 xfailed`**
+  in 184.90 s.** Every stage green -- tests, lint, types, dataset validation, and
+  the Phase 0 / Phase 3 / Phase 4 baselines plus the ADR-0016 invariants, all
+  `--check`. `git status` is empty afterwards, so nothing regenerated. **The
+  authoritative gate evidence for this slice.** The count moved 2281 -> 2293:
+  **+12 tests, and no baseline moved**, which is what a change that adds a
+  language rather than altering an existing one should look like.
+
 - `tests/unit/test_go_adapter.py` -- 5 passed.
 - `tests/integration/test_go_resolution.py` -- 4 passed, **1 xfailed
   (`strict`)**, the import finding above.
