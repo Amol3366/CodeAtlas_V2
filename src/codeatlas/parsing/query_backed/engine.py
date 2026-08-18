@@ -21,6 +21,7 @@ from tree_sitter import QueryCursor
 from codeatlas.contracts import SymbolKind
 from codeatlas.domain.ids import symbol_id, symbol_version_id
 from codeatlas.domain.symbols import SymbolRecord
+from codeatlas.extraction.query_relations import extract_query_references
 from codeatlas.parsing.query_backed.profile import LanguageAdapter
 from codeatlas.parsing.registry import (
     PARSER_BUNDLE_VERSION,
@@ -59,12 +60,16 @@ class TagsBackedParser:
             tree.root_node, request.content, request.relative_path
         )
         symbols = tuple(self._definitions(tree.root_node, request, module_path))
+        references = extract_query_references(
+            tree.root_node, request.content, request, self._adapter, symbols
+        )
         return ParseResult(
             parser_name=self.name,
             parser_version=self.version,
             success=True,
             symbols=symbols,
             diagnostics=(),
+            references=references,
         )
 
     def _definitions(

@@ -115,10 +115,16 @@ def default_registry() -> ParserRegistry:
     """Build the registry: Python, TypeScript/JavaScript, documents, config."""
     from codeatlas.parsing.document_parser import DocumentParser
     from codeatlas.parsing.python_parser import PythonParser
+    from codeatlas.parsing.query_backed.engine import TagsBackedParser
+    from codeatlas.parsing.query_backed.languages.java import JavaAdapter
     from codeatlas.parsing.tsjs_parser import TsJsParser
 
     registry = ParserRegistry()
     registry.register(PythonParser())
     registry.register(TsJsParser())
     registry.register(DocumentParser())
+    # ADR-0065: query-backed languages. `register` refuses to shadow an
+    # existing language, so a collision surfaces here rather than depending
+    # on import order.
+    registry.register(TagsBackedParser(JavaAdapter()))
     return registry

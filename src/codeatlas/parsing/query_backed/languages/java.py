@@ -92,9 +92,10 @@ class JavaAdapter:
 
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         for child in node.children:
-            if child.type == "modifiers":
-                if b"public" in source[child.start_byte : child.end_byte]:
-                    return "public"
+            if child.type == "modifiers" and b"public" in source[
+                child.start_byte : child.end_byte
+            ]:
+                return "public"
         return "private"
 
 
