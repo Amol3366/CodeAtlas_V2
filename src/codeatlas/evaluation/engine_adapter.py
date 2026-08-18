@@ -129,6 +129,12 @@ SUPPORTED_FIXTURES = (
     # a fixture admitted here without cases is refused by
     # test_every_corpus_fixture_is_measured_unless_deliberately_unsupported.
     "symbol_breadth",
+    # `java_app` (ADR-0065) is deliberately NOT here yet. The fixture exists and
+    # is indexed by the integration suite, but it carries no scored query cases:
+    # authoring gold data for a language whose resolution is still unverified
+    # would encode behaviour the ADR-0065 checkpoint might disprove, and a gold
+    # range derived from engine output is exactly what ADR-0003 and ADR-0036
+    # forbid. Cases are added after the checkpoint, with the gold declared first.
 )
 
 
