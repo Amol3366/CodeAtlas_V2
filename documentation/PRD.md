@@ -80,7 +80,9 @@ unless the user explicitly says otherwise, per repository.
 - **No GitHub/GitLab or CI integration.**
 - **No network exposure beyond loopback.**
 - **No new languages beyond Python, TypeScript, and JavaScript** (plus Markdown
-  and common config/schema formats) without an approved ADR.
+  and common config/schema formats) without an approved ADR. **ADR-0065 proposes
+  Java, Go, Rust and Scala and is `proposed`, not approved** — so this non-goal
+  stands as written until that changes.
 - **No PostgreSQL, message broker, microservices, or Kubernetes.** SQLite is the
   system of record.
 

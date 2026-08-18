@@ -499,7 +499,10 @@ Schema version is 14. Contract version is 1.1.
 These are not hidden:
 
 - Language coverage is focused on Python, TypeScript, JavaScript, Markdown, and
-  common config/schema formats.
+  common config/schema formats. A repository in any other language yields no
+  symbols and no relations. **ADR-0065 proposes Java, Go, Rust and Scala through
+  a shared query-backed parser; it is `proposed`, not approved, and
+  unimplemented.**
 - The packaged executable is unsigned.
 - Some Chromium conversation-route Playwright tests are skipped because of a
   browser renderer crash; Firefox proves the workflow.

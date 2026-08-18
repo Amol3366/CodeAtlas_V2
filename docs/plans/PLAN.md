@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **Post-gate session 2026-08-16/17 merged eight branches**: ADR-0050 (q035), ADR-0051 (q006), ADR-0052 (depth-2 claims), ADR-0053 (`CONCEPTUAL` measurable), ADR-0054 (finding subject/path), ADR-0055 (route cites its handler), plus two artifact regenerations and one documentation pass. **No migration; `SCHEMA_VERSION` stays 14 and `contract_version` stays `1.1` throughout** |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** **All seven `extra_build.md` tasks are now closed** (ADR-0050 to ADR-0059), so that file had no live content and its own preamble said to delete it rather than let it rot. **Deleted 2026-08-19** on the user's instruction, after its two uniquely-recorded working rules were moved into `documentation/memory.md`; references to it in ADRs and earlier handoff entries are historical evidence and were deliberately left alone. ADR-0056 was **accepted 2026-08-17**; ADR-0057, ADR-0058 and ADR-0059 landed the same day. The Deferred Register below remains the authority on what is open, and every row in it is closed or deferred with a named trigger |
+| Next gate       | none - the Section 20 development order is finished and the closeout is recorded. **New work requires an explicit user decision.** **All seven `extra_build.md` tasks are now closed** (ADR-0050 to ADR-0059), so that file had no live content and its own preamble said to delete it rather than let it rot. **Deleted 2026-08-19** on the user's instruction, after its two uniquely-recorded working rules were moved into `documentation/memory.md`; references to it in ADRs and earlier handoff entries are historical evidence and were deliberately left alone. ADR-0056 was **accepted 2026-08-17**; ADR-0057, ADR-0058 and ADR-0059 landed the same day. **A new sub-project is proposed and awaiting a §25 decision: ADR-0065**, query-backed language support for Java, Go, Rust and Scala. Design accepted by the user 2026-08-19; the ADR is `proposed`, **no code exists**, and it needs explicit approval for the scope change and for four grammar dependencies before implementation. The Deferred Register below remains the authority on what is open, and every row in it is closed or deferred with a named trigger |
 
 ## Deferred Register
 
@@ -289,6 +289,91 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-19T03:00:00Z — ADR-0065 proposed: query-backed language support, measured not assumed
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: no phase task. Post-gate. The user asked for Java and Go, then for
+  all of Go, Java, C#, Rust, Ruby, PHP, C/C++, Kotlin, Swift and Scala.
+- New record: **ADR-0065**, status **`proposed`**. Design spec accepted by the
+  user 2026-08-19. **No source change and no implementation.**
+  `SCHEMA_VERSION` stays `14`, `contract_version` stays `1.1`.
+
+**Eleven languages is a program, not a task, and the scope was flagged rather
+than absorbed.** Measured cost of the existing implementations: `python_parser` +
+`python_relations` = **1,087 lines**; `tsjs_parser` + `tsjs_relations` = **1,014**
+for two languages — before fixtures, evaluation cases and the required test
+layers. Eleven hand-written parsers is ~11,000 source and ~25,000 test lines.
+
+**The spike, which is what §25 requires as discovery evidence.** All eleven
+grammar packages install cleanly, including Kotlin and Swift, which were expected
+to fail. **Nine of eleven ship a `tags.scm`** — C# and Kotlin ship no `.scm`
+files at all — and those nine are **9 lines (C) to 66 (Scala)**, ctags-grade
+navigation aids. Yield on matched ~25-line samples:
+
+| Language | Definitions | References | Verdict |
+| --- | --- | --- | --- |
+| Java | 5 | call 4, class 2, implementation 1 | strong both |
+| Go | 5 | call 5, type 17 | strong both |
+| Rust | 8 | call 7, implementation 2 | strong both |
+| Scala | 8 | call 3, class 1, interface 1 | strong defs, adequate refs |
+| Ruby | 5 | call **31** in 22 lines | noisy |
+| PHP | 8 | call **2** | sparse |
+| Swift / C++ / C | 9 / 6 / 3 | **0** | definitions only |
+| C# / Kotlin | — | — | no `tags.scm` |
+
+**The finding that shaped the architecture: no `tags.scm` captures an import.**
+Every capture name across all nine was checked; `definition.module` marks module
+*declarations*, never `import`/`use`/`require`. That is decisive because
+resolution is built on the import graph — 4,839 `IMPORTS` edges on this
+repository — and without imports, cross-file resolution degrades to name
+matching, which yields `ambiguous` rather than `resolved`.
+
+**A purely declarative design was proposed by me and then disproven by
+measurement, twice**, before it reached the spec: no query can compute Go's
+`receiver → OrderService.Capture`, because the receiver is a **field of the
+method node, not a lexical ancestor**; and Rust's `impl_item` needs its `type`
+field read, though it repays that by handing over an `IMPLEMENTS` edge free.
+Hence a shared engine plus a thin per-language adapter — `tags.scm` cuts the
+per-language cost roughly 4x, it does not eliminate it.
+
+- Files: `docs/adr/0065-query-backed-language-support.md` (new),
+  `docs/superpowers/specs/2026-08-19-query-backed-language-support-design.md`
+  (new), the ADR index (new **Proposed records** section, so a proposed record is
+  never listed among accepted ones), `README.md`, `documentation/PRD.md`,
+  `documentation/codeatlas-v2-working-guide.md`, `documentation/memory.md`, this
+  file.
+
+**Verification.** The spike ran in a throwaway venv under the scratchpad;
+`pyproject.toml` and `uv.lock` are untouched and `git status` was clean before
+the documentation commits. Grammar installs, `tags.scm` presence, capture yields,
+the absence of import captures, and the Go/Rust node-shape results were each read
+from the tools rather than reasoned about. **No gate was run and none is claimed
+— documentation only.**
+
+**Limitations, stated rather than smoothed over.**
+
+- **One load-bearing assumption is not measured:** that `resolution.py`
+  generalizes to these languages' module semantics without change. That comes
+  from reading the resolver, not running it. The implementation plan must verify
+  it in slice one, before three more languages are built on it; if it fails,
+  `RESOLVER_VERSION` bumps too and the estimate rises.
+- The yield table comes from **self-authored samples**, which are cleaner than
+  real code and therefore flatter the result. A real Java or Go repository would
+  be stronger evidence and was offered; none was available.
+- Implementation would bump `PARSER_BUNDLE_VERSION` **1.4.0 → 1.5.0**, making
+  every snapshot stale and forcing a reindex for every user. That is affordable
+  only because ADR-0064 took a cold index of this repository from ~343 s to
+  **32.6 s** — it was not affordable a week ago.
+- Adding four fixtures trips four hardcoded guards on purpose, including
+  `test_engine_adapter.py:94`, which fails if a fixture is not added to
+  `SUPPORTED_FIXTURES` — ADR-0017's lesson wired into a test.
+
+- Next: **user decision on the §25 scope change and the four grammar
+  dependencies.** On approval, ADR-0065 moves to `accepted` and the
+  writing-plans skill produces a task-level plan starting with the Java slice and
+  the resolver verification above.
+
 
 ### 2026-08-19T01:00:00Z — `extra_build.md` deleted, after rescuing two rules recorded nowhere else
 

@@ -2173,6 +2173,22 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   anything until their later stages are run directly. **Also rescued from
   `extra_build.md` on 2026-08-19.**
 
+- **A grammar is not a parser, and `tags.scm` is not a graph** (ADR-0065,
+  proposed 2026-08-19). Tree-sitter grammars ship a `tags.scm` query file, which
+  makes "one generic parser for eleven languages" look obvious. Measured: nine of
+  eleven ship one, they are 9-66 lines, and **not one of them captures an
+  import** — so the thing resolution is actually built on is the thing the
+  generic mechanism cannot supply. A design that looked purely declarative was
+  disproven a second way by Go, whose method receiver is a **field of the method
+  node rather than a lexical ancestor**, so an ancestor-walking qualified name is
+  *wrong* rather than missing. `tags.scm` cuts per-language cost about 4x; it
+  does not remove it.
+- **Flag scope before refining it.** The request went from "Java and Go" to
+  eleven languages. Measuring the existing implementations first — 1,087 lines
+  for Python, 1,014 for TS+JS, before fixtures and tests — turned "that's a lot"
+  into a number that could be argued with, and turned one impossible task into a
+  decomposed program with a spike at the front.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
@@ -2359,6 +2375,13 @@ Carried into gate approvals as declared work rather than dropped:
 
 **Current, as of 2026-08-19.** The Deferred Register in `docs/plans/PLAN.md` is
 the authority on what is open; this is a pointer, not a third copy.
+
+**Awaiting a user decision: ADR-0065** (`proposed`) — query-backed language
+support for Java, Go, Rust and Scala. The design spec is accepted; the §25 scope
+change and the four grammar dependencies are not. **No code exists.** On
+approval, the next step is a task-level implementation plan starting with the
+Java slice and the unverified assumption that `resolution.py` generalizes to
+Java and Go module semantics.
 `extra_build.md` was the execution order until its last task closed
 (ADR-0050 to ADR-0059); it was **deleted 2026-08-19** on its own instruction,
 after its two uniquely-recorded working rules were moved into Decisions above.

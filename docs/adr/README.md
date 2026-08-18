@@ -123,6 +123,17 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0064](0064-resolution-indexes-what-it-used-to-scan.md) | **The bottleneck, found in the stage three records had already measured and dismissed.** Timing `_analyze_state`'s four operations separately instead of trusting a timer's name: `list_files` 1.25 s, `read_file` 0.07 s, **`parse` 8.14 s (2.5%)**, **`resolve` 310.24 s (97.0%)**. Parsing the whole repository takes **8 seconds** — so ADR-0060's "99.5% is parsing", ADR-0061's inherited framing, and ADR-0062's "~6% and linear" are **all corrected here**. `resolution.py` had claimed O(references) since it was written while three call sites scanned `symbols_by_id.values()` per reference: `_resolve_mention` (112,265 mentions x 11,502 symbols = **1.29 billion**, `str.lower` called 880 million times), `_RouteIndex.handlers` (`name_tokens`, a regex split, called **10.5 million** times), and `_derive_config_edges`. ADR-0062's exponent of **1.14** was honest and useless: it was fitted on a generated corpus of ~15-line Python modules containing **no Markdown, so no mentions and no routes** — the entire quadratic term was structurally absent from the sweep. Fixed by moving every symbol-only predicate into `_Index`, plus `matching_forms`, which enumerates the closed plural rule so token matching becomes a dictionary hit instead of a comparison against every symbol. **Verified identical across all 168,605 relations on the real repository**, not merely green on fixtures. Guarded by a *counting* test, because wall-clock is exactly what sent the previous three records wrong | none (post-gate) |
 
+## Proposed records
+
+Not approved and not implemented. A proposed record is a decision **asked for**,
+never a decision made; nothing may depend on one until its status is `accepted`.
+
+| ADR | Decision | Blocked on |
+| --- | --- | --- |
+| [0065](0065-query-backed-language-support.md) | Query-backed parser engine with thin per-language adapters, applied to **Java, Go, Rust and Scala only** — symbols, `IMPORTS`, `CALLS`, `INHERITS`, `IMPLEMENTS`, and changed-symbol detection, but **no test edges and no route detection**. Grounded in a 2026-08-19 spike: nine of eleven grammars ship a `tags.scm`, none of them captures an import, and Go's receiver is a node field rather than a lexical ancestor — which disproves a purely declarative design twice over | §25 approval for new language support, plus approval for four grammar dependencies |
+
+## Notes
+
 None is superseded. ADR-0008 is the first record to change a published contract
 under Section 25, and carries that section's checklist as an explicit table.
 ADR-0009 admits the optional vector store the blueprint gates behind its
