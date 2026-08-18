@@ -168,7 +168,7 @@ definition range and snapshot-bound evidence.
 Use this when you want literal text or path matches.
 
 ```powershell
-uv run codeatlas search text <repository_id> "idempotency key"
+uv run codeatlas search <repository_id> "idempotency key" --kind text
 ```
 
 What happens:
@@ -220,7 +220,7 @@ Use this to ask about callers, callees, dependencies, related tests, related
 documents, or traces.
 
 ```powershell
-uv run codeatlas graph callers <repository_id> PaymentService.capture
+uv run codeatlas callers <repository_id> PaymentService.capture
 ```
 
 What happens:

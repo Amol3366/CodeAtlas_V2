@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-17
+Last updated: 2026-08-19
 
 ## Current Phase
 
@@ -1185,6 +1185,38 @@ of a status list is how they drift, which is the `--format pr` and
       Deviations, both harmless and stated rather than hidden: port 8123 so the
       probe could not collide with a running server, and no `--open`, because
       launching a browser proves nothing that probing `/` and `/v1` does not.
+
+- [x] README rewritten as the project's front door (2026-08-19). It now covers
+      the problem, the trust contract and derivation ladder, a quick start, a
+      full feature catalogue, the indexing/answer/preflight pipelines, the
+      architecture and stack, all four surfaces, provider configuration,
+      operations, the security model, measured results with their caveats, and
+      a documentation map.
+
+      **It opened by finding two documented commands that cannot run.** The
+      README's first code block — the one a new user copies — advertised
+      `codeatlas graph callers ...` and `codeatlas search text <id> "..."`.
+      There is **no `graph` command group** (the graph verbs are top level:
+      `callers`, `callees`, `deps`, `exports`, `tests`, `trace`), and `search`
+      takes `<repository_id> <query> --kind text|files|symbols`, so the
+      documented form consumed the query as the repository id and died with
+      `Got unexpected extra argument(s)`. Both were wrong in
+      `codeatlas-v2-working-guide.md` too, and both are fixed in both files;
+      no code or script ever used the broken form.
+
+      **The lesson is the ADR-0060 lesson on a different surface: a name was
+      trusted instead of the thing it named.** `graph callers` reads exactly
+      like a Typer sub-app and never was one. Every command, route, tool name,
+      exit code and version in the new README was read out of the source or the
+      tracked artifacts — `codeatlas --help`, the router prefixes, the MCP
+      registry, `baseline-phase-4.json` — rather than copied from prose, which
+      is how the two broken commands survived being in the README twice.
+
+      Two figures were corrected against the artifacts while writing: the
+      `exact_symbol_resolution` denominator is not restated (the baseline
+      records the value, not the case count), and Phase 7's evidence recall is
+      given as **0.80 strict / 1.0000 containment** today beside its 0.6667
+      gate figure, rather than implying the gate number still stands.
 
 ## In Progress
 
