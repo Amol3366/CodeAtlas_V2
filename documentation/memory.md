@@ -2418,13 +2418,25 @@ branch `query-backed-language-support`, **not merged to `main`**.
 
 **Start here tomorrow, in order:**
 
-1. **Re-run `scripts/check_phase4.ps1 -SkipSync` and read the whole log.** The
-   run started at the end of the session was still buffering when it ended, so
-   **its result is unknown — do not record it as a pass.** What *is* verified
-   for the Rust/Scala slice: 54 passed / 2 xfailed across the four slices, ruff
-   clean, mypy clean over 379 files, two mutation checks. The Java and Go slices
-   each passed a full gate (`2281` and `2293 passed`), so a failure now would
-   point at Rust/Scala.
+1. **Re-run `scripts/check_phase4.ps1 -SkipSync` and read the whole log.**
+   The run that completed at session end **FAILED** — `1 failed, 2312 passed,
+   2 xfailed`. Cause found and fixed:
+   `test_registry_resolves_python_and_ignores_unsupported_languages` asserted
+   `parser_for("rust") is None`, using Rust as its example of an unregistered
+   language — and ADR-0065 registered Rust. **The property was still right; the
+   example went stale**, which is exactly what that test's own comment records
+   happening to `typescript` in Phase 3. The placeholder is now `kotlin`,
+   chosen because ADR-0065 *measured* its grammar as shipping no `tags.scm`, so
+   it cannot be registered by this engine.
+
+   **The fix is verified only against its own file (29 passed). The gate has
+   never run green on this branch — re-run it before claiming anything.**
+
+   **And read the log, not the exit code.** The background runner reported
+   **exit 0** while the log said `Tests failed with exit code 1` and PowerShell
+   threw. This project already records "progress dots that stop with no failure
+   summary mean a terminated process" and "`$?` after a pipe is the pipe's exit
+   code"; this is the same family, and it nearly recorded a red gate as green.
 2. **Rule the two declared limits**, both `strict` xfails carrying full
    diagnoses in their test files:
    - **Go import matching policy.** A Go import resolves `external` because its

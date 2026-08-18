@@ -208,11 +208,17 @@ def test_registry_resolves_python_and_ignores_unsupported_languages() -> None:
     # that `typescript` is unsupported — that was Phase 1's truth, not a
     # contract. It still asserts the property that matters: a language nobody
     # registered resolves to nothing rather than to an arbitrary parser.
+    #
+    # ADR-0065 then registered Rust, and this line had used `rust` as its
+    # example of an unregistered language — the same staleness the paragraph
+    # above records for `typescript`, recurring for the same reason. `kotlin`
+    # is the example now precisely because ADR-0065 measured its grammar as
+    # shipping no `tags.scm`, so it cannot be registered by this engine.
     registry = default_registry()
     parser = registry.parser_for("python")
     assert parser is not None
     assert parser.name == "python"
-    assert registry.parser_for("rust") is None
+    assert registry.parser_for("kotlin") is None
 
 
 def test_registry_rejects_a_duplicate_language() -> None:
