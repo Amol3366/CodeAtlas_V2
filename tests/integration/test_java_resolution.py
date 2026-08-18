@@ -113,7 +113,8 @@ def test_a_java_import_resolves_across_packages(java_harness: JavaHarness) -> No
     imports = [r for r in relations if r[0] == "IMPORTS"]
     assert imports, f"no IMPORTS relations stored at all; got {relations}"
     resolved = [r for r in imports if r[2] == "resolved"]
-    assert resolved, f"no Java import resolved; states={[(r[1], r[2]) for r in imports]}"
+    states = [(r[1], r[2]) for r in imports]
+    assert resolved, f"no Java import resolved; states={states}"
 
 
 def test_a_java_call_resolves_to_the_imported_class_method(
