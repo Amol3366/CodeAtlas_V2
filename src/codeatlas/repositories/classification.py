@@ -28,6 +28,13 @@ _LANGUAGE_BY_SUFFIX: dict[str, str] = {
     ".yml": "yaml",
     ".toml": "toml",
     ".sql": "sql",
+    # ADR-0065: parsed by the query-backed engine rather than a
+    # hand-written parser. Classification is the prerequisite -- a file
+    # whose language is unknown never reaches a parser at all.
+    ".java": "java",
+    ".go": "go",
+    ".rs": "rust",
+    ".scala": "scala",
 }
 
 _BINARY_SUFFIXES: frozenset[str] = frozenset(
