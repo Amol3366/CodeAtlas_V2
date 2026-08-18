@@ -2376,12 +2376,14 @@ Carried into gate approvals as declared work rather than dropped:
 **Current, as of 2026-08-19.** The Deferred Register in `docs/plans/PLAN.md` is
 the authority on what is open; this is a pointer, not a third copy.
 
-**Awaiting a user decision: ADR-0065** (`proposed`) — query-backed language
-support for Java, Go, Rust and Scala. The design spec is accepted; the §25 scope
-change and the four grammar dependencies are not. **No code exists.** On
-approval, the next step is a task-level implementation plan starting with the
-Java slice and the unverified assumption that `resolution.py` generalizes to
-Java and Go module semantics.
+**Active: ADR-0065** (`accepted` 2026-08-19) — query-backed language support for
+Java, Go, Rust and Scala. The design, the §25 scope change, and four required
+grammar dependencies are all approved. **Approval is not implementation: no code
+exists, and no surface may claim these languages work until it lands.** Delivery
+is Java -> Go -> Rust -> Scala, and **slice one must verify that `resolution.py`
+generalizes to Java and Go module semantics before the other three are built on
+it** — that is the one load-bearing claim in the design that was read from the
+code rather than measured.
 `extra_build.md` was the execution order until its last task closed
 (ADR-0050 to ADR-0059); it was **deleted 2026-08-19** on its own instruction,
 after its two uniquely-recorded working rules were moved into Decisions above.

@@ -1,6 +1,6 @@
 # ADR-0065: Query-backed language support for Java, Go, Rust, and Scala
 
-- Status: **proposed** — not approved, not implemented
+- Status: **accepted** 2026-08-19 — approved, not yet implemented
 - Date: 2026-08-19
 - Decision owners: user/product and implementing agent
 - Supersedes: none
@@ -176,11 +176,27 @@ Rollback loses no data and reverses no migration, but costs a second reindex.
 
 ## Approval
 
-**Not yet approved.** `AGENTS.md` §25 requires explicit user approval for new
-programming-language support, and the "Libraries" rule requires approval for the
-four grammar dependencies.
+**Approved by the user on 2026-08-19**, in two stages recorded separately
+because they are two different gates.
 
-The design in the linked spec was reviewed and accepted by the user on
-2026-08-19. **That is approval of the design, not of the §25 scope change.**
-This record stays `proposed` until the user approves the scope change itself,
-naming the four languages and the four dependencies.
+1. **The design** — the linked spec was reviewed and accepted.
+2. **The §25 scope change and the dependencies** — approved explicitly
+   afterwards, which is what moves this record from `proposed` to `accepted`.
+
+**Exact scope approved:**
+
+- New programming-language support for **Java, Go, Rust, and Scala** — and only
+  those four — through the shared query-backed engine described above.
+- Four **required** (not optional) dependencies: `tree-sitter-java`,
+  `tree-sitter-go`, `tree-sitter-rust`, `tree-sitter-scala`, pinned in
+  `uv.lock` like every other dependency.
+- The `PARSER_BUNDLE_VERSION` bump **1.4.0 → 1.5.0** and the full reindex it
+  forces on every existing user.
+
+**Explicitly not approved, and still out of scope:** test edges, route
+detection, configuration and schema edges, C#, Kotlin, and the remaining five
+languages. Each needs its own record.
+
+**Not yet implemented.** Approval authorises the work; it does not describe
+shipped behaviour. No surface may claim these languages are supported until the
+implementation lands with its verification recorded.

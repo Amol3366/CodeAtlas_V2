@@ -12,7 +12,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | --- | --- |
 | **Status** | Phases 0–7 complete, every gate user-approved; project closed out 2026-08-10, post-gate work ongoing |
 | **Platform** | Windows 11 primary (loopback only, single user) |
-| **Languages indexed** | Python, TypeScript, JavaScript, Markdown, common config/schema formats. Java/Go/Rust/Scala **proposed, not built** (ADR-0065) |
+| **Languages indexed** | Python, TypeScript, JavaScript, Markdown, common config/schema formats. Java/Go/Rust/Scala **approved but not built** (ADR-0065) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Tests** | 2252 passing at the last full gate run |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
@@ -646,9 +646,10 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   lookup, no callers, and no impact analysis. A new language needs an approved
   ADR under §25.
 
-  **Proposed, and not implemented: Java, Go, Rust, and Scala (ADR-0065).**
-  Status is `proposed` — not approved, no code. If you are choosing a tool
-  today, the supported set is the three languages above. A spike on 2026-08-19
+  **Approved but not implemented: Java, Go, Rust, and Scala (ADR-0065).**
+  Accepted 2026-08-19 — the scope change and its four grammar dependencies are
+  approved, and **no code exists yet**. If you are choosing a tool today, the
+  supported set is the three languages above. A spike on 2026-08-19
   measured Tree-sitter's shipped `tags.scm` files: all eleven requested grammars
   install, but only **nine ship a `tags.scm`** (C# and Kotlin ship none), and
   **none of the nine captures an import** — which matters because resolution is
