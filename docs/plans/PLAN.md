@@ -353,7 +353,18 @@ ADR-0036 forbid.
   five new test files, the `java_app` fixture, ADR-0065, and the documentation
   set.
 
-**Verification.** Every stage run individually and read from the process:
+**Verification.**
+
+- **`scripts/check_phase4.ps1 -SkipSync` ran to completion through the wrapper:
+  `Phase 4 verification completed.`, exit code `0`, `2281 passed` in 175.77 s.**
+  Every stage green in one run -- tests, lint, types, dataset validation
+  (8 fixtures / 65 query / 28 change cases), and the Phase 0 / Phase 3 / Phase 4
+  baselines plus the ADR-0016 invariants, all `--check`. `git status` is empty
+  afterwards, so nothing regenerated. **This is the authoritative gate evidence
+  for this change**; the stage-by-stage figures below were reached first and
+  independently, and `2281` is the same total as `1593 + 688` by a second route.
+
+Stages also run individually, each read from the process:
 
 - `tests/unit tests/integration` — **1593 passed** after both version bumps.
 - `tests/evaluation tests/security tests/contract tests/end_to_end` — **688
