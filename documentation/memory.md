@@ -1300,6 +1300,89 @@ of a status list is how they drift, which is the `--format pr` and
       "Tell them where to go" — against a 206-line threat model. Found while
       reading, out of scope for a README task, recorded rather than fixed.
 
+- [x] **Java is measured: the first evaluation cases for a query-backed
+      language (P1-1, 2026-08-19).** Corpus **65 -> 69 query cases**;
+      `java_app` admitted to `SUPPORTED_FIXTURES`. No `src/` behaviour change
+      (the only source edit is the fixture tuple), no version bump, no
+      migration. Gate green: **2313 passed, 2 xfailed, exit 0**.
+
+      **Java only, deliberately.** Go, Rust and Scala ship on the same engine
+      but each carries an undecided limit, and **a corpus case is the wrong
+      instrument for an open ruling** — it would either encode the limit as
+      correct or fail for a reason already known and declared. Java has no such
+      limit, which is what made it the honest first slice; the same
+      Java-first discipline ADR-0065 itself used.
+
+      **q069 was wrong when I wrote it, and the way it was wrong is the
+      lesson.** I asked the `DEPENDENCIES` view for a `CALLS` edge. That view
+      traverses **`IMPORTS` and `REFERENCES` only**, so a method has neither and
+      the engine correctly returned nothing — an expectation **unsatisfiable by
+      construction**, the ADR-0031/0035 shape one level up: not a name the
+      system cannot produce, but a *kind the view does not traverse*.
+
+      **The ADR-0036 validator passed it.** That validator checks the declared
+      symbols resolve through `find_exact`; it cannot know which *view* the case
+      invokes. So it is not the guard for this class, and that is now a stated
+      limit rather than an assumed cover. Rewritten as a genuine `IMPORTS` case
+      against `OrderService`, it passes and pins the ADR-0065 resolver fix.
+
+      **Two metrics broke before it was fixed, and both were the corpus telling
+      the truth**: `exact_symbol_resolution` 1.0000 -> 0.9818 (54/55 — still
+      clearing 0.98, but the entire margin), and **`relation_path_recall`
+      1.0000 -> 0.9630, which is gated at 1.0 absolutely** (ADR-0058). ADR-0058
+      wrote that gate saying an ungated threshold the corpus already satisfies
+      is decoration until you make it fail. **It failed here, on the first new
+      case that declared a relation, and it caught a real authoring error.**
+
+      **Mutation-checked with three mutations, because three of the four cases
+      passed on their first run:**
+
+      | Mutation | Caught by |
+      | --- | --- |
+      | `_DECLARED_MODULE_LANGUAGES` emptied (undoes the ADR-0065 resolver fix) | **q069 only** |
+      | Java `qualified_name` drops its owning class | q067, q068, q069 |
+      | Java parser unregistered | all four |
+
+      **q068's `CALLS` still resolved under mutation A**, so it does *not* cover
+      the resolver fix — it resolves through a different tier. **q069 is the
+      only case pinning the thing the ADR-0065 checkpoint existed to verify.**
+      Worth knowing before anyone edits it.
+
+      Every restore was **from a file copy, never `git checkout --`** (ADR-0022,
+      ADR-0042 both record that command cutting wider than intended).
+
+      **The denominator tripwire fired and that is it working.**
+      `test_threshold_granularity` asserts the exact scored count so a
+      denominator cannot move unnoticed — 51 -> 55. **The margin is unchanged**:
+      one miss scores 0.9818 at 55 against 0.9804 at 51, both clear 0.98; two
+      misses fail at both sizes.
+
+      **Baselines moved for arithmetic and for genuinely better evidence.** The
+      evidence *rates* rose — containing 0.7500 -> 0.7571, exact 0.6544 ->
+      0.6643 — because Java's declared ranges match the engine exactly, which is
+      unusual: most corpus growth lowers them (ADR-0018, ADR-0025). Two small
+      dips (`ndcg` -0.0013, `symbol_recall_at_10` -0.0016) are the known cost of
+      the q055-q058 convention that declares both ends of a relation while
+      `ranked_symbols` carries one. **Quote them together or not at all.**
+
+- [x] **CRLF drift is wider than documentation — it is in source too
+      (2026-08-19).** The earlier entry recorded nine Markdown files. The full
+      count is **18**: twelve `.py` files plus the six remaining `.md`, and the
+      pattern is again decisive — `query_backed/*`, `resolution.py`,
+      `registry.py`, `classification.py`, `query_relations.py`,
+      `engine_adapter.py` and the four ADR-0065 test files. All from that
+      session.
+
+      **One `i/crlf` entry is not drift and proves the mechanism works**:
+      `variants/python_app/crlf-only/target/.../service.py` is the deliberate
+      ADR-0043 fixture, held CRLF by an explicit `-text` attribute. Declared
+      CRLF survives; undeclared CRLF is what drifts.
+
+      Files touched by this session are normalized; the rest are recorded in the
+      Deferred Register rather than rewritten. **The durable fix is widening the
+      LF guard beyond `tests/evaluation`**, which is why it is a P2 item and not
+      a cleanup.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

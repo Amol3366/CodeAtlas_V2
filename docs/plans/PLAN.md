@@ -73,6 +73,7 @@ with verification.
 
 | Item                                                                                                             | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Reopens when                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible |
 | Pid-reuse detection in crash recovery                                                                            | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                                                                                                                                                                          |
 | `relation_path_correctness` measured precision                                                                 | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | q010: does`IMPORTS` target the module or the bound class?                                                      | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                                          |
@@ -289,6 +290,98 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-19T15:00:00Z — Java is measured: the first evaluation cases for a query-backed language
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: P1-1 of the post-ADR-0065 program, first slice.
+- Corpus **65 -> 69 query cases**; `java_app` admitted to `SUPPORTED_FIXTURES`.
+  **No behaviour change under `src/`** — the only source edit is that tuple. No
+  version bump, no migration. `SCHEMA_VERSION` `14`, `contract_version` `1.1`.
+
+**Java only, and that is the design.** Go, Rust and Scala run on the same engine
+but each carries an undecided limit. **A corpus case is the wrong instrument for
+an open ruling**: it would either encode the limit as correct or fail for a
+reason already known and declared. Java carries no such limit, which is what
+makes it the honest first slice — the Java-first discipline ADR-0065 used on
+itself, for the same reason.
+
+**q069 was mis-specified, and how it was wrong is the transferable part.** It
+asked the `DEPENDENCIES` view for a `CALLS` edge. That view traverses
+**`IMPORTS` and `REFERENCES` only**, so a method has neither and the engine
+correctly returned nothing. The expectation was **unsatisfiable by
+construction** — the ADR-0031/ADR-0035 shape one level up: not a name the system
+cannot produce, but a **kind the view does not traverse**.
+
+**The ADR-0036 validator passed it**, because that validator asks whether the
+declared symbols resolve through `find_exact` — it cannot know which view a case
+invokes. **That is a stated limit of the guard, not a gap to be assumed
+covered.** Rewritten against `OrderService` as a real `IMPORTS` case, it passes.
+
+**Two gated metrics broke before the fix, and both were the corpus working.**
+`exact_symbol_resolution` 1.0000 -> 0.9818 (54/55: still clears 0.98, but spends
+the whole margin) and **`relation_path_recall` 1.0000 -> 0.9630 against an
+absolute 1.0 gate** (ADR-0058). That record justified the absolute threshold by
+arguing an ungated number the corpus already satisfies is decoration until it
+fails. **It failed on the first new case to declare a relation, and it caught a
+genuine authoring error.**
+
+**Mutation-checked three ways, because three of four cases passed first run:**
+
+| Mutation | Caught by |
+| --- | --- |
+| `_DECLARED_MODULE_LANGUAGES` emptied — undoes the ADR-0065 resolver fix | **q069 only** |
+| Java `qualified_name` drops its owning class | q067, q068, q069 |
+| Java parser unregistered | all four |
+
+**q068's `CALLS` still resolves under mutation A**, through a different
+resolution tier — so it does *not* cover the resolver fix. **q069 is the only
+case pinning what the ADR-0065 checkpoint existed to verify**, which anyone
+editing it should know. Every restore was from a **file copy, never
+`git checkout --`**.
+
+**The denominator tripwire fired, as designed.** `test_threshold_granularity`
+asserts the exact scored count so a denominator cannot move unnoticed: 51 -> 55,
+updated deliberately. **The margin is unchanged** — one miss scores 0.9818 at 55
+against 0.9804 at 51 and both clear 0.98; two misses fail at both sizes.
+
+**Baselines moved, and unusually the evidence rates moved up**: containing
+0.7500 -> 0.7571, exact 0.6544 -> 0.6643, because Java's declared ranges match
+the engine exactly. Most corpus growth *lowers* them (ADR-0018, ADR-0025). Two
+small dips — `ndcg_at_10` -0.0013, `symbol_recall_at_10` -0.0016 — are the known
+cost of the q055-q058 convention that declares both ends of a relation while
+`ranked_symbols` carries one. Quote them together or not at all.
+
+- Files: `tests/evaluation/cases/queries.json` (q066-q069),
+  `cases/dataset.json`, `src/codeatlas/evaluation/engine_adapter.py`
+  (`SUPPORTED_FIXTURES`), four count guards in `tests/evaluation/`,
+  `test_threshold_granularity.py`, the three regenerated baselines,
+  `documentation/memory.md`, this file.
+
+**Verification.**
+
+- **`scripts/check_phase4.ps1 -SkipSync` — exit 0, `2313 passed, 2 xfailed`**,
+  344.72 s; `GATE_LASTEXITCODE=0` captured to the log and the log grepped for
+  failure markers, both agreeing. All nine stages, every baseline `--check`.
+- `run_evaluation.py validate` — valid, 8 fixtures / 69 query / 28 change cases.
+- `test_expectations_name_real_symbols.py` (ADR-0036) — 5 passed.
+- `tests/evaluation` — 120 passed. `ruff` clean. `mypy` clean.
+- Gold declared by reading the fixture source **before** the engine was run
+  against it (ADR-0003, ADR-0036). Confirmed afterwards, not before: the engine
+  emits exactly four Java symbols and the two declared ranges match byte-exactly.
+
+**Limitations, stated rather than smoothed over.**
+
+- **Four cases over a two-file fixture is a beginning, not coverage.** Nothing
+  measures Java inheritance, interfaces, constructors, fields, or overloads,
+  and there is **no Java change case**, so changed-symbol detection — a headline
+  ADR-0065 capability — is still unmeasured.
+- **Go, Rust and Scala remain entirely unmeasured**, pending their rulings.
+- The `symbol_recall_at_10` dip is a convention cost, not a capability loss, and
+  will recur with every relation case that declares both ends.
+
+- Next: the two ADR-0065 rulings (P0-2) still gate Go/Rust/Scala cases. A Java
+  **change** case is the natural next slice and needs no ruling.
 
 ### 2026-08-19T12:00:00Z — README corrected against source; the branch gate runs green for the first time
 

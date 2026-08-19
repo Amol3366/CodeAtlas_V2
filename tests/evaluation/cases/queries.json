@@ -2213,6 +2213,123 @@
                       "forbidden_claims":  [
                                                "run_pipeline is called by test_pipeline_advances."
                                            ]
+                  },
+                  {
+                      "id": "q066",
+                      "repository_fixture": "java_app",
+                      "snapshot_id": "java-v1",
+                      "question": "Where is the PaymentService class defined?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "PaymentService"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/java/com/shop/payments/PaymentService.java",
+                              "symbol": "PaymentService",
+                              "start_line": 3,
+                              "end_line": 6,
+                              "evidence_id": "q066-e1",
+                              "snapshot_id": "java-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "PaymentService contacts an external payment gateway."
+                      ]
+                  },
+                  {
+                      "id": "q067",
+                      "repository_fixture": "java_app",
+                      "snapshot_id": "java-v1",
+                      "question": "Where is OrderService.capture defined?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "OrderService.capture"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/java/com/shop/orders/OrderService.java",
+                              "symbol": "OrderService.capture",
+                              "start_line": 12,
+                              "end_line": 14,
+                              "evidence_id": "q067-e1",
+                              "snapshot_id": "java-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "capture retries the charge when it fails."
+                      ]
+                  },
+                  {
+                      "id": "q068",
+                      "repository_fixture": "java_app",
+                      "snapshot_id": "java-v1",
+                      "question": "What calls PaymentService.charge?",
+                      "intent": "CALLERS",
+                      "expected_abstention": false,
+                      "query_subject": "PaymentService.charge",
+                      "expected_symbols": [
+                          "OrderService.capture"
+                      ],
+                      "expected_relations": [
+                          "OrderService.capture CALLS PaymentService.charge"
+                      ],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/java/com/shop/orders/OrderService.java",
+                              "symbol": "OrderService.capture",
+                              "start_line": 13,
+                              "end_line": 13,
+                              "evidence_id": "q068-e1",
+                              "snapshot_id": "java-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Dynamic dispatch may add callers."
+                      ],
+                      "forbidden_claims": [
+                          "This is the only runtime caller."
+                      ]
+                  },
+                  {
+                      "id": "q069",
+                      "repository_fixture": "java_app",
+                      "snapshot_id": "java-v1",
+                      "question": "What does OrderService depend on?",
+                      "intent": "DEPENDENCIES",
+                      "expected_abstention": false,
+                      "query_subject": "OrderService",
+                      "expected_symbols": [
+                          "OrderService",
+                          "PaymentService"
+                      ],
+                      "expected_relations": [
+                          "OrderService IMPORTS PaymentService"
+                      ],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/java/com/shop/orders/OrderService.java",
+                              "symbol": "OrderService",
+                              "start_line": 3,
+                              "end_line": 3,
+                              "evidence_id": "q069-e1",
+                              "snapshot_id": "java-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "OrderService depends on a database driver."
+                      ]
                   }
               ]
 }

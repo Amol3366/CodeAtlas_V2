@@ -14,6 +14,6 @@
   ],
   "query_cases_file": "queries.json",
   "change_cases_file": "changes.json",
-  "expected_query_count": 65,
+  "expected_query_count": 69,
   "expected_change_count": 28
 }

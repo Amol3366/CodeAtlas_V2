@@ -78,18 +78,20 @@ def test_the_exact_symbol_gate_now_expresses_its_stated_target() -> None:
     assertion failed at that moment, exactly as the pair of tripwires below it
     was written to do.
 
-    It is **51** since ADR-0059 added q065, and the margin is unchanged: one
-    miss scores 0.9804 and still clears 0.98, two score 0.9608 and fail. The
-    exact counts are asserted rather than only the inequality, because a
-    denominator that moves without anyone noticing is how ADR-0017 hid 16
+    It was **51** after ADR-0059 added q065, and is **55** since the four Java
+    cases (q066-q069) admitted `java_app` on 2026-08-19. **The margin is
+    unchanged across both moves**: at 51 one miss scored 0.9804, at 55 it scores
+    0.9818, and both clear 0.98; two misses score 0.9608 and 0.9636 and both
+    fail. The exact counts are asserted rather than only the inequality, because
+    a denominator that moves without anyone noticing is how ADR-0017 hid 16
     unscored cases for four phases -- so a change here should have to be
-    deliberate.
+    deliberate. This test failing is that mechanism working, not a regression.
     """
     scored = _scored(SYMBOL_INTENTS)
     required = math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9)
 
-    assert scored == 51
-    assert required == 50
+    assert scored == 55
+    assert required == 54
     assert required < scored, "0.98 must now tolerate exactly one miss"
 
 
