@@ -32,3 +32,43 @@ export function skipChromiumRendererCrash(browserName: string): void {
     "Chromium renderer crash on conversation-route navigation — browser defect, passes on Firefox (see docs/plans/PLAN.md 2026-07-28)",
   );
 }
+
+/**
+ * The Chromium renderer crash on the transmitting Settings fieldset.
+ *
+ * A **second, distinct trigger** for the same class of defect, ruled by the user
+ * on 2026-08-19 and given its own function rather than reusing the one above.
+ * The reason string reaches the test report, and labelling this
+ * "conversation-route navigation" would name one thing while showing another —
+ * the mistake ADR-0019 exists to record.
+ *
+ * Chromium (Playwright 1.62.0, `chromium-1234`) kills its renderer while
+ * rendering the Settings **Embedding provider** fieldset for a repository whose
+ * policy transmits. The trace shows `goto("/settings")` completing and the
+ * `settings-repository` assertion passing first, so the page mounts and the
+ * header renders before the renderer dies. Firefox renders the identical tree
+ * correctly.
+ *
+ * **This one is not reached by a client-side navigation**, which is what makes
+ * it distinct. `docs/operations/end-to-end-tests.md` used to claim a full page
+ * load rendered the branch correctly on both engines, and that claim is why this
+ * test was written with `page.goto` and left unskipped while its neighbours were
+ * skipped. It was measured false on 2026-08-19: five runs, five crashes, from a
+ * clean state, in isolation and in the full suite, headed and headless, against
+ * a freshly built bundle. Residue and a stale bundle were both ruled out.
+ *
+ * **Skipping a failing test is normally forbidden** by `documentation/rules.md`.
+ * This is an explicit user ruling, taken on the same terms as the seven above:
+ * the assertion is not lost, only the engine it is proven on, because Firefox
+ * runs it. The full reproduction is the 2026-08-19 handoff in
+ * `docs/plans/PLAN.md` and its Deferred Register row.
+ *
+ * **To check whether the browser has been fixed:** delete this call and run
+ * `pnpm exec playwright test settings.spec.ts --project=chromium`.
+ */
+export function skipChromiumSettingsCrash(browserName: string): void {
+  test.skip(
+    browserName === "chromium",
+    "Chromium renderer crash rendering the transmitting Settings fieldset — browser defect, passes on Firefox (see docs/plans/PLAN.md 2026-08-19)",
+  );
+}

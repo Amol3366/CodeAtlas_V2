@@ -16,8 +16,24 @@
  * policy off stopped it. It is the same class as the conversation-route defect
  * in `e2e/support/chromium-crash.ts`, on a second route.
  *
- * A full page load keeps the assertion running on both engines rather than
- * skipping Chromium, which is why it is preferred here to a skip.
+ * **The paragraph above no longer holds, and is kept because the probes behind
+ * it were real.** Measured 2026-08-19: the transmitting test loads `/settings`
+ * with `page.goto` — a full document navigation — and **Chromium crashes
+ * anyway**. Five runs, five crashes, from a clean state, in isolation and in
+ * the full suite, headed and headless, against a freshly built bundle; residue
+ * and a stale bundle were both ruled out, and Firefox still renders the tree
+ * correctly. So a full page load is *not* a workaround for this branch.
+ *
+ * **Why the two accounts can both be honest:** the Settings page has gained
+ * content since those eight probes — a per-repository embedding-model field
+ * (ADR-0014) and the credential entry (ADR-0015) — so the tree rendered under a
+ * transmitting policy today is not the tree they tested. That is a *hypothesis*
+ * offered so the disagreement is not mistaken for one account being careless;
+ * it was not measured, and the Chromium build is unchanged at `chromium-1234`.
+ *
+ * The test is therefore skipped on Chromium, by explicit user ruling on
+ * 2026-08-19, on the same terms as its seven neighbours: Firefox runs it, so
+ * the assertion is not lost — only the engine it is proven on.
  *
  * No provider is ever constructed and nothing leaves the machine: the
  * transmitting policy is a stored row, and its extra is not installed.
@@ -26,6 +42,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./support/fixtures";
+import { skipChromiumSettingsCrash } from "./support/chromium-crash";
 
 interface RepositorySummary {
   readonly repository_id: string;
@@ -247,7 +264,9 @@ test("a repository with no provider says so, and can be saved and tested", async
 
 test("a repository whose policy transmits shows the warning, the budget, and its coverage", async ({
   page,
+  browserName,
 }) => {
+  skipChromiumSettingsCrash(browserName);
   const repository = await defaultRepository(page);
   await setPolicy(page, repository.repository_id, {
     embedding_provider: "openai",

@@ -1472,11 +1472,48 @@ of a status list is how they drift, which is the `--format pr` and
       It is false: the crash reaches it through a full document navigation too.
       Corrected there, with the measurement beside it.
 
-      **Deliberately not fixed.** The consistent remedy is the skip helper that
-      already covers seven tests for this same defect — but `rules.md` forbids
-      skipping a test to make a build pass, so that is a ruling, not a cleanup.
-      A clean full Chromium run is **7 skipped, 3 passed, 1 failed**, so the
-      failure is real and does redden the gate.
+      **Ruled by the user the same day: skip it like the other seven.**
+      `rules.md` forbids skipping a test to make a build pass, which is why it
+      was left failing until the owner ruled rather than tidied away — the rule
+      makes this a decision, and the decision was made with the reproduction in
+      front of it.
+
+      **Applied through a separate helper, `skipChromiumSettingsCrash`, not the
+      existing one.** The existing reason string reads "conversation-route
+      navigation", and that text reaches the test report — reusing it would have
+      named one thing while showing another, which is the ADR-0019 mistake on a
+      new surface. Two triggers, two accurate labels.
+
+      **After the ruling: chromium 8 skipped / 3 passed / 0 failed (exit 0);
+      firefox 11 passed / 0 skipped / 0 failed (exit 0).** The Firefox number is
+      the one that matters — it is the whole justification, and it was measured
+      rather than assumed: no assertion was lost, only the engine it is proven
+      on.
+
+      **I manufactured a false RED gate, which is the mirror of this project's
+      usual failure.** Running `check_phase7.ps1` through
+      `*>&1 | Tee-Object`, the gate reported exit 1 at the web component tests.
+      Nothing had failed: **vitest wrote one benign line to stderr**, and
+      PowerShell 5.1 wraps a *native command's* stderr in a `NativeCommandError`
+      record when streams are redirected, flipping `$?` to false at exit 0. Run
+      directly, `vitest run` gives **22 files / 205 tests / exit 0**.
+
+      Three earlier `check_phase4` runs used the same wrapper and passed — **not
+      because the wrapper is safe, but because nothing wrote to stderr in
+      them.** The hazard is documented for this shell and I hit it anyway.
+
+      This project has recorded false *greens* repeatedly (`$?` after a pipe, a
+      gate whose log and exit code disagree). **A false red is the same class
+      and costs the same way**: the next reader believes a clean tree is broken.
+      **Do not merge streams when invoking a gate** — tee stdout only and let
+      stderr through.
+
+      **A hypothesis was offered for how both accounts can be honest**, and
+      labelled as one: the Settings page gained a per-repository embedding-model
+      field (ADR-0014) and credential entry (ADR-0015) after those eight probes,
+      so the tree rendered under a transmitting policy today is not the tree they
+      tested. **Not measured**, and the Chromium build is unchanged — so it is
+      written as a hypothesis rather than a conclusion.
 
 - [x] **CRLF drift is wider than documentation — it is in source too
       (2026-08-19).** The earlier entry recorded nine Markdown files. The full

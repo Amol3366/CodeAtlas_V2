@@ -91,7 +91,7 @@ with verification.
 | ~~**A `Finding` carries no subject or file path** (ADR-0042 follow-up 1)~~                              | **CLOSED 2026-08-17 — ADR-0054, and the rendering problem was the symptom.** `_finding_citations` keyed changed symbols on `qualified_name` **alone**, so two modules each defining `total` collapsed to whichever the dict comprehension saw last: **the finding about `billing.py` cited lines in `orders.py`**. A §4.1 violation — the citation does not support the claim — and **ADR-0042's own rule ("pair within the file first") reaching a surface that ruling did not touch**. `FindingDraft` now carries `subject_file`, and a symbol draft resolves **only** by location, with no name fallback, because a wrong citation still renders as a valid finding. `Finding` gains optional `subject`/`file_path` **derived from the citation, never stored** — `change_findings` has no such columns, storing them would be a second copy that can disagree, and deriving means no migration and no drift. Surfaced in JSON, Markdown, PR, the CLI verdict and the web list; SARIF needed nothing, already carrying the location in `artifactLocation`. `contract_version` stays `1.1`, `SCHEMA_VERSION` stays 14                                                                                                                                                                                | —                                                                                                                                                                          |
 | **A gated intent left the denominator, flattering six metrics**                                            | **CLOSED 2026-08-17 — ADR-0053.** `CONCEPTUAL` was absent from `SUPPORTED_INTENTS`, so `predict_exact_symbols` emitted `_abstention(measured=False)` and the case **never reached the engine**. **q024 had never been measured**; ADR-0051 put q006 in the same state hours earlier. This is ADR-0017 on the neighbouring constant, failing the **opposite** way — a gated *fixture* scores `False` and stays in the denominator as a miss, a gated *intent* **leaves** it, so the omission removed a failing case from the average instead of reporting capability as failure. Under-reporting is loud and gets found; flattering is silent. Corrected: `relation_path_recall` 0.9130 → **0.8750**, `relation_path_correctness` 0.8261 → 0.7917, `primary_evidence_recall_at_10` 0.9471 → 0.9310, `exact_evidence_rate` 0.6880 → 0.6591, `ndcg_at_10` and `symbol_recall_at_10` down; `exact_symbol_resolution` **1.0000 unchanged** and `unmet_targets` unchanged. **ADR-0051's conclusion survives** — q006 measured through lexical gives 0.9943, confirming it does pass containment — **but its evidence did not establish it**, and that is recorded as the correction                                                                                                     | —                                                                                                                                                                          |
 | ~~**Ranking sensitivity needs distractors, not larger answer sets**~~                                          | **CLOSED 2026-08-17 — ADR-0059. Ruled: a graph expectation declares direct results only**, which is what makes `exact_symbol_resolution` a ranking gate rather than only a resolution gate — a true indirect result left undeclared means the metric asks whether the *direct* answer ranks first. **The row's own model was wrong twice over.** Sensitivity is **not** structurally unavailable for a correctly-specified direct case: it needs a **two-hop chain**, and `symbol_breadth` had none — nothing called `run_pipeline` or `test_pipeline_advances`. A fixture-shape limit, not a structural one. And the counts had drifted from the recorded "9 sensitive, 9 distractors, the same 9" to **11, 12, and not the same set**, partly through ADR-0051, ADR-0053 and ADR-0057. Fixed: q015 corrected on ADR-0036 grounds, `start_pipeline` added for a two-hop chain, q065 added to query it. **q053 is now the first post-2026-08-15 case to be reversal-sensitive**; the symbol-intent sensitive set is q003, q005, q015, q053 | —                                                                                                                                                    |
-| **Chromium Playwright tests now FAIL, not just skip — and it reproduces on `main`** | **REPRODUCED AND MECHANISM NAMED 2026-08-19; the disposition is now a decision, not an investigation.** The row's reopening condition was "someone reproduces it from a clean state and names the mechanism". Both are done, and **its prime suspect was wrong**. **The mechanism:** Chromium's renderer **crashes** (`Protocol error (Runtime.callFunctionOn): Page crashed`) while rendering the Settings **Embedding provider** fieldset for a repository whose policy transmits. The trace shows `goto /settings` completing and the `settings-repository` assertion *passing* first, so the page mounts and the header renders before the renderer dies. **Ruled out, each by measurement rather than argument:** *residue* — the register's prime suspect — reproduces with `.e2e-tmp` deleted, so no persisted policy survives; *a stale bundle* — reproduces against a freshly built `dist`, the trap this project has hit twice before; *a flake* — **five runs, five failures**, in isolation and in the full suite; *the headless shell* — `--headed` crashes identically. **Firefox renders the same tree correctly**, twice. **A correction to the docs came out of it:** `docs/operations/end-to-end-tests.md` claimed "the identical tree renders correctly on a full page load on both engines", which is why this test was written with `page.goto` and left unskipped. **That is false** — the crash reaches it through a full document navigation too. Corrected there. **Clean full Chromium run: 7 skipped, 3 passed, 1 failed.** The failure is real and reddens the gate. **Deliberately not fixed here:** the consistent remedy is the existing skip helper that already covers seven tests for this same renderer defect, but `documentation/rules.md` forbids skipping a test to make a build pass, so that is the user's call rather than mine. The alternative is changing the app to avoid whatever Chromium chokes on, which is a product change for a browser bug. | A ruling on skip-vs-change, or Chromium ships a version that renders the branch |
+| ~~**Chromium Playwright tests now FAIL, not just skip**~~ | **CLOSED 2026-08-19 — reproduced, mechanism named, then ruled by the user.** **The mechanism:** Chromium's renderer *crashes* (`Protocol error (Runtime.callFunctionOn): Page crashed`) while rendering the Settings **Embedding provider** fieldset for a repository whose policy transmits; the trace shows `goto /settings` completing and the `settings-repository` assertion *passing* first, so the page mounts before the renderer dies. It is a crash, not a failed expectation. **The row's own prime suspect was wrong.** Residue is ruled out — it reproduces with `.e2e-tmp` deleted; so is a stale bundle (freshly built `dist`), a flake (**five runs, five failures**), and the headless shell (`--headed` crashes identically). Firefox renders the identical tree correctly. **Third recorded instance of a written-down diagnosis being wrong: a remedy in this register is still a hypothesis.** **It falsified the claim that shaped the test** — `end-to-end-tests.md` and the spec's own docstring both said a full page load renders the branch correctly on both engines, which is why this test used `page.goto` and stayed unskipped. Corrected in both, with the probes that produced the original claim kept rather than deleted. **Ruled by the user: skip it like the other seven.** Applied through a *separate* helper, `skipChromiumSettingsCrash`, because the existing reason string says "conversation-route navigation" and would have mislabelled this crash in the report. `rules.md` forbids skipping a test to make a build pass, so this was applied only on the ruling and is recorded as one. **After: chromium 8 skipped / 3 passed / 0 failed (exit 0); firefox 11 passed / 0 skipped / 0 failed (exit 0)** — so no assertion was lost, only the engine it is proven on | Chromium ships a build that renders the branch — delete the helper call and run `playwright test settings.spec.ts --project=chromium` |
 | **A `CALLERS` expectation may name its own subject**                                                        | **OPEN — narrower than what ADR-0059 ruled, and deliberately left.** q005 expects `IdempotencyStore.claim` among the callers of `IdempotencyStore.claim`, and q053 expects `OrderPipeline.advance` among its own; nothing calls itself here, so both lose recall for declaring it. **This is not the ADR-0018 violation it first appears to be** — that record explicitly allows a self-referential case ("absent means `expected_symbols[0]`, which is correct for every exact, lexical, and self-referential case") and separately records that module-scoped queries *do* return the subject first. **A first reading that nine cases contradicted ADR-0018 was wrong and is corrected here rather than acted on** | Someone rules whether a caller/dependency expectation may name its own subject                                                                       |
 | ~~original entry~~                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
 | **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone adds cases whose answer sets are large enough for order to matter                                                                                                   |
@@ -290,6 +290,92 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-19T21:00:00Z — Ruled: the Settings crash is skipped like its seven neighbours
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: P1-4 closed by user ruling. Test-suite change only — **nothing
+  under `src/` and no application code touched**. No version bump, no migration.
+
+**The ruling.** The user ruled that `settings.spec.ts`'s transmitting test is
+skipped on Chromium on the same terms as the seven existing skips. It was left
+failing until then on purpose: `documentation/rules.md` says *do not delete,
+skip, or weaken a test to make a build pass*, so silencing it was a decision for
+the owner rather than a cleanup for an agent — and the decision was made with
+the reproduction and the named mechanism already in front of it.
+
+**Applied through a separate helper, `skipChromiumSettingsCrash`, deliberately
+not by reusing `skipChromiumRendererCrash`.** The existing reason string reads
+"conversation-route navigation" and **that text reaches the test report**; this
+crash is reached by a full document navigation to `/settings`. Reusing it would
+have labelled one thing while showing another — the ADR-0019 mistake on a new
+surface. Two triggers now carry two accurate labels, each with its own
+reproduction in its own docstring.
+
+**Two documents asserted the thing that turned out to be false, and both are
+corrected rather than quietly edited.** `docs/operations/end-to-end-tests.md`
+and the spec's own file docstring each said the identical tree renders correctly
+on a full page load on both engines — which is *why* this test used `page.goto`
+and stayed unskipped. **The eight single-variable probes behind that claim are
+kept**, not deleted, with the 2026-08-19 measurement beside them: deleting the
+earlier reasoning would hide that it was real work which stopped being true.
+
+**A hypothesis for how both accounts can be honest, labelled as one:** the
+Settings page gained a per-repository embedding-model field (ADR-0014) and
+credential entry (ADR-0015) after those probes, so the tree rendered under a
+transmitting policy today is not the tree they tested. **Not measured**, and the
+Chromium build is unchanged at `chromium-1234` — so it is written as a
+hypothesis, not a conclusion.
+
+- Files: `apps/web/e2e/support/chromium-crash.ts` (new
+  `skipChromiumSettingsCrash`), `apps/web/e2e/settings.spec.ts` (the skip and a
+  corrected docstring), `docs/operations/end-to-end-tests.md`,
+  `documentation/memory.md`, this file.
+
+**Verification.**
+
+| Run | Result |
+| --- | --- |
+| `playwright test --project=chromium` (clean state) | **8 skipped, 3 passed, 0 failed — exit 0** |
+| `playwright test --project=firefox` (clean state) | **11 passed, 0 skipped, 0 failed — exit 0** |
+| `tsc --noEmit` | clean |
+| `eslint` on both changed files | clean |
+| `vitest run` (web component tests) | **22 files, 205 tests, exit 0** |
+| **`check_phase7.ps1 -SkipSync`** — the gate that owns e2e | **exit 0**, `GATE_LASTEXITCODE=0`, `Phase 7 verification completed.` Playwright inside the gate: **8 skipped, 14 passed** across both engines |
+
+**A false RED gate was manufactured on the way, and it is worth more than the
+fix.** `check_phase7.ps1` invoked through `*>&1 | Tee-Object` reported **exit 1**
+at the web component tests. Nothing had failed: vitest wrote a single benign
+line to **stderr**, and PowerShell 5.1 wraps a *native command's* stderr in a
+`NativeCommandError` when streams are redirected, flipping `$?` to false at exit
+0. Run directly, the same suite is 205 passed, exit 0.
+
+Three earlier `check_phase4` runs in this session used the identical wrapper and
+passed — **not because it is safe, but because nothing wrote to stderr in
+them.** This register already carries several false *greens* (`$?` after a pipe;
+a gate whose log and exit code disagree). **A false red is the same class and
+costs the same way**, and it is the one this session produced. **Invoke a gate
+with stdout tee'd only; never merge stderr into it.**
+
+**The Firefox run is the load-bearing evidence**, not the Chromium one. The
+ruling's justification is that no assertion is lost, only the engine it is
+proven on — so the number that matters is that Firefox still runs **all 11**,
+including the test just skipped. That was measured, not assumed.
+
+**Limitations.**
+
+- **The skip is a workaround, not a fix.** The branch still crashes Chromium,
+  which is the browser most users have; nobody has confirmed the page is safe
+  for a real user with a transmitting policy in Chromium. The suite no longer
+  tells you if that changes for the worse — only Firefox does.
+- The exact DOM or CSS trigger inside the fieldset is **still unknown**;
+  narrowing it means bisecting product code for a browser bug and was not done.
+- Untested against any Chromium build other than Playwright 1.62's
+  `chromium-1234`, so "upstream defect" stays an inherited characterisation.
+- No upstream issue searched for or filed.
+
+- Next: unchanged — the two ADR-0065 rulings and the merge (P0), then P1-2 and
+  P1-3's §12 half.
 
 ### 2026-08-19T19:30:00Z — P1-4: the Chromium failure reproduced, and its prime suspect was wrong
 
