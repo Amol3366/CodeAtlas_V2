@@ -99,6 +99,13 @@ if (Test-Path $release) { Remove-Item -Recurse -Force $release }
 
 $migrations = Join-Path $root "src/codeatlas/storage/sqlite/migrations"
 
+# CodeAtlas's own authored import queries (ADR-0065). Read from disk relative to
+# `__file__`, so they are data rather than modules and PyInstaller does not find
+# them -- the same reason the migrations beside them are carried explicitly.
+# Missing, they fail *after* the grammar `tags.scm` files are found, which is how
+# the 2026-08-19 rebuild hit two separate data omissions one after the other.
+$importQueries = Join-Path $root "src/codeatlas/parsing/query_backed/queries"
+
 $pyinstallerArgs = @(
     "--noconfirm",
     "--name", "codeatlas",
@@ -107,8 +114,32 @@ $pyinstallerArgs = @(
     "--specpath", (Join-Path $dist "spec"),
     "--add-data", "$assets;web",
     "--add-data", "$migrations;codeatlas/storage/sqlite/migrations",
+    "--add-data", "$importQueries;codeatlas/parsing/query_backed/queries",
     "--collect-submodules", "uvicorn"
 )
+
+# The query-backed grammars ship their `tags.scm` as package *data*, and
+# `load_tags_source` reads it off disk with `os.walk` (ADR-0065). PyInstaller
+# finds the modules by analysis -- the imports are static -- but never the data,
+# which is the same reason the migrations and the web assets above are carried
+# explicitly rather than discovered.
+#
+# Omitting these does not degrade the build, it destroys it: every parser is
+# constructed eagerly by `build_registry()`, so the first command to build
+# services dies with `FileNotFoundError: tree_sitter_java ships no tags.scm`.
+# Measured on the 2026-08-19 artifact: `repo add` and even `doctor` failed with
+# an unhandled exception and only `--help` survived.
+#
+# These are required dependencies, not optional extras, so they belong in the
+# base arguments and never behind `-SemanticLocal`.
+foreach ($grammar in @(
+    "tree_sitter_java",
+    "tree_sitter_go",
+    "tree_sitter_rust",
+    "tree_sitter_scala"
+)) {
+    $pyinstallerArgs += @("--collect-data", $grammar)
+}
 
 if ($SemanticLocal) {
     Write-Output "==> Including semantic-local optional dependencies"

@@ -106,6 +106,64 @@ def test_the_packaged_build_indexes_and_answers(tmp_path: Path) -> None:
     assert payload["evidence"][0]["file_path"].endswith("service.py")
 
 
+_JAVA_SOURCE = """package com.shop;
+
+public class OrderService {
+    public void capture(String orderId) {
+    }
+}
+"""
+
+
+@packaged
+def test_the_packaged_build_parses_a_query_backed_language(tmp_path: Path) -> None:
+    """A query-backed grammar resolves a symbol inside the frozen build.
+
+    **This test exists because the 2026-08-19 rebuild shipped an artifact that
+    could not run at all.** ADR-0065's parsers read two kinds of file that are
+    *data* rather than modules: each grammar's own ``queries/tags.scm``, and the
+    ``*.imports.scm`` authored in this repository. PyInstaller finds the modules
+    by analysis -- the imports are static -- and neither set of data files, so
+    both have to be carried explicitly like the migrations.
+
+    Omitting them does not degrade the build, it destroys it: ``build_registry``
+    constructs every parser eagerly, so the first command to build services died
+    with ``FileNotFoundError: tree_sitter_java ships no tags.scm``. ``doctor``
+    failed too; only ``--help`` survived. The two omissions surfaced *one after
+    the other*, which is why this asserts a real parse rather than that the
+    binary starts.
+
+    Java stands in for all four: they share one engine and one loader, so a
+    missing data file for any of them fails the same way. Asserting on the
+    resolved symbol -- not merely on exit code 0 -- is what separates "the
+    grammar loaded" from "the process did not crash".
+    """
+    database = tmp_path / "db.sqlite"
+    source = tmp_path / "repo" / "src" / "main" / "java" / "com" / "shop"
+    source.mkdir(parents=True)
+    (source / "OrderService.java").write_text(_JAVA_SOURCE, encoding="utf-8")
+
+    added = _run("repo", "add", str(tmp_path / "repo"), "--db", str(database), "--json")
+    assert added.returncode == 0, added.stderr
+    repository_id = json.loads(added.stdout)["repository_id"]
+
+    indexed = _run("index", repository_id, "--db", str(database), "--json")
+    assert indexed.returncode == 0, indexed.stderr
+
+    found = _run(
+        "symbol",
+        repository_id,
+        "OrderService.capture",
+        "--db",
+        str(database),
+        "--json",
+    )
+    assert found.returncode == 0, found.stderr
+    payload = json.loads(found.stdout)
+    assert payload["evidence"], "the packaged build resolved no Java evidence"
+    assert payload["evidence"][0]["file_path"].endswith("OrderService.java")
+
+
 @packaged
 def test_the_packaged_build_upgrades_a_prior_version_database(tmp_path: Path) -> None:
     """Gate condition 5's second half, measured on the artifact.

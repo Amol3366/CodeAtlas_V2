@@ -292,6 +292,93 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-20T01:00:00Z — P1-2: the packaged build was broken by ADR-0065, and rebuilding found it
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P1-2 closed.** The artifact is rebuilt, semantic-local, and
+  verified behaviourally.
+- **No product code was wrong.** The fix is two `--add-data` / `--collect-data`
+  additions in `scripts/build_package.ps1`, plus one new packaged test. No
+  version bump, no migration, no contract change.
+
+**The packaged build could not run at all.** Not a Java-only degradation:
+`build_registry()` constructs every parser eagerly, so the first command to build
+services died with `FileNotFoundError: tree_sitter_java ships no tags.scm`.
+**`doctor` failed, `repo add` failed, and only `--help` worked.** This shipped
+into `main` earlier today.
+
+**Two data omissions, and fixing the first revealed the second:**
+
+| Missing from the artifact | What it is |
+| --- | --- |
+| each grammar's `queries/tags.scm` | grammar package **data**; `load_tags_source` finds it with `os.walk` |
+| `src/codeatlas/parsing/query_backed/queries/*.imports.scm` | **CodeAtlas's own** authored queries, read relative to `__file__` |
+
+**The cause is a category this repository had already solved.** PyInstaller finds
+modules by analysis — the grammar imports are static, so `tree_sitter_java`
+itself was bundled — and never finds *data*. That is exactly why the migrations
+and web assets are carried explicitly, under a comment warning that a frozen
+build without them "fails on a user's **first** run, which is the worst time to
+find out". ADR-0065 introduced two more data sets and the list was not extended.
+
+**The build's self-verification could not catch it.** It checks that the
+executable answers `--help`, and `--help` was the one thing that still worked.
+**A smoke check that never constructs services proves less than it appears to**,
+and `packaging-and-install.md` now says so beside the check.
+
+**The gate would have caught it; nobody ran it.** `check_phase7 -Package`
+registers and indexes a repository, which crashes on this. `-Package` is opt-in
+and four ADR-0065 slices shipped without it — the register's own "`-Semantic` /
+`-Package` gate artifacts nothing else reaches" lesson, this time producing a
+**critical** defect rather than a stale number.
+
+**Guard added.** `test_the_packaged_build_parses_a_query_backed_language` indexes
+a Java file through the binary and asserts the **resolved symbol** rather than
+exit 0, because "the process did not crash" and "the grammar loaded" are
+different facts. **No synthetic mutation was needed**: the real one had already
+occurred — the pre-fix binary returned non-zero from `repo add`, which is the
+returncode this test asserts.
+
+**Method note worth reusing.** The defect was found and fixed using **cheap
+deterministic builds**, because the grammar-data question is independent of the
+semantic stack. Two fast builds cost a fraction of one torch build, and only the
+final artifact was built with `-SemanticLocal`.
+
+- Files: `scripts/build_package.ps1`,
+  `tests/end_to_end/test_packaged_build.py` (new test),
+  `docs/operations/packaging-and-install.md`, `documentation/memory.md`, this
+  file. `dist/` is gitignored, so **the artifact itself is local state and this
+  commit does not deliver it to anyone else.**
+
+**Verification, on the final semantic artifact.**
+
+| Check | Result |
+| --- | --- |
+| `build_package.ps1 -SemanticLocal -SkipZip` | exit 0 |
+| `tests/end_to_end/test_packaged_build.py` | **7 passed** |
+| Semantic stack in `_internal` | `torch`, `lancedb`, `sentence_transformers` present |
+| Bundled data | **4** `tags.scm` + **4** `*.imports.scm` |
+| Packaged exe indexing `java_app` | **4 symbols — identical to source mode** |
+| Packaged exe `deps OrderService` | **`OrderService IMPORTS PaymentService`** — ADR-0065's resolver fix inside the frozen build |
+| `check_phase4.ps1 -SkipSync` | **exit 0**, `GATE_LASTEXITCODE=0` — **2338 passed, 3 skipped, 2 xfailed**. The count rose from 2315 because installing the semantic extra un-skips the tests that require it; the environment changed, not the corpus |
+
+**Limitations.**
+
+- **The zip was not rebuilt** (`-SkipZip`), so `dist/codeatlas-win64.zip` is
+  stale and inconsistent with the folder beside it. `release-validation.md`
+  records that compressing the ~1 GB semantic tree exceeded the automation
+  timeout here; a release must rebuild it deliberately.
+- **`uv sync --extra semantic-local` was run to make the build possible**, so the
+  dev environment now carries torch. It is a declared extra from `uv.lock`, not a
+  new dependency, and `uv sync --all-groups --frozen` reverses it.
+- **Go, Rust and Scala were not individually exercised through the binary.** They
+  share one engine and one loader with Java, so a missing data file fails
+  identically — but that is an argument, not a measurement.
+- The packaged **performance** numbers were not re-measured; `-Perf` was not run.
+
+- Next: the two ADR-0065 rulings (P0-2) still gate Go/Rust/Scala evaluation
+  cases, and P1-3's §12 divergences still need a direction.
+
 ### 2026-08-19T23:00:00Z — ADR-0065 merged to `main`
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

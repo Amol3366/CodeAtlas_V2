@@ -1567,6 +1567,63 @@ of a status list is how they drift, which is the `--format pr` and
       Rebuilding it is the next item, and it must carry `-SemanticLocal` or it
       silently becomes a deterministic-only package.
 
+- [x] **The packaged build was completely broken by ADR-0065, and rebuilding it
+      is what found out (P1-2, 2026-08-19).** Two data files were missing from
+      the artifact; **the fix is in `build_package.ps1`, and no product code was
+      wrong.**
+
+      **It was not a Java-only degradation — the binary could not run at all.**
+      `build_registry()` constructs every parser eagerly, so the first command to
+      build services died with `FileNotFoundError: tree_sitter_java ships no
+      tags.scm`. **`doctor` failed. `repo add` failed. Only `--help` worked.**
+
+      **Two omissions, surfacing one after the other**, which is the part worth
+      remembering — fixing the first *revealed* the second:
+
+      | Missing | What it is |
+      | --- | --- |
+      | each grammar's `queries/tags.scm` | grammar package **data**; `load_tags_source` reads it with `os.walk` |
+      | `parsing/query_backed/queries/*.imports.scm` | **our own** authored queries, read relative to `__file__` |
+
+      **The cause is a category error that this repository already had the
+      answer to.** PyInstaller finds modules by analysis — the grammar imports
+      are static, so `tree_sitter_java` itself was bundled — and it never finds
+      *data*. That is precisely why the migrations and the web assets are carried
+      explicitly, with a comment saying a frozen build without them "fails on a
+      user's **first** run, which is the worst time to find out". ADR-0065 added
+      two more data sets and nobody extended the list.
+
+      **The build's own verification could not catch it**: it checks the
+      executable answers `--help`, and `--help` was the one command that still
+      worked. **A smoke check that avoids constructing services proves less than
+      it looks.**
+
+      **The gate would have caught it — nobody ran it.** `check_phase7 -Package`
+      registers and indexes a repository, which crashes on this. `-Package` is
+      opt-in, and four ADR-0065 slices shipped without it. That is the recorded
+      "`-Semantic` / `-Package` gate artifacts nothing else reaches" lesson
+      producing a **critical** defect on `main` rather than a stale artifact.
+
+      **Guard added:** `test_the_packaged_build_parses_a_query_backed_language`
+      indexes a Java file through the binary and asserts the **resolved symbol**,
+      not exit 0 — "the process did not crash" and "the grammar loaded" are
+      different facts. No mutation was synthesised for it because the real one
+      already happened: the pre-fix binary returned non-zero from `repo add`, and
+      the test asserts that returncode.
+
+      **Verified on the final semantic artifact**, not on a proxy: 7/7 packaged
+      tests, torch/lancedb/sentence_transformers present, all four `tags.scm` and
+      all four `imports.scm` bundled, and the packaged exe indexing `java_app` to
+      **4 symbols — identical to source mode** — with
+      `OrderService IMPORTS PaymentService` resolving, which is ADR-0065's
+      resolver fix running inside the frozen build.
+
+      **A cheap deterministic build was used to find the defect before spending
+      a torch build on it.** The grammar-data question is independent of the
+      semantic stack, so the fast build answered it twice for a fraction of the
+      cost. Worth repeating whenever a packaging question is not about the heavy
+      dependencies.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

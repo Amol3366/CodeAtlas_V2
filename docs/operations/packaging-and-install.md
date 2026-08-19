@@ -33,15 +33,30 @@ loads the native tree-sitter extensions from disk. It is still one command the
 user runs, which is what the decision was really asking for. The deviation was
 approved on 2026-07-28.
 
-Two data sets are carried explicitly, because neither is a module:
+Four data sets are carried explicitly, because none of them is a module:
 
 | Bundled | Why it would otherwise be missing |
 | --- | --- |
 | `apps/web/dist` → `web` | `serve --web` would have nothing to serve |
 | the SQL migrations | They are read through `importlib.resources`; a frozen build without them fails on a user's *first* run against a fresh database, which is the worst time to find out |
+| each grammar's `queries/tags.scm` (`--collect-data` for `tree_sitter_java`, `-go`, `-rust`, `-scala`) | ADR-0065's engine reads them off disk with `os.walk`. PyInstaller finds the grammar *modules* by analysis — the imports are static — and never their data |
+| `src/codeatlas/parsing/query_backed/queries` | The `*.imports.scm` authored in this repository, read relative to `__file__` |
+
+> **The last two were missing from the 2026-08-19 rebuild and the artifact could
+> not run at all.** Every parser is constructed eagerly by `build_registry()`, so
+> this is not a Java-only degradation: `repo add` **and** `doctor` died with
+> `FileNotFoundError: tree_sitter_java ships no tags.scm`, and only `--help`
+> survived. The two omissions surfaced **one after the other** — fixing the
+> grammar data revealed the authored-query data behind it.
+>
+> `test_the_packaged_build_parses_a_query_backed_language` now indexes a Java
+> file through the binary and asserts the **resolved symbol**, not just exit 0,
+> because "the process did not crash" and "the grammar loaded" are different
+> facts.
 
 The build verifies its own artifact — a build whose executable cannot answer
-`--help` is not a build — before zipping.
+`--help` is not a build — before zipping. **That check would not have caught
+this**: `--help` was the one command that still worked.
 
 ### In the gate
 
