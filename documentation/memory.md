@@ -1618,6 +1618,23 @@ of a status list is how they drift, which is the `--format pr` and
       `OrderService IMPORTS PaymentService` resolving, which is ADR-0065's
       resolver fix running inside the frozen build.
 
+      **Guarded at gate level afterwards (2026-08-19).** The packaged test only
+      runs behind opt-in `-Package` -- the flag that let this reach `main` --
+      so two unit tests now derive the requirement from the **adapters**: what
+      they pass to `load_tags_source` must be `--collect-data`'d, and the
+      authored query directory must be `--add-data`'d. They need no build and
+      run in every gate. Adapters are found by **glob**, so a new language is
+      covered without anyone extending a list -- which is the failure one level
+      up from the one being guarded.
+
+      **My own first guard was weak, and mutation is what caught it.** The
+      authored-query test asserted only that `"query_backed/queries"` appeared
+      somewhere in the script -- and it **passed with the `--add-data` line
+      deleted**, because the `$importQueries = Join-Path ...` definition
+      contains the same substring. Now matched against the `--add-data`
+      argument itself. **Defining a path is not bundling it**, and a
+      substring search cannot tell the two apart.
+
       **A cheap deterministic build was used to find the defect before spending
       a torch build on it.** The grammar-data question is independent of the
       semantic stack, so the fast build answered it twice for a fraction of the

@@ -75,3 +75,107 @@ def test_no_powershell_script_is_called_with_array_splatting(
         "positional, so every argument fails to bind. Use a hashtable splat "
         "(@{ Name = $true }) or pass the switches literally."
     )
+
+
+# --- The packaging script bundles what the parsers read -----------------------
+#
+# A second class of packaging defect, caught the same way and for the same
+# reason: statically, because proving it dynamically costs a PyInstaller build.
+#
+# ADR-0065's parsers read two kinds of file that are *data* rather than modules
+# -- each grammar's own `queries/tags.scm`, and the `*.imports.scm` authored in
+# this repository. PyInstaller finds the modules by analysis, since the imports
+# are static, and never the data.
+#
+# Omitting them does not degrade the build, it destroys it. `build_registry()`
+# constructs every parser eagerly, so on 2026-08-19 the packaged artifact died
+# on the first command that built services -- `repo add` and `doctor` both
+# raised `FileNotFoundError: tree_sitter_java ships no tags.scm`, and only
+# `--help` survived.
+#
+# `test_the_packaged_build_parses_a_query_backed_language` covers this too, but
+# it needs a built artifact and therefore only runs behind the opt-in `-Package`
+# flag -- the same flag that went unrun through four ADR-0065 slices and let the
+# defect reach `main`. These tests need no build and run in every gate.
+
+_LANGUAGES = Path("src/codeatlas/parsing/query_backed/languages")
+_BUILD_SCRIPT = SCRIPTS / "build_package.ps1"
+
+# `load_tags_source("tree_sitter_java")` -- the grammar package whose shipped
+# data the adapter reads.
+_TAGS_SOURCE = re.compile(r"load_tags_source\(\s*[\"'](?P<module>[\w.]+)[\"']")
+# `load_query_source("java.imports.scm")` -- a query authored in this repository.
+_QUERY_SOURCE = re.compile(r"load_query_source\(\s*[\"'](?P<name>[\w.]+)[\"']")
+
+
+def _adapter_sources() -> list[Path]:
+    """Every language adapter, found by glob rather than by a list.
+
+    A list would have to be extended for a new language, which is the exact
+    failure this test exists to catch -- one level up.
+    """
+    return sorted(
+        path for path in _LANGUAGES.glob("*.py") if path.name != "__init__.py"
+    )
+
+
+def test_every_grammar_whose_data_is_read_is_collected_by_the_build() -> None:
+    """A grammar's `tags.scm` must be bundled, or the artifact cannot start.
+
+    Derived from the adapters rather than from a constant: whatever they pass to
+    `load_tags_source` is what has to exist on disk at runtime, so a language
+    added without a matching `--collect-data` fails here in milliseconds instead
+    of in a user's first command.
+    """
+    script = _BUILD_SCRIPT.read_text(encoding="utf-8")
+    collected = set(re.findall(r'"--collect-data",\s*"?(?P<m>[\w.]+)"?', script))
+    collected |= set(re.findall(r'"(tree_sitter_\w+)"', script))
+
+    required = {
+        match.group("module")
+        for path in _adapter_sources()
+        for match in _TAGS_SOURCE.finditer(path.read_text(encoding="utf-8"))
+    }
+    assert required, "no adapter reads a grammar tags.scm; the regex is stale"
+
+    missing = sorted(required - collected)
+    assert not missing, (
+        f"{_BUILD_SCRIPT.name} does not bundle grammar data for {missing}. "
+        "PyInstaller finds the module by analysis and never its data files, so "
+        "the packaged build raises FileNotFoundError on the first command that "
+        "constructs parsers. Add --collect-data for each."
+    )
+
+
+def test_the_authored_import_queries_are_added_to_the_build() -> None:
+    """The `*.imports.scm` written in this repository must be bundled too.
+
+    This is the omission that surfaced *behind* the grammar one on 2026-08-19:
+    fixing the first revealed the second, because they fail at different points
+    in the same constructor.
+    """
+    script = _BUILD_SCRIPT.read_text(encoding="utf-8")
+    authored = {
+        match.group("name")
+        for path in _adapter_sources()
+        for match in _QUERY_SOURCE.finditer(path.read_text(encoding="utf-8"))
+    }
+    assert authored, "no adapter reads an authored query; the regex is stale"
+
+    # The whole directory is carried in one `--add-data`, so the check is that
+    # the directory is bundled -- not that each file is named.
+    #
+    # **Matched against the `--add-data` argument, not against the path string.**
+    # A first version of this asserted only that "query_backed/queries" appeared
+    # somewhere in the script, and it passed with the `--add-data` line deleted:
+    # the `$importQueries = Join-Path ...` definition contains the same substring.
+    # Mutation is what caught that; the assertion now names the flag it depends on.
+    bundled = re.search(
+        r'"--add-data"\s*,\s*"[^"]*query_backed[/\\]queries"',
+        script.replace("\\", "/"),
+    )
+    assert bundled, (
+        f"{_BUILD_SCRIPT.name} does not --add-data the authored query directory, "
+        f"but the adapters load {sorted(authored)} from it relative to __file__. "
+        "Defining the path is not bundling it."
+    )

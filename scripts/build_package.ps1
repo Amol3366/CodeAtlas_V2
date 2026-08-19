@@ -7,12 +7,20 @@
 # antivirus heuristics. The user approved onedir on 2026-07-28; the deviation
 # and its reasoning are recorded in the ADR-0007 Outcome section.
 #
-# Two data sets have to be carried explicitly, because neither is a module:
+# Four data sets have to be carried explicitly, because none of them is a module:
 #
 #   * the built web application, so `serve --web` has something to serve;
 #   * the SQL migrations, which are read through `importlib.resources` and
 #     would otherwise be absent from the frozen build — the failure would not
-#     appear until a user's first run against a fresh database.
+#     appear until a user's first run against a fresh database;
+#   * each query-backed grammar's own `queries/tags.scm` (ADR-0065);
+#   * this repository's authored `*.imports.scm`.
+#
+# The last two were missing on 2026-08-19 and the artifact could not run at all:
+# every parser is built eagerly, so `repo add` and `doctor` both died and only
+# `--help` worked. `tests/unit/test_gate_script_invocations.py` now derives both
+# requirements from the adapters, so a new language fails there in milliseconds
+# rather than in a user's first command.
 [CmdletBinding()]
 param(
     [switch]$SkipWebBuild,

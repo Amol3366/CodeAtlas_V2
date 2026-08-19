@@ -362,6 +362,22 @@ final artifact was built with `-SemanticLocal`.
 | Packaged exe `deps OrderService` | **`OrderService IMPORTS PaymentService`** — ADR-0065's resolver fix inside the frozen build |
 | `check_phase4.ps1 -SkipSync` | **exit 0**, `GATE_LASTEXITCODE=0` — **2338 passed, 3 skipped, 2 xfailed**. The count rose from 2315 because installing the semantic extra un-skips the tests that require it; the environment changed, not the corpus |
 
+**Guarded at gate level, after the fact.** The packaged test above only runs
+behind opt-in `-Package` — the very flag that let this reach `main` — so two
+unit tests in `tests/unit/test_gate_script_invocations.py` now derive the
+requirement from the **adapters**: whatever they pass to `load_tags_source` must
+be `--collect-data`'d, and the authored query directory must be `--add-data`'d.
+No build needed; they run in every gate. **Adapters are found by glob**, so a
+new language is covered without anyone extending a list — which is the failure
+one level above the one being guarded.
+
+**The first version of that guard was weak and mutation caught it.** The
+authored-query test asserted only that `"query_backed/queries"` appeared
+somewhere in the script, and it **passed with the `--add-data` line deleted**:
+the `$importQueries = Join-Path ...` definition carries the same substring. It
+now matches the `--add-data` argument itself. **Defining a path is not bundling
+it.** Both guards are mutation-checked in both directions.
+
 **Limitations.**
 
 - **The zip was not rebuilt** (`-SkipZip`), so `dist/codeatlas-win64.zip` is
