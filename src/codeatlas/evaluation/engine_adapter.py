@@ -141,6 +141,16 @@ SUPPORTED_FIXTURES = (
     # open ruling -- it would either encode the limit as correct or fail for a
     # reason already known and declared. Java has no such limit.
     "java_app",
+    # `scala_app` admitted 2026-08-19 with q070-q073, once ADR-0067 settled the
+    # member-call limit. **q072 is the first evaluation coverage of that
+    # ruling**: `payments.charge(id)` emitted no edge at all until the profile
+    # contract gained a supplementary references query, and a unit test was the
+    # only thing pinning it.
+    #
+    # Go and Rust are still absent. Neither carries an open ruling any more --
+    # ADR-0066 declined Go's import policy -- so they are simply unwritten, not
+    # blocked, and they are the next slice rather than a deferral.
+    "scala_app",
 )
 
 

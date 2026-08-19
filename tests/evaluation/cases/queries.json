@@ -2330,6 +2330,125 @@
                       "forbidden_claims": [
                           "OrderService depends on a database driver."
                       ]
+                  },
+                  {
+                      "id": "q070",
+                      "repository_fixture": "scala_app",
+                      "snapshot_id": "scala-v1",
+                      "question": "Where is the Scala PaymentService class defined?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "PaymentService"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/scala/com/shop/payments/PaymentService.scala",
+                              "symbol": "PaymentService",
+                              "start_line": 3,
+                              "end_line": 5,
+                              "evidence_id": "q070-e1",
+                              "snapshot_id": "scala-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "PaymentService settles funds with a bank."
+                      ]
+                  },
+                  {
+                      "id": "q071",
+                      "repository_fixture": "scala_app",
+                      "snapshot_id": "scala-v1",
+                      "question": "Where is OrderService.capture defined in the Scala service?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "OrderService.capture"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/scala/com/shop/orders/OrderService.scala",
+                              "symbol": "OrderService.capture",
+                              "start_line": 6,
+                              "end_line": 8,
+                              "evidence_id": "q071-e1",
+                              "snapshot_id": "scala-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "A Scala method is reported as FUNCTION; the shipped tags.scm does not distinguish it from a top-level definition (ADR-0065)."
+                      ],
+                      "forbidden_claims": [
+                          "capture charges the card twice."
+                      ]
+                  },
+                  {
+                      "id": "q072",
+                      "repository_fixture": "scala_app",
+                      "snapshot_id": "scala-v1",
+                      "question": "What calls PaymentService.charge in the Scala service?",
+                      "intent": "CALLERS",
+                      "expected_abstention": false,
+                      "query_subject": "PaymentService.charge",
+                      "expected_symbols": [
+                          "OrderService.capture"
+                      ],
+                      "expected_relations": [
+                          "OrderService.capture CALLS PaymentService.charge"
+                      ],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/scala/com/shop/orders/OrderService.scala",
+                              "symbol": "OrderService.capture",
+                              "start_line": 7,
+                              "end_line": 7,
+                              "evidence_id": "q072-e1",
+                              "snapshot_id": "scala-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Dynamic dispatch may add callers."
+                      ],
+                      "forbidden_claims": [
+                          "This is the only runtime caller."
+                      ]
+                  },
+                  {
+                      "id": "q073",
+                      "repository_fixture": "scala_app",
+                      "snapshot_id": "scala-v1",
+                      "question": "What does the Scala OrderService depend on?",
+                      "intent": "DEPENDENCIES",
+                      "expected_abstention": false,
+                      "query_subject": "OrderService",
+                      "expected_symbols": [
+                          "OrderService",
+                          "PaymentService"
+                      ],
+                      "expected_relations": [
+                          "OrderService IMPORTS PaymentService"
+                      ],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/scala/com/shop/orders/OrderService.scala",
+                              "symbol": "OrderService",
+                              "start_line": 3,
+                              "end_line": 3,
+                              "evidence_id": "q073-e1",
+                              "snapshot_id": "scala-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "OrderService depends on a database driver."
+                      ]
                   }
               ]
 }

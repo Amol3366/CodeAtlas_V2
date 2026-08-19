@@ -1,7 +1,7 @@
 {
   "case_counts": {
     "changes": 29,
-    "queries": 69
+    "queries": 73
   },
   "contract_version": "1.0",
   "implementation_status": "implemented",
@@ -9,23 +9,23 @@
     "abstention_correctness": 1.0,
     "changed_symbol_precision": 0.9482758620689655,
     "changed_symbol_recall": 1.0,
-    "containing_evidence_rate": 0.7588652482269503,
+    "containing_evidence_rate": 0.7655172413793103,
     "containing_evidence_recall_at_10": 1.0,
     "direct_impact_recall": 1.0,
-    "exact_evidence_rate": 0.6666666666666666,
+    "exact_evidence_rate": 0.6758620689655173,
     "exact_symbol_resolution": 1.0,
     "finding_count_correctness": 1.0,
     "finding_precision": 1.0,
     "lexical_resolution": 1.0,
     "mean_reciprocal_rank": 1.0,
-    "ndcg_at_10": 0.9237030927905524,
-    "primary_evidence_recall_at_10": 0.9408602150537635,
-    "relation_path_correctness": 0.8734567901234568,
+    "ndcg_at_10": 0.9225195394804546,
+    "primary_evidence_recall_at_10": 0.9432989690721649,
+    "relation_path_correctness": 0.882183908045977,
     "relation_path_recall": 1.0,
-    "symbol_recall_at_10": 0.9,
+    "symbol_recall_at_10": 0.8985507246376812,
     "total_duration_ms": 0.0,
     "unsupported_claim_rate": 0.0,
-    "valid_evidence_rate": 0.6666666666666666
+    "valid_evidence_rate": 0.6758620689655173
   },
   "targets_met": false,
   "unmet_targets": [

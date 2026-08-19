@@ -293,6 +293,86 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-20T07:00:00Z — Scala is measured; ADR-0067 gets evaluation coverage
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: P1-1 continued. Corpus **69 -> 73 query cases**, `scala_app`
+  admitted to `SUPPORTED_FIXTURES`.
+- **The only source edit is that tuple.** No behaviour change, no version bump,
+  no migration. `SCHEMA_VERSION` 14, `contract_version` `1.1`.
+
+**q072 is the point of the slice.** ADR-0067 shipped Scala member calls that
+morning, and until now **a unit test was the only thing pinning them** — no
+metric could see the capability at all, so `relation_path_recall` and the
+evidence rates were blind to a ruling made hours earlier.
+
+**Mutation-checked, and it discriminates exactly.** Blinding the extractor to
+the supplementary query fails **q072 alone**; q070, q071 and q073 correctly stay
+green. That is a case doing precisely the job it was written for, rather than a
+case that happens to pass.
+
+**I nearly "fixed" a correct case, and the check that stopped it is the
+transferable part.** My probe compared `ranked_symbols[0]` against
+`expected_symbols[0]` and reported q073 as failing. Before changing anything I
+compared it with its Java twin **q069** and its Python analogue **q058**: both
+have the *identical* shape — expected `[subject, target]`, ranked `[target]` —
+and both pass today. So the metric does not score what my probe scored. The real
+scorer then confirmed `exact_symbol_resolution` **1.0000 across 59 cases**.
+
+**Check what the harness actually measures before believing a hand-rolled
+comparison of it.** Same family as this session's earlier false negative from
+comparing `changed_symbols` alone, and the same family as this corpus's long
+record of "the instrument was wrong, not the engine" — except here the
+instrument was mine and it was pointed at a case I had just written.
+
+**The denominator tripwire fired for the second time in a day** (55 -> 59), and
+the margin is *still* unchanged: one miss scores 0.9831 and clears 0.98, two
+score 0.9661 and fail. **The corpus has grown 51 -> 59 without ever buying
+slack** — worth restating on every growth, because a widening denominator is the
+easiest way to make a target look met.
+
+- Files: `tests/evaluation/cases/fixtures/scala_app/` (new, 2 files),
+  `queries.json` (q070-q073), `dataset.json`,
+  `src/codeatlas/evaluation/engine_adapter.py`, four count guards,
+  `test_threshold_granularity.py`, the three regenerated baselines,
+  `documentation/memory.md`, this file.
+
+**Verification.**
+
+| Check | Result |
+| --- | --- |
+| `check_phase4.ps1 -SkipSync` | **exit 0**, `GATE_LASTEXITCODE=0` — **2344 passed, 3 skipped** |
+| `run_evaluation.py validate` | valid — **9 fixtures / 73 query / 29 change** |
+| `test_expectations_name_real_symbols.py` (ADR-0036) | 5 passed |
+| `exact_symbol_resolution` | **1.0000** over 59 scored cases |
+| `unmet_targets` | `['changed_symbol_precision']` — unchanged, still the structural miss |
+| Mutation: ignore `references_query` | **q072 alone fails** |
+
+Gold was declared by reading the fixture source **before** the engine ran
+against it; the engine then emitted the same four ranges, and a fifth symbol —
+`OrderService.payments`, the constructor parameter — that the reading had not
+anticipated.
+
+**Movements.** Evidence rates rose again (containing 0.7589 -> 0.7655, exact
+0.6667 -> 0.6759) because Scala's declared ranges match the engine exactly, as
+Java's did. Two small dips — `ndcg_at_10` -0.0012, `symbol_recall_at_10` -0.0014
+— are the known cost of the q055-q058 convention that declares both ends of a
+relation while `ranked_symbols` carries one.
+
+**Limitations.**
+
+- **Four cases over a two-file fixture**, and **no Scala change case**, so
+  changed-symbol detection on Scala is still unmeasured.
+- Nothing measures Scala traits, objects, pattern matching, or implicits.
+- **Go and Rust remain unwritten.** They are *not* blocked — ADR-0066 declined
+  Go's import policy rather than deferring it — so this is unfinished work
+  rather than a dependency.
+- A Scala method still reports as `FUNCTION` (ADR-0065's declared limit); q071
+  records that in its own `limitations` rather than asserting the kind.
+
+- Next: Go and Rust cases finish the language coverage. Then P1-3's §12
+  divergences, and the smaller items.
+
 ### 2026-08-20T05:00:00Z — Package rebuilt at parser 1.6.0; the fixed build script holds
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

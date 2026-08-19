@@ -19,7 +19,7 @@ def test_validate_command_reports_dataset_counts(capsys: object) -> None:
 
     assert exit_code == EXIT_SUCCESS
     output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert '"query_cases": 69' in output
+    assert '"query_cases": 73' in output
     assert '"change_cases": 29' in output
 
 
@@ -42,7 +42,7 @@ def test_null_baseline_writes_stable_json_and_markdown(tmp_path: Path) -> None:
     assert exit_code == EXIT_SUCCESS
     payload = json.loads(json_output.read_text(encoding="utf-8"))
     assert payload["implementation_status"] == "not_implemented"
-    assert payload["case_counts"] == {"changes": 29, "queries": 69}
+    assert payload["case_counts"] == {"changes": 29, "queries": 73}
     assert "# CodeAtlas Evaluation Report" in markdown_output.read_text(
         encoding="utf-8"
     )

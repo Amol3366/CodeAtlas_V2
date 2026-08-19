@@ -1714,6 +1714,46 @@ of a status list is how they drift, which is the `--format pr` and
       share the engine and loader with Java and Scala, which is an argument
       rather than a measurement.
 
+- [x] **Scala is measured; ADR-0067 now has evaluation coverage (2026-08-19).**
+      Corpus **69 -> 73 query cases**, `scala_app` admitted. The only source
+      edit is `SUPPORTED_FIXTURES`; no behaviour change, no version bump.
+
+      **q072 is the point of the slice.** ADR-0067 shipped Scala member calls
+      that morning, and until now a **unit test was the only thing pinning
+      them** — no metric could see the capability at all. Mutation-checked:
+      blinding the extractor to the supplementary query fails **q072 alone**,
+      while q070/q071/q073 correctly stay green. That is the case doing exactly
+      the job it was written for.
+
+      **I nearly "fixed" a correct case, and the check that saved it is the
+      lesson.** My probe compared `ranked_symbols[0]` against
+      `expected_symbols[0]` and called q073 a failure. Before touching it I
+      compared against its Java twin **q069** and its Python analogue **q058** —
+      both have the *identical* shape (expected `[subject, target]`, ranked
+      `[target]`) and both pass today. So the metric does not score what my
+      probe scored. Running the real scorer confirmed
+      `exact_symbol_resolution` **1.0000 at 59 cases**.
+
+      **Check what the harness measures before believing a hand-rolled
+      comparison of it** — the same family as the earlier false negative from
+      comparing `changed_symbols` alone, and the reason this corpus has a
+      documented history of "the instrument was wrong, not the engine".
+
+      **Evidence rates rose again** — containing 0.7589 -> 0.7655, exact
+      0.6667 -> 0.6759 — because Scala's declared ranges match the engine
+      exactly, as Java's did. Two small dips (`ndcg` -0.0012,
+      `symbol_recall_at_10` -0.0014) are the known cost of the q055-q058
+      convention that declares both ends while `ranked_symbols` carries one.
+
+      **The denominator tripwire fired for the second time in a day** (55 ->
+      59) and the margin is *still* unchanged: one miss scores 0.9831 and
+      clears 0.98, two score 0.9661 and fail. **The corpus has grown 51 -> 59
+      without ever buying slack**, which is the property worth stating whenever
+      it grows.
+
+      Go and Rust remain unwritten — **not blocked**, since ADR-0066 declined
+      Go's import policy rather than deferring it. They are the next slice.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
