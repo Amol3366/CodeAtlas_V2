@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 ## Current Phase
 
@@ -3049,13 +3049,50 @@ Carried into gate approvals as declared work rather than dropped:
 
 ## Next Up
 
-**Current, as of 2026-08-19.** The Deferred Register in `docs/plans/PLAN.md` is
+**Current, as of 2026-08-20.** The Deferred Register in `docs/plans/PLAN.md` is
 the authority on what is open; this is a pointer, not a third copy.
 
-**ADR-0065 is DELIVERED — Java, Go, Rust and Scala all ship** (2026-08-19), on
-branch `query-backed-language-support`, **not merged to `main`**.
+### Where things stand
 
-**Start here tomorrow, in order:**
+**ADR-0065 is delivered, merged, measured and packaged.** Java, Go, Rust and
+Scala ship on `main`; both limits it carried are ruled (ADR-0066 declined Go's
+import policy, ADR-0067 widened the profile contract for Scala); all four have
+query *and* change evaluation cases; and the packaged artifact is rebuilt and
+verified at parser `1.6.0`.
+
+Corpus is **80 query / 32 change cases over 11 fixtures**. Versions: parser
+`1.6.0`, chunker `1.1.0`, resolver `1.5.0`, `SCHEMA_VERSION` 14,
+`contract_version` `1.1`. Last gate: `check_phase4.ps1 -SkipSync` exit 0,
+**2350 passed, 3 skipped, no xfails**.
+
+### Two decisions are waiting on the user
+
+1. **`unmet_targets` is empty and nothing was fixed.** `changed_symbol_precision`
+   crossed 0.95 by **dilution** — c020/c021/c022 still score exactly 0.50 each,
+   and the denominator moved 29 -> 32. **Never cite "all Section 19.3 targets
+   met" without this.** Decide: gate per-case, report the imperfect count beside
+   the aggregate, or accept it explicitly.
+2. **`AGENTS.md` §12 disagrees with the implementation** on two route shapes and
+   one unimplemented endpoint. Move the contract or move the code; §25 makes it
+   an approval matter. (§5's language profile needs no decision — an approved
+   ADR changed it — and is simply unwritten work.)
+
+### Startable without anyone
+
+The plan is `docs/superpowers/plans/2026-08-20-remaining-work.md`. Next in it:
+**P2-B**, widening the LF guard beyond `tests/evaluation` — the sibling of the
+README guard, and the reason 18 files drifted unnoticed. Then `SECURITY.md`
+(still GitHub boilerplate), the stale zip, the merged branch, and `AGENTS.md` §5.
+
+**One environment note before running anything:** the suite now takes ~16 minutes
+rather than ~6, because a packaged artifact exists and the semantic extras are
+installed, so the packaged e2e tests **run rather than skip**. That is more
+coverage, not a regression — but a run that looks hung probably is not.
+
+---
+
+**The three items below are DONE and are kept for their reasoning**, which is the
+reusable part. They were the resume point on 2026-08-19.
 
 1. ~~**Re-run `scripts/check_phase4.ps1 -SkipSync` and read the whole log.**~~
    **DONE 2026-08-19 — the gate is GREEN on this branch for the first time:
@@ -3109,7 +3146,7 @@ branch `query-backed-language-support`, **not merged to `main`**.
 3. **Decide whether to merge to `main`.** Both version bumps land in one
    reindex; nothing is merged yet.
 
-**The largest gap: no evaluation case measures any of the four languages.**
+~~**The largest gap: no evaluation case measures any of the four languages.**~~ **CLOSED 2026-08-19/20 — all four are measured; see the entries above.** Kept for its reasoning:
 Unit, integration and security tests are coverage, not measurement, and the
 Section 19.3 target table still says nothing about Java, Go, Rust or Scala. No
 fixture was added to `SUPPORTED_FIXTURES`, deliberately — ADR-0017's guard

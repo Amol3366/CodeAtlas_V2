@@ -163,6 +163,37 @@ at the activation gate). Evidence: ADR-0009, migrations `0010`–`0011`,
 
 ## Post-Gate Work (no phase)
 
+> **2026-08-19/20 — language support, ADR-0065 to ADR-0067.** The largest
+> post-gate change since Phase 7. **Java, Go, Rust and Scala** now run on one
+> shared query-backed parser engine: each grammar's own `tags.scm` plus an
+> `imports.scm` authored here, behind a ~150-line adapter. They get symbols,
+> qualified names, `IMPORTS`, `CALLS`, `INHERITS`, `IMPLEMENTS`, `REFERENCES`
+> and **changed-symbol detection** — but **no test edges and no route
+> detection**, so preflight on them is materially thinner than on Python. That
+> is a two-tier language model, not seven equal languages.
+>
+> **Both limits ADR-0065 carried were ruled and closed.** ADR-0066 **declines**
+> a Go import matching policy permanently: the prefix lives in `go.mod`, which a
+> single-file parse cannot read, and trimming wrongly would make a third-party
+> path resolve onto local code — inventing a relationship §4.1 forbids.
+> ADR-0067 **closes** Scala's member-call gap by giving `LanguageProfile` an
+> optional second authored query. **The two went opposite ways because of where
+> the missing information lives** — Go's is in a file the parser may not read;
+> Scala's was in the syntax tree and only a query was missing.
+>
+> All four are measured: the corpus is **80 query / 32 change cases over 11
+> fixtures**. `PARSER_BUNDLE_VERSION` reached **1.6.0** and `RESOLVER_VERSION`
+> **1.5.0**, so every snapshot went stale twice and users reindex.
+> `SCHEMA_VERSION` stayed **14** and `contract_version` **1.1** throughout — no
+> migration, no contract change.
+>
+> **A critical packaging defect was found by rebuilding**: the grammars' own
+> `tags.scm` and this repository's `*.imports.scm` are *data*, which PyInstaller
+> never finds by analysis, so the packaged artifact **could not run at all** —
+> `doctor` and `repo add` both died and only `--help` worked. Fixed, guarded at
+> gate level, and a packaged test now parses Java through the binary.
+
+
 Delivered after Phase 7's gate, recorded in the handoff log rather than as
 reopened tasks.
 

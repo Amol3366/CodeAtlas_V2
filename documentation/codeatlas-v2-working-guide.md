@@ -1,6 +1,6 @@
 # CodeAtlas V2 Working Guide
 
-Status: current orientation document as of 2026-08-07
+Status: current orientation document as of 2026-08-20
 
 Authority note: this file explains CodeAtlas V2 in one readable place. The
 release-blocking contract is `../AGENTS.md`; live task status is
@@ -490,21 +490,32 @@ features include:
 - inline citation buttons and an on-demand evidence panel;
 - ephemeral session mode;
 - packaged Windows build;
-- backup, restore, upgrade, watcher, recovery, and release validation flows.
+- backup, restore, upgrade, watcher, recovery, and release validation flows;
+- **Java, Go, Rust and Scala** on one shared query-backed parser (ADR-0065),
+  with both of its declared limits since ruled (ADR-0066, ADR-0067) and all
+  four languages covered by query *and* change evaluation cases.
 
-Schema version is 14. Contract version is 1.1.
+Schema version is 14. Contract version is 1.1. Parser bundle 1.6.0, chunker 1.1.0, resolver 1.5.0.
 
 ## Known Limits and Open Gaps
 
 These are not hidden:
 
-- Language coverage is focused on Python, TypeScript, JavaScript, Markdown, and
-  common config/schema formats. A repository in any other language yields no
-  symbols and no relations. **Java, Go, Rust and Scala shipped 2026-08-19
-  (ADR-0065)** through one shared query-backed parser — symbols, calls,
-  references and changed-symbol detection, but no test edges and no route
-  detection. Two declared limits: a Go *import* resolves `external` pending a
-  matching policy, and Scala captures only calls to a bare identifier.
+- **Language coverage is two tiers.** Python, TypeScript and JavaScript get the
+  full engine. **Java, Go, Rust and Scala** (ADR-0065) get symbols, qualified
+  names, imports, calls, references and changed-symbol detection — but **no test
+  edges, no route detection, and no configuration or schema edges**, so change
+  preflight on them is materially thinner. Everything else — C#, Kotlin, Ruby,
+  PHP, Swift, C/C++ — yields no symbols and no relations.
+
+  Both limits ADR-0065 declared are now **ruled**. A **Go import stays
+  `external`, permanently** (ADR-0066): the prefix lives in `go.mod`, which a
+  single-file parse cannot read, and trimming wrongly would resolve a
+  third-party path onto local code. **Scala member calls are captured**
+  (ADR-0067) via a second authored query on the profile. Remaining declared
+  quirks: a Go interface reads as `CLASS`, a Scala method as `FUNCTION`, and
+  none of the four is classified at statement level, so every body change
+  reports `PUBLIC_BEHAVIOR_CHANGED`.
 - The packaged executable is unsigned.
 - Some Chromium conversation-route Playwright tests are skipped because of a
   browser renderer crash; Firefox proves the workflow.

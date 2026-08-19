@@ -1,6 +1,6 @@
 # Architecture — CodeAtlas
 
-Status: current as of 2026-08-07
+Status: current as of 2026-08-20
 Normative source: `AGENTS.md` Sections 6–17. This file is the navigable map;
 that file is the contract.
 
@@ -97,7 +97,7 @@ CodeAtlas_V2/
 │   │   └── query_backed/                   # ADR-0065: one engine + per-language adapters
 │   │       ├── engine.py                   #   runs tags.scm, builds SymbolRecords
 │   │       ├── profile.py                  #   LanguageProfile / LanguageAdapter
-│   │       ├── queries/                    #   imports.scm authored here
+│   │       ├── queries/                    #   imports.scm + scala.references.scm
 │   │       └── languages/                  #   java.py, go.py, rust.py, scala.py
 │   ├── extraction/                         # symbols and relations
 │   ├── chunking/                           # logical chunk identity and versions
@@ -116,13 +116,24 @@ CodeAtlas_V2/
 │   ├── unit/ integration/ contract/ end_to_end/
 │   ├── security/ retrieval/ evaluation/ fixtures/
 ├── docs/
-│   ├── adr/                                # 0000-template + ADR-0001..0015
+│   ├── adr/                                # 0000-template + ADR-0001..0067
 │   ├── api/ · evaluation/ · operations/ · security/
 │   └── plans/PLAN.md                       # LIVE task status — the coordination file
 ├── documentation/                          # this folder: PRD, architecture, rules, phases, design, memory
 ├── packaging/
 └── scripts/                                # check_phaseN.ps1, baselines, perf, setup, packaging
 ```
+
+> **The two ADR-0065 limits are ruled.** A **Go import stays `external`**
+> permanently (ADR-0066) — its prefix lives in `go.mod`, which a single-file
+> parse may not read, and trimming wrongly would resolve a third-party path onto
+> local code. **Scala member calls are captured** (ADR-0067) through an optional
+> second authored query: `LanguageProfile.references_query`, which Java, Go and
+> Rust leave `None`. That slot is the only contract change either ruling made.
+>
+> The four query-backed languages produce **no test edges, no route detection,
+> and no configuration or schema edges**, and none is classified at statement
+> level — so every body change in them reports `PUBLIC_BEHAVIOR_CHANGED`.
 
 ### Rules of thumb
 
@@ -152,6 +163,8 @@ explicit; schema is never mutated at startup.
   in `.env` (ADR-0011), because an unknown OpenAI id also needs a declared width.
 - `Snapshot` — id, repository, Git HEAD, working-tree fingerprint, lifecycle
   state, parser/chunker/index versions. **Exactly one is active per repository.**
+  Current stamps: parser bundle **1.6.0**, chunker **1.1.0**, resolver **1.5.0** —
+  a change to any one makes every existing snapshot stale and forces a reindex.
 - `FileRecord` — stable logical id, snapshot membership, normalized relative
   path, content hash, language, classification, line map.
 - `Symbol` — stable logical id + version id, kind, qualified name, signature,
@@ -351,6 +364,6 @@ wanted.
 | Topic | File |
 | --- | --- |
 | Live task status | `docs/plans/PLAN.md` |
-| Decisions and their rationale | `docs/adr/0001`–`0015` |
+| Decisions and their rationale | `docs/adr/0001`–`0067` |
 | Chunking, search, graph, change analysis | `docs/operations/*.md` |
 | Measured numbers and their caveats | `docs/evaluation/*.md` |

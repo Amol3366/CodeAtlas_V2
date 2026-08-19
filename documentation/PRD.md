@@ -1,6 +1,6 @@
 # PRD — CodeAtlas
 
-Status: current as of 2026-08-07
+Status: current as of 2026-08-20
 Authority note: this file describes the product in plain language. The
 release-blocking contract is `AGENTS.md`; the deep technical rationale is
 `CODEATLAS_INDUSTRY_BLUEPRINT_2026.md`. Where this file and `AGENTS.md`
@@ -79,10 +79,14 @@ unless the user explicitly says otherwise, per repository.
 - **No multi-user tenancy, RBAC, billing, or enterprise control plane.**
 - **No GitHub/GitLab or CI integration.**
 - **No network exposure beyond loopback.**
-- **No new languages beyond Python, TypeScript, and JavaScript** (plus Markdown
-  and common config/schema formats) without an approved ADR. **ADR-0065 approved
-  Java, Go, Rust and Scala on 2026-08-19 and all four shipped the same day**, so
-  the boundary is now seven languages plus Markdown and config.
+- **No new languages without an approved ADR.** ADR-0065 approved **Java, Go,
+  Rust and Scala** on 2026-08-19; all four shipped, merged, and are measured. The
+  boundary is now **seven languages plus Markdown and config — in two tiers**.
+  Python, TypeScript and JavaScript get the full engine. The four query-backed
+  languages get symbols, imports and calls, and **no test edges, no route
+  detection, and no configuration or schema edges** — so change preflight on them
+  is materially thinner, and no surface should imply otherwise. C#, Kotlin, Ruby,
+  PHP, Swift and C/C++ remain out; each needs its own §25 approval.
 - **No PostgreSQL, message broker, microservices, or Kubernetes.** SQLite is the
   system of record.
 
