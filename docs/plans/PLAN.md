@@ -91,7 +91,7 @@ with verification.
 | ~~**A `Finding` carries no subject or file path** (ADR-0042 follow-up 1)~~                              | **CLOSED 2026-08-17 — ADR-0054, and the rendering problem was the symptom.** `_finding_citations` keyed changed symbols on `qualified_name` **alone**, so two modules each defining `total` collapsed to whichever the dict comprehension saw last: **the finding about `billing.py` cited lines in `orders.py`**. A §4.1 violation — the citation does not support the claim — and **ADR-0042's own rule ("pair within the file first") reaching a surface that ruling did not touch**. `FindingDraft` now carries `subject_file`, and a symbol draft resolves **only** by location, with no name fallback, because a wrong citation still renders as a valid finding. `Finding` gains optional `subject`/`file_path` **derived from the citation, never stored** — `change_findings` has no such columns, storing them would be a second copy that can disagree, and deriving means no migration and no drift. Surfaced in JSON, Markdown, PR, the CLI verdict and the web list; SARIF needed nothing, already carrying the location in `artifactLocation`. `contract_version` stays `1.1`, `SCHEMA_VERSION` stays 14                                                                                                                                                                                | —                                                                                                                                                                          |
 | **A gated intent left the denominator, flattering six metrics**                                            | **CLOSED 2026-08-17 — ADR-0053.** `CONCEPTUAL` was absent from `SUPPORTED_INTENTS`, so `predict_exact_symbols` emitted `_abstention(measured=False)` and the case **never reached the engine**. **q024 had never been measured**; ADR-0051 put q006 in the same state hours earlier. This is ADR-0017 on the neighbouring constant, failing the **opposite** way — a gated *fixture* scores `False` and stays in the denominator as a miss, a gated *intent* **leaves** it, so the omission removed a failing case from the average instead of reporting capability as failure. Under-reporting is loud and gets found; flattering is silent. Corrected: `relation_path_recall` 0.9130 → **0.8750**, `relation_path_correctness` 0.8261 → 0.7917, `primary_evidence_recall_at_10` 0.9471 → 0.9310, `exact_evidence_rate` 0.6880 → 0.6591, `ndcg_at_10` and `symbol_recall_at_10` down; `exact_symbol_resolution` **1.0000 unchanged** and `unmet_targets` unchanged. **ADR-0051's conclusion survives** — q006 measured through lexical gives 0.9943, confirming it does pass containment — **but its evidence did not establish it**, and that is recorded as the correction                                                                                                     | —                                                                                                                                                                          |
 | ~~**Ranking sensitivity needs distractors, not larger answer sets**~~                                          | **CLOSED 2026-08-17 — ADR-0059. Ruled: a graph expectation declares direct results only**, which is what makes `exact_symbol_resolution` a ranking gate rather than only a resolution gate — a true indirect result left undeclared means the metric asks whether the *direct* answer ranks first. **The row's own model was wrong twice over.** Sensitivity is **not** structurally unavailable for a correctly-specified direct case: it needs a **two-hop chain**, and `symbol_breadth` had none — nothing called `run_pipeline` or `test_pipeline_advances`. A fixture-shape limit, not a structural one. And the counts had drifted from the recorded "9 sensitive, 9 distractors, the same 9" to **11, 12, and not the same set**, partly through ADR-0051, ADR-0053 and ADR-0057. Fixed: q015 corrected on ADR-0036 grounds, `start_pipeline` added for a two-hop chain, q065 added to query it. **q053 is now the first post-2026-08-15 case to be reversal-sensitive**; the symbol-intent sensitive set is q003, q005, q015, q053 | —                                                                                                                                                    |
-| **Chromium Playwright tests now FAIL, not just skip — and it reproduces on `main`**                             | **OPEN — environmental, found 2026-08-18, and explicitly not caused by the change that found it.** The register has recorded seven Chromium *skips* since 2026-08-11; these are **failures**. Two full runs of the same tree gave **different failure sets** — 3 failed / 12 passed, then 2 failed / 13 passed — which is a flake signature, and `stream-reconnection.spec.ts:140` passes when run alone. But **`settings.spec.ts:248` ("a repository whose policy transmits shows the warning, the budget, and its coverage") fails reproducibly in isolation**, and **fails identically on `main` with this branch's changes stashed** — so it is pre-existing, not a regression. It also passed in a full `check_phase7 -Semantic` run earlier the same day (15 passed / 7 skipped / 0 failed), so it is state- or load-dependent rather than constant. Prime suspect is residue: the suite starts a backend on a loopback port and the failing test is about a repository *policy*, which is persisted. **Not diagnosed further here**, because the change under test touched no source and the failure predates it | Someone reproduces it from a clean state and names the mechanism, or it starts failing on a tree where it previously passed twice |
+| **Chromium Playwright tests now FAIL, not just skip — and it reproduces on `main`** | **REPRODUCED AND MECHANISM NAMED 2026-08-19; the disposition is now a decision, not an investigation.** The row's reopening condition was "someone reproduces it from a clean state and names the mechanism". Both are done, and **its prime suspect was wrong**. **The mechanism:** Chromium's renderer **crashes** (`Protocol error (Runtime.callFunctionOn): Page crashed`) while rendering the Settings **Embedding provider** fieldset for a repository whose policy transmits. The trace shows `goto /settings` completing and the `settings-repository` assertion *passing* first, so the page mounts and the header renders before the renderer dies. **Ruled out, each by measurement rather than argument:** *residue* — the register's prime suspect — reproduces with `.e2e-tmp` deleted, so no persisted policy survives; *a stale bundle* — reproduces against a freshly built `dist`, the trap this project has hit twice before; *a flake* — **five runs, five failures**, in isolation and in the full suite; *the headless shell* — `--headed` crashes identically. **Firefox renders the same tree correctly**, twice. **A correction to the docs came out of it:** `docs/operations/end-to-end-tests.md` claimed "the identical tree renders correctly on a full page load on both engines", which is why this test was written with `page.goto` and left unskipped. **That is false** — the crash reaches it through a full document navigation too. Corrected there. **Clean full Chromium run: 7 skipped, 3 passed, 1 failed.** The failure is real and reddens the gate. **Deliberately not fixed here:** the consistent remedy is the existing skip helper that already covers seven tests for this same renderer defect, but `documentation/rules.md` forbids skipping a test to make a build pass, so that is the user's call rather than mine. The alternative is changing the app to avoid whatever Chromium chokes on, which is a product change for a browser bug. | A ruling on skip-vs-change, or Chromium ships a version that renders the branch |
 | **A `CALLERS` expectation may name its own subject**                                                        | **OPEN — narrower than what ADR-0059 ruled, and deliberately left.** q005 expects `IdempotencyStore.claim` among the callers of `IdempotencyStore.claim`, and q053 expects `OrderPipeline.advance` among its own; nothing calls itself here, so both lose recall for declaring it. **This is not the ADR-0018 violation it first appears to be** — that record explicitly allows a self-referential case ("absent means `expected_symbols[0]`, which is correct for every exact, lexical, and self-referential case") and separately records that module-scoped queries *do* return the subject first. **A first reading that nine cases contradicted ADR-0018 was wrong and is corrected here rather than acted on** | Someone rules whether a caller/dependency expectation may name its own subject                                                                       |
 | ~~original entry~~                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
 | **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone adds cases whose answer sets are large enough for order to matter                                                                                                   |
@@ -290,6 +290,84 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-19T19:30:00Z — P1-4: the Chromium failure reproduced, and its prime suspect was wrong
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: P1-4 of the post-ADR-0065 program. **Investigation only — no
+  source, test, corpus, contract, schema or version change.** The only edits are
+  this file, `documentation/memory.md`, and one corrected paragraph in
+  `docs/operations/end-to-end-tests.md`.
+
+**The register row asked for a reproduction from a clean state and a named
+mechanism. Both are delivered, and the row's own prime suspect is disproved.**
+
+**Mechanism.** Chromium's renderer **crashes** — `Protocol error
+(Runtime.callFunctionOn): Page crashed` — while rendering the Settings
+**Embedding provider** fieldset for a repository whose policy transmits. The
+trace is specific: `goto /settings` completes and the `settings-repository`
+assertion **passes**, so the page mounts and the header renders *before* the
+renderer dies. This is a crash, not a failed expectation — which is the fact the
+row's "prime suspect is residue" framing missed, and it was visible in a saved
+`error-context.md` the whole time.
+
+| Hypothesis | Status | Ruled out by |
+| --- | --- | --- |
+| Residue — a persisted repository policy (**the row's prime suspect**) | **false** | reproduces with `.e2e-tmp` deleted, so no policy survives |
+| A stale `apps/web/dist` bundle | **false** | reproduces against a freshly built bundle (`vite build`, 3.41 s) |
+| A flake | **false** | **five runs, five failures** — isolation and full suite |
+| The Playwright headless shell | **false** | `--headed` crashes identically |
+
+**Firefox renders the identical tree correctly**, both tests, twice. So it is a
+browser defect rather than application logic.
+
+**A documented claim that shaped the test turned out to be false.**
+`docs/operations/end-to-end-tests.md` stated that "the identical tree renders
+correctly on a full page load on both engines" — which is *why*
+`settings.spec.ts:248` was written with `page.goto` and left unskipped while
+seven neighbours are skipped. It is not true: the crash reaches it through a
+full document navigation too. Corrected in that file, with the measurement
+beside it rather than a bare edit.
+
+**This is the third recorded instance of a written-down diagnosis being wrong**
+(the 2026-08-15 entry holds two more, one of which named a *fix* that would have
+been wrong). **A remedy written into the register is still a hypothesis.**
+
+**Clean full Chromium run: 7 skipped, 3 passed, 1 failed.** The failure is real
+and does redden the gate; it is not absorbed by the existing skips.
+
+**Deliberately not fixed, and the reason is a rule rather than caution.** The
+consistent remedy is the skip helper that already covers seven tests for this
+same renderer defect, with Firefox providing the coverage. But
+`documentation/rules.md` says *do not delete, skip, or weaken a test to make a
+build pass* — so applying it is a **ruling**, not a cleanup, and it is the
+user's to make. The alternative is changing application code to avoid whatever
+Chromium chokes on, which is a product change made for a browser bug.
+
+**Verification.**
+
+- `playwright test settings.spec.ts --project=chromium` — **runs 1-3 from a
+  cleaned `.e2e-tmp`**, all `1 failed, 1 skipped`, identical crash.
+- Run 4 after `vite build` — same.
+- `--headed` — same.
+- `--project=firefox` — **2 passed**.
+- Full `--project=chromium` from clean state — `1 failed, 7 skipped, 3 passed`.
+- Trace extracted from `trace.zip` and read for the action sequence; full logs
+  kept per run rather than piped through a tail, which is how the previous
+  attempt lost its evidence.
+
+**Limitations.**
+
+- **The crash is localised to the fieldset, not to a line.** Narrowing further
+  means bisecting that component's DOM or CSS, which edits product code to chase
+  a browser bug and was deliberately not started.
+- Chromium build is Playwright 1.62's `chromium-1234`. **Not retested against
+  another Chromium build**, so "upstream defect" remains the inherited
+  characterisation rather than something proven here.
+- No upstream issue was searched for or filed.
+
+- Next: **user decision** — skip it like its seven neighbours, or change the
+  component. Unrelated and unchanged: the two ADR-0065 rulings and the merge.
 
 ### 2026-08-19T17:00:00Z — Java changed-symbol detection is measured (c029)
 

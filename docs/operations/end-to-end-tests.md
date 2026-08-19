@@ -63,11 +63,20 @@ prove less than suites that exercise the one users run.
 | `settings.spec.ts` | The settings route against the real API: the provider list and each provider's availability, `POST /v1/models/test` reporting `PROVIDER_DISABLED`, a `PATCH` that survives a reload, and — with a transmitting policy set through the API — the warning, the stored budget, and real coverage numbers. |
 
 The settings suite reaches the transmitting rendering by loading `/settings`
-directly rather than clicking into it. Chromium kills its renderer when a
-*client-side* navigation mounts that branch; the identical tree renders
-correctly on a full page load on both engines. Loading the URL keeps the
-assertion running everywhere instead of skipping the browser most people use.
-The isolation evidence is in the suite's header comment.
+directly rather than clicking into it, because Chromium kills its renderer when
+a *client-side* navigation mounts that branch.
+
+> **The second half of this paragraph was measured false on 2026-08-19 and is
+> corrected here.** It used to read "the identical tree renders correctly on a
+> full page load on both engines". It does not. `settings.spec.ts:248` uses
+> `page.goto("/settings")` — a full document navigation — and **Chromium's
+> renderer still crashes**, deterministically: five runs from a clean state, in
+> isolation and in the full suite, headed and headless, against a freshly built
+> bundle. Firefox renders the same tree correctly.
+>
+> **A full page load is therefore not a workaround for this branch**, only for
+> the conversation routes. The reproduction and the ruled-out hypotheses are the
+> Deferred Register row in `docs/plans/PLAN.md`.
 
 The transmitting policy is set on whichever repository a fresh load will show,
 and restored in a `finally` block — the database outlives the test.
@@ -92,10 +101,19 @@ pnpm exec playwright show-trace test-results/<test-dir>/trace.zip
 Chromium and Firefox; WebKit is untested. The suites cover the three workflows
 Phase 5 deferred plus the settings route, rather than the whole of Section 14.
 
-Four conversation-route tests are skipped on Chromium, whose renderer crashes on
-client-side navigation to `/conversations/{id}` (`e2e/support/chromium-crash.ts`).
-Firefox proves all of them. The settings suite needs no such skip: it avoids the
-one client-side navigation Chromium cannot survive.
+Tests are skipped on Chromium wherever its renderer crashes
+(`e2e/support/chromium-crash.ts`); Firefox proves all of them. A clean full run
+on 2026-08-19 counted **seven skipped, three passed, and one failed** — count it
+from the run rather than copying a number forward, which this document has
+already had to correct once.
+
+**The one failure is `settings.spec.ts:248`, and it is not skipped.** It used to
+be described here as needing no skip because it avoids client-side navigation.
+That reasoning was measured false: the crash reaches it through a full document
+navigation too, so the suite has an unskipped test failing on a browser defect.
+**Whether it joins the skip helper is a decision, not a cleanup** — this project
+forbids skipping a test to make a build pass, so it is recorded in the Deferred
+Register with its reproduction rather than quietly silenced.
 
 The stream suite proves the transport contract as a browser sees it. It does not
 prove the conversation UI reconnects mid-run, because submission runs inline and

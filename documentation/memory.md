@@ -1432,6 +1432,52 @@ of a status list is how they drift, which is the `--format pr` and
       row goes last**; their comments say so and c025-c028 are already ordered
       that way.
 
+- [x] **The Chromium e2e failure reproduced and its mechanism named (P1-4,
+      2026-08-19).** Investigation only — **no source, test, corpus, or
+      contract change**. The register row's reopening condition was "someone
+      reproduces it from a clean state and names the mechanism"; both are done,
+      and **the row's own prime suspect was wrong**.
+
+      **The mechanism.** Chromium's renderer *crashes* — `Protocol error
+      (Runtime.callFunctionOn): Page crashed` — while rendering the Settings
+      **Embedding provider** fieldset for a repository whose policy transmits.
+      The trace shows `goto /settings` completing and the `settings-repository`
+      assertion **passing** first, so the page mounts and the header renders
+      before the renderer dies. It is a crash, not a failed assertion, which is
+      the fact the row's framing missed.
+
+      **Four hypotheses ruled out by measurement rather than argument:**
+
+      | Hypothesis | Ruled out by |
+      | --- | --- |
+      | Residue (the row's prime suspect: a persisted repository policy) | reproduces with `.e2e-tmp` deleted |
+      | A stale `dist` bundle (a trap hit twice before) | reproduces against a freshly built bundle |
+      | A flake | **five runs, five failures**, isolation and full suite |
+      | The Playwright headless shell | `--headed` crashes identically |
+
+      **Firefox renders the same tree correctly**, twice — so it is a browser
+      defect, not application logic.
+
+      **The register's residue guess is the third time a written-down diagnosis
+      has been wrong here** (the 2026-08-15 entry records two more, one of which
+      named a fix that would have been wrong). *A remedy written into the
+      register is still a hypothesis*, and the cost of following one is a
+      session spent on the wrong layer — the same cost as the 2026-08-05 stale
+      Settings incident.
+
+      **It also falsified a documented claim that shaped the test.**
+      `docs/operations/end-to-end-tests.md` said "the identical tree renders
+      correctly on a full page load on both engines", which is *why*
+      `settings.spec.ts:248` was written with `page.goto` and left unskipped.
+      It is false: the crash reaches it through a full document navigation too.
+      Corrected there, with the measurement beside it.
+
+      **Deliberately not fixed.** The consistent remedy is the skip helper that
+      already covers seven tests for this same defect — but `rules.md` forbids
+      skipping a test to make a build pass, so that is a ruling, not a cleanup.
+      A clean full Chromium run is **7 skipped, 3 passed, 1 failed**, so the
+      failure is real and does redden the gate.
+
 - [x] **CRLF drift is wider than documentation — it is in source too
       (2026-08-19).** The earlier entry recorded nine Markdown files. The full
       count is **18**: twelve `.py` files plus the six remaining `.md`, and the
