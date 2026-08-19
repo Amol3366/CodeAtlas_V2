@@ -1533,6 +1533,40 @@ of a status list is how they drift, which is the `--format pr` and
       LF guard beyond `tests/evaluation`**, which is why it is a P2 item and not
       a cleanup.
 
+- [x] **ADR-0065 merged to `main` (2026-08-19).** 26 commits, 66 files, 6,424
+      insertions — Java, Go, Rust and Scala on the shared query-backed engine,
+      plus the first evaluation cases for a query-backed language. Merged
+      `--no-ff`, this repository's convention. **`SCHEMA_VERSION` stays 14, no
+      migration, `contract_version` stays `1.1`; `PARSER_BUNDLE_VERSION` and
+      `RESOLVER_VERSION` are both `1.5.0`, so every snapshot is stale and every
+      user reindexes once.**
+
+      **The merged tree is byte-identical to the branch tip** (`git diff`
+      returned empty), so the branch's green gate transferred rather than being
+      assumed to. The gate was still re-run on `main`, because a merge to `main`
+      is the worst place to accept "it passed over there".
+
+      **The first post-merge gate failed, and chasing it was right.** e2e came
+      back **13 passes instead of 14**: `restart-persistence` on Firefox expected
+      its own question `IdempotencyStore.claim` and the locator resolved five
+      times to **`PaymentService.capture`** — another suite's question. **Not a
+      timeout and not a timing flake**: the page showed a conversation the test
+      never created, which is a cross-suite leak in the shared `.e2e-tmp`
+      database. Three clean runs afterwards were 14 passed / exit 0, and the
+      second gate on `main` is green.
+
+      **Two things worth carrying.** The failure text *named its own mechanism*
+      — the previous occurrence of this family lost which tests failed to a
+      truncating pipe, so capturing the whole log is what turned an anonymous
+      flake into a register row with evidence. And **nothing was pushed on
+      "probably a flake"**: the push waited for a green gate, which is the only
+      thing that distinguishes a judgement from a hope.
+
+      **The packaged artifact is now stale against `main`** — it predates
+      ADR-0065, is stamped `1.4.0`, and cannot index the four new languages.
+      Rebuilding it is the next item, and it must carry `-SemanticLocal` or it
+      silently becomes a deterministic-only package.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
