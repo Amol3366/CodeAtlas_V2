@@ -187,7 +187,7 @@ def test_null_baseline_is_honest_and_deterministic() -> None:
 
     assert first == second
     assert first.implementation_status == "not_implemented"
-    assert first.case_counts == {"queries": 65, "changes": 28}
+    assert first.case_counts == {"queries": 69, "changes": 29}
     assert first.metrics.exact_symbol_resolution == 0.0
     assert first.metrics.symbol_recall_at_10 == 0.0
     assert first.metrics.mean_reciprocal_rank == 0.0
@@ -224,7 +224,7 @@ def test_markdown_report_contains_status_counts_and_metrics() -> None:
 
     assert "# CodeAtlas Evaluation Report" in rendered
     assert "not_implemented" in rendered
-    assert "| Query cases | 65 |" in rendered
+    assert "| Query cases | 69 |" in rendered
     assert "| Exact symbol resolution | 0.0000 |" in rendered
     assert "not applicable" in rendered
 

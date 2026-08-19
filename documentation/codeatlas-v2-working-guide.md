@@ -499,7 +499,12 @@ Schema version is 14. Contract version is 1.1.
 These are not hidden:
 
 - Language coverage is focused on Python, TypeScript, JavaScript, Markdown, and
-  common config/schema formats.
+  common config/schema formats. A repository in any other language yields no
+  symbols and no relations. **Java, Go, Rust and Scala shipped 2026-08-19
+  (ADR-0065)** through one shared query-backed parser — symbols, calls,
+  references and changed-symbol detection, but no test edges and no route
+  detection. Two declared limits: a Go *import* resolves `external` pending a
+  matching policy, and Scala captures only calls to a bare identifier.
 - The packaged executable is unsigned.
 - Some Chromium conversation-route Playwright tests are skipped because of a
   browser renderer crash; Firefox proves the workflow.

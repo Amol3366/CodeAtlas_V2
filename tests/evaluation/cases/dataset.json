@@ -9,10 +9,11 @@
     {"id":"mixed_app","root":"mixed_app","kind":"mixed-language","snapshots":[{"id":"mixed-v1","members":["backend.py","frontend.ts","docs/flow.md"]}]},
     {"id":"git_changes","root":"git_changes","kind":"git-change","snapshots":[{"id":"git-base","members":["base/service.py"]},{"id":"git-target","members":["target/processor.py"]}]},
     {"id":"malicious_unsupported","root":"malicious_unsupported","kind":"security","snapshots":[{"id":"security-v1","members":["source/malformed.py","content/untrusted.md","content/safe.json"]}]},
-    {"id":"symbol_breadth","root":"symbol_breadth","kind":"symbol-breadth","snapshots":[{"id":"breadth-v1","members":["src/orders/repository.py","src/orders/pipeline.py","src/web/handlers.ts","src/web/widgets.js","tests/test_pipeline.py"]}]}
+    {"id":"symbol_breadth","root":"symbol_breadth","kind":"symbol-breadth","snapshots":[{"id":"breadth-v1","members":["src/orders/repository.py","src/orders/pipeline.py","src/web/handlers.ts","src/web/widgets.js","tests/test_pipeline.py"]}]},
+    {"id":"java_app","root":"java_app","kind":"java","snapshots":[{"id":"java-v1","members":["src/main/java/com/shop/orders/OrderService.java","src/main/java/com/shop/payments/PaymentService.java"]}]}
   ],
   "query_cases_file": "queries.json",
   "change_cases_file": "changes.json",
-  "expected_query_count": 65,
-  "expected_change_count": 28
+  "expected_query_count": 69,
+  "expected_change_count": 29
 }

@@ -1218,6 +1218,321 @@ of a status list is how they drift, which is the `--format pr` and
       given as **0.80 strict / 1.0000 containment** today beside its 0.6667
       gate figure, rather than implying the gate number still stands.
 
+- [x] README corrected against source after the ADR-0065 slices (2026-08-19).
+      Documentation only; no source, contract, schema, migration, or corpus
+      change. `SCHEMA_VERSION` stays `14`, `contract_version` stays `1.1`.
+
+      **The previous entry's own rule was not applied to the ADR-0065 edits it
+      later received, and that is the lesson.** That rewrite read every command,
+      route, tool name and version out of the source. The four language slices
+      then edited the README four times *by hand*, and every defect found today
+      is in text those edits touched — while the parts derived from source were
+      still correct. **A file is only as verified as its most recent edit.**
+
+      **The worst of it was a paragraph in three drafting layers welded
+      together.** The language-coverage limit simultaneously claimed Java, Go,
+      Rust and Scala "yield zero symbols and zero relations", announced they had
+      shipped, and then said *"If accepted, it would give those four…"* — the
+      conditional from when ADR-0065 was still `proposed`. It also repeated "no
+      test edges and no route detection" twice within itself. Any reader would
+      have concluded the opposite of the truth about a feature that shipped.
+
+      **Five figures had gone stale, none caught by any gate**, because no test
+      reads `README.md`:
+
+      | Claim | Was | Source of truth |
+      | --- | --- | --- |
+      | Parser bundle / resolver | `1.4.0` / `1.4.0` | **`1.5.0` / `1.5.0`** — `registry.py`, `resolution.py` |
+      | MCP tools | 21, `trace_flow` missing | **22** — `build_registry().names` |
+      | Corpus fixtures | 7 | **8** — `run_evaluation.py validate` (`java_app`) |
+      | Changed-symbol precision | 0.9375 | **0.9464** — `baseline-phase-4.json` |
+      | Packaged refresh / preflight p95 | 0.975 s / 2.298 s | **0.799 s / 2.243 s** — `baseline-phase-7-perf.json` |
+
+      **`trace_flow` is the `graph callers` defect again**, one surface over.
+      The list was transcribed rather than derived, so the single MCP tool built
+      from a loop comprehension — instead of a literal `name=` — was the one
+      that fell out. The CLI table documented `trace` correctly the whole time.
+      Counted now with `build_registry()`, the way the routes already were.
+
+      **The precision figure is the instructive one.** It rose 0.9375 → 0.9464
+      with **no engine change**: WS-1's three added change cases widened the
+      denominator. Quoting it as an improvement would be exactly the arithmetic
+      -as-progress error this project keeps recording, so the README states the
+      cause beside the number.
+
+      **Branch state was deliberately kept out of the README.** ADR-0065 is
+      unmerged, but `documentation/rules.md` puts live status in
+      `docs/plans/PLAN.md` and keeps policy and product documents free of it —
+      the same split that governs `AGENTS.md`. A README that said "unmerged"
+      would be wrong the hour it merged.
+
+      Content added, not just corrected: the two-stage reference → relation
+      split and the six-step resolution trust order; what is deliberately never
+      emitted (dynamic calls, computed members, type inference) and why that is
+      measurable rather than invisible; traversal bounds and the refuse-don't
+      -clamp rule; `GapReason` and the ADR-0016 invariant; what preflight will
+      not tell you (ADR-0043/0044/0045, and the non-atomic working tree); and
+      three gate traps — phases 1/2 always fail by design, `-Semantic` gates
+      artifacts nothing else reaches, and read the log rather than the exit code.
+
+      A `valid_evidence_rate` note was added because the metric is a documented
+      trap: it equals `exact_evidence_rate` by definition (ADR-0003) and reads
+      0.6544, which a reader lands on as "35% of evidence is invalid". The table
+      row above it is the §4.1 invariant, which is a different statement.
+
+      **CRLF drift in nine tracked Markdown files, and it predates this
+      session.** `git ls-files --eol` reports `i/lf w/crlf` against a
+      `.gitattributes` declaring `* text=auto eol=lf`. The nine are exactly the
+      files the ADR-0065 session edited — several of which this session never
+      opened for writing, which is what proves the drift was inherited rather
+      than introduced. **This is the ADR-0022 hazard landing where the guard
+      does not reach**: `test_every_corpus_file_has_lf_endings_in_the_working_tree`
+      is scoped to `tests/evaluation`, so it protects the corpus and not the
+      documentation — the same "a rule enforced by a file only the fixtures live
+      under does not cover the product" shape ADR-0043 recorded.
+
+      The three files edited here were normalized to LF, each verified by
+      `git diff --stat` being identical before and after, so only endings moved.
+      Six remain and are listed in the handoff rather than fixed — they
+      normalize on commit and corrupt nothing.
+
+      **`SECURITY.md` is untouched GitHub boilerplate** — "5.1.x ✅ / 4.0.x ✅",
+      "Tell them where to go" — against a 206-line threat model. Found while
+      reading, out of scope for a README task, recorded rather than fixed.
+
+- [x] **Java is measured: the first evaluation cases for a query-backed
+      language (P1-1, 2026-08-19).** Corpus **65 -> 69 query cases**;
+      `java_app` admitted to `SUPPORTED_FIXTURES`. No `src/` behaviour change
+      (the only source edit is the fixture tuple), no version bump, no
+      migration. Gate green: **2313 passed, 2 xfailed, exit 0**.
+
+      **Java only, deliberately.** Go, Rust and Scala ship on the same engine
+      but each carries an undecided limit, and **a corpus case is the wrong
+      instrument for an open ruling** — it would either encode the limit as
+      correct or fail for a reason already known and declared. Java has no such
+      limit, which is what made it the honest first slice; the same
+      Java-first discipline ADR-0065 itself used.
+
+      **q069 was wrong when I wrote it, and the way it was wrong is the
+      lesson.** I asked the `DEPENDENCIES` view for a `CALLS` edge. That view
+      traverses **`IMPORTS` and `REFERENCES` only**, so a method has neither and
+      the engine correctly returned nothing — an expectation **unsatisfiable by
+      construction**, the ADR-0031/0035 shape one level up: not a name the
+      system cannot produce, but a *kind the view does not traverse*.
+
+      **The ADR-0036 validator passed it.** That validator checks the declared
+      symbols resolve through `find_exact`; it cannot know which *view* the case
+      invokes. So it is not the guard for this class, and that is now a stated
+      limit rather than an assumed cover. Rewritten as a genuine `IMPORTS` case
+      against `OrderService`, it passes and pins the ADR-0065 resolver fix.
+
+      **Two metrics broke before it was fixed, and both were the corpus telling
+      the truth**: `exact_symbol_resolution` 1.0000 -> 0.9818 (54/55 — still
+      clearing 0.98, but the entire margin), and **`relation_path_recall`
+      1.0000 -> 0.9630, which is gated at 1.0 absolutely** (ADR-0058). ADR-0058
+      wrote that gate saying an ungated threshold the corpus already satisfies
+      is decoration until you make it fail. **It failed here, on the first new
+      case that declared a relation, and it caught a real authoring error.**
+
+      **Mutation-checked with three mutations, because three of the four cases
+      passed on their first run:**
+
+      | Mutation | Caught by |
+      | --- | --- |
+      | `_DECLARED_MODULE_LANGUAGES` emptied (undoes the ADR-0065 resolver fix) | **q069 only** |
+      | Java `qualified_name` drops its owning class | q067, q068, q069 |
+      | Java parser unregistered | all four |
+
+      **q068's `CALLS` still resolved under mutation A**, so it does *not* cover
+      the resolver fix — it resolves through a different tier. **q069 is the
+      only case pinning the thing the ADR-0065 checkpoint existed to verify.**
+      Worth knowing before anyone edits it.
+
+      Every restore was **from a file copy, never `git checkout --`** (ADR-0022,
+      ADR-0042 both record that command cutting wider than intended).
+
+      **The denominator tripwire fired and that is it working.**
+      `test_threshold_granularity` asserts the exact scored count so a
+      denominator cannot move unnoticed — 51 -> 55. **The margin is unchanged**:
+      one miss scores 0.9818 at 55 against 0.9804 at 51, both clear 0.98; two
+      misses fail at both sizes.
+
+      **Baselines moved for arithmetic and for genuinely better evidence.** The
+      evidence *rates* rose — containing 0.7500 -> 0.7571, exact 0.6544 ->
+      0.6643 — because Java's declared ranges match the engine exactly, which is
+      unusual: most corpus growth lowers them (ADR-0018, ADR-0025). Two small
+      dips (`ndcg` -0.0013, `symbol_recall_at_10` -0.0016) are the known cost of
+      the q055-q058 convention that declares both ends of a relation while
+      `ranked_symbols` carries one. **Quote them together or not at all.**
+
+- [x] **Java changed-symbol detection is measured (c029, 2026-08-19).** The
+      first *change* case for a query-backed language. Corpus **28 -> 29 change
+      cases**. No `src/` change at all, no version bump, no migration.
+
+      **The classifier decides what a Java change case can honestly expect, and
+      reading it removed all the guesswork.** `statement_diff` dispatches on
+      language — Python via `ast`, TypeScript/JavaScript via tree-sitter — and
+      **every other language falls through to `PUBLIC_BEHAVIOR_CHANGED`**. So
+      Java body changes are **not classified at statement level**, by
+      construction, for all four query-backed languages.
+
+      c029 was designed to *measure that limit rather than avoid it*: it adds a
+      `throw` guard clause, which on the Python path would classify as
+      `ERROR_BEHAVIOR_CHANGED` and on Java reports `PUBLIC_BEHAVIOR_CHANGED`.
+      The limit is declared in the case's own `limitations`, so the corpus
+      states it rather than a reader inferring it.
+
+      **Every expectation matched on the first run** — changed symbol, finding
+      code, and the impact path `PaymentService.charge -> OrderService.capture`,
+      which is the useful part: **Java impact analysis works through the inbound
+      `CALLS` edge even though Java has no test edges.** The absence of a test in
+      that impact list is the ADR-0065 limit made visible in data.
+
+      **Mutation-checked, and the first mutation taught more than it was meant
+      to.** Making the query-backed symbol hash constant, I compared
+      `changed_symbols` alone and read **"NOT DETECTED"** — the symbol still
+      reported as changed. Comparing what the case *actually declares* showed it
+      **is** detected: the finding flips `PUBLIC_BEHAVIOR_CHANGED` ->
+      `DEPENDENCY_CHANGED` and the impact path empties.
+
+      Two things follow. **Changed-symbol detection does not rest on the content
+      hash alone**, which nobody had written down. And **a mutation check must
+      compare everything the case asserts, not the one field you had in mind** —
+      a narrower proxy reports a false negative, which is the same shape as
+      ADR-0052's "assert against the one claim under test, never the joined
+      text", inverted.
+
+      | Mutation | Detected by |
+      | --- | --- |
+      | query-backed symbol `content_hash` made constant | findings **and** impact paths (not `changed_symbols`) |
+      | `reference.call -> CALLS` mapping removed | impact paths |
+
+      **`changed_symbol_precision` 0.9464 -> 0.9483 and that is not an
+      improvement.** A perfect case widened the denominator; the engine did not
+      change. It is still the sole unmet target and still short of 0.95. Same
+      arithmetic-is-not-progress caution as the 0.9400 -> 0.9464 move.
+
+      **The first full gate run FAILED and was right to** — `2 failed, 2311
+      passed`, both `test_every_declared_case_is_covered_by_this_table`, in
+      `test_findings.py` and `test_impact_cases.py`. **These are not count
+      guards**, which is why updating the five `28 -> 29` literals did not
+      satisfy them: each asserts the corpus's case set equals the set its own
+      *rule table* models, so a change case nothing models is refused outright.
+
+      The earlier lesson recorded "adding one corpus case touched nine hardcoded
+      counts across five files -- next time find them in one pass". I did find
+      the counts in one pass and **still missed these two, because they are a
+      different kind of guard**: coverage, not cardinality. Grepping for the old
+      number cannot find a guard that never mentions it. **Look for what
+      *models* a case, not only for what counts one.**
+
+      The impact row needed a new `_JAVA_APP` graph whose only expansion is the
+      inbound `CALLS` — writing it is what made the no-test-edge limit concrete.
+      **Both tables are position-indexed elsewhere in their own files, so a new
+      row goes last**; their comments say so and c025-c028 are already ordered
+      that way.
+
+- [x] **The Chromium e2e failure reproduced and its mechanism named (P1-4,
+      2026-08-19).** Investigation only — **no source, test, corpus, or
+      contract change**. The register row's reopening condition was "someone
+      reproduces it from a clean state and names the mechanism"; both are done,
+      and **the row's own prime suspect was wrong**.
+
+      **The mechanism.** Chromium's renderer *crashes* — `Protocol error
+      (Runtime.callFunctionOn): Page crashed` — while rendering the Settings
+      **Embedding provider** fieldset for a repository whose policy transmits.
+      The trace shows `goto /settings` completing and the `settings-repository`
+      assertion **passing** first, so the page mounts and the header renders
+      before the renderer dies. It is a crash, not a failed assertion, which is
+      the fact the row's framing missed.
+
+      **Four hypotheses ruled out by measurement rather than argument:**
+
+      | Hypothesis | Ruled out by |
+      | --- | --- |
+      | Residue (the row's prime suspect: a persisted repository policy) | reproduces with `.e2e-tmp` deleted |
+      | A stale `dist` bundle (a trap hit twice before) | reproduces against a freshly built bundle |
+      | A flake | **five runs, five failures**, isolation and full suite |
+      | The Playwright headless shell | `--headed` crashes identically |
+
+      **Firefox renders the same tree correctly**, twice — so it is a browser
+      defect, not application logic.
+
+      **The register's residue guess is the third time a written-down diagnosis
+      has been wrong here** (the 2026-08-15 entry records two more, one of which
+      named a fix that would have been wrong). *A remedy written into the
+      register is still a hypothesis*, and the cost of following one is a
+      session spent on the wrong layer — the same cost as the 2026-08-05 stale
+      Settings incident.
+
+      **It also falsified a documented claim that shaped the test.**
+      `docs/operations/end-to-end-tests.md` said "the identical tree renders
+      correctly on a full page load on both engines", which is *why*
+      `settings.spec.ts:248` was written with `page.goto` and left unskipped.
+      It is false: the crash reaches it through a full document navigation too.
+      Corrected there, with the measurement beside it.
+
+      **Ruled by the user the same day: skip it like the other seven.**
+      `rules.md` forbids skipping a test to make a build pass, which is why it
+      was left failing until the owner ruled rather than tidied away — the rule
+      makes this a decision, and the decision was made with the reproduction in
+      front of it.
+
+      **Applied through a separate helper, `skipChromiumSettingsCrash`, not the
+      existing one.** The existing reason string reads "conversation-route
+      navigation", and that text reaches the test report — reusing it would have
+      named one thing while showing another, which is the ADR-0019 mistake on a
+      new surface. Two triggers, two accurate labels.
+
+      **After the ruling: chromium 8 skipped / 3 passed / 0 failed (exit 0);
+      firefox 11 passed / 0 skipped / 0 failed (exit 0).** The Firefox number is
+      the one that matters — it is the whole justification, and it was measured
+      rather than assumed: no assertion was lost, only the engine it is proven
+      on.
+
+      **I manufactured a false RED gate, which is the mirror of this project's
+      usual failure.** Running `check_phase7.ps1` through
+      `*>&1 | Tee-Object`, the gate reported exit 1 at the web component tests.
+      Nothing had failed: **vitest wrote one benign line to stderr**, and
+      PowerShell 5.1 wraps a *native command's* stderr in a `NativeCommandError`
+      record when streams are redirected, flipping `$?` to false at exit 0. Run
+      directly, `vitest run` gives **22 files / 205 tests / exit 0**.
+
+      Three earlier `check_phase4` runs used the same wrapper and passed — **not
+      because the wrapper is safe, but because nothing wrote to stderr in
+      them.** The hazard is documented for this shell and I hit it anyway.
+
+      This project has recorded false *greens* repeatedly (`$?` after a pipe, a
+      gate whose log and exit code disagree). **A false red is the same class
+      and costs the same way**: the next reader believes a clean tree is broken.
+      **Do not merge streams when invoking a gate** — tee stdout only and let
+      stderr through.
+
+      **A hypothesis was offered for how both accounts can be honest**, and
+      labelled as one: the Settings page gained a per-repository embedding-model
+      field (ADR-0014) and credential entry (ADR-0015) after those eight probes,
+      so the tree rendered under a transmitting policy today is not the tree they
+      tested. **Not measured**, and the Chromium build is unchanged — so it is
+      written as a hypothesis rather than a conclusion.
+
+- [x] **CRLF drift is wider than documentation — it is in source too
+      (2026-08-19).** The earlier entry recorded nine Markdown files. The full
+      count is **18**: twelve `.py` files plus the six remaining `.md`, and the
+      pattern is again decisive — `query_backed/*`, `resolution.py`,
+      `registry.py`, `classification.py`, `query_relations.py`,
+      `engine_adapter.py` and the four ADR-0065 test files. All from that
+      session.
+
+      **One `i/crlf` entry is not drift and proves the mechanism works**:
+      `variants/python_app/crlf-only/target/.../service.py` is the deliberate
+      ADR-0043 fixture, held CRLF by an explicit `-text` attribute. Declared
+      CRLF survives; undeclared CRLF is what drifts.
+
+      Files touched by this session are normalized; the rest are recorded in the
+      Deferred Register rather than rewritten. **The durable fix is widening the
+      LF guard beyond `tests/evaluation`**, which is why it is a P2 item and not
+      a cleanup.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
@@ -2173,6 +2488,59 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   anything until their later stages are run directly. **Also rescued from
   `extra_build.md` on 2026-08-19.**
 
+- **A grammar is not a parser, and `tags.scm` is not a graph** (ADR-0065,
+  proposed 2026-08-19). Tree-sitter grammars ship a `tags.scm` query file, which
+  makes "one generic parser for eleven languages" look obvious. Measured: nine of
+  eleven ship one, they are 9-66 lines, and **not one of them captures an
+  import** — so the thing resolution is actually built on is the thing the
+  generic mechanism cannot supply. A design that looked purely declarative was
+  disproven a second way by Go, whose method receiver is a **field of the method
+  node rather than a lexical ancestor**, so an ancestor-walking qualified name is
+  *wrong* rather than missing. `tags.scm` cuts per-language cost about 4x; it
+  does not remove it.
+- **Flag scope before refining it.** The request went from "Java and Go" to
+  eleven languages. Measuring the existing implementations first — 1,087 lines
+  for Python, 1,014 for TS+JS, before fixtures and tests — turned "that's a lot"
+  into a number that could be argued with, and turned one impossible task into a
+  decomposed program with a spike at the front.
+
+- **A grammar's `tags.scm` marks the KIND; a sibling `@name` capture carries the
+  target** (ADR-0065, 2026-08-19). Java's puts `@reference.call` on the
+  *argument list*, so reading the reference node's own text gave `"(orderId)"`
+  where the method was `charge`. `IMPLEMENTS` passed anyway and was pure luck:
+  `type_list` held one identifier, and `implements A, B` would have emitted the
+  target `"A, B"`. Found by a test, before it shipped.
+- **`resolution.py` had a hardcoded Python-only module index** (ADR-0065). It
+  gated `module_to_file` on `record.language == "python"` *and* derived the
+  module from the file path, so Java's declared `com.shop.payments` never
+  matched `src.main.java.com.shop.payments` and every cross-package import
+  resolved `external`. Fixed by indexing the declared `module_path` for
+  languages that declare one. **Python and TS/JS are deliberately excluded:
+  their module IS their path, and a second opinion would change conclusions
+  that are already right.**
+- **Landing two staleness bumps together costs one reindex, not two.**
+  `PARSER_BUNDLE_VERSION` and `RESOLVER_VERSION` both went 1.4.0 -> 1.5.0 in the
+  same change for that reason. Sequencing them would have made users reindex
+  twice for one feature.
+- **A checkpoint is only worth having if you are willing to be wrong.** ADR-0065
+  recorded one assumption read from code rather than measured, and planned Java
+  alone so the other three languages were not built on it. The assumption was
+  **false**, and the cost of finding out was one integration test rather than
+  four languages of rework.
+
+- **A language's module identity may not be in any file you parse** (ADR-0065,
+  Go slice). Java declares `package com.shop.payments` in the source, so
+  indexing the declaration works. Go's import path carries the prefix from
+  `go.mod` — `myapp/internal/payments` — and a parse is a pure function of *one*
+  file, so that prefix is unknowable. The fix is not more parsing but a
+  **matching policy**, and its cost is asymmetric: trimming too far makes a
+  third-party import resolve onto local code, which invents a relationship
+  §4.1 forbids. **A miss is the safe direction.**
+- **`owner_hint` earned its place.** It was added because Go's receiver is a
+  field rather than an ancestor, and Go's whole slice needs no lexical scope at
+  all — `scope_node_types` is empty. The hook that justified rejecting a purely
+  declarative design is the hook the second language runs entirely on.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
@@ -2359,6 +2727,76 @@ Carried into gate approvals as declared work rather than dropped:
 
 **Current, as of 2026-08-19.** The Deferred Register in `docs/plans/PLAN.md` is
 the authority on what is open; this is a pointer, not a third copy.
+
+**ADR-0065 is DELIVERED — Java, Go, Rust and Scala all ship** (2026-08-19), on
+branch `query-backed-language-support`, **not merged to `main`**.
+
+**Start here tomorrow, in order:**
+
+1. ~~**Re-run `scripts/check_phase4.ps1 -SkipSync` and read the whole log.**~~
+   **DONE 2026-08-19 — the gate is GREEN on this branch for the first time:
+   `2313 passed, 2 xfailed`, exit 0, in 483 s.** All nine stages ran to
+   completion (contract schema, tests, ruff, mypy over 379 files, dataset
+   validation, the Phase 0/3/4 baselines, ADR-0016 invariants), and
+   `git status` afterwards showed only the two documentation files this session
+   edited — so **every `--check` baseline reproduced byte-for-byte** and nothing
+   regenerated. The two xfails are the declared Go-import and Scala-member-call
+   limits. The stale-placeholder fix in `609a63f` is now verified in a full run
+   rather than against its own file.
+
+   **The exit code was not trusted on its own**, per the warning below: the run
+   was tee'd to a log, `$LASTEXITCODE` captured explicitly to that log
+   (`GATE_LASTEXITCODE=0`), and the log grepped for `FAILED` / `ERROR` /
+   `Tests failed` / a non-zero exit — all absent. Both signals agreeing is what
+   makes this claim safe to make.
+
+   Original entry, kept because the reasoning is the reusable part:
+
+   The run that completed at session end **FAILED** — `1 failed, 2312 passed,
+   2 xfailed`. Cause found and fixed:
+   `test_registry_resolves_python_and_ignores_unsupported_languages` asserted
+   `parser_for("rust") is None`, using Rust as its example of an unregistered
+   language — and ADR-0065 registered Rust. **The property was still right; the
+   example went stale**, which is exactly what that test's own comment records
+   happening to `typescript` in Phase 3. The placeholder is now `kotlin`,
+   chosen because ADR-0065 *measured* its grammar as shipping no `tags.scm`, so
+   it cannot be registered by this engine.
+
+   **The fix is verified only against its own file (29 passed). The gate has
+   never run green on this branch — re-run it before claiming anything.**
+
+   **And read the log, not the exit code.** The background runner reported
+   **exit 0** while the log said `Tests failed with exit code 1` and PowerShell
+   threw. This project already records "progress dots that stop with no failure
+   summary mean a terminated process" and "`$?` after a pipe is the pipe's exit
+   code"; this is the same family, and it nearly recorded a red gate as green.
+2. **Rule the two declared limits**, both `strict` xfails carrying full
+   diagnoses in their test files:
+   - **Go import matching policy.** A Go import resolves `external` because its
+     path carries the `go.mod` prefix. The cost is **asymmetric** — trimming to
+     one segment makes a third-party `github.com/foo/payments` resolve onto a
+     local `payments`, *inventing* a relationship §4.1 forbids. A miss is the
+     safe direction. Contrast: Rust's `crate` is a keyword, so Rust imports
+     resolve — that contrast is the diagnosis.
+   - **Scala member calls.** Its `tags.scm` has only
+     `(call_expression (identifier) @name)`, so `obj.method(x)` — most Scala
+     calls — is invisible. Closing it needs a supplementary references query;
+     the profile contract carries one authored slot (`imports_query`).
+3. **Decide whether to merge to `main`.** Both version bumps land in one
+   reindex; nothing is merged yet.
+
+**The largest gap: no evaluation case measures any of the four languages.**
+Unit, integration and security tests are coverage, not measurement, and the
+Section 19.3 target table still says nothing about Java, Go, Rust or Scala. No
+fixture was added to `SUPPORTED_FIXTURES`, deliberately — ADR-0017's guard
+requires scored cases, and gold data must be declared before the engine runs
+against it (ADR-0003, ADR-0036). The design, the §25 scope change, and four required
+grammar dependencies are all approved. **Approval is not implementation: no code
+exists, and no surface may claim these languages work until it lands.** Delivery
+is Java -> Go -> Rust -> Scala, and **slice one must verify that `resolution.py`
+generalizes to Java and Go module semantics before the other three are built on
+it** — that is the one load-bearing claim in the design that was read from the
+code rather than measured.
 `extra_build.md` was the execution order until its last task closed
 (ADR-0050 to ADR-0059); it was **deleted 2026-08-19** on its own instruction,
 after its two uniquely-recorded working rules were moved into Decisions above.

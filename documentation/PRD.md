@@ -80,7 +80,9 @@ unless the user explicitly says otherwise, per repository.
 - **No GitHub/GitLab or CI integration.**
 - **No network exposure beyond loopback.**
 - **No new languages beyond Python, TypeScript, and JavaScript** (plus Markdown
-  and common config/schema formats) without an approved ADR.
+  and common config/schema formats) without an approved ADR. **ADR-0065 approved
+  Java, Go, Rust and Scala on 2026-08-19 and all four shipped the same day**, so
+  the boundary is now seven languages plus Markdown and config.
 - **No PostgreSQL, message broker, microservices, or Kubernetes.** SQLite is the
   system of record.
 

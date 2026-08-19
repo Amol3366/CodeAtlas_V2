@@ -60,3 +60,20 @@ def test_a_module_merely_starting_with_conftest_is_not_test_code() -> None:
     # Exact stem only. `conftest_helpers.py` is ordinary source.
     classification, _ = classify("src/orders/conftest_helpers.py")
     assert classification is FileClassification.SOURCE_CODE
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "expected"),
+    [
+        ("src/main/java/com/shop/OrderService.java", "java"),
+        ("internal/orders/service.go", "go"),
+        ("src/orders/service.rs", "rust"),
+        ("src/main/scala/shop/OrderService.scala", "scala"),
+    ],
+)
+def test_query_backed_languages_are_classified(
+    relative_path: str, expected: str
+) -> None:
+    """ADR-0065. Recognising the extension is what lets a parser see the file."""
+    _classification, language = classify(relative_path)
+    assert language == expected

@@ -263,6 +263,21 @@ ROWS: tuple[Row, ...] = (
     Row("c027", _change("cache.ttl", CONFIG, file_path="services/alpha.yaml")),
     # c028: line endings are not a change, so nothing reaches the rule table.
     Row("c028"),
+    # c029: the first query-backed language to reach this table. A Java body
+    # change carries no statement-level class -- `statement_diff` dispatches on
+    # Python and TS/JS and every other language falls through to
+    # PUBLIC_BEHAVIOR_CHANGED -- so an added `throw` that would read as
+    # ERROR_BEHAVIOR_CHANGED in Python arrives here as a plain behavior change.
+    # The row records the limit; it is not a placeholder for a finer one.
+    Row(
+        "c029",
+        _change(
+            "PaymentService.charge",
+            METHOD,
+            body=BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED,
+            file_path="src/main/java/com/shop/payments/PaymentService.java",
+        ),
+    ),
 )
 
 

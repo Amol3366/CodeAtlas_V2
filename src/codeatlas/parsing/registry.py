@@ -34,7 +34,11 @@ from codeatlas.domain.symbols import SymbolRecord
 # `pyproject.toml` reported eight keys changed, seven of them falsely. The
 # range still cites; the hash now identifies. Symbol identity moves, so every
 # snapshot is stale until re-indexed.
-PARSER_BUNDLE_VERSION: str = "1.4.0"
+# 1.5.0 (ADR-0065): a query-backed parser emits Java symbols and references, so
+# every symbol version derived by the 1.4.0 bundle is stale. RESOLVER_VERSION
+# moves to 1.5.0 in the same change, deliberately: both make every snapshot
+# stale, and landing them together costs users one reindex rather than two.
+PARSER_BUNDLE_VERSION: str = "1.5.0"
 
 
 @dataclass(frozen=True)
@@ -115,10 +119,22 @@ def default_registry() -> ParserRegistry:
     """Build the registry: Python, TypeScript/JavaScript, documents, config."""
     from codeatlas.parsing.document_parser import DocumentParser
     from codeatlas.parsing.python_parser import PythonParser
+    from codeatlas.parsing.query_backed.engine import TagsBackedParser
+    from codeatlas.parsing.query_backed.languages.go import GoAdapter
+    from codeatlas.parsing.query_backed.languages.java import JavaAdapter
+    from codeatlas.parsing.query_backed.languages.rust import RustAdapter
+    from codeatlas.parsing.query_backed.languages.scala import ScalaAdapter
     from codeatlas.parsing.tsjs_parser import TsJsParser
 
     registry = ParserRegistry()
     registry.register(PythonParser())
     registry.register(TsJsParser())
     registry.register(DocumentParser())
+    # ADR-0065: query-backed languages. `register` refuses to shadow an
+    # existing language, so a collision surfaces here rather than depending
+    # on import order.
+    registry.register(TagsBackedParser(JavaAdapter()))
+    registry.register(TagsBackedParser(GoAdapter()))
+    registry.register(TagsBackedParser(RustAdapter()))
+    registry.register(TagsBackedParser(ScalaAdapter()))
     return registry

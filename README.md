@@ -12,9 +12,10 @@ specific repository. Nothing here treats a language model as repository truth.
 | --- | --- |
 | **Status** | Phases 0–7 complete, every gate user-approved; project closed out 2026-08-10, post-gate work ongoing |
 | **Platform** | Windows 11 primary (loopback only, single user) |
-| **Languages indexed** | Python, TypeScript, JavaScript, Markdown, common config/schema formats |
+| **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
-| **Tests** | 2252 passing at the last full gate run |
+| **Component versions** | Parser bundle `1.5.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
+| **Tests** | **2313 passed, 2 xfailed** — `check_phase4.ps1 -SkipSync`, exit 0, 2026-08-19. The two xfails are the declared Go-import and Scala-member-call limits |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -168,7 +169,16 @@ uv sync --extra semantic-openai   # OpenAI embeddings; transmits, needs a key an
   content reuses its existing chunk and embedding rows.
 - **Symbol extraction** via Tree-sitter with Python `ast` enrichment, plus
   TypeScript/JavaScript parsing, Markdown sections, and nested configuration
-  keys as addressable symbols.
+  keys as addressable symbols. A nested key (`service.port`) is a symbol in its
+  own right, citing its own line and hashing its own *value* — so editing one
+  key in a `pyproject.toml` reports one change, not eight (ADR-0025, ADR-0041).
+- **Java, Go, Rust, and Scala** run on one shared query-backed engine
+  (ADR-0065): each grammar's own `tags.scm` plus an `imports.scm` authored here,
+  behind a ~150-line adapter implementing five methods. Adding a language costs
+  roughly a quarter of a hand-written parser. The engine stays a pure function
+  of one file — imports are emitted as *references* carrying a target hint, and
+  resolution happens later against the whole snapshot, exactly as the Python and
+  TS/JS parsers already do.
 
 ### Retrieval
 
@@ -194,6 +204,35 @@ imported class is `static_resolved`; a test reaching it only through a pytest
 fixture or a helper call is `low_confidence_heuristic` — still citable, but it
 *explains* a coverage gap rather than closing it.
 
+**How a name becomes an edge.** Derivation is split in two. A **reference** is
+what one file said (`total`, `"./orders"`, `Order`) — a pure function of that
+file's bytes, so an unchanged file's references carry forward untouched. A
+**relation** is what that reference turned out to mean in a snapshot, resolved
+across the whole snapshot on every index run and never reused. That asymmetry is
+why an edge cannot outlive the symbol it points at.
+
+Resolution takes the first match in a deliberate *trust* order: same file and
+scope → same file, module scope → followed through an import → sibling module in
+the same package → repository-wide, **only when the name is globally unique** →
+otherwise unresolved, or `ambiguous` when a level produced several candidates.
+Only the fifth step reaches across the repository on a bare name, and a
+non-unique bare name never becomes a `CALLS` edge.
+
+**What is deliberately not emitted.** A call through a variable, an attribute of
+unknown type, a computed member, or `getattr` produces **no edge at all** —
+each unemitted category is counted and surfaced as a parse diagnostic, so the
+gap is measurable rather than invisible. Also unrepresented: `tsconfig.json`
+path aliases, monorepo workspace resolution, dynamic `import()`, computed
+`require()`, re-export chains beyond one hop, and all type inference.
+
+**Traversal is bounded and says when it truncated.** Depth defaults to 2 (max
+5), visited nodes 200 (max 1,000), returned edges 50 (max 200), paths 10 (max
+25). A request *above* a maximum is refused rather than clamped — a caller
+asking for depth 50 has misunderstood something, and quietly giving them depth 5
+would hide that. A claim's derivation is the **weakest** among its supporting
+edges; an ambiguous root abstains and lists candidates instead of picking one;
+and "no callers found" and "callers were not analyzed" stay different statements.
+
 ### Change preflight — the core workflow
 
 ```powershell
@@ -214,8 +253,33 @@ rules, and orders findings by risk. Base-side evidence is labelled historical.
 moved trunk reports the trunk's own commits as your changes, inverted, so
 `--since` resolves a real merge base.
 
+**Test gaps carry their reason, not just their existence.** Every changed symbol
+with no qualifying `TESTS` edge appears in `test_gaps` with a `GapReason`
+explaining *why*: `FIXTURE_MEDIATED_ONLY` and `HELPER_MEDIATED_ONLY` cite the
+low-confidence edge found one hop away, so the report shows its strongest
+near-miss; `IMPORTED_NOT_CALLED`, `CALLED_NOT_IMPORTED`, and
+`NO_TEST_FILE_REFERENCE` cover the direct-path failures. **Finding a near-miss
+never removes the symbol from `test_gaps`** — a weak edge explains a gap, it
+does not close one (ADR-0016), and that invariant has its own corpus and gate
+because the Phase 4 corpus structurally cannot see it.
+
 **Formats:** `text` (default, shaped for a terminal), `json` (canonical),
-`markdown`, `pr` (PR-ready), `sarif` (2.1.0, for scanners).
+`markdown` (complete audit record), `pr` (PR-ready — verdict and findings first,
+supporting detail in `<details>`, bounded at 60,000 characters with any cut
+declared rather than silently dropped), `sarif` (2.1.0, for scanners). SARIF
+deliberately omits test gaps: a gap is explicitly not a finding, and emitting
+one as a SARIF result would assert exactly what ADR-0016 refuses.
+
+**What preflight will not tell you.** It parses **both full states** every run —
+O(repository), not O(change). A file that Git tracks but indexing excludes is
+invisible to it (ADR-0044): such a file has no symbols and no evidence to cite,
+so reporting it would mean reporting something no answer could support. An
+oversized tracked file is skipped with a `FILE_TOO_LARGE` warning naming it
+(ADR-0045). A change that is *only* line endings reports nothing (ADR-0043) —
+the same answer Git gives under `text=auto`. And **an analysis over a live
+working tree is not atomic**: a file caught mid-write reads as empty, which
+correctly reports every symbol in it as deleted. Do not edit the tree you are
+measuring.
 
 ### Conversations and the web app
 
@@ -268,8 +332,10 @@ active → superseded
 
 Vector coverage is tracked separately and can **never** block deterministic
 activation. Component versions are stamped into each snapshot — parser bundle
-`1.4.0`, chunker `1.1.0`, resolver `1.4.0` — and a change to any of them makes
-existing snapshots stale and forces a reindex.
+`1.5.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
+existing snapshots stale and forces a reindex. The parser and resolver bumps
+landed together in ADR-0065 deliberately: both invalidate every snapshot, so
+shipping them in one change costs users one reindex rather than two.
 
 ### The answer pipeline
 
@@ -452,8 +518,9 @@ Tool schema version `1.0`. Registered tools: `register_repository`,
 `resolve_symbol`, `resolve_file`, `search_files`, `search_symbols`,
 `search_text`, `get_evidence`, `get_callers`, `get_callees`,
 `get_dependencies`, `get_exports`, `get_related_tests`, `get_related_documents`,
-`analyze_working_tree`, `analyze_commit_range`, `get_change_analysis`,
-`get_change_report`.
+`trace_flow`, `analyze_working_tree`, `analyze_commit_range`,
+`get_change_analysis`, `get_change_report` — **22 tools**, read from
+`build_registry()` rather than transcribed.
 
 Inputs and outputs are bounded and versioned. A tool returns warnings and
 unsupported states rather than silently omitting them.
@@ -617,16 +684,29 @@ Every control below is enforced, not aspirational — see
 Numbers here name their method. The full target table is `AGENTS.md` §19.3;
 caveats live in `docs/evaluation/*-baseline-environment.md`.
 
-| Measure | Result |
-| --- | --- |
-| Valid file-and-line evidence | 100% |
-| Active-snapshot leakage | 0 |
-| Exact symbol resolution | **1.0000** (corpus: 65 query cases, 28 change cases, 7 fixtures) |
-| Changed-symbol recall · direct-impact recall | 1.0000 · 1.0000 |
-| Unsupported factual claim rate | 0.0000 |
-| Containing-evidence Recall@10 | **1.0000** |
-| Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) |
-| Packaged refresh p95 · preflight p95 | 0.975 s · 2.298 s (semantic-local, on the artifact) |
+| Measure | Result | Source |
+| --- | --- | --- |
+| Evidence resolving to a real file and line range | 100% — invariant, not a corpus rate | §4.1, security suite |
+| Active-snapshot leakage | 0 | snapshot-isolation suite |
+| Exact symbol resolution | **1.0000** | `baseline-phase-4.json` |
+| Changed-symbol recall · direct-impact recall | 1.0000 · 1.0000 | `baseline-phase-4.json` |
+| Unsupported factual claim rate | 0.0000 | `baseline-phase-4.json` |
+| Containing-evidence Recall@10 | **1.0000** | `baseline-phase-4.json` |
+| Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) | `baseline-phase-4.json` |
+| Packaged refresh p95 · preflight p95 | **0.799 s · 2.243 s** (semantic-local, on the artifact; cold start 1.060 s, coverage 1.0) | `baseline-phase-7-perf.json`, 2026-08-10 |
+
+Corpus: **65 query cases, 28 change cases, 8 fixtures** — plus a separate
+invariant corpus (`tests/evaluation/invariant_cases/`) that asserts a boolean
+rather than an accuracy, and a 14-case conceptual corpus for the semantic layer.
+
+> **Do not read `valid_evidence_rate` (0.6544) as "35% of evidence is invalid".**
+> It equals `exact_evidence_rate` by definition (ADR-0003) and measures *exact
+> span match against a gold range*, retained under the old name so historical
+> numbers keep their meaning. The gate reads `containing_evidence_rate`, because
+> a graph answer cites the call site that proves a claim, which rarely equals a
+> gold range describing a definition. The row above is the §4.1 invariant —
+> every cited range resolves to real lines of a real file — which is a different
+> statement from either rate.
 
 **Performance, corrected 2026-08-18 (ADR-0064).** Preflight on a real 706-file
 repository was **635 s**; it is now **21.6 s median**, and a cold index went
@@ -639,8 +719,53 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
 
 ### Known limits — stated, not hidden
 
-- **Language coverage** is Python, TypeScript, JavaScript, Markdown, and common
-  config/schema formats. A new language needs an approved ADR.
+- **Language coverage is two tiers, and the second tier is thinner.** Python,
+  TypeScript, and JavaScript get the full engine — hand-written parsers, test
+  edges, route detection, and configuration/schema edges. **Java, Go, Rust, and
+  Scala** (ADR-0065) get symbols with qualified names, `IMPORTS`, `CALLS`,
+  `INHERITS`, `IMPLEMENTS`, `REFERENCES`, exact lookup, search, evidence, and
+  changed-symbol detection — but **no test edges, no route detection, and no
+  configuration or schema edges.** Preflight on a Java repository is materially
+  thinner than on a Python one, and no surface here claims otherwise.
+
+  Everything else — C#, Kotlin, Ruby, PHP, C/C++, Swift, and the rest — yields
+  **zero symbols and zero relations**: file listing, full-text search, and a Git
+  diff, but no symbol lookup, no callers, and no impact analysis. Markdown and
+  common config/schema formats are parsed for structure throughout. A new
+  language needs an approved ADR under §25.
+
+  **Three limits of the query-backed tier are declared rather than hidden.**
+  A `tags.scm` capture is a pattern match with **no receiver context**, where
+  `python_relations.py` walks a real `ast` — so all four resolve calls less
+  completely than Python does. **A Go import resolves `external`**, because its
+  path carries the module prefix declared in `go.mod` and a parse is a pure
+  function of one file; closing it needs a *matching policy*, and trimming too
+  far would make a third-party `github.com/foo/payments` resolve onto a local
+  `payments`, inventing a relationship §4.1 forbids — a miss is the safe
+  direction. Rust's `crate` is a language *keyword*, so Rust imports do resolve;
+  that contrast is the whole diagnosis. And **Scala captures only calls to a
+  bare identifier**, not `obj.method(x)`, because its shipped `tags.scm` lacks
+  the member-call pattern the other three have. The last two are `strict`
+  xfails carrying their diagnosis in the test file, awaiting a ruling.
+
+  Two kind mappings are approximate for the same reason: a **Go interface reads
+  as `CLASS`** and a **Scala method reads as `FUNCTION`**, because neither
+  grammar's `tags.scm` distinguishes them.
+
+  **Why these four and not eleven.** A spike on 2026-08-19 measured Tree-sitter's
+  shipped `tags.scm` files rather than assuming: all eleven requested grammars
+  install, only **nine ship a `tags.scm`** (C# and Kotlin ship none), and **not
+  one of the nine captures an import** — decisive, because resolution is built
+  on the import graph, so each language needs an `imports.scm` authored here.
+  Java, Go, Rust, and Scala were the four that measured well on both definitions
+  and references; Ruby and PHP were deferred on reference quality, and
+  Swift/C++/C on having no references at all. See ADR-0065 and
+  `docs/superpowers/specs/2026-08-19-query-backed-language-support-design.md`.
+
+  **No evaluation case measures any of the four**, so no metric covers them —
+  unit, integration, and security tests are their only coverage. This is the
+  largest open gap in ADR-0065, and gold data must be declared before the engine
+  is run against it (ADR-0003, ADR-0036).
 - **The packaged executable is unsigned**, so SmartScreen warns on first run.
   This needs a purchased certificate — a purchasing decision, not an engineering
   task.
@@ -650,10 +775,14 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   2026-08-18, reproduces on `main`, and is under investigation.
 - **The semantic-local packaged tree is 1.05 GB** (torch), accepted at the
   Phase 7 activation gate.
-- **Changed-symbol precision is 0.9375 against a ≥0.95 target** — structural, not
-  a defect: three corpus cases split one physical diff into three single-symbol
-  cases that count each other's symbols against them. The other 21 score 1.0.
-  The corpus is never edited to move a number (ADR-0003).
+- **Changed-symbol precision is 0.9464 against a ≥0.95 target** — the sole entry
+  in `unmet_targets`, and structural rather than a defect: three corpus cases
+  (c020–c022) split one physical diff into three single-symbol cases, so the
+  engine — correctly reporting both affected symbols every run — has each case
+  count the other's symbol against it. Every other change case scores 1.0. It
+  read 0.9375 at the Phase 4 gate and rose only because later cases widened the
+  denominator, which is arithmetic and not an improvement. The corpus is never
+  edited to move a number (ADR-0003).
 - **Phase 7's primary evidence Recall@10 missed its ≥0.90 target**, measured at
   0.6667 at the gate. On the semantic corpus today it reads **0.80** under the
   strict line-range metric and **1.0000** under the containment-based metric
@@ -720,9 +849,19 @@ scripts it runs the Playwright suites **inside** the gate; `-SkipE2E` opts out
 for a fast inner loop. `scripts/check_phase0.ps1` … `check_phase7.ps1` each still
 prove their own phase.
 
-Run gates one at a time. Progress dots that stop with no failure summary mean a
-**terminated process**, not a broken test — read the whole log before believing a
-gate result, and re-run in isolation before calling anything a regression.
+Three things that have each cost a session:
+
+- **`check_phase1.ps1` and `check_phase2.ps1` are marked SUPERSEDED and always
+  fail by design.** Their baselines are frozen history that ADR-0017
+  deliberately never regenerated, so they report "baseline artifacts are stale"
+  every time. Running them is a false alarm, not a check.
+- **`-Semantic` gates artifacts that no other run reaches.** Two tracked
+  baselines sat stale for two days behind it while `-SkipSync` runs stayed
+  green. It is the flag that goes unrun.
+- **Read the log, not the exit code.** Progress dots that stop with no failure
+  summary mean a **terminated process**, not a broken test; a gate has been seen
+  reporting exit 0 while its log said otherwise. Re-run in isolation before
+  calling anything a regression.
 
 ### House rules for contributors and agents
 
@@ -755,6 +894,9 @@ blunt version. The ones that bite most often:
 | Port already in use | `--port` on `serve`, `-ApiPort` on `run_dev.ps1` |
 | Script will not run | Use the `-ExecutionPolicy Bypass -File` form |
 | A repository will not reindex | `codeatlas doctor` names the blocking run and its pid |
+| Symbols or relations vanished after upgrading | A parser/chunker/resolver version bump makes every existing snapshot stale. Reindex once — ADR-0065 moved parser and resolver to `1.5.0` together so this costs one pass, not two |
+| `SCHEMA_VERSION_UNSUPPORTED` | This database was written by a *newer* build. Migrations are forward-only, so run the newer build, or `codeatlas restore` the `.pre-upgrade-vN` checkpoint it wrote |
+| Preflight reports a whole file's symbols as deleted | The tree was edited *while* it was being analysed; a file caught mid-write reads as empty. Re-run on a quiet tree |
 | The UI looks older than the code | You are almost certainly running the packaged build. Rebuild with `scripts/build_package.ps1` |
 | An embedding option is greyed out | Its optional extra is not installed — `uv sync --extra semantic-local` |
 
