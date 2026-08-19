@@ -1220,6 +1220,47 @@
                                                "The PaymentService class changed.",
                                                "The service module changed."
                                            ]
+                  },
+                  {
+                      "id": "c029",
+                      "repository_fixture": "java_app",
+                      "snapshot_id": "java-v1",
+                      "base_ref": "HEAD",
+                      "target_ref": "working-tree:guard-clause",
+                      "expected_symbols": [
+                          "PaymentService.charge"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/java/com/shop/payments/PaymentService.java",
+                              "symbol": "PaymentService.charge",
+                              "start_line": 4,
+                              "end_line": 8,
+                              "evidence_id": "c029-e1",
+                              "snapshot_id": "java-v1"
+                          }
+                      ],
+                      "expected_changed_symbols": [
+                          "PaymentService.charge"
+                      ],
+                      "expected_impact_paths": [
+                          [
+                              "PaymentService.charge",
+                              "OrderService.capture"
+                          ]
+                      ],
+                      "expected_findings": [
+                          "PUBLIC_BEHAVIOR_CHANGED"
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Java body changes are not classified at statement level, so an added throw reports as a behavior change rather than an error-behavior change.",
+                          "Java has no test edges (ADR-0065), so no test appears in impact."
+                      ],
+                      "forbidden_claims": [
+                          "charge now validates every argument."
+                      ]
                   }
               ]
 }

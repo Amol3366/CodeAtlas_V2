@@ -105,6 +105,22 @@ _PYTHON_EDGES = (
     ("test_capture_uses_idempotency_store", "PaymentService.capture", TESTS),
 )
 
+# ADR-0065. Java carries no TESTS edge and no route, so the only thing that can
+# expand from a changed method is its inbound CALLS -- which is the point of
+# c029: impact analysis works for a query-backed language, and the absence of a
+# test in the result is the declared limit rather than a missing edge here.
+_JAVA_APP = {
+    "OrderService": CLASS,
+    "OrderService.capture": METHOD,
+    "PaymentService": CLASS,
+    "PaymentService.charge": METHOD,
+}
+_JAVA_EDGES = (
+    ("OrderService", "OrderService.capture", CONTAINS),
+    ("PaymentService", "PaymentService.charge", CONTAINS),
+    ("OrderService.capture", "PaymentService.charge", CALLS),
+)
+
 _TSJS = {"Order": IFACE, "total": PY, "render": PY}
 _TSJS_EDGES = (
     ("total", "Order", REFERENCES),
@@ -197,6 +213,14 @@ CASES: tuple[Case, ...] = (
     # c028 changes nothing, so there is nothing to orient. An empty change set
     # is the assertion, not a gap in the table.
     Case("c028", _PYTHON_APP, _PYTHON_EDGES, ()),
+    # c029: a Java method body change. The inbound CALLS edge is the whole
+    # expansion -- no test edge exists for Java (ADR-0065).
+    Case(
+        "c029",
+        _JAVA_APP,
+        _JAVA_EDGES,
+        (("PaymentService.charge", ChangeKind.MODIFIED),),
+    ),
     Case(
         "c015", _MIXED, _MIXED_EDGES, (("get_order", ChangeKind.MODIFIED),), _ROUTE
     ),

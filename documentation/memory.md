@@ -1365,6 +1365,73 @@ of a status list is how they drift, which is the `--format pr` and
       the q055-q058 convention that declares both ends of a relation while
       `ranked_symbols` carries one. **Quote them together or not at all.**
 
+- [x] **Java changed-symbol detection is measured (c029, 2026-08-19).** The
+      first *change* case for a query-backed language. Corpus **28 -> 29 change
+      cases**. No `src/` change at all, no version bump, no migration.
+
+      **The classifier decides what a Java change case can honestly expect, and
+      reading it removed all the guesswork.** `statement_diff` dispatches on
+      language — Python via `ast`, TypeScript/JavaScript via tree-sitter — and
+      **every other language falls through to `PUBLIC_BEHAVIOR_CHANGED`**. So
+      Java body changes are **not classified at statement level**, by
+      construction, for all four query-backed languages.
+
+      c029 was designed to *measure that limit rather than avoid it*: it adds a
+      `throw` guard clause, which on the Python path would classify as
+      `ERROR_BEHAVIOR_CHANGED` and on Java reports `PUBLIC_BEHAVIOR_CHANGED`.
+      The limit is declared in the case's own `limitations`, so the corpus
+      states it rather than a reader inferring it.
+
+      **Every expectation matched on the first run** — changed symbol, finding
+      code, and the impact path `PaymentService.charge -> OrderService.capture`,
+      which is the useful part: **Java impact analysis works through the inbound
+      `CALLS` edge even though Java has no test edges.** The absence of a test in
+      that impact list is the ADR-0065 limit made visible in data.
+
+      **Mutation-checked, and the first mutation taught more than it was meant
+      to.** Making the query-backed symbol hash constant, I compared
+      `changed_symbols` alone and read **"NOT DETECTED"** — the symbol still
+      reported as changed. Comparing what the case *actually declares* showed it
+      **is** detected: the finding flips `PUBLIC_BEHAVIOR_CHANGED` ->
+      `DEPENDENCY_CHANGED` and the impact path empties.
+
+      Two things follow. **Changed-symbol detection does not rest on the content
+      hash alone**, which nobody had written down. And **a mutation check must
+      compare everything the case asserts, not the one field you had in mind** —
+      a narrower proxy reports a false negative, which is the same shape as
+      ADR-0052's "assert against the one claim under test, never the joined
+      text", inverted.
+
+      | Mutation | Detected by |
+      | --- | --- |
+      | query-backed symbol `content_hash` made constant | findings **and** impact paths (not `changed_symbols`) |
+      | `reference.call -> CALLS` mapping removed | impact paths |
+
+      **`changed_symbol_precision` 0.9464 -> 0.9483 and that is not an
+      improvement.** A perfect case widened the denominator; the engine did not
+      change. It is still the sole unmet target and still short of 0.95. Same
+      arithmetic-is-not-progress caution as the 0.9400 -> 0.9464 move.
+
+      **The first full gate run FAILED and was right to** — `2 failed, 2311
+      passed`, both `test_every_declared_case_is_covered_by_this_table`, in
+      `test_findings.py` and `test_impact_cases.py`. **These are not count
+      guards**, which is why updating the five `28 -> 29` literals did not
+      satisfy them: each asserts the corpus's case set equals the set its own
+      *rule table* models, so a change case nothing models is refused outright.
+
+      The earlier lesson recorded "adding one corpus case touched nine hardcoded
+      counts across five files -- next time find them in one pass". I did find
+      the counts in one pass and **still missed these two, because they are a
+      different kind of guard**: coverage, not cardinality. Grepping for the old
+      number cannot find a guard that never mentions it. **Look for what
+      *models* a case, not only for what counts one.**
+
+      The impact row needed a new `_JAVA_APP` graph whose only expansion is the
+      inbound `CALLS` — writing it is what made the no-test-edge limit concrete.
+      **Both tables are position-indexed elsewhere in their own files, so a new
+      row goes last**; their comments say so and c025-c028 are already ordered
+      that way.
+
 - [x] **CRLF drift is wider than documentation — it is in source too
       (2026-08-19).** The earlier entry recorded nine Markdown files. The full
       count is **18**: twelve `.py` files plus the six remaining `.md`, and the

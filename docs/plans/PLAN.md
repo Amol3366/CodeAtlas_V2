@@ -291,6 +291,96 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-19T17:00:00Z — Java changed-symbol detection is measured (c029)
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: P1-1 second slice. The first **change** case for a query-backed
+  language. Corpus **28 -> 29 change cases**.
+- **No `src/` change whatsoever**, no version bump, no migration.
+  `SCHEMA_VERSION` `14`, `contract_version` `1.1`.
+
+**Reading the classifier is what made the expectation declarable.**
+`statement_diff` dispatches on language — Python through `ast`, TS/JS through
+tree-sitter — and **every other language falls through to
+`PUBLIC_BEHAVIOR_CHANGED`**. Java body changes therefore carry **no
+statement-level classification**, by construction, and the same holds for Go,
+Rust and Scala. This was read from the code, not inferred from a run.
+
+**c029 measures that limit instead of avoiding it.** It adds a `throw` guard
+clause: on the Python path that classifies as `ERROR_BEHAVIOR_CHANGED`; on Java
+it reports `PUBLIC_BEHAVIOR_CHANGED`. The case declares the limit in its own
+`limitations`, so the corpus states it rather than leaving a reader to infer it
+from a coarse finding.
+
+**Every expectation matched on the first run**, including the impact path
+`PaymentService.charge -> OrderService.capture`. That is the substantive
+result: **Java impact analysis reaches a caller through the inbound `CALLS`
+edge**, and the *absence* of any test in that impact list is ADR-0065's
+no-test-edges limit visible as data rather than as prose.
+
+**The first mutation produced a false negative, and that is the lesson.**
+Making the query-backed symbol `content_hash` constant, a comparison of
+`changed_symbols` alone read **NOT DETECTED** — the symbol still reported as
+changed. Comparing everything the case declares showed it **is** detected: the
+finding flips to `DEPENDENCY_CHANGED` and the impact path empties.
+
+Two findings follow. **Changed-symbol detection does not rest on the content
+hash alone** — undocumented until now. And **a mutation check must compare
+every field the case asserts, not the one the author had in mind**; a narrower
+proxy manufactures a false negative, the inverse of ADR-0052's "assert against
+the one claim under test, never the joined text".
+
+| Mutation | Detected by |
+| --- | --- |
+| query-backed symbol `content_hash` made constant | findings **and** impact paths — *not* `changed_symbols` |
+| `reference.call -> CALLS` mapping removed | impact paths |
+
+Both restored **from file copies, never `git checkout --`**.
+
+**`changed_symbol_precision` 0.9464 -> 0.9483, and it is not an improvement.**
+A perfect case widened the denominator; no engine behaviour changed. It remains
+the sole entry in `unmet_targets` and still misses 0.95.
+
+- Files: `tests/evaluation/cases/changes.json` (c029),
+  `cases/variants/java_app/guard-clause/target/.../PaymentService.java` (new),
+  `cases/dataset.json`, five count guards in `tests/evaluation/`, the three
+  regenerated baselines, `documentation/memory.md`, this file.
+
+**Verification.**
+
+- `run_evaluation.py validate` — valid, 8 fixtures / 69 query / **29 change**.
+- c029 run through the real `ChangeAnalysisEngine`: changed symbol, finding code
+  and impact path all match the declared gold exactly.
+- **The first full gate run FAILED, and it caught a real omission** —
+  `2 failed, 2311 passed`. Both failures were
+  `test_every_declared_case_is_covered_by_this_table`, in `test_findings.py`
+  and `test_impact_cases.py`. **Neither is a count guard**: each asserts that
+  the corpus's case set equals the set the *rule table* in that file declares,
+  so a new change case that nothing models is refused. Fixed by adding a c029
+  row to both — the findings row records the coarse Java body class, and the
+  impact row required a new `_JAVA_APP` graph whose only expansion is the
+  inbound `CALLS`, because Java has no test edge to walk.
+- **New rows go last, positionally.** Both tables are indexed by position
+  elsewhere in their own files; their comments say so, and c025-c028 are
+  already ordered for that reason.
+- Second full gate run: **`check_phase4.ps1 -SkipSync` — exit 0, `2315 passed,
+  2 xfailed`**, 342.10 s, all nine stages, every baseline `--check` reproducing.
+  `GATE_LASTEXITCODE=0` captured to the log and the log grepped for failure
+  markers, both agreeing. The count moved 2313 -> 2315: **exactly the two
+  parameterised table rows**, which is what a change that models one new case
+  and alters no behaviour should look like.
+- `tests/unit tests/evaluation` — 997 passed, 1 xfailed. `ruff` clean.
+
+**Limitations.**
+
+- One change case over a two-file fixture. Java **deletion**, **rename**,
+  **signature change** and **added symbol** remain unmeasured, as do all of Go,
+  Rust and Scala.
+- The case cannot distinguish a Java `throw` from any other body edit, because
+  the engine does not either. That is the limit being recorded, not a defect.
+
+- Next: unchanged — the two ADR-0065 rulings (P0-2) still gate Go/Rust/Scala.
+
 ### 2026-08-19T15:00:00Z — Java is measured: the first evaluation cases for a query-backed language
 
 - Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.

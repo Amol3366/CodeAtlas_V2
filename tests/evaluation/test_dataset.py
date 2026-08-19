@@ -23,9 +23,9 @@ def test_shipped_dataset_has_declared_phase_zero_cardinality() -> None:
 
     assert len(dataset.fixtures) == 8
     assert len(dataset.query_cases) == 69
-    assert len(dataset.change_cases) == 28
+    assert len(dataset.change_cases) == 29
     assert len({case.id for case in dataset.query_cases}) == 69
-    assert len({case.id for case in dataset.change_cases}) == 28
+    assert len({case.id for case in dataset.change_cases}) == 29
 
 
 def test_shipped_dataset_evidence_resolves_inside_fixture_roots() -> None:
