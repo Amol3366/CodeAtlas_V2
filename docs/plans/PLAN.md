@@ -294,6 +294,64 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-20T15:00:00Z — README claims are guarded (P2-A)
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P2-A closed.** `tests/unit/test_readme_claims.py`, eight
+  assertions. **No source change**; README corrections only.
+
+**No mutation had to be invented — the README was already wrong.** On its first
+run the guard failed on exactly the two claims that had drifted since yesterday:
+parser bundle `1.5.0` against a declared `1.6.0`, and corpus `65/28/8` against
+`80/32/11`. It *passed* `resolver 1.5.0`, which genuinely had not moved, so it
+discriminates rather than failing indiscriminately. That is a stronger
+mutation-check than a synthetic one, because the defect was real.
+
+**A third stale claim surfaced that the guard cannot cover.** The Tests row read
+"2313 passed, 2 xfailed" when both xfails had been closed hours earlier by
+ADR-0066 and ADR-0067. A test count is a **measurement** — it comes from running
+the suite, not from reading source — so no assertion here can derive it. Fixed
+by hand, and **the guard's docstring now states what it does not cover**: a
+guard whose scope is unstated gets mistaken for a guarantee, which is how the
+packaged `--help` check was trusted while the binary could not run.
+
+**Deliberately narrow**: the facts that have actually drifted, not the whole
+document. A guard that fails on ordinary rewording is one people learn to
+delete.
+
+**Fourth instance of one pattern.** A list that must be extended when something
+is added, with nothing enforcing it: `SUPPORTED_FIXTURES` and the two `ROWS`
+tables are guarded and each forced a decision; the PyInstaller data list was not
+and shipped a broken artifact; `README.md` was not and drifted twice in two days.
+
+- Files: `tests/unit/test_readme_claims.py` (new), `README.md` (three
+  corrections), `documentation/memory.md`, this file.
+
+**Verification.**
+
+| Check | Result |
+| --- | --- |
+| Guard against the **stale** README | **2 failed** — parser bundle and corpus counts, both real |
+| Guard after correcting them | **8 passed** |
+| `ruff check src tests scripts apps` | clean |
+| `mypy --no-incremental src tests` | clean over **357 files** |
+
+A single-file `mypy` run reported missing-stub errors; run as the gate invokes
+it, over `src tests`, it is clean. Worth knowing before anyone reads a
+single-file mypy result as a failure.
+
+**Limitations.**
+
+- **The test count is unguarded** and will go stale again; it is a measurement.
+- Prose, structure and the measured-results table are unguarded by choice. Those
+  figures name the artifact each came from, so checking them by hand is cheap.
+- The patterns are tied to the README's current phrasing. A reword fails the
+  guard rather than passing silently — the safer direction, but it does mean the
+  guard needs updating when the wording genuinely changes.
+
+- Next: P2-B (widen the LF guard beyond the corpus) is the sibling of this one.
+  The dilution decision from P1-B and P1-C's §12 both still need you.
+
 ### 2026-08-20T13:00:00Z — Change cases for Scala, Go and Rust — and `unmet_targets` empties by dilution
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

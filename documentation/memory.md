@@ -1830,6 +1830,33 @@ of a status list is how they drift, which is the `--format pr` and
       producing one code is the declared limit, recorded in each case's own
       `limitations` rather than left for a reader to infer.**
 
+- [x] **README claims are guarded (P2-A, 2026-08-20).** Eight assertions
+      deriving the README's version constants, MCP tool count and corpus counts
+      from source. **No mutation had to be invented: the README was already
+      wrong when the guard was written**, and it caught both drifts on its first
+      run — parser bundle `1.5.0` against a declared `1.6.0`, and corpus
+      `65/28/8` against `80/32/11`. It correctly *passed* `resolver 1.5.0`,
+      which genuinely had not moved, so it discriminates rather than just
+      failing.
+
+      **A third stale claim was found that the guard cannot cover**: the Tests
+      row still read "2313 passed, 2 xfailed" when both xfails had been closed
+      by ADR-0066/0067. A test count is a **measurement**, not derivable from
+      source, so no assertion here can hold it. Fixed by hand, and the guard's
+      docstring now says what it does *not* cover and why — a guard whose scope
+      is unstated gets mistaken for a guarantee.
+
+      **Deliberately narrow.** It checks the facts that have actually drifted,
+      not the whole document: a guard that fails on ordinary rewording is one
+      people learn to delete.
+
+      This is the fourth item in the pattern the project keeps meeting — a list
+      that must be extended when something is added, with nothing enforcing it.
+      `SUPPORTED_FIXTURES` and the two `ROWS` tables are guarded and each forced
+      a decision; the PyInstaller data list was not, and shipped an artifact
+      that could not run at all; `README.md` was not, and drifted twice in two
+      days.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

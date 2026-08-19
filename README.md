@@ -14,8 +14,8 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Platform** | Windows 11 primary (loopback only, single user) |
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
-| **Component versions** | Parser bundle `1.5.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2313 passed, 2 xfailed** — `check_phase4.ps1 -SkipSync`, exit 0, 2026-08-19. The two xfails are the declared Go-import and Scala-member-call limits |
+| **Component versions** | Parser bundle `1.6.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
+| **Tests** | **2350 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, exit 0, 2026-08-20. **No xfails**: the two ADR-0065 limits were ruled and closed (ADR-0066, ADR-0067) |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -332,7 +332,7 @@ active → superseded
 
 Vector coverage is tracked separately and can **never** block deterministic
 activation. Component versions are stamped into each snapshot — parser bundle
-`1.5.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
+`1.6.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
 existing snapshots stale and forces a reindex. The parser and resolver bumps
 landed together in ADR-0065 deliberately: both invalidate every snapshot, so
 shipping them in one change costs users one reindex rather than two.
@@ -695,7 +695,7 @@ caveats live in `docs/evaluation/*-baseline-environment.md`.
 | Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) | `baseline-phase-4.json` |
 | Packaged refresh p95 · preflight p95 | **0.799 s · 2.243 s** (semantic-local, on the artifact; cold start 1.060 s, coverage 1.0) | `baseline-phase-7-perf.json`, 2026-08-10 |
 
-Corpus: **65 query cases, 28 change cases, 8 fixtures** — plus a separate
+Corpus: **80 query cases, 32 change cases, 11 fixtures** — plus a separate
 invariant corpus (`tests/evaluation/invariant_cases/`) that asserts a boolean
 rather than an accuracy, and a 14-case conceptual corpus for the semantic layer.
 
