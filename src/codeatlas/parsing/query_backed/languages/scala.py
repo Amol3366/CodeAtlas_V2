@@ -62,6 +62,13 @@ class ScalaAdapter:
             imports_query=Query(grammar, load_query_source("scala.imports.scm")),
             kind_by_capture=_KIND_BY_CAPTURE,
             scope_node_types=_SCOPE_NODE_TYPES,
+            # Scala is the only one of the four whose shipped `tags.scm` has no
+            # member-call pattern, so `payments.charge(id)` produced no edge
+            # (ADR-0065 recorded it; ADR-0067 closes it). Java, Go and Rust
+            # supply nothing here and are unaffected.
+            references_query=Query(
+                grammar, load_query_source("scala.references.scm")
+            ),
         )
 
     def module_path(self, root: Any, source: bytes, relative_path: str) -> str:

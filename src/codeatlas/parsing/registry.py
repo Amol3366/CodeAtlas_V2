@@ -38,7 +38,13 @@ from codeatlas.domain.symbols import SymbolRecord
 # every symbol version derived by the 1.4.0 bundle is stale. RESOLVER_VERSION
 # moves to 1.5.0 in the same change, deliberately: both make every snapshot
 # stale, and landing them together costs users one reindex rather than two.
-PARSER_BUNDLE_VERSION: str = "1.5.0"
+# 1.6.0 (ADR-0067): Scala emits CALLS edges for member calls -- `obj.method(x)`
+# -- which its shipped `tags.scm` never captured. A Scala file therefore yields
+# references it did not before, so every symbol version derived by the 1.5.0
+# bundle is stale. RESOLVER_VERSION is deliberately NOT moved: resolution draws
+# the same conclusions from a reference as it always did; only the set of
+# references changed.
+PARSER_BUNDLE_VERSION: str = "1.6.0"
 
 
 @dataclass(frozen=True)

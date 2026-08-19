@@ -8,7 +8,6 @@ declared limitations at the bottom of this file.
 
 from __future__ import annotations
 
-import pytest
 from tree_sitter import Parser as TreeSitterParser
 
 from codeatlas.contracts import SymbolKind
@@ -114,11 +113,59 @@ SCALA_CALL_LIMIT = (
 )
 
 
-@pytest.mark.xfail(strict=True, reason=SCALA_CALL_LIMIT)
+# Ruled 2026-08-19 (ADR-0067): the profile contract gained a second authored
+# query slot and Scala fills it, so this no longer xfails. The limit text
+# above is kept verbatim as the reasoning the decision was made on.
 def test_a_method_call_on_a_receiver_is_captured() -> None:
+    """`payments.charge(id)` produces a CALLS edge (ADR-0067).
+
+    Was a `strict` xfail: Scala's shipped `tags.scm` matches only
+    `(call_expression (identifier) @name)`, so a call on a receiver -- most
+    real Scala -- was invisible. The supplementary `scala.references.scm`
+    captures the `field_expression`'s `field`, which is the method name.
+    """
     result = TagsBackedParser(ScalaAdapter()).parse(_request())
 
     assert any(
         ref.kind.value == "CALLS" and ref.target_hint == "charge"
         for ref in result.references
     )
+
+
+def test_a_bare_call_is_still_captured_alongside_member_calls() -> None:
+    """The supplementary query adds coverage; it does not replace any.
+
+    `helper(orderId)` is matched by the grammar's shipped `tags.scm` and
+    `payments.charge(orderId)` only by `scala.references.scm` (ADR-0067). Both
+    must survive, because the extractor now runs two queries and the failure
+    worth guarding against is one shadowing the other -- a supplementary query
+    that quietly replaced the shipped one would trade a known gap for a silent
+    regression.
+
+    Asserted together in one test on purpose: separately, each passes while the
+    other is broken.
+    """
+    result = TagsBackedParser(ScalaAdapter()).parse(_request())
+    called = {ref.target_hint for ref in result.references if ref.kind.value == "CALLS"}
+
+    assert {"helper", "charge"} <= called, (
+        f"expected both the bare and the member call, got {sorted(called)}"
+    )
+
+
+def test_a_member_call_is_recorded_once() -> None:
+    """Two queries must not store one call twice.
+
+    `parts` spans both queries so an identical name on one line is treated as
+    the same reference. If a future query captured `charge` as well, this fails
+    rather than silently doubling an edge -- and a duplicated CALLS edge would
+    inflate impact analysis, which is the product's core claim.
+    """
+    result = TagsBackedParser(ScalaAdapter()).parse(_request())
+    charges = [
+        ref
+        for ref in result.references
+        if ref.kind.value == "CALLS" and ref.target_hint == "charge"
+    ]
+
+    assert len(charges) == 1, f"expected one CALLS edge for charge, got {len(charges)}"

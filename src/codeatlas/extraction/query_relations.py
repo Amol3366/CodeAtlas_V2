@@ -43,36 +43,48 @@ def extract_query_references(
     module_symbol_id = symbols[0].symbol_id if symbols else f"module_{request.file_id}"
     references = list(adapter.imports(root, source, request.file_id, module_symbol_id))
     parts: dict[tuple[str, RelationKind, str, int], int] = {}
-    for _pattern, captures in QueryCursor(adapter.profile.tags_query).matches(root):
-        kind = _match_kind(captures)
-        if kind is None:
-            continue
-        # The reference capture marks the *kind*; the target name is a separate
-        # `@name` capture in the same match. Java's tags.scm puts
-        # `@reference.call` on the argument list, not the method name, so
-        # reading the reference node's own text yields "(orderId)" rather than
-        # "charge" -- and `implements A, B` would yield "A, B".
-        for name_node in captures.get("name", ()):
-            hint = _text(name_node, source)
-            line = name_node.start_point[0] + 1
-            owner = _enclosing_symbol_id(line, symbols, module_symbol_id)
-            # `part` distinguishes two otherwise-identical references on one
-            # line, as in `f(f(x))`. Both are real edges.
-            key = (owner, kind, hint, line)
-            part = parts.get(key, 0)
-            parts[key] = part + 1
-            references.append(
-                SymbolReference(
-                    source_symbol_id=owner,
-                    file_id=request.file_id,
-                    kind=kind,
-                    target_hint=hint,
-                    module_hint="",
-                    start_line=line,
-                    end_line=name_node.end_point[0] + 1,
-                    part=part,
+    # The grammar's shipped query, then this repository's supplementary one
+    # when a language has it (ADR-0067). Both use the same
+    # `reference.*` / `@name` convention, so one loop consumes both and
+    # neither needs to know the other exists.
+    #
+    # `parts` spans both deliberately: a name captured by both queries on
+    # one line is the same call, and giving the second occurrence a distinct
+    # `part` would store one call twice.
+    queries = [adapter.profile.tags_query]
+    if adapter.profile.references_query is not None:
+        queries.append(adapter.profile.references_query)
+    for query in queries:
+        for _pattern, captures in QueryCursor(query).matches(root):
+            kind = _match_kind(captures)
+            if kind is None:
+                continue
+            # The reference capture marks the *kind*; the target name is a separate
+            # `@name` capture in the same match. Java's tags.scm puts
+            # `@reference.call` on the argument list, not the method name, so
+            # reading the reference node's own text yields "(orderId)" rather than
+            # "charge" -- and `implements A, B` would yield "A, B".
+            for name_node in captures.get("name", ()):
+                hint = _text(name_node, source)
+                line = name_node.start_point[0] + 1
+                owner = _enclosing_symbol_id(line, symbols, module_symbol_id)
+                # `part` distinguishes two otherwise-identical references on one
+                # line, as in `f(f(x))`. Both are real edges.
+                key = (owner, kind, hint, line)
+                part = parts.get(key, 0)
+                parts[key] = part + 1
+                references.append(
+                    SymbolReference(
+                        source_symbol_id=owner,
+                        file_id=request.file_id,
+                        kind=kind,
+                        target_hint=hint,
+                        module_hint="",
+                        start_line=line,
+                        end_line=name_node.end_point[0] + 1,
+                        part=part,
+                    )
                 )
-            )
     return tuple(references)
 
 

@@ -139,9 +139,32 @@ GO_IMPORT_FINDING = (
     "so it is recorded for a decision rather than chosen here."
 )
 
+# Ruled 2026-08-19 (ADR-0066): declined, permanently. The finding above is
+# kept verbatim as the reasoning the decision was made on, not rewritten to
+# read as though the outcome were always obvious.
 
-@pytest.mark.xfail(strict=True, reason=GO_IMPORT_FINDING)
-def test_a_go_import_resolves_across_packages(go_harness: GoHarness) -> None:
+
+def test_a_go_import_is_recorded_external_by_ruling(go_harness: GoHarness) -> None:
+    """A Go import stays `external`, and that is the decision (ADR-0066).
+
+    **This was a `strict` xfail until the user ruled it on 2026-08-19.** It is
+    inverted rather than deleted, on ADR-0045's precedent: the test existed so
+    the behaviour could not change silently, and it still does — it now asserts
+    the ruled outcome in the same place instead of predicting a fix that is not
+    coming.
+
+    The reasoning, kept in ``GO_IMPORT_FINDING`` above: the module prefix lives
+    in ``go.mod``, which a parse of a single file cannot read, so closing this
+    needs a *matching policy* rather than more parsing. Its cost is asymmetric —
+    trimming too far makes a third-party ``github.com/foo/payments`` resolve onto
+    a local ``payments``, **inventing** a relationship §4.1 forbids. A miss is
+    the safe direction; an invention is not.
+
+    So the assertion is deliberately two-sided. The import must be **recorded**
+    — dropping it entirely would lose a true fact about the file — and it must
+    be **unresolved**, because resolving it here would mean the matching policy
+    had been added without the ADR that governs it.
+    """
     imports = [
         row
         for row in _rows(go_harness, "relations", "kind, target_hint, resolution")
@@ -149,4 +172,8 @@ def test_a_go_import_resolves_across_packages(go_harness: GoHarness) -> None:
     ]
 
     assert imports, "no IMPORTS relations stored at all"
-    assert any(row[2] == "resolved" for row in imports)
+    assert all(row[2] == "external" for row in imports), (
+        "a Go import resolved. That is not an improvement unless a matching "
+        "policy was ruled and recorded: see ADR-0066, which declines one "
+        "because a wrong match invents a relationship section 4.1 forbids."
+    )

@@ -27,9 +27,10 @@ from codeatlas.domain.symbols import Visibility
 class LanguageProfile:
     """Everything a language contributes as data rather than as behavior.
 
-    ``grammar``, ``tags_query`` and ``imports_query`` are typed ``Any`` because
-    they are Tree-sitter objects: importing ``tree_sitter`` types here would put
-    a parser dependency in a contract module that adapters and tests both read.
+    ``grammar``, ``tags_query``, ``imports_query`` and ``references_query`` are
+    typed ``Any`` because they are Tree-sitter objects: importing ``tree_sitter``
+    types here would put a parser dependency in a contract module that adapters
+    and tests both read.
     """
 
     language: str
@@ -38,6 +39,21 @@ class LanguageProfile:
     imports_query: Any
     kind_by_capture: Mapping[str, SymbolKind]
     scope_node_types: frozenset[str]
+    # An optional second authored query, for references a grammar's shipped
+    # `tags.scm` does not capture (ADR-0067).
+    #
+    # It exists because Scala's `tags.scm` matches only
+    # `(call_expression (identifier) @name)`, so `payments.charge(id)` -- most
+    # real Scala calls -- produced no edge at all, while Java, Go and Rust all
+    # ship a member-call pattern. ADR-0065 declined to widen the contract
+    # mid-slice and recorded the gap instead; this is that gap closed.
+    #
+    # **Optional on purpose.** A language whose shipped query is sufficient
+    # supplies nothing and runs exactly as before, so adding the slot changed no
+    # behaviour for Java, Go or Rust. Its captures use the same
+    # `reference.*` / `@name` convention as `tags_query`, which is what lets one
+    # extractor consume both without knowing which query a match came from.
+    references_query: Any | None = None
 
 
 class LanguageAdapter(Protocol):

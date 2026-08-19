@@ -74,6 +74,7 @@ with verification.
 | Item                                                                                                             | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Reopens when                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible |
+| ~~**ADR-0065's two declared limits: Go imports and Scala member calls**~~ | **BOTH CLOSED 2026-08-19 by user ruling, and they were ruled in opposite directions on purpose.** **Go (ADR-0066): declined, permanently.** The module prefix lives in `go.mod`, which a single-file parse cannot read, so closing it needs a *matching policy* rather than more parsing — and the cost is asymmetric: trimming too far makes a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing** a relationship §4.1 forbids. The `strict` xfail is **inverted rather than deleted** (ADR-0045's precedent) and now pins both halves: the import is recorded, and it is not resolved. **Scala (ADR-0067): closed.** `LanguageProfile` gained an optional `references_query`; Scala authors `scala.references.scm` capturing the `field_expression`'s `field`. **What separates the two rulings is where the missing information lives** — Go's is in a file the parser is not allowed to read, Scala's was in the syntax tree all along and only a query was missing. Declaring a limit that nine lines of query closes would have recorded an absence of work as a property of the language. `PARSER_BUNDLE_VERSION` **1.5.0 -> 1.6.0** (Scala yields references it did not before); `RESOLVER_VERSION` deliberately unchanged, because resolution draws the same conclusions from a reference as it always did. **The corpus carries no xfails at all now.** | Someone wants a Go matching policy (supersede ADR-0066), or a fourth language needs a supplementary query |
 | Pid-reuse detection in crash recovery                                                                            | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                                                                                                                                                                          |
 | `relation_path_correctness` measured precision                                                                 | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | q010: does`IMPORTS` target the module or the bound class?                                                      | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                                          |
@@ -291,6 +292,86 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T03:00:00Z — ADR-0065's two limits ruled: Go declined, Scala closed
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P0-2 closed.** Both limits ADR-0065 carried are now decisions.
+- **`PARSER_BUNDLE_VERSION` 1.5.0 → 1.6.0**, so **every snapshot is stale and
+  every user reindexes once**. `RESOLVER_VERSION` deliberately unchanged;
+  `SCHEMA_VERSION` 14, no migration; `contract_version` `1.1`.
+
+**Ruled in opposite directions, and the asymmetry is the point.**
+
+**ADR-0066 — Go: declined, permanently.** A Go import stays `external`. The
+module prefix lives in `go.mod`, which a single-file parse cannot read, so
+closing it needs a *matching policy* rather than more parsing — and the cost is
+asymmetric: trimming too far makes a third-party `github.com/foo/payments`
+resolve onto a local `payments`, **inventing** a relationship §4.1 forbids.
+
+**ADR-0067 — Scala: closed.** `LanguageProfile` gains an optional
+`references_query`; Scala authors `scala.references.scm`, and
+`payments.charge(id)` now emits a `CALLS` edge.
+
+**What separates them is where the missing information lives.** Go's is in a
+file the parser is not permitted to read. Scala's was in the syntax tree the
+whole time and only a *query* was missing. **Declaring a limit that nine lines
+of query closes would record an absence of work as a property of the language**
+— "both are limits of the mechanism" was the comfortable answer and the wrong
+one.
+
+**Both xfails inverted rather than deleted** (ADR-0045's precedent). The Go test
+now pins **both halves** — the import *is* recorded, and it is *not* resolved —
+so a future matching policy cannot land without superseding the ADR that governs
+it. **The corpus now carries no xfails at all**, where it carried two.
+
+**The grammar was measured before the query was written.** A member call's
+`function` is a `field_expression` whose **`field`** is the method name;
+capturing `value` would target the *receiver* and assert a variable was called —
+a different and false claim. Chained `a.b.c(x)` matches once, on `c`.
+
+**Two guards, for the two ways a supplementary query goes wrong.** One asserts a
+bare call **and** a member call both survive — **together in one test, because
+separately each passes while the other is broken** — so a supplementary query
+cannot silently shadow the shipped one. The other asserts a member call is
+stored **once**: `parts` spans both queries, and a doubled `CALLS` edge would
+inflate impact analysis, which is the product's core claim.
+
+**Java, Go and Rust verified unaffected**, not assumed: their profiles report
+`references_query=None` and their suites are unchanged. The slot being optional
+is what makes that true by construction.
+
+- Files: `docs/adr/0066-*.md`, `docs/adr/0067-*.md` (new), `docs/adr/README.md`,
+  `parsing/query_backed/profile.py`, `queries/scala.references.scm` (new),
+  `languages/scala.py`, `extraction/query_relations.py`, `parsing/registry.py`,
+  `tests/integration/test_go_resolution.py`, `tests/unit/test_scala_adapter.py`,
+  `documentation/memory.md`, this file.
+
+**Verification.**
+
+| Check | Result |
+| --- | --- |
+| `check_phase4.ps1 -SkipSync` | **exit 0**, `GATE_LASTEXITCODE=0` — **2344 passed, 3 skipped, 0 xfailed** (was 2 xfailed) |
+| Mutation: extractor ignores `references_query` | **fails** the Scala member-call test |
+| Java / Go / Rust profiles | `references_query=None`; 41 adapter + integration tests pass |
+| `ruff`, `mypy` | clean over 356 files |
+| ADR index vs files | 66 = 66 |
+
+**Limitations.**
+
+- **A Scala member call resolves by name only.** The receiver's *type* is
+  unknown, so `a.charge(x)` and `b.charge(x)` are indistinguishable; they become
+  `MAY_CALL` or stay unresolved rather than false `CALLS` edges. The derivation
+  ladder absorbs this, but edge volume on a Scala repository rises.
+- **No evaluation case measures any of this.** Go, Rust and Scala still have
+  zero corpus coverage — the rulings unblock writing those cases; they are not
+  those cases.
+- **Second forced reindex in one day.** Not combined with ADR-0065's because the
+  ruling came after that change had shipped and merged.
+- The packaged artifact is now **stale again** at parser `1.5.0`.
+
+- Next: Go/Rust/Scala evaluation cases are now unblocked (P1-1's remainder).
+  Still open: P1-3's §12 divergences, and the artifact needs another rebuild.
 
 ### 2026-08-20T01:00:00Z — P1-2: the packaged build was broken by ADR-0065, and rebuilding found it
 

@@ -1641,6 +1641,60 @@ of a status list is how they drift, which is the `--format pr` and
       cost. Worth repeating whenever a packaging question is not about the heavy
       dependencies.
 
+- [x] **ADR-0065's two declared limits are ruled and closed (2026-08-19).**
+      ADR-0066 (Go) and ADR-0067 (Scala). **They were ruled in opposite
+      directions, and what separates them is the reusable part.**
+
+      **Go: declined, permanently.** A Go import stays `external`. The module
+      prefix lives in `go.mod`, which a single-file parse cannot read, so
+      closing it needs a *matching policy* rather than more parsing — and the
+      cost is asymmetric: trimming too far makes a third-party
+      `github.com/foo/payments` resolve onto a local `payments`, **inventing** a
+      relationship §4.1 forbids. A miss is safe; an invention is not.
+
+      **Scala: closed.** `LanguageProfile` gained an optional
+      `references_query`; Scala authors `scala.references.scm` capturing the
+      `field_expression`'s **`field`** — `payments.charge(id)` now emits a
+      `CALLS` edge.
+
+      **The distinction is where the missing information lives.** Go's is in a
+      file the parser is not permitted to read. Scala's was in the syntax tree
+      the whole time and only a *query* was missing. Declaring a limit that nine
+      lines of query closes would record an absence of work as a property of the
+      language — which is why "both are declared limits of the mechanism" would
+      have been the comfortable answer and the wrong one.
+
+      **Both xfails handled the same way, deliberately: inverted, not deleted.**
+      The Go test now pins *both* halves — the import is recorded, and it is not
+      resolved — so a future matching policy cannot land without the ADR that
+      governs it. ADR-0045's precedent: inverting a pinning test is not deleting
+      it. **The corpus now carries no xfails at all.**
+
+      **The grammar was measured before the query was written.** A member call's
+      `function` is a `field_expression` whose `field` is the method name;
+      capturing `value` instead would target the *receiver* and assert that a
+      variable was called — a different and false claim. Chained `a.b.c(x)`
+      matches once, on `c`.
+
+      **Two guards, for the two ways a supplementary query goes wrong.** One
+      asserts a bare call **and** a member call both survive — together in one
+      test, because separately each passes while the other is broken — so a
+      supplementary query cannot silently *shadow* the shipped one. The other
+      asserts a member call is stored **once**, because `parts` spans both
+      queries and a doubled `CALLS` edge would inflate impact analysis, which is
+      the product's core claim. Mutation-checked: blinding the extractor to the
+      supplementary query fails the Scala test.
+
+      **`PARSER_BUNDLE_VERSION` 1.5.0 -> 1.6.0; `RESOLVER_VERSION` deliberately
+      unchanged.** Only the *set* of references changed; resolution draws the
+      same conclusions from a reference as it always did. **Second forced
+      reindex in one day** — not combined with ADR-0065's because the ruling
+      came after that change had already shipped and merged.
+
+      **Java, Go and Rust verified unaffected**, not assumed: their profiles
+      report `references_query=None` and their suites are unchanged. The slot
+      being optional is what makes that true by construction.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
