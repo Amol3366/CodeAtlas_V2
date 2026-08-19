@@ -105,6 +105,49 @@ _PYTHON_EDGES = (
     ("test_capture_uses_idempotency_store", "PaymentService.capture", TESTS),
 )
 
+# The other three query-backed languages, same shape as _JAVA_APP and for the
+# same reason: no TESTS edge and no route exists, so a changed callee expands
+# through its inbound CALLS or not at all.
+#
+# _SCALA_APP's edge is the one worth naming: it exists only because ADR-0067
+# made member calls emit CALLS. Before that ruling a change to `charge` would
+# have reported no impact whatsoever.
+_SCALA_APP = {
+    "OrderService": CLASS,
+    "OrderService.capture": METHOD,
+    "PaymentService": CLASS,
+    "PaymentService.charge": METHOD,
+}
+_SCALA_EDGES = (
+    ("OrderService", "OrderService.capture", CONTAINS),
+    ("PaymentService", "PaymentService.charge", CONTAINS),
+    ("OrderService.capture", "PaymentService.charge", CALLS),
+)
+
+_GO_APP = {
+    "OrderService": CLASS,
+    "OrderService.Capture": METHOD,
+    "Service": CLASS,
+    "Service.Charge": METHOD,
+}
+_GO_EDGES = (
+    ("OrderService", "OrderService.Capture", CONTAINS),
+    ("Service", "Service.Charge", CONTAINS),
+    ("OrderService.Capture", "Service.Charge", CALLS),
+)
+
+_RUST_APP = {
+    "OrderService": CLASS,
+    "OrderService.capture": METHOD,
+    "PaymentService": CLASS,
+    "PaymentService.charge": METHOD,
+}
+_RUST_EDGES = (
+    ("OrderService", "OrderService.capture", CONTAINS),
+    ("PaymentService", "PaymentService.charge", CONTAINS),
+    ("OrderService.capture", "PaymentService.charge", CALLS),
+)
+
 # ADR-0065. Java carries no TESTS edge and no route, so the only thing that can
 # expand from a changed method is its inbound CALLS -- which is the point of
 # c029: impact analysis works for a query-backed language, and the absence of a
@@ -219,6 +262,25 @@ CASES: tuple[Case, ...] = (
         "c029",
         _JAVA_APP,
         _JAVA_EDGES,
+        (("PaymentService.charge", ChangeKind.MODIFIED),),
+    ),
+    # c030-c032: the same orientation check for the other three.
+    Case(
+        "c030",
+        _SCALA_APP,
+        _SCALA_EDGES,
+        (("PaymentService.charge", ChangeKind.MODIFIED),),
+    ),
+    Case(
+        "c031",
+        _GO_APP,
+        _GO_EDGES,
+        (("Service.Charge", ChangeKind.MODIFIED),),
+    ),
+    Case(
+        "c032",
+        _RUST_APP,
+        _RUST_EDGES,
         (("PaymentService.charge", ChangeKind.MODIFIED),),
     ),
     Case(

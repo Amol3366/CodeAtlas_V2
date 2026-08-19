@@ -1795,6 +1795,41 @@ of a status list is how they drift, which is the `--format pr` and
       changed-symbol detection is unmeasured for Scala, Go and Rust; and
       `symbol_breadth`, `scala_app`, `go_app` and `rust_app` all carry zero.
 
+- [x] **Change cases for Scala, Go and Rust (P1-B, 2026-08-20).** Corpus **29 ->
+      32 change cases**; all four ADR-0065 languages now have change coverage.
+      **No source change at all** — variants, cases, two table rows each, counts.
+
+      **c030 measures ADR-0067 on the change side.** Mutating the extractor to
+      ignore the supplementary query fails **c030 alone**; c029, c031 and c032
+      survive, because Java, Go and Rust ship member-call patterns in their own
+      `tags.scm` and Scala does not. So Scala's *impact analysis* depends on that
+      ruling, not just its symbol lookup — before ADR-0067 a change to `charge`
+      would have reported **no impact whatsoever**.
+
+      **`unmet_targets` is now EMPTY for the first time in the project's
+      history, and nothing was fixed.** `changed_symbol_precision` 0.9483 ->
+      0.9531 crossed its 0.95 target **by dilution**: c020, c021 and c022 each
+      still score **exactly 0.50**, unchanged, and the denominator moved 29 ->
+      32. `(29x1.0 + 3x0.5)/32 = 0.9531`; the same three gave `0.9483` at 29.
+
+      **This is a loss of gate signal and it must not be quoted as an
+      achievement.** The cases were not added to move it — Scala, Go and Rust
+      had no change coverage at all — but the effect is that a real, known,
+      per-case defect **stopped being visible to the aggregate**. It is the
+      mirror of ADR-0032/0033: there a threshold could not express a miss; here
+      the denominator grew until a miss cannot register.
+
+      **Never cite "all Section 19.3 targets met" without this entry.** Recorded
+      in the register with a trigger, and in the README beside the number.
+      Needs a decision: gate per-case, report the imperfect count beside the
+      aggregate, or accept it explicitly.
+
+      All three findings are `PUBLIC_BEHAVIOR_CHANGED` — a Scala `require`, a Go
+      early `return` and a Rust `assert!` are indistinguishable, because
+      `statement_diff` dispatches on Python and TS/JS only. **Three languages
+      producing one code is the declared limit, recorded in each case's own
+      `limitations` rather than left for a reader to infer.**
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

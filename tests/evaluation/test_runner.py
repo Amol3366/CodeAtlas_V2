@@ -187,7 +187,7 @@ def test_null_baseline_is_honest_and_deterministic() -> None:
 
     assert first == second
     assert first.implementation_status == "not_implemented"
-    assert first.case_counts == {"queries": 80, "changes": 29}
+    assert first.case_counts == {"queries": 80, "changes": 32}
     assert first.metrics.exact_symbol_resolution == 0.0
     assert first.metrics.symbol_recall_at_10 == 0.0
     assert first.metrics.mean_reciprocal_rank == 0.0

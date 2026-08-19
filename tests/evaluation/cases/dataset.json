@@ -18,5 +18,5 @@
   "query_cases_file": "queries.json",
   "change_cases_file": "changes.json",
   "expected_query_count": 80,
-  "expected_change_count": 29
+  "expected_change_count": 32
 }

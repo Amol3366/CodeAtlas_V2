@@ -278,6 +278,39 @@ ROWS: tuple[Row, ...] = (
             file_path="src/main/java/com/shop/payments/PaymentService.java",
         ),
     ),
+    # c030-c032 complete the query-backed four. All three carry
+    # PUBLIC_BEHAVIOR_CHANGED for the same structural reason as c029:
+    # `statement_diff` dispatches on Python and TS/JS only, so a Scala `require`,
+    # a Go early `return` and a Rust `assert!` are all indistinguishable from any
+    # other body edit. **Three languages producing one finding code is the limit
+    # being recorded, not a gap in these rows.**
+    Row(
+        "c030",
+        _change(
+            "PaymentService.charge",
+            METHOD,
+            body=BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED,
+            file_path="src/main/scala/com/shop/payments/PaymentService.scala",
+        ),
+    ),
+    Row(
+        "c031",
+        _change(
+            "Service.Charge",
+            METHOD,
+            body=BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED,
+            file_path="internal/payments/service.go",
+        ),
+    ),
+    Row(
+        "c032",
+        _change(
+            "PaymentService.charge",
+            METHOD,
+            body=BodyChangeClass.PUBLIC_BEHAVIOR_CHANGED,
+            file_path="src/payments/mod.rs",
+        ),
+    ),
 )
 
 

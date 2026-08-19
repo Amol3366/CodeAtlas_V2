@@ -775,14 +775,23 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   2026-08-18, reproduces on `main`, and is under investigation.
 - **The semantic-local packaged tree is 1.05 GB** (torch), accepted at the
   Phase 7 activation gate.
-- **Changed-symbol precision is 0.9464 against a ≥0.95 target** — the sole entry
-  in `unmet_targets`, and structural rather than a defect: three corpus cases
-  (c020–c022) split one physical diff into three single-symbol cases, so the
-  engine — correctly reporting both affected symbols every run — has each case
-  count the other's symbol against it. Every other change case scores 1.0. It
-  read 0.9375 at the Phase 4 gate and rose only because later cases widened the
-  denominator, which is arithmetic and not an improvement. The corpus is never
-  edited to move a number (ADR-0003).
+- **Changed-symbol precision now reads 0.9531 and `unmet_targets` is empty —
+  and that is dilution, not a fix.** The structural cause is untouched: three
+  corpus cases (c020–c022) split one physical diff into three single-symbol
+  cases, so the engine — correctly reporting both affected symbols every run —
+  has each case count the other's against it. **All three still score exactly
+  0.50.** The aggregate crossed 0.95 only because the change corpus grew 29 → 32
+  while those three stayed imperfect: `(29×1.0 + 3×0.5)/32 = 0.9531`, where the
+  same three gave `0.9483` at 29 and `0.9375` at the Phase 4 gate.
+
+  So the Phase 4 baseline now reports **`targets_met: true` with no unmet
+  targets** — for the first time — while the engine is exactly as accurate as it
+  was the day before. **Never cite "all Section 19.3 targets met" without this
+  paragraph.** A real per-case defect has simply stopped being visible to the
+  aggregate, which is the mirror of the threshold-granularity problem ADR-0032
+  and ADR-0033 record. The corpus is never edited to move a number (ADR-0003),
+  and it was not here — the cases were added to measure three languages that had
+  no change coverage — but the effect still has to be declared.
 - **Phase 7's primary evidence Recall@10 missed its ≥0.90 target**, measured at
   0.6667 at the gate. On the semantic corpus today it reads **0.80** under the
   strict line-range metric and **1.0000** under the containment-based metric

@@ -1261,6 +1261,132 @@
                       "forbidden_claims": [
                           "charge now validates every argument."
                       ]
+                  },
+                  {
+                      "id": "c030",
+                      "repository_fixture": "scala_app",
+                      "snapshot_id": "scala-v1",
+                      "base_ref": "HEAD",
+                      "target_ref": "working-tree:guard-clause",
+                      "expected_symbols": [
+                          "PaymentService.charge"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/main/scala/com/shop/payments/PaymentService.scala",
+                              "symbol": "PaymentService.charge",
+                              "start_line": 4,
+                              "end_line": 6,
+                              "evidence_id": "c030-e1",
+                              "snapshot_id": "scala-v1"
+                          }
+                      ],
+                      "expected_changed_symbols": [
+                          "PaymentService.charge"
+                      ],
+                      "expected_impact_paths": [
+                          [
+                              "PaymentService.charge",
+                              "OrderService.capture"
+                          ]
+                      ],
+                      "expected_findings": [
+                          "PUBLIC_BEHAVIOR_CHANGED"
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Body classification dispatches on Python and TypeScript/JavaScript only, so every other language falls through to PUBLIC_BEHAVIOR_CHANGED -- an added guard clause is not distinguished from any other statement change (ADR-0065).",
+                          "This language has no test edges (ADR-0065), so no test appears in impact.",
+                          "The impact path exists only because ADR-0067 made Scala member calls emit a CALLS edge; without it a change to charge would report no impact."
+                      ],
+                      "forbidden_claims": [
+                          "charge now validates every argument."
+                      ]
+                  },
+                  {
+                      "id": "c031",
+                      "repository_fixture": "go_app",
+                      "snapshot_id": "go-v1",
+                      "base_ref": "HEAD",
+                      "target_ref": "working-tree:guard-clause",
+                      "expected_symbols": [
+                          "Service.Charge"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "internal/payments/service.go",
+                              "symbol": "Service.Charge",
+                              "start_line": 5,
+                              "end_line": 10,
+                              "evidence_id": "c031-e1",
+                              "snapshot_id": "go-v1"
+                          }
+                      ],
+                      "expected_changed_symbols": [
+                          "Service.Charge"
+                      ],
+                      "expected_impact_paths": [
+                          [
+                              "Service.Charge",
+                              "OrderService.Capture"
+                          ]
+                      ],
+                      "expected_findings": [
+                          "PUBLIC_BEHAVIOR_CHANGED"
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Body classification dispatches on Python and TypeScript/JavaScript only, so every other language falls through to PUBLIC_BEHAVIOR_CHANGED -- an added guard clause is not distinguished from any other statement change (ADR-0065).",
+                          "This language has no test edges (ADR-0065), so no test appears in impact.",
+                          "The added early return is not classified as a return-value change, because Go is not on the statement-classifier's dispatch."
+                      ],
+                      "forbidden_claims": [
+                          "Charge now rejects empty order identifiers."
+                      ]
+                  },
+                  {
+                      "id": "c032",
+                      "repository_fixture": "rust_app",
+                      "snapshot_id": "rust-v1",
+                      "base_ref": "HEAD",
+                      "target_ref": "working-tree:guard-clause",
+                      "expected_symbols": [
+                          "PaymentService.charge"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/payments/mod.rs",
+                              "symbol": "PaymentService.charge",
+                              "start_line": 4,
+                              "end_line": 6,
+                              "evidence_id": "c032-e1",
+                              "snapshot_id": "rust-v1"
+                          }
+                      ],
+                      "expected_changed_symbols": [
+                          "PaymentService.charge"
+                      ],
+                      "expected_impact_paths": [
+                          [
+                              "PaymentService.charge",
+                              "OrderService.capture"
+                          ]
+                      ],
+                      "expected_findings": [
+                          "PUBLIC_BEHAVIOR_CHANGED"
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Body classification dispatches on Python and TypeScript/JavaScript only, so every other language falls through to PUBLIC_BEHAVIOR_CHANGED -- an added guard clause is not distinguished from any other statement change (ADR-0065).",
+                          "This language has no test edges (ADR-0065), so no test appears in impact.",
+                          "The added assert! is not classified as an error-behaviour change, for the same dispatch reason."
+                      ],
+                      "forbidden_claims": [
+                          "charge panics on every empty identifier at runtime."
+                      ]
                   }
               ]
 }

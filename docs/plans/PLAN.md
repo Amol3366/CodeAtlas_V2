@@ -75,6 +75,7 @@ with verification.
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible |
 | ~~**ADR-0065's two declared limits: Go imports and Scala member calls**~~ | **BOTH CLOSED 2026-08-19 by user ruling, and they were ruled in opposite directions on purpose.** **Go (ADR-0066): declined, permanently.** The module prefix lives in `go.mod`, which a single-file parse cannot read, so closing it needs a *matching policy* rather than more parsing — and the cost is asymmetric: trimming too far makes a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing** a relationship §4.1 forbids. The `strict` xfail is **inverted rather than deleted** (ADR-0045's precedent) and now pins both halves: the import is recorded, and it is not resolved. **Scala (ADR-0067): closed.** `LanguageProfile` gained an optional `references_query`; Scala authors `scala.references.scm` capturing the `field_expression`'s `field`. **What separates the two rulings is where the missing information lives** — Go's is in a file the parser is not allowed to read, Scala's was in the syntax tree all along and only a query was missing. Declaring a limit that nine lines of query closes would have recorded an absence of work as a property of the language. `PARSER_BUNDLE_VERSION` **1.5.0 -> 1.6.0** (Scala yields references it did not before); `RESOLVER_VERSION` deliberately unchanged, because resolution draws the same conclusions from a reference as it always did. **The corpus carries no xfails at all now.** | Someone wants a Go matching policy (supersede ADR-0066), or a fourth language needs a supplementary query |
+| **`changed_symbol_precision` now reads 0.9531 and `unmet_targets` is EMPTY — by dilution, not by any fix** | **OPEN — a loss of gate signal, recorded 2026-08-20 the moment it happened.** For the first time the Phase 4 baseline reports `targets_met: true` with **no unmet targets**. **Nothing was fixed.** The structural cause is untouched: c020, c021 and c022 each still score **exactly 0.50**, for the reason recorded since Phase 4 — they split one physical `git_changes` diff into three single-symbol cases, so the engine correctly reporting both affected symbols has each case count the other's against it. The aggregate crossed 0.95 because P1-B's three change cases took the denominator **29 -> 32**, diluting three imperfect cases: (29x1.0 + 3x0.5)/32 = **0.9531**, where (26x1.0 + 3x0.5)/29 = 0.9483. **Pure arithmetic.** **The cases were not added to move it** — they exist to measure Scala, Go and Rust, which had no change coverage at all — but the effect is that a real, known, per-case defect is **no longer visible to the gate**. That is the mirror of ADR-0032/ADR-0033: there a threshold could not express a miss; here the denominator has grown until a miss cannot register. **Do not cite "all Section 19.3 targets met" without this row.** The engine is exactly as accurate as it was yesterday. Needs a decision: gate on per-case precision, report the count of imperfect cases beside the aggregate, or accept the dilution and say so | A decision is taken on how to keep the c020-c022 defect visible |
 | Pid-reuse detection in crash recovery                                                                            | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                                                                                                                                                                          |
 | `relation_path_correctness` measured precision                                                                 | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | q010: does`IMPORTS` target the module or the bound class?                                                      | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                                          |
@@ -292,6 +293,83 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T13:00:00Z — Change cases for Scala, Go and Rust — and `unmet_targets` empties by dilution
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P1-B closed.** Corpus **29 -> 32 change cases**; all four
+  ADR-0065 languages now have change coverage.
+- **No source change at all.** Variant overlays, three cases, two table rows
+  each, and counts. No version bump, no migration.
+
+**c030 measures ADR-0067 on the change side.** Mutating the extractor to ignore
+the supplementary references query fails **c030 alone** — c029, c031 and c032
+survive, because Java, Go and Rust ship member-call patterns in their own
+`tags.scm` and Scala does not. So Scala's *impact analysis* depends on that
+ruling, not merely its symbol lookup: before ADR-0067, a change to `charge`
+would have reported **no impact whatsoever**.
+
+## `unmet_targets` is now empty, and nothing was fixed
+
+**The Phase 4 baseline reports `targets_met: true` with no unmet targets for the
+first time in this project's history.** It is dilution.
+
+`changed_symbol_precision` went 0.9483 -> **0.9531**, crossing its 0.95 target.
+The structural cause is **untouched**: c020, c021 and c022 each still score
+**exactly 0.50**, verified per case, for the reason recorded since Phase 4 —
+they split one physical `git_changes` diff into three single-symbol cases, so
+the engine correctly reporting both affected symbols has each case count the
+other's against it.
+
+```text
+29 cases:  (26 x 1.0 + 3 x 0.5) / 29 = 0.9483   <- missed
+32 cases:  (29 x 1.0 + 3 x 0.5) / 32 = 0.9531   <- "met"
+```
+
+**Pure arithmetic.** The engine is exactly as accurate as it was the day before.
+
+**The cases were not added to move it** — Scala, Go and Rust had no change
+coverage at all, which is what P1-B existed to fix — but the effect has to be
+declared: a real, known, per-case defect **stopped being visible to the
+aggregate**. That is the mirror of ADR-0032 and ADR-0033: there a threshold
+could not express a miss; here the denominator has grown until a miss cannot
+register.
+
+**Never cite "all Section 19.3 targets met" without this.** It is now a register
+row with a trigger, a README paragraph beside the number, and a memory entry.
+**It needs a decision**: gate on per-case precision, report the imperfect-case
+count beside the aggregate, or accept the dilution explicitly.
+
+**All three findings are `PUBLIC_BEHAVIOR_CHANGED`.** A Scala `require`, a Go
+early `return` and a Rust `assert!` are indistinguishable, because
+`statement_diff` dispatches on Python and TS/JS only. Three languages producing
+one code is the declared limit, written into each case's own `limitations`.
+
+- Files: three variant overlays (new), `changes.json` (c030-c032),
+  `dataset.json`, five count guards, `test_findings.py` (three rows),
+  `test_impact_cases.py` (three graphs + three rows), three regenerated
+  baselines, `README.md`, `documentation/memory.md`, this file.
+
+**Verification.**
+
+| Check | Result |
+| --- | --- |
+| `check_phase4.ps1 -SkipSync` | **`Phase 4 verification completed.`, `GATE_LASTEXITCODE=0`** — **2350 passed, 3 skipped**, `All checks passed!` |
+| `run_evaluation.py validate` | valid — 11 fixtures / 80 query / **32 change** |
+| Three cases through the real `ChangeAnalysisEngine` | changed symbol, finding and impact path all match on first run |
+| Mutation: ignore `references_query` | **c030 alone fails** |
+| Per-case audit | c020/c021/c022 still 0.50; **3 imperfect of 32** |
+| `changed_symbol_recall`, `direct_impact_recall`, `finding_precision`, `finding_count_correctness` | 1.0000 each |
+
+**Limitations.**
+
+- **The dilution above is the headline limitation**, not a footnote.
+- Each change is one body edit on a two-file fixture. Deletion, rename,
+  signature change and added-symbol remain unmeasured for all four languages.
+- `symbol_breadth` still carries **no** change case.
+
+- Next: the dilution decision is the live one. Otherwise P1-C's §12 divergence,
+  then the P2 items — README drift guard, LF guard widening, `SECURITY.md`.
 
 ### 2026-08-20T10:00:00Z — All four ADR-0065 languages are measured (P1-A)
 
