@@ -147,10 +147,23 @@ SUPPORTED_FIXTURES = (
     # contract gained a supplementary references query, and a unit test was the
     # only thing pinning it.
     #
-    # Go and Rust are still absent. Neither carries an open ruling any more --
-    # ADR-0066 declined Go's import policy -- so they are simply unwritten, not
-    # blocked, and they are the next slice rather than a deferral.
     "scala_app",
+    # `go_app` and `rust_app` admitted 2026-08-20, completing ADR-0065's four.
+    #
+    # **Go carries no import case, and that is a stated limit rather than an
+    # omission.** ADR-0066 rules a Go import stays `external`; an external edge
+    # has no `target_symbol_id`, so it never appears in a `relation_path`
+    # (ADR-0057 restricts those to resolved edges). The corpus vocabulary cannot
+    # express the ruled outcome, and a case that cannot fail reads as coverage
+    # while providing none. `test_a_go_import_is_recorded_external_by_ruling` is
+    # the only guard.
+    #
+    # **Rust's q080 is the control for that reasoning.** Its `crate` is a
+    # language keyword, so its import *does* resolve -- the contrast that
+    # diagnosed Go. If Rust imports ever stopped resolving, ADR-0066's
+    # explanation would have lost the comparison it rests on.
+    "go_app",
+    "rust_app",
 )
 
 

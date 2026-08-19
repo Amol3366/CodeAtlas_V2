@@ -11,10 +11,12 @@
     {"id":"malicious_unsupported","root":"malicious_unsupported","kind":"security","snapshots":[{"id":"security-v1","members":["source/malformed.py","content/untrusted.md","content/safe.json"]}]},
     {"id":"symbol_breadth","root":"symbol_breadth","kind":"symbol-breadth","snapshots":[{"id":"breadth-v1","members":["src/orders/repository.py","src/orders/pipeline.py","src/web/handlers.ts","src/web/widgets.js","tests/test_pipeline.py"]}]},
     {"id":"java_app","root":"java_app","kind":"java","snapshots":[{"id":"java-v1","members":["src/main/java/com/shop/orders/OrderService.java","src/main/java/com/shop/payments/PaymentService.java"]}]},
-  {"id":"scala_app","root":"scala_app","kind":"scala","snapshots":[{"id":"scala-v1","members":["src/main/scala/com/shop/orders/OrderService.scala","src/main/scala/com/shop/payments/PaymentService.scala"]}]}
+  {"id":"scala_app","root":"scala_app","kind":"scala","snapshots":[{"id":"scala-v1","members":["src/main/scala/com/shop/orders/OrderService.scala","src/main/scala/com/shop/payments/PaymentService.scala"]}]},
+  {"id":"go_app","root":"go_app","kind":"go","snapshots":[{"id":"go-v1","members":["internal/orders/service.go","internal/payments/service.go"]}]},
+  {"id":"rust_app","root":"rust_app","kind":"rust","snapshots":[{"id":"rust-v1","members":["src/orders/mod.rs","src/payments/mod.rs"]}]}
   ],
   "query_cases_file": "queries.json",
   "change_cases_file": "changes.json",
-  "expected_query_count": 73,
+  "expected_query_count": 80,
   "expected_change_count": 29
 }

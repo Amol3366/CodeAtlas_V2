@@ -293,6 +293,84 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-20T10:00:00Z — All four ADR-0065 languages are measured (P1-A)
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P1-A closed.** Corpus **73 -> 80 query cases**; `go_app` and
+  `rust_app` admitted, completing coverage of ADR-0065's four languages.
+- **The only source edit is `SUPPORTED_FIXTURES`.** No behaviour change, no
+  version bump, no migration.
+
+**Go deliberately gets no import case, and refusing to write one is the
+finding.** ADR-0066 rules a Go import stays `external`; an external edge carries
+no `target_symbol_id`, so it never appears in a `relation_path` — ADR-0057
+restricts those to resolved edges. **The corpus vocabulary cannot express the
+ruled outcome at all.** A case written anyway would pass whatever the engine
+did, and a case that cannot fail reads as coverage while providing none (the
+c028 lesson). `test_a_go_import_is_recorded_external_by_ruling` remains the only
+guard, now stated rather than assumed.
+
+**q080 is the control that keeps ADR-0066 honest.** Rust's `crate` is a language
+*keyword*, so its import **does** resolve — the exact contrast that diagnosed
+Go. If Rust imports ever stopped resolving, ADR-0066's explanation would lose
+the comparison it rests on, and now a metric would say so.
+
+**Two mutations, each hitting exactly the cases that depend on it.**
+
+| Mutation | Fails | Survives |
+| --- | --- | --- |
+| declared-module index emptied (the ADR-0065 resolver fix) | **q069, q073, q080** — the three import cases | q076, q079 — calls resolve through another tier |
+| Go `owner_hint` blinded (receiver qualification) | **q075, q076** | q074 — a plain struct needs no receiver |
+
+**Every moved metric moved up**, which had not happened on previous growth:
+containing 0.7655 -> 0.7763, exact 0.6759 -> 0.6908, and `ndcg_at_10` and
+`symbol_recall_at_10` **both rose** where earlier additions traded a ranking dip
+for evidence. All four query-backed fixtures have declared ranges the engine
+matches exactly.
+
+**The denominator tripwire fired a third time in two days** (59 -> 66), margin
+still unchanged: one miss scores 0.9848 and clears 0.98, two score 0.9697 and
+fail. **51 -> 66 without ever buying slack.**
+
+- Files: `fixtures/go_app/` and `fixtures/rust_app/` (new, 2 files each),
+  `queries.json` (q074-q080), `dataset.json`, `engine_adapter.py`, four count
+  guards, `test_threshold_granularity.py`, three regenerated baselines,
+  `documentation/memory.md`, this file.
+
+**Verification.**
+
+| Check | Result |
+| --- | --- |
+| `check_phase4.ps1 -SkipSync` | **`Phase 4 verification completed.`, `GATE_LASTEXITCODE=0`**, no `FAILED` in the log; all stages including the three `--check` baselines and the ADR-0016 invariants |
+| `run_evaluation.py validate` | valid — **11 fixtures / 80 query / 29 change** |
+| `exact_symbol_resolution` | **1.0000** over 66 scored cases |
+| `relation_path_recall` | **1.0000** |
+| `unmet_targets` | `['changed_symbol_precision']` — unchanged structural miss |
+| `tests/evaluation` | 120 passed |
+| Go + Rust adapter and integration suites | 20 passed |
+
+A separate direct `pytest -q` over the whole suite confirmed it independently:
+**2344 passed, 3 skipped, exit 0** in 954 s. Worth noting the suite is now
+materially slower — ~16 minutes against ~6 earlier in the week — because a
+packaged artifact exists and the semantic extras are installed, so the packaged
+e2e tests **run rather than skip**. That is more coverage, not a regression, but
+it changes what "run the suite" costs and is why an earlier attempt was cut off
+by a timeout rather than by a failure.
+
+**Limitations.**
+
+- **Change cases exist for Java only** (one). Changed-symbol detection — the
+  headline ADR-0065 capability — is unmeasured for Scala, Go and Rust, and
+  `symbol_breadth` carries none either.
+- Go's cases are **three, not four**, for the structural reason above.
+- Nothing measures Go interfaces (reported as `CLASS`), Rust traits, generics,
+  or Scala objects and pattern matching.
+- Each fixture is two files; these measure that the mechanism works, not that it
+  scales.
+
+- Next: **P1-B**, change cases for Scala, Go and Rust — the fixtures now exist,
+  so it reuses them. Then P1-C's §12 decision and the P2 items.
+
 ### 2026-08-20T07:00:00Z — Scala is measured; ADR-0067 gets evaluation coverage
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

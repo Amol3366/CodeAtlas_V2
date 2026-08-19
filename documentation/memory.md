@@ -1754,6 +1754,47 @@ of a status list is how they drift, which is the `--format pr` and
       Go and Rust remain unwritten — **not blocked**, since ADR-0066 declined
       Go's import policy rather than deferring it. They are the next slice.
 
+- [x] **All four ADR-0065 languages are now measured (P1-A, 2026-08-20).**
+      Corpus **73 -> 80 query cases**, `go_app` and `rust_app` admitted. Only
+      source edit is `SUPPORTED_FIXTURES`; no behaviour change, no version bump.
+
+      **Go deliberately gets no import case, and refusing to write one is the
+      finding.** ADR-0066 rules a Go import stays `external`; an external edge
+      carries no `target_symbol_id`, so it never appears in a `relation_path`
+      (ADR-0057 restricts those to resolved edges). **The corpus vocabulary
+      cannot express the ruled outcome at all.** A case written anyway would
+      pass whatever the engine did — and a case that cannot fail reads as
+      coverage while providing none, which is the c028 lesson. The inverted
+      integration test remains the only guard, and that is now stated rather
+      than assumed.
+
+      **q080 is the control that keeps ADR-0066 honest.** Rust's `crate` is a
+      language *keyword*, so its import **does** resolve — the exact contrast
+      that diagnosed Go. Mutation A (emptying the declared-module index) fails
+      **q069, q073 and q080** — the three import cases — while the CALLS cases
+      survive, because calls resolve through a different tier. So if Rust
+      imports ever stopped resolving, ADR-0066's explanation would lose the
+      comparison it rests on, and a metric would say so.
+
+      **Mutation B blinds Go's `owner_hint`** — the hook the entire Go slice
+      runs on, since Go's receiver is a field rather than a lexical ancestor —
+      and fails **q075 and q076** while q074 (a plain struct) survives. Each
+      mutation hits exactly the cases that depend on it.
+
+      **Every moved metric moved up**, which has not happened on previous
+      growth: containing 0.7655 -> 0.7763, exact 0.6759 -> 0.6908, ndcg and
+      `symbol_recall_at_10` both up. Earlier additions traded a small ranking
+      dip for evidence; these did not, because all four query-backed fixtures
+      have declared ranges the engine matches exactly.
+
+      **The tripwire fired a third time in two days** (59 -> 66) and the margin
+      is *still* unchanged — one miss scores 0.9848 and clears 0.98, two score
+      0.9697 and fail. **51 -> 66 without ever buying slack.**
+
+      Remaining gap, stated: **change cases exist for Java only** (one), so
+      changed-symbol detection is unmeasured for Scala, Go and Rust; and
+      `symbol_breadth`, `scala_app`, `go_app` and `rust_app` all carry zero.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by

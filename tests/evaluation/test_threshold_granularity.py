@@ -79,11 +79,14 @@ def test_the_exact_symbol_gate_now_expresses_its_stated_target() -> None:
     was written to do.
 
     It was **51** after ADR-0059 added q065, **55** with the Java cases
-    (q066-q069), and is **59** since the Scala cases (q070-q073) admitted
-    `scala_app` -- all on 2026-08-19. **The margin is unchanged across every
-    move**: one miss scores 0.9804, 0.9818 and 0.9831 at 51, 55 and 59, and all
-    three clear 0.98; two misses score 0.9608, 0.9636 and 0.9661 and all three
-    fail. So the corpus has grown 51 -> 59 without ever buying slack.
+    (q066-q069), **59** with the Scala cases (q070-q073), and is **66** since
+    the Go and Rust cases (q074-q080) completed ADR-0065's four languages.
+    **The margin is unchanged across every move**: one miss scores 0.9804,
+    0.9818, 0.9831 and 0.9848 at 51, 55, 59 and 66, and every one clears 0.98;
+    two misses score 0.9608, 0.9636, 0.9661 and 0.9697 and every one fails. So
+    the corpus has grown **51 -> 66 without ever buying slack**, which is the
+    property to restate on each growth: a widening denominator is the easiest
+    way to make a target look met.
 
     The exact counts are asserted rather than only the inequality, because a
     denominator that moves without anyone noticing is how ADR-0017 hid 16
@@ -93,8 +96,8 @@ def test_the_exact_symbol_gate_now_expresses_its_stated_target() -> None:
     scored = _scored(SYMBOL_INTENTS)
     required = math.ceil(EXACT_SYMBOL_THRESHOLD * scored - 1e-9)
 
-    assert scored == 59
-    assert required == 58
+    assert scored == 66
+    assert required == 65
     assert required < scored, "0.98 must now tolerate exactly one miss"
 
 

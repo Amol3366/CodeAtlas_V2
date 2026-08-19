@@ -2449,6 +2449,212 @@
                       "forbidden_claims": [
                           "OrderService depends on a database driver."
                       ]
+                  },
+                  {
+                      "id": "q074",
+                      "repository_fixture": "go_app",
+                      "snapshot_id": "go-v1",
+                      "question": "Where is the Go payments Service type defined?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "Service"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "internal/payments/service.go",
+                              "symbol": "Service",
+                              "start_line": 3,
+                              "end_line": 3,
+                              "evidence_id": "q074-e1",
+                              "snapshot_id": "go-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "A Go interface is reported as CLASS; the shipped tags.scm does not distinguish it from a struct (ADR-0065)."
+                      ],
+                      "forbidden_claims": [
+                          "Service opens a network connection."
+                      ]
+                  },
+                  {
+                      "id": "q075",
+                      "repository_fixture": "go_app",
+                      "snapshot_id": "go-v1",
+                      "question": "Where is OrderService.Capture defined in the Go service?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "OrderService.Capture"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "internal/orders/service.go",
+                              "symbol": "OrderService.Capture",
+                              "start_line": 11,
+                              "end_line": 13,
+                              "evidence_id": "q075-e1",
+                              "snapshot_id": "go-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "Capture retries the charge on failure."
+                      ]
+                  },
+                  {
+                      "id": "q076",
+                      "repository_fixture": "go_app",
+                      "snapshot_id": "go-v1",
+                      "question": "What calls Service.Charge in the Go service?",
+                      "intent": "CALLERS",
+                      "expected_abstention": false,
+                      "query_subject": "Service.Charge",
+                      "expected_symbols": [
+                          "OrderService.Capture"
+                      ],
+                      "expected_relations": [
+                          "OrderService.Capture CALLS Service.Charge"
+                      ],
+                      "expected_evidence": [
+                          {
+                              "file_path": "internal/orders/service.go",
+                              "symbol": "OrderService.Capture",
+                              "start_line": 12,
+                              "end_line": 12,
+                              "evidence_id": "q076-e1",
+                              "snapshot_id": "go-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Dynamic dispatch may add callers.",
+                          "Go's tags.scm marks every type_identifier as a reference, so a Go file yields many REFERENCES edges; they are true, and builtins among them stay unresolved rather than being invented (ADR-0065)."
+                      ],
+                      "forbidden_claims": [
+                          "This is the only runtime caller."
+                      ]
+                  },
+                  {
+                      "id": "q077",
+                      "repository_fixture": "rust_app",
+                      "snapshot_id": "rust-v1",
+                      "question": "Where is the Rust PaymentService struct defined?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "PaymentService"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/payments/mod.rs",
+                              "symbol": "PaymentService",
+                              "start_line": 1,
+                              "end_line": 1,
+                              "evidence_id": "q077-e1",
+                              "snapshot_id": "rust-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "PaymentService holds a database handle."
+                      ]
+                  },
+                  {
+                      "id": "q078",
+                      "repository_fixture": "rust_app",
+                      "snapshot_id": "rust-v1",
+                      "question": "Where is OrderService.capture defined in the Rust service?",
+                      "intent": "EXACT_SYMBOL",
+                      "expected_abstention": false,
+                      "expected_symbols": [
+                          "OrderService.capture"
+                      ],
+                      "expected_relations": [],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/orders/mod.rs",
+                              "symbol": "OrderService.capture",
+                              "start_line": 8,
+                              "end_line": 10,
+                              "evidence_id": "q078-e1",
+                              "snapshot_id": "rust-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "capture borrows the payment service mutably."
+                      ]
+                  },
+                  {
+                      "id": "q079",
+                      "repository_fixture": "rust_app",
+                      "snapshot_id": "rust-v1",
+                      "question": "What calls PaymentService.charge in the Rust service?",
+                      "intent": "CALLERS",
+                      "expected_abstention": false,
+                      "query_subject": "PaymentService.charge",
+                      "expected_symbols": [
+                          "OrderService.capture"
+                      ],
+                      "expected_relations": [
+                          "OrderService.capture CALLS PaymentService.charge"
+                      ],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/orders/mod.rs",
+                              "symbol": "OrderService.capture",
+                              "start_line": 9,
+                              "end_line": 9,
+                              "evidence_id": "q079-e1",
+                              "snapshot_id": "rust-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [
+                          "Dynamic dispatch may add callers."
+                      ],
+                      "forbidden_claims": [
+                          "This is the only runtime caller."
+                      ]
+                  },
+                  {
+                      "id": "q080",
+                      "repository_fixture": "rust_app",
+                      "snapshot_id": "rust-v1",
+                      "question": "What does the Rust OrderService depend on?",
+                      "intent": "DEPENDENCIES",
+                      "expected_abstention": false,
+                      "query_subject": "OrderService",
+                      "expected_symbols": [
+                          "OrderService",
+                          "PaymentService"
+                      ],
+                      "expected_relations": [
+                          "OrderService IMPORTS PaymentService"
+                      ],
+                      "expected_evidence": [
+                          {
+                              "file_path": "src/orders/mod.rs",
+                              "symbol": "OrderService",
+                              "start_line": 1,
+                              "end_line": 1,
+                              "evidence_id": "q080-e1",
+                              "snapshot_id": "rust-v1"
+                          }
+                      ],
+                      "warnings": [],
+                      "limitations": [],
+                      "forbidden_claims": [
+                          "OrderService depends on an HTTP client."
+                      ]
                   }
               ]
 }
