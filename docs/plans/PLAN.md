@@ -290,6 +290,139 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-19T12:00:00Z — README corrected against source; the branch gate runs green for the first time
+
+- Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.
+- Transition: no phase task. Post-gate, documentation only.
+- **No source, contract, schema, migration, or corpus change.** `SCHEMA_VERSION`
+  stays `14`, `contract_version` stays `1.1`, no version bump.
+
+**The gate is green on this branch for the first time**, closing the item the
+previous handoff left open: **`2313 passed, 2 xfailed`, exit 0, 483.28 s**, all
+nine stages run to completion. `git status` afterwards shows only the two
+documentation files this session edited, so **every `--check` baseline
+reproduced byte-for-byte and nothing regenerated**. The stale-placeholder fix in
+`609a63f` is now verified in a full run rather than against its own file.
+
+The previous entry warned that a background runner had reported exit 0 over a
+log saying otherwise, so **both signals were captured and both were checked**:
+the run was tee'd to a log, `$LASTEXITCODE` written into that log explicitly
+(`GATE_LASTEXITCODE=0`), and the log grepped for `FAILED`, `ERROR`,
+`Tests failed`, and any non-zero exit — all absent.
+
+**The README's defects were all in text the four ADR-0065 slices edited by
+hand, and none of it was in text the previous rewrite derived from source.**
+That rewrite read every command, route, tool name and version out of
+`codeatlas --help`, the router prefixes, `build_registry()` and the tracked
+artifacts. The language slices then hand-edited the file four times. **A file is
+only as verified as its most recent edit** — and no gate covers this one,
+because no test reads `README.md`.
+
+**The worst defect was a limit paragraph in three drafting layers welded
+together.** It simultaneously claimed Java, Go, Rust and Scala "yield zero
+symbols and zero relations", announced that they had shipped, and then said
+*"If accepted, it would give those four…"* — the conditional from when ADR-0065
+was still `proposed`. It also repeated "no test edges and no route detection"
+twice within itself. A reader would have drawn the opposite of the truth about a
+feature that shipped that day.
+
+Five figures had gone stale, each re-derived from its authority:
+
+| Claim | Was | Now, and its source |
+| --- | --- | --- |
+| Parser bundle / resolver | `1.4.0` / `1.4.0` | **`1.5.0` / `1.5.0`** — `registry.py:41`, `resolution.py:71` |
+| MCP tools | 21, `trace_flow` absent | **22** — `build_registry().names` |
+| Corpus fixtures | 7 | **8** — `run_evaluation.py validate` (`java_app`) |
+| Changed-symbol precision | 0.9375 | **0.9464** — `baseline-phase-4.json` |
+| Packaged refresh / preflight p95 | 0.975 s / 2.298 s | **0.799 s / 2.243 s** — `baseline-phase-7-perf.json` |
+
+**`trace_flow` is the `graph callers` defect one surface over.** The tool list
+was transcribed rather than derived, so the single tool built from a loop
+comprehension instead of a literal `name=` was the one that fell out — while the
+CLI table documented `trace` correctly throughout. It is now counted from
+`build_registry()`, as the route list already was.
+
+**The precision figure is the instructive one:** it rose with **no engine
+change**, because WS-1's three added change cases widened the denominator.
+Quoting that as improvement is the arithmetic-as-progress error this project
+keeps recording, so the README now states the cause beside the number.
+
+**CRLF drift found in nine tracked Markdown files, and it is not mine.**
+`git ls-files --eol` shows `i/lf w/crlf` against a `.gitattributes` declaring
+`* text=auto eol=lf`. The nine are exactly the files the ADR-0065 session
+edited — including `documentation/architecture.md`, `documentation/PRD.md` and
+`docs/adr/0065-*.md`, which this session never opened for writing, which is what
+establishes the drift as pre-existing rather than introduced here. This is the
+ADR-0022 hazard on files the corpus LF guard does not cover, since
+`test_every_corpus_file_has_lf_endings_in_the_working_tree` scopes to
+`tests/evaluation` only.
+
+**The three files this session edited were normalized to LF** — `README.md`,
+`documentation/memory.md`, and this file. In each case `git diff --stat` was
+identical before and after the normalization, which is the evidence that only
+line endings moved and no content did. **The remaining six are left untouched
+and recorded here rather than fixed**: they normalize on commit and corrupt
+nothing, but the working tree disagrees with its own declared rule, and
+rewriting six files nobody asked about is a separate act. They are
+`docs/adr/0065-query-backed-language-support.md`, `docs/adr/README.md`,
+`docs/superpowers/plans/2026-08-19-query-backed-language-support-java-slice.md`,
+`documentation/PRD.md`, `documentation/architecture.md`, and
+`documentation/codeatlas-v2-working-guide.md`.
+
+**Branch state was deliberately kept out of the README.** ADR-0065 is unmerged,
+but `documentation/rules.md` puts live status in this file and keeps product and
+policy documents free of it — the same split that governs `AGENTS.md`. A README
+saying "unmerged" would be wrong the hour it merged.
+
+- Files: `README.md` (+219/−55 before the gate result was added),
+  `documentation/memory.md`, this file. No file under `src/`, `tests/`,
+  `scripts/`, or `apps/` was touched.
+
+**Verification.**
+
+- **`scripts/check_phase4.ps1 -SkipSync` — exit 0, `2313 passed, 2 xfailed`**,
+  483.28 s. Stages: contract schema, tests, ruff (clean), mypy (**379 files**,
+  clean), dataset validation (8 fixtures / 65 query / 28 change cases), Phase 0,
+  Phase 3 and Phase 4 baselines, ADR-0016 invariants — all `--check`.
+- Versions read from `registry.py`, `chunker.py`, `resolution.py`,
+  `migrations.py`, `mcp/tools.py`.
+- MCP tools enumerated by importing `build_registry()` — 22.
+- Routes enumerated from the live OpenAPI schema — 38 paths, matching what the
+  README already documented.
+- CLI verified against `uv run codeatlas --help`; exit codes against the
+  `EXIT_*` constants in `cli/main.py`.
+- Traversal bounds verified against `retrieval/graph.py` (depth 2/5, visited
+  200/1,000, edges 50/200, paths 10/25, and `validate()` refusing rather than
+  clamping).
+- Parse-diagnostic codes verified present in `python_relations.py` and
+  `tsjs_relations.py`.
+- Metrics read from `baseline-phase-4.json`, `baseline-phase-7.json`, and
+  `baseline-phase-7-perf.json`.
+- All 14 in-page anchors and every relative `.md` link resolve (checked by
+  script). One anchor was retargeted to a heading with no punctuation rather
+  than depend on how a renderer slugs an em dash.
+
+**Limitations, stated rather than smoothed over.**
+
+- **No test covers `README.md`**, so nothing prevents this recurring. The
+  durable fix would be a check that derives the version, tool-count and metric
+  claims from source — not proposed here, because it is a code change and this
+  task was documentation.
+- The Playwright skip count ("seven across five spec files") is **carried
+  forward from the register, not recounted** — no browser suite was run.
+- `SECURITY.md` is **untouched GitHub boilerplate** ("5.1.x ✅ / 4.0.x ✅",
+  "Tell them where to go") against a 206-line threat model. Found while
+  reading, out of scope for a README task, deliberately not fixed.
+- The measured-results table remains a summary of tracked artifacts and will
+  drift again if a baseline is regenerated without revisiting it. It now names
+  the artifact each row came from, so the check is cheap.
+
+- Next: **user decision.** Unchanged from the previous handoff — the two
+  ADR-0065 limits (Go import matching policy, Scala member calls) and whether to
+  merge to `main`. Newly available: the branch gate is green, so the merge
+  decision no longer waits on verification. Also open and smaller: the six
+  CRLF-drifted files above, and `SECURITY.md`.
+
 ### 2026-08-19T09:00:00Z — Rust and Scala ship; ADR-0065 complete, with two limits declared
 
 - Agent: Claude Code `claude-opus-5`, branch `query-backed-language-support`.

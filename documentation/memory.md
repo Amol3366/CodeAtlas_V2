@@ -1218,6 +1218,88 @@ of a status list is how they drift, which is the `--format pr` and
       given as **0.80 strict / 1.0000 containment** today beside its 0.6667
       gate figure, rather than implying the gate number still stands.
 
+- [x] README corrected against source after the ADR-0065 slices (2026-08-19).
+      Documentation only; no source, contract, schema, migration, or corpus
+      change. `SCHEMA_VERSION` stays `14`, `contract_version` stays `1.1`.
+
+      **The previous entry's own rule was not applied to the ADR-0065 edits it
+      later received, and that is the lesson.** That rewrite read every command,
+      route, tool name and version out of the source. The four language slices
+      then edited the README four times *by hand*, and every defect found today
+      is in text those edits touched — while the parts derived from source were
+      still correct. **A file is only as verified as its most recent edit.**
+
+      **The worst of it was a paragraph in three drafting layers welded
+      together.** The language-coverage limit simultaneously claimed Java, Go,
+      Rust and Scala "yield zero symbols and zero relations", announced they had
+      shipped, and then said *"If accepted, it would give those four…"* — the
+      conditional from when ADR-0065 was still `proposed`. It also repeated "no
+      test edges and no route detection" twice within itself. Any reader would
+      have concluded the opposite of the truth about a feature that shipped.
+
+      **Five figures had gone stale, none caught by any gate**, because no test
+      reads `README.md`:
+
+      | Claim | Was | Source of truth |
+      | --- | --- | --- |
+      | Parser bundle / resolver | `1.4.0` / `1.4.0` | **`1.5.0` / `1.5.0`** — `registry.py`, `resolution.py` |
+      | MCP tools | 21, `trace_flow` missing | **22** — `build_registry().names` |
+      | Corpus fixtures | 7 | **8** — `run_evaluation.py validate` (`java_app`) |
+      | Changed-symbol precision | 0.9375 | **0.9464** — `baseline-phase-4.json` |
+      | Packaged refresh / preflight p95 | 0.975 s / 2.298 s | **0.799 s / 2.243 s** — `baseline-phase-7-perf.json` |
+
+      **`trace_flow` is the `graph callers` defect again**, one surface over.
+      The list was transcribed rather than derived, so the single MCP tool built
+      from a loop comprehension — instead of a literal `name=` — was the one
+      that fell out. The CLI table documented `trace` correctly the whole time.
+      Counted now with `build_registry()`, the way the routes already were.
+
+      **The precision figure is the instructive one.** It rose 0.9375 → 0.9464
+      with **no engine change**: WS-1's three added change cases widened the
+      denominator. Quoting it as an improvement would be exactly the arithmetic
+      -as-progress error this project keeps recording, so the README states the
+      cause beside the number.
+
+      **Branch state was deliberately kept out of the README.** ADR-0065 is
+      unmerged, but `documentation/rules.md` puts live status in
+      `docs/plans/PLAN.md` and keeps policy and product documents free of it —
+      the same split that governs `AGENTS.md`. A README that said "unmerged"
+      would be wrong the hour it merged.
+
+      Content added, not just corrected: the two-stage reference → relation
+      split and the six-step resolution trust order; what is deliberately never
+      emitted (dynamic calls, computed members, type inference) and why that is
+      measurable rather than invisible; traversal bounds and the refuse-don't
+      -clamp rule; `GapReason` and the ADR-0016 invariant; what preflight will
+      not tell you (ADR-0043/0044/0045, and the non-atomic working tree); and
+      three gate traps — phases 1/2 always fail by design, `-Semantic` gates
+      artifacts nothing else reaches, and read the log rather than the exit code.
+
+      A `valid_evidence_rate` note was added because the metric is a documented
+      trap: it equals `exact_evidence_rate` by definition (ADR-0003) and reads
+      0.6544, which a reader lands on as "35% of evidence is invalid". The table
+      row above it is the §4.1 invariant, which is a different statement.
+
+      **CRLF drift in nine tracked Markdown files, and it predates this
+      session.** `git ls-files --eol` reports `i/lf w/crlf` against a
+      `.gitattributes` declaring `* text=auto eol=lf`. The nine are exactly the
+      files the ADR-0065 session edited — several of which this session never
+      opened for writing, which is what proves the drift was inherited rather
+      than introduced. **This is the ADR-0022 hazard landing where the guard
+      does not reach**: `test_every_corpus_file_has_lf_endings_in_the_working_tree`
+      is scoped to `tests/evaluation`, so it protects the corpus and not the
+      documentation — the same "a rule enforced by a file only the fixtures live
+      under does not cover the product" shape ADR-0043 recorded.
+
+      The three files edited here were normalized to LF, each verified by
+      `git diff --stat` being identical before and after, so only endings moved.
+      Six remain and are listed in the handoff rather than fixed — they
+      normalize on commit and corrupt nothing.
+
+      **`SECURITY.md` is untouched GitHub boilerplate** — "5.1.x ✅ / 4.0.x ✅",
+      "Tell them where to go" — against a 206-line threat model. Found while
+      reading, out of scope for a README task, recorded rather than fixed.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
@@ -2418,7 +2500,25 @@ branch `query-backed-language-support`, **not merged to `main`**.
 
 **Start here tomorrow, in order:**
 
-1. **Re-run `scripts/check_phase4.ps1 -SkipSync` and read the whole log.**
+1. ~~**Re-run `scripts/check_phase4.ps1 -SkipSync` and read the whole log.**~~
+   **DONE 2026-08-19 — the gate is GREEN on this branch for the first time:
+   `2313 passed, 2 xfailed`, exit 0, in 483 s.** All nine stages ran to
+   completion (contract schema, tests, ruff, mypy over 379 files, dataset
+   validation, the Phase 0/3/4 baselines, ADR-0016 invariants), and
+   `git status` afterwards showed only the two documentation files this session
+   edited — so **every `--check` baseline reproduced byte-for-byte** and nothing
+   regenerated. The two xfails are the declared Go-import and Scala-member-call
+   limits. The stale-placeholder fix in `609a63f` is now verified in a full run
+   rather than against its own file.
+
+   **The exit code was not trusted on its own**, per the warning below: the run
+   was tee'd to a log, `$LASTEXITCODE` captured explicitly to that log
+   (`GATE_LASTEXITCODE=0`), and the log grepped for `FAILED` / `ERROR` /
+   `Tests failed` / a non-zero exit — all absent. Both signals agreeing is what
+   makes this claim safe to make.
+
+   Original entry, kept because the reasoning is the reusable part:
+
    The run that completed at session end **FAILED** — `1 failed, 2312 passed,
    2 xfailed`. Cause found and fixed:
    `test_registry_resolves_python_and_ignores_unsupported_languages` asserted
