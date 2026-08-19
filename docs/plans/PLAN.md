@@ -293,6 +293,54 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-20T05:00:00Z — Package rebuilt at parser 1.6.0; the fixed build script holds
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: the artifact is current again after ADR-0067's forced reindex.
+- **No repository change beyond this record.** `dist/` is gitignored, so the
+  artifact is local state and this commit delivers it to nobody else.
+
+**The build script's fix held, and one thing it did was not planned for.** The
+authored queries are bundled as a **whole directory**, so
+`scala.references.scm` — which did not exist when that `--add-data` was written
+— was carried without anyone touching the build. Naming files individually would
+have shipped an artifact that started, parsed Java, and silently lost Scala's
+member calls. **Bundling the directory rather than its contents is what made the
+new capability survive a build nobody re-examined.**
+
+**Verified behaviourally, not by exit code.**
+
+| Check | Result |
+| --- | --- |
+| `build_package.ps1 -SemanticLocal -SkipZip` | exit 0 |
+| `tests/end_to_end/test_packaged_build.py` | **7 passed**, including the Java parse guard |
+| Bundled data | **4** grammar `tags.scm`, **5** authored `.scm` — `scala.references.scm` among them |
+| Semantic stack | `torch`, `lancedb`, `sentence_transformers` present |
+| Snapshot written **by the exe** | **parser `1.6.0`**, resolver `1.5.0`, chunker `1.1.0` — matching source exactly |
+| Packaged `callers PaymentService.charge` on Scala | **`OrderService.capture CALLS PaymentService.charge`** |
+
+**The last row is the one worth keeping.** It is ADR-0067's ruling — made hours
+earlier — resolving **cross-package, inside a frozen build, through a query file
+that did not exist when the packaging defect was fixed.** A version stamp says
+the build is current; this says the build *works*, and ADR-0037 is the recorded
+case of those two differing.
+
+**Limitations.**
+
+- **The zip is still stale** (`-SkipZip`), so `dist/codeatlas-win64.zip` does not
+  match the folder beside it. Unchanged from the previous rebuild and still
+  something a release must do deliberately.
+- **Go and Rust were not exercised through the binary**, only Java and Scala.
+  They share the engine and loader, so the argument carries — but it is an
+  argument, not a measurement.
+- **Packaged performance was not re-measured**; `-Perf` was not run, so the
+  recorded p95 figures still describe the 2026-08-10 artifact.
+- The dev environment still carries the `semantic-local` extra.
+
+- Next: Go/Rust/Scala evaluation cases (P1-1's remainder) are the largest open
+  gap. Smaller: P1-3's §12 divergences, `SECURITY.md`, the stale zip, the merged
+  branch.
+
 ### 2026-08-20T03:00:00Z — ADR-0065's two limits ruled: Go declined, Scala closed
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

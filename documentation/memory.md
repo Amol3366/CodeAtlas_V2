@@ -1695,6 +1695,25 @@ of a status list is how they drift, which is the `--format pr` and
       report `references_query=None` and their suites are unchanged. The slot
       being optional is what makes that true by construction.
 
+- [x] **Package rebuilt at parser 1.6.0 (2026-08-19).** Verified behaviourally:
+      7/7 packaged tests, the semantic stack present, the snapshot written *by
+      the exe* stamping **parser 1.6.0 / resolver 1.5.0 / chunker 1.1.0** exactly
+      as source does, and the packaged binary resolving
+      `OrderService.capture CALLS PaymentService.charge` on Scala — **ADR-0067's
+      ruling, made hours earlier, working cross-package inside a frozen build.**
+
+      **The build fix held in a way that was not planned for.** The authored
+      queries are bundled as a **whole directory**, so `scala.references.scm` —
+      which did not exist when that `--add-data` was written — was carried with
+      nobody touching the build script. Naming files individually would have
+      produced an artifact that started, parsed Java, and **silently lost Scala
+      member calls**. Bundle the directory, not its contents.
+
+      Still stale: the zip (`-SkipZip`), and packaged performance was not
+      re-measured. Go and Rust were not exercised through the binary — they
+      share the engine and loader with Java and Scala, which is an argument
+      rather than a measurement.
+
 ## In Progress
 
 ~~**s007 — a genuine conceptual retrieval miss.**~~ **Fixed 2026-08-09** by
