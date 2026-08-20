@@ -690,6 +690,7 @@ caveats live in `docs/evaluation/*-baseline-environment.md`.
 | Active-snapshot leakage | 0 | snapshot-isolation suite |
 | Exact symbol resolution | **1.0000** | `baseline-phase-4.json` |
 | Changed-symbol recall · direct-impact recall | 1.0000 · 1.0000 | `baseline-phase-4.json` |
+| Changed-symbol precision | 0.9531 — but **29 of 32 cases** score exactly 1.0; read the limitation below | `baseline-phase-4.json` |
 | Unsupported factual claim rate | 0.0000 | `baseline-phase-4.json` |
 | Containing-evidence Recall@10 | **1.0000** | `baseline-phase-4.json` |
 | Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) | `baseline-phase-4.json` |
@@ -792,6 +793,19 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   and ADR-0033 record. The corpus is never edited to move a number (ADR-0003),
   and it was not here — the cases were added to measure three languages that had
   no change coverage — but the effect still has to be declared.
+
+  **What was done about it, and what was not.** Two things were already true
+  and stayed true: the three cases are pinned per-case and two-sided in
+  `tests/evaluation/test_change_adapter.py` — an allowlist that fails if a
+  fourth case drops below 1.0, and equally if one of the three is quietly
+  "fixed" — and their 0.50 is the honest full diff, so it is not corrected.
+  The defect was therefore never a lost regression guard; it was a
+  *reporting* one, and the report is what changed.
+  `changed_symbol_exact_cases` is now emitted beside the mean, so the Phase 4
+  row reads **`0.9531 (29/32 cases exact)`** and the aggregate can no longer
+  be read as "every case is exact". The 0.95 threshold is deliberately
+  unchanged: a count cannot be diluted by adding cases that already pass, so
+  the pair says what neither number says alone.
 - **Phase 7's primary evidence Recall@10 missed its ≥0.90 target**, measured at
   0.6667 at the gate. On the semantic corpus today it reads **0.80** under the
   strict line-range metric and **1.0000** under the containment-based metric

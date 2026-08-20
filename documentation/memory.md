@@ -1824,6 +1824,18 @@ of a status list is how they drift, which is the `--format pr` and
       Needs a decision: gate per-case, report the imperfect count beside the
       aggregate, or accept it explicitly.
 
+      **[CLOSED 2026-08-20, and one word above was wrong.]** "A loss of gate
+      signal" overstated it. The per-case option was **already implemented** —
+      `tests/evaluation/test_change_adapter.py` pins c020-c022 two-sided and has
+      since Phase 4, so the *gate* never stopped seeing them; only the
+      *aggregate* did, which this entry says correctly one paragraph earlier.
+      Resolved by the second option: `changed_symbol_exact_cases` is emitted
+      beside the mean, and the Phase 4 row now reads
+      `0.9531 (29/32 cases exact)`. Threshold unchanged, the three 0.50s
+      unchanged (ADR-0003). **The lesson worth keeping is the misdiagnosis:**
+      what was missing got written down before the suite was checked for what
+      already existed.
+
       All three findings are `PUBLIC_BEHAVIOR_CHANGED` — a Scala `require`, a Go
       early `return` and a Rust `assert!` are indistinguishable, because
       `statement_diff` dispatches on Python and TS/JS only. **Three languages
@@ -3065,17 +3077,29 @@ Corpus is **80 query / 32 change cases over 11 fixtures**. Versions: parser
 `contract_version` `1.1`. Last gate: `check_phase4.ps1 -SkipSync` exit 0,
 **2350 passed, 3 skipped, no xfails**.
 
-### Two decisions are waiting on the user
+### One decision is waiting on the user
 
-1. **`unmet_targets` is empty and nothing was fixed.** `changed_symbol_precision`
-   crossed 0.95 by **dilution** — c020/c021/c022 still score exactly 0.50 each,
-   and the denominator moved 29 -> 32. **Never cite "all Section 19.3 targets
-   met" without this.** Decide: gate per-case, report the imperfect count beside
-   the aggregate, or accept it explicitly.
-2. **`AGENTS.md` §12 disagrees with the implementation** on two route shapes and
+1. **`AGENTS.md` §12 disagrees with the implementation** on two route shapes and
    one unimplemented endpoint. Move the contract or move the code; §25 makes it
    an approval matter. (§5's language profile needs no decision — an approved
    ADR changed it — and is simply unwritten work.)
+
+~~2. **`unmet_targets` is empty and nothing was fixed.**~~ **CLOSED 2026-08-20,
+and the framing was half wrong.** `changed_symbol_precision` did cross 0.95 by
+**dilution** — c020/c021/c022 still score exactly 0.50 each and the denominator
+moved 29 -> 32 — but the option offered first, "gate per-case", was **already
+implemented**: `tests/evaluation/test_change_adapter.py` has pinned those three
+two-sided since Phase 4, failing if a fourth case slips below 1.0 and equally if
+one of the three is quietly "fixed". **No regression guard was ever lost.** What
+went blind was the *aggregate* and every report built on it, so the fix was
+reporting: `changed_symbol_exact_cases` is emitted beside the mean and the
+Phase 4 row now reads `0.9531 (29/32 cases exact)`. The 0.95 threshold is
+unchanged and the three 0.50s stand — they are the honest full diff (ADR-0003).
+
+**The reusable lesson is the mistake, not the fix:** the register recorded this
+as "no longer visible to the gate" and it was read as urgent for a day on that
+basis. Nobody had checked the suite for an existing guard before writing down
+what was missing. **Check what already exists before recording a gap.**
 
 ### Startable without anyone
 

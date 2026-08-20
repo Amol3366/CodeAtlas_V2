@@ -15,7 +15,7 @@
 | Valid evidence rate | not applicable |
 | Exact evidence rate | not applicable |
 | Containing evidence rate | not applicable |
-| Changed-symbol precision | 0.0000 |
+| Changed-symbol precision | 0.0000 (0/32 cases exact) |
 | Changed-symbol recall | 0.0000 |
 | Direct-impact recall | 0.0000 |
 | Unsupported-claim rate | not applicable |

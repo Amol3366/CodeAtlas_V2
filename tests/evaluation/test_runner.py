@@ -713,3 +713,139 @@ def test_a_single_expected_finding_matched_once_counts_as_correct() -> None:
     score = score_change_case(case, prediction)
 
     assert score.finding_count_correct is True
+
+
+def test_exact_change_case_count_credits_a_correctly_empty_prediction() -> None:
+    """With nothing predicted, exactly one case is still exact -- c028.
+
+    c028 declares no changed symbols, so predicting none is the right answer
+    and scores 1.0. The count therefore measures *correct* cases, not cases
+    that produced output; a field that counted predictions would read 0 here.
+
+    It also pins the count apart from the denominator. Every change case is
+    always scored -- a missing prediction becomes an empty one -- so a field
+    that counted cases scored would equal `case_counts["changes"]` and say
+    nothing.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+
+    report = evaluate_predictions(dataset, PredictionFile())
+
+    assert report.metrics.changed_symbol_exact_cases == 1
+    assert report.case_counts["changes"] == len(dataset.change_cases)
+
+
+def test_exact_change_case_count_counts_every_case_that_scored_one() -> None:
+    """One perfect prediction lifts the count by one, to c001 and c028.
+
+    This is the number the aggregate hides. `changed_symbol_precision` is a
+    *mean*, so cases that score 1.0 lift it while imperfect cases stay exactly
+    as imperfect as they were -- which is how the 0.95 gate was crossed on
+    2026-08-19 with nothing fixed. A count of exact cases cannot be diluted.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+
+    report = evaluate_predictions(dataset, _one_exact_change_prediction())
+
+    assert report.metrics.changed_symbol_exact_cases == 2
+
+
+def test_markdown_reports_the_exact_case_count_beside_the_precision_aggregate() -> None:
+    """A reader of the report sees the count without opening the corpus.
+
+    `unmet_targets` went empty on 2026-08-19 without a single case improving:
+    the mean crossed 0.95 because the denominator grew from 29 to 32 while
+    c020, c021 and c022 stayed at 0.50. The row now carries what the mean
+    cannot say.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+
+    rendered = render_markdown(
+        evaluate_predictions(dataset, _one_exact_change_prediction())
+    )
+
+    assert "| Changed-symbol precision | 0.0625 (2/32 cases exact) |" in rendered
+
+
+def test_markdown_omits_the_count_for_an_artifact_that_predates_it() -> None:
+    """An older baseline renders exactly as it always did.
+
+    The field is defaulted to `None` so such an artifact still loads; if the
+    renderer printed `None/32` the guarantee would be worthless.
+    """
+    report = null_baseline(load_dataset(DATASET_ROOT))
+    older = report.model_copy(
+        update={
+            "metrics": report.metrics.model_copy(
+                update={"changed_symbol_exact_cases": None}
+            )
+        }
+    )
+
+    assert "| Changed-symbol precision | 0.0000 |" in render_markdown(older)
+
+
+def test_a_case_scoring_exactly_one_half_is_not_counted_as_exact() -> None:
+    """0.50 is the score this field exists to expose, so it must not count.
+
+    c020, c021 and c022 each score exactly 0.50: they split one comparison, so
+    the honest full diff carries two truly-changed symbols where the case
+    declares one, and ADR-0003 forbids editing the corpus to lift it. A count
+    that treated "at least half right" as exact would report those three as
+    exact and hide the very thing it was added to surface -- so the boundary,
+    not just the extremes, is pinned here.
+
+    **One residual, stated rather than hidden.** No change case declares more
+    than one expected changed symbol, so a case's precision can only be `1/n`
+    -- 1.0, 0.5, 0.333, ... and never a value in (0.5, 1.0). A mutation to
+    `> 0.5` is therefore unreachable through this corpus and survives. Killing
+    it would need a multi-symbol case, which is a corpus change, not a test
+    change; if one is ever added, tighten this test to cover it.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+    predictions = PredictionFile(
+        change_predictions=[
+            ChangePrediction(
+                case_id="c001",
+                changed_symbols=["PaymentService.capture"],
+                impact_paths=[],
+                findings=[],
+                evidence=[],
+                claims=[],
+                duration_ms=0.0,
+            ),
+            ChangePrediction(
+                case_id="c002",
+                changed_symbols=[
+                    "PaymentService.capture",
+                    "PaymentService.refund",
+                ],
+                impact_paths=[],
+                findings=[],
+                evidence=[],
+                claims=[],
+                duration_ms=0.0,
+            ),
+        ]
+    )
+
+    report = evaluate_predictions(dataset, predictions)
+
+    assert report.metrics.changed_symbol_exact_cases == 2
+
+
+def _one_exact_change_prediction() -> PredictionFile:
+    """c001's declared changed symbol, predicted exactly and nothing else."""
+    return PredictionFile(
+        change_predictions=[
+            ChangePrediction(
+                case_id="c001",
+                changed_symbols=["PaymentService.capture"],
+                impact_paths=[],
+                findings=[],
+                evidence=[],
+                claims=[],
+                duration_ms=0.0,
+            )
+        ]
+    )

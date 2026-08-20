@@ -221,6 +221,25 @@ class AggregateMetrics(ContractModel):
     # `containing_evidence_recall_at_10` got from ADR-0027.
     relation_path_recall: MetricValue = None
     changed_symbol_precision: MetricValue
+    # How many change cases scored *exactly* 1.0, reported beside the mean
+    # above because the mean cannot say it.
+    #
+    # A mean dilutes. On 2026-08-19 `changed_symbol_precision` crossed its 0.95
+    # gate and `unmet_targets` went empty without one case improving: c020,
+    # c021 and c022 still scored 0.50 each and the denominator grew 29 -> 32.
+    # A reader saw "targets met" and no sign of the three. This count cannot be
+    # lifted by adding cases that already pass, so the pair reports what
+    # neither number reports alone.
+    #
+    # It is deliberately *not* gated. The three imperfect cases are already
+    # pinned per-case, two-sided, in `tests/evaluation/test_change_adapter.py`
+    # -- an allowlist that fails if a fourth case drops below 1.0 and equally
+    # if one of the three is quietly "fixed". The defect this field closes is
+    # a reporting one, so the fix is reporting.
+    #
+    # Defaulted to `None` so an artifact written before this record still loads
+    # and is scored exactly as it was -- the ADR-0038 pattern.
+    changed_symbol_exact_cases: int | None = Field(default=None, ge=0)
     changed_symbol_recall: MetricValue
     direct_impact_recall: MetricValue
     finding_precision: MetricValue
@@ -449,6 +468,11 @@ def null_baseline(dataset: Dataset) -> EvaluationReport:
         # leaving it unset would say "not measured" -- a different claim.
         relation_path_recall=0.0,
         changed_symbol_precision=0.0,
+        # Explicitly 0, not the field's `None` default, for the reason the
+        # `containing_evidence_recall_at_10` comment above gives: this baseline
+        # asserts "nothing is implemented, so nothing is found", and leaving it
+        # unset would say "not measured" instead.
+        changed_symbol_exact_cases=0,
         changed_symbol_recall=0.0,
         direct_impact_recall=0.0,
         finding_precision=0.0,
@@ -506,7 +530,7 @@ def render_markdown(report: EvaluationReport) -> str:
         ),
         (
             "Changed-symbol precision",
-            _format_metric(report.metrics.changed_symbol_precision),
+            _format_changed_symbol_precision(report),
         ),
         (
             "Changed-symbol recall",
@@ -704,6 +728,9 @@ def _aggregate(
         relation_path_recall=_mean(relation_recall_scores),
         changed_symbol_precision=_mean(
             [score.changed_symbol_precision for score in change_scores]
+        ),
+        changed_symbol_exact_cases=sum(
+            score.changed_symbol_precision == 1.0 for score in change_scores
         ),
         changed_symbol_recall=_mean(
             [score.changed_symbol_recall for score in change_scores]
@@ -996,6 +1023,20 @@ def _normalize_claim(value: str) -> str:
 
 def _format_metric(value: MetricValue) -> str:
     return "not applicable" if value is None else f"{value:.4f}"
+
+
+def _format_changed_symbol_precision(report: EvaluationReport) -> str:
+    """The mean, and how many cases actually reached 1.0.
+
+    Quoted together so the aggregate cannot be read as "every case is exact",
+    which is what an empty `unmet_targets` looked like while three cases sat at
+    0.50. An artifact written before the count existed renders unchanged.
+    """
+    value = _format_metric(report.metrics.changed_symbol_precision)
+    exact = report.metrics.changed_symbol_exact_cases
+    if exact is None:
+        return value
+    return f"{value} ({exact}/{report.case_counts['changes']} cases exact)"
 
 
 def _ensure_unique(values: list[str], label: str) -> None:

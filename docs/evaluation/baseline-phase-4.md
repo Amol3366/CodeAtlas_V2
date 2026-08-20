@@ -15,7 +15,7 @@
 | Valid evidence rate | 0.6968 |
 | Exact evidence rate | 0.6968 |
 | Containing evidence rate | 0.7806 |
-| Changed-symbol precision | 0.9531 |
+| Changed-symbol precision | 0.9531 (29/32 cases exact) |
 | Changed-symbol recall | 1.0000 |
 | Direct-impact recall | 1.0000 |
 | Unsupported-claim rate | 0.0000 |

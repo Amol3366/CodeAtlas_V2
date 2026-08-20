@@ -7,6 +7,7 @@
   "implementation_status": "implemented",
   "metrics": {
     "abstention_correctness": 1.0,
+    "changed_symbol_exact_cases": 1,
     "changed_symbol_precision": 0.03125,
     "changed_symbol_recall": 0.03125,
     "containing_evidence_rate": 0.7543859649122807,

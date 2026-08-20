@@ -50,13 +50,13 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | **none - closed.** Phases 0-7 are all `complete`. Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed; that condition has since been met under a corrected metric (ADR-0027), and the correction must be cited with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Active task     | **none - closed.** Phases 0-7 remain complete. The post-ADR-0065 program (`docs/superpowers/plans/2026-08-20-remaining-work.md`) has delivered its P0 and P1: merged, both limits ruled, all four languages measured on query *and* change sides, the package rebuilt, and the README guarded. **Two decisions wait on the user** — the `changed_symbol_precision` dilution, and `AGENTS.md` §12 |
+| Active task     | **none - closed.** Phases 0-7 remain complete. The post-ADR-0065 program (`docs/superpowers/plans/2026-08-20-remaining-work.md`) has delivered its P0 and P1: merged, both limits ruled, all four languages measured on query *and* change sides, the package rebuilt, and the README guarded. **One decision waits on the user** — the `AGENTS.md` §12 divergence. The `changed_symbol_precision` dilution is **closed**: it was a reporting defect, not a lost guard, and the report now carries `changed_symbol_exact_cases` beside the mean |
 | Task status     | `complete` - Phase 7 stays approved; everything since is post-gate work. `SCHEMA_VERSION` **14**, `contract_version` **1.1**, parser bundle **1.6.0**, chunker **1.1.0**, resolver **1.5.0**. Corpus **80 query / 32 change over 11 fixtures**. Last gate: `check_phase4.ps1 -SkipSync` exit 0, **2350 passed, 3 skipped, no xfails** |
 | Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** Two are outstanding and are named in the Deferred Register: the `changed_symbol_precision` **dilution** (the aggregate now reads met while c020-c022 still score 0.50 each), and the `AGENTS.md` §12 divergence. Work needing nobody: P2-B (widen the LF guard), `SECURITY.md`, the stale zip, the merged branch, `AGENTS.md` §5 |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: P2-B (widen the LF guard), `SECURITY.md`, the stale zip, the merged branch, `AGENTS.md` §5 |
 
 ## Deferred Register
 
@@ -75,7 +75,7 @@ with verification.
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible |
 | ~~**ADR-0065's two declared limits: Go imports and Scala member calls**~~ | **BOTH CLOSED 2026-08-19 by user ruling, and they were ruled in opposite directions on purpose.** **Go (ADR-0066): declined, permanently.** The module prefix lives in `go.mod`, which a single-file parse cannot read, so closing it needs a *matching policy* rather than more parsing — and the cost is asymmetric: trimming too far makes a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing** a relationship §4.1 forbids. The `strict` xfail is **inverted rather than deleted** (ADR-0045's precedent) and now pins both halves: the import is recorded, and it is not resolved. **Scala (ADR-0067): closed.** `LanguageProfile` gained an optional `references_query`; Scala authors `scala.references.scm` capturing the `field_expression`'s `field`. **What separates the two rulings is where the missing information lives** — Go's is in a file the parser is not allowed to read, Scala's was in the syntax tree all along and only a query was missing. Declaring a limit that nine lines of query closes would have recorded an absence of work as a property of the language. `PARSER_BUNDLE_VERSION` **1.5.0 -> 1.6.0** (Scala yields references it did not before); `RESOLVER_VERSION` deliberately unchanged, because resolution draws the same conclusions from a reference as it always did. **The corpus carries no xfails at all now.** | Someone wants a Go matching policy (supersede ADR-0066), or a fourth language needs a supplementary query |
-| **`changed_symbol_precision` now reads 0.9531 and `unmet_targets` is EMPTY — by dilution, not by any fix** | **OPEN — a loss of gate signal, recorded 2026-08-20 the moment it happened.** For the first time the Phase 4 baseline reports `targets_met: true` with **no unmet targets**. **Nothing was fixed.** The structural cause is untouched: c020, c021 and c022 each still score **exactly 0.50**, for the reason recorded since Phase 4 — they split one physical `git_changes` diff into three single-symbol cases, so the engine correctly reporting both affected symbols has each case count the other's against it. The aggregate crossed 0.95 because P1-B's three change cases took the denominator **29 -> 32**, diluting three imperfect cases: (29x1.0 + 3x0.5)/32 = **0.9531**, where (26x1.0 + 3x0.5)/29 = 0.9483. **Pure arithmetic.** **The cases were not added to move it** — they exist to measure Scala, Go and Rust, which had no change coverage at all — but the effect is that a real, known, per-case defect is **no longer visible to the gate**. That is the mirror of ADR-0032/ADR-0033: there a threshold could not express a miss; here the denominator has grown until a miss cannot register. **Do not cite "all Section 19.3 targets met" without this row.** The engine is exactly as accurate as it was yesterday. Needs a decision: gate on per-case precision, report the count of imperfect cases beside the aggregate, or accept the dilution and say so | A decision is taken on how to keep the c020-c022 defect visible |
+| **`changed_symbol_precision` now reads 0.9531 and `unmet_targets` is EMPTY — by dilution, not by any fix** | **CLOSED 2026-08-20 — the defect was in the reporting, and the reporting is what changed.** For the first time the Phase 4 baseline reports `targets_met: true` with **no unmet targets**. **Nothing was fixed.** The structural cause is untouched: c020, c021 and c022 each still score **exactly 0.50**, for the reason recorded since Phase 4 — they split one physical `git_changes` diff into three single-symbol cases, so the engine correctly reporting both affected symbols has each case count the other's against it. The aggregate crossed 0.95 because P1-B's three change cases took the denominator **29 -> 32**, diluting three imperfect cases: (29x1.0 + 3x0.5)/32 = **0.9531**, where (26x1.0 + 3x0.5)/29 = 0.9483. **Pure arithmetic.** **The cases were not added to move it** — they exist to measure Scala, Go and Rust, which had no change coverage at all — but the effect is that a real, known, per-case defect is **no longer visible in the aggregate**. **Correction, 2026-08-20:** this row first read "no longer visible to the gate", and that was wrong. `tests/evaluation/test_change_adapter.py` has pinned c020-c022 per-case since Phase 4, two-sided — an allowlist that fails if a fourth case drops below 1.0 and equally if one of the three is quietly "fixed" — so the gate never stopped seeing them. What went blind was the *aggregate*, and every report built on it. The error mattered: it made this row read as a lost regression guard, which is a far more urgent thing than the reporting gap it actually was. That is the mirror of ADR-0032/ADR-0033: there a threshold could not express a miss; here the denominator has grown until a miss cannot register. **Do not cite "all Section 19.3 targets met" without this row.** The engine is exactly as accurate as it was yesterday. **Resolved by the second option, because the first was already true.** `changed_symbol_exact_cases` is now emitted beside the mean and rendered with it, so the Phase 4 row reads `0.9531 (29/32 cases exact)` and the aggregate can no longer be read as "every case is exact". The 0.95 threshold is deliberately unchanged and the three cases are not "fixed": their 0.50 is the honest full diff (ADR-0003). A count cannot be diluted by adding cases that already pass, so the pair says what neither number says alone. Mutation-checked in five variants; one residual is recorded in the test docstring — no change case declares more than one expected changed symbol, so precision can only be `1/n` and a `> 0.5` mutation is unreachable through this corpus | — |
 | Pid-reuse detection in crash recovery                                                                            | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                                                                                                                                                                          |
 | `relation_path_correctness` measured precision                                                                 | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | q010: does`IMPORTS` target the module or the bound class?                                                      | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                                          |
@@ -293,6 +293,108 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T17:00:00Z — The dilution decision, resolved: the report now counts exact cases
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **the `changed_symbol_precision` dilution register row is CLOSED.**
+  One of the two decisions that were waiting on the user is settled; only the
+  `AGENTS.md` §12 divergence still needs them.
+
+## The decision was smaller than the record said
+
+The row offered three options — gate per-case, report the imperfect count, or
+accept the dilution. **The first was already implemented.**
+`tests/evaluation/test_change_adapter.py` has pinned c020/c021/c022 per-case
+since Phase 4, and pinned them *two-sided*:
+
+- `test_overlay_cases_predict_exactly_the_declared_symbols` — every case except
+  the literal allowlist `{c020, c021, c022}` must score exactly 1.0, so a fourth
+  case slipping to 0.9 fails immediately;
+- `test_shared_comparison_cases_report_the_full_honest_diff` — those three must
+  score **exactly** 0.5, so quietly "fixing" one also fails.
+
+**So no regression guard was ever lost**, and the register's phrase "no longer
+visible to the gate" was wrong. It has been corrected in place with the reason,
+because the error changed how urgent the row looked: a lost gate guard is a far
+more serious thing than the reporting gap this actually was. Nobody checked the
+suite for an existing guard before writing down what was missing.
+
+What *had* gone blind was the aggregate, and every report built on it: the Phase
+4 baseline reported `targets_met: true` with an empty `unmet_targets` while three
+cases sat at 0.50.
+
+## What changed
+
+`AggregateMetrics.changed_symbol_exact_cases` — the number of change cases
+scoring exactly 1.0 — reported beside the mean and rendered with it:
+
+```
+| Changed-symbol precision | 0.9531 (29/32 cases exact) |
+```
+
+Following the ADR-0038 pattern exactly: **added beside, never replacing**, and
+defaulted to `None` so an artifact written before this record still loads and is
+scored as it was. Verified: `baseline-phase-1` and `baseline-phase-2` still load,
+reading `None`. (Phase 6/7, rerank and explanation artifacts are a different
+shape entirely and were never `EvaluationReport` documents.)
+
+**Deliberately not changed.** The 0.95 threshold stays: a count cannot be diluted
+by adding cases that already pass, so the pair says what neither number says
+alone. The three 0.50 scores stay: they are the honest full diff of a shared
+comparison, and ADR-0003 forbids editing the corpus to move a number.
+
+## Files
+
+- `src/codeatlas/evaluation/runner.py` — the field, its count in `_aggregate`, an
+  explicit `0` in `null_baseline` (not the `None` default — "nothing found" is a
+  different claim from "not measured"), and `_format_changed_symbol_precision`.
+- `tests/evaluation/test_runner.py` — five tests.
+- `docs/evaluation/baseline-phase-{0,3,4}.{json,md}` — regenerated.
+- `README.md` — a results-table row, and the limitation now records the fix.
+- `docs/plans/PLAN.md`, `documentation/memory.md` — register, Active Work, this.
+
+## Verification
+
+- TDD: tests written first, **watched fail** with `AttributeError: 'AggregateMetrics'
+  object has no attribute 'changed_symbol_exact_cases'`.
+- **Two test expectations were wrong on first run and the code was right.** c028
+  declares no changed symbols, so an empty prediction scores 1.0 there — a
+  correct abstention. The tests were corrected, and the case made them stronger.
+- **Mutation-checked in five variants.** Count → `len(change_scores)`: caught.
+  Renderer drops the suffix: caught. Renderer loses the `None` guard: caught.
+  Threshold → `>= 0.5`: **survived**, and that is the exact defect this field
+  exists to catch, since c020-c022 score precisely 0.50. A boundary test was
+  added and it is now caught. Threshold → `> 0.5` still survives and is
+  **unreachable by construction**: no change case declares more than one expected
+  changed symbol, so precision can only be `1/n` and never lands in (0.5, 1.0).
+  Recorded in the test docstring rather than papered over.
+- **The first mutation run was worthless and was redone.** It restored the file
+  with `git checkout --`, which reverted the uncommitted production change too,
+  so every run after the first tested a file with no field at all and "failed"
+  by `AttributeError`. Redone against a saved copy.
+- Baselines: confirmed **stale first** (`--check` exit 5), regenerated, then
+  green. Diffed key-by-key against `HEAD`: **one key added, none removed, no
+  value changed** — every historical number preserved.
+- **Full gate GREEN.** `scripts/check_phase4.ps1 -SkipSync`, all nine stages,
+  `GATE_LASTEXITCODE=0`, **2363 passed, 3 skipped** in 690.69 s (11:30). The
+  exit code was not trusted on its own: the run was tee'd to a log and the log
+  grepped for `FAILED` / `ERROR` / `Tests failed` / `Traceback` / a non-zero
+  exit — all absent. The 3 skips are the semantic-local environment skips.
+
+**Limitations.**
+
+- The `> 0.5` mutation survives and cannot be killed through this corpus. If a
+  multi-symbol change case is ever added, tighten
+  `test_a_case_scoring_exactly_one_half_is_not_counted_as_exact` to cover it.
+- The field is **reported, not gated**, by choice. Gating a count would be a
+  second threshold over the same three cases the per-case tests already pin.
+- Phase 1 and 2 baselines keep the old key set, correctly — they are historical
+  records and the gate deliberately does not re-check them.
+
+- Next: **P2-B** (widen the LF guard beyond `tests/evaluation`) is the sibling of
+  P2-A and the item that stops a third recurrence. Only the `AGENTS.md` §12
+  divergence still needs a user decision.
 
 ### 2026-08-20T15:00:00Z — README claims are guarded (P2-A)
 
