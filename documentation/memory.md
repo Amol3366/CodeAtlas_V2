@@ -1842,6 +1842,38 @@ of a status list is how they drift, which is the `--format pr` and
       producing one code is the declared limit, recorded in each case's own
       `limitations` rather than left for a reader to infer.**
 
+- [x] **`AGENTS.md` §5 records the profile ADR-0065 approved (2026-08-20).**
+      "Python, TypeScript, and JavaScript source" became **seven languages in
+      two tiers**, with the query-backed four's exclusions (no test edges, no
+      route detection, no config or schema edges) written into the contract
+      rather than left in an ADR nobody opens.
+
+      **Why it was work and not a decision, which is the reusable part:** §25
+      lists "new programming-language support" as needing approval, and
+      **ADR-0065 *is* that approval**. §5 opens with "Unless an approved ADR
+      changes the profile", so it defers to exactly that. The contract had
+      already changed; §5 was describing a state the project left two days
+      earlier.
+
+      **"Seven" was verified from the running registry, not the docs.**
+      `default_registry().parser_for` returns a parser for python, typescript,
+      javascript, java, go, rust, scala and `None` for kotlin, csharp, ruby,
+      php, swift, c, cpp. Checking prose against other prose that already
+      agrees with it proves nothing.
+
+      **Two more stale lists found, deliberately not touched** — outside the
+      ask, same class, no decision needed: §6 omits the query-backed engine
+      entirely, and §19 requires fixtures for Python and TS/JS only. The §22
+      phase checklists say it too and **must stay** — they record what a
+      completed phase delivered, and editing them would falsify history
+      instead of correcting a claim.
+
+      **Nothing guards `AGENTS.md`.** §5 drifted for two days against an ADR in
+      this same repository. A guard could derive the language list from
+      `default_registry()` the way `test_readme_claims.py` derives its figures;
+      not written, because the contract has more drift than one guard covers
+      and half a guard invites trusting the unguarded half.
+
 - [x] **`SECURITY.md` is no longer the GitHub template (P2-C, 2026-08-20).**
       It carried a support table for `5.1.x` and `4.0.x` — versions that have
       never existed — and the placeholder prose, on a public repository with a
@@ -3181,9 +3213,15 @@ what was missing. **Check what already exists before recording a gap.**
 The plan is `docs/superpowers/plans/2026-08-20-remaining-work.md`.
 **P2-A and P2-B are both done** — the README's claims and the repository's line
 endings are now guarded, and those were the two items whose entire purpose was
-stopping a recurrence. **`SECURITY.md` is rewritten and the merged branch is
-deleted locally**, so the last item needing nobody is `AGENTS.md` §5's language
-profile (unwritten work, not a decision — an approved ADR already changed it).
+stopping a recurrence. **`SECURITY.md` is rewritten, the merged branch is deleted
+locally, and `AGENTS.md` §5 now carries the two-tier language profile.**
+
+Work still needing nobody: `AGENTS.md` **§6 and §19** hold the same stale language
+list §5 did — §6 omits the query-backed engine, §19 requires fixtures for Python
+and TS/JS only while four more exist and are measured. Same bookkeeping fix, no
+decision needed. (The §22 phase checklists say the same thing and **must not** be
+touched: they record what a completed phase delivered.) Then P2-D (re-measure
+packaged performance) and P2-F (two live-path defects).
 
 **The stale `dist/codeatlas-win64.zip` is rebuilt (2026-08-20), and it was not
 what anyone expected.** The guess was that it held the PyInstaller data defect —

@@ -146,7 +146,17 @@ Unless an approved ADR changes the profile, target:
 - single user;
 - local Windows 11 workstation as the primary supported environment;
 - local Git repositories;
-- Python, TypeScript, and JavaScript source;
+- source in **seven languages, in two tiers** (ADR-0065, approved
+  2026-08-19, which is the §25 approval this line records):
+  - **Python, TypeScript and JavaScript** — the full engine;
+  - **Java, Go, Rust and Scala** — query-backed, giving symbols, imports and
+    calls and **no test edges, no route detection, and no configuration or
+    schema edges**, so change preflight on them is materially thinner and no
+    surface may imply otherwise. ADR-0066 declined a Go import policy and
+    ADR-0067 widened the profile contract so Scala member calls emit an edge;
+  - C#, Kotlin, Ruby, PHP, Swift and C/C++ remain **out**. C# and Kotlin ship
+    no `tags.scm`; the rest were measured and deferred. Each needs its own
+    §25 approval;
 - Markdown and common configuration/schema formats;
 - deterministic operation without a GPU, embedding model, or LLM;
 - CLI, local REST API, MCP, JSON, Markdown, SARIF, and web UI;

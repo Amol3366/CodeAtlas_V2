@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: `AGENTS.md` §5's language profile — the last of them. `SECURITY.md` is rewritten and the merged branch is deleted locally. **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. `AGENTS.md` §5 is now updated to the two-tier language profile. Work needing nobody: §6 and §19 carry the same stale language list and are the same bookkeeping fix; then P2-D (re-measure packaged performance) and P2-F (two live-path defects). **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
 
 ## Deferred Register
 
@@ -293,6 +293,76 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T20:45:00Z — `AGENTS.md` §5 records the language profile ADR-0065 approved
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **the §5 half of P1-C is closed.** §12 remains the one open
+  decision.
+
+## Why this was work and not a decision
+
+§25 lists "new programming-language support" as needing explicit approval — and
+**ADR-0065 is that approval**, granted 2026-08-19. §5 opens with "Unless an
+approved ADR changes the profile", so it defers to exactly that. Recording the
+outcome is bookkeeping; the contract was already changed by the ADR, and §5 was
+simply describing a state the project left two days ago.
+
+## What it says now
+
+"Python, TypeScript, and JavaScript source" becomes **seven languages in two
+tiers**:
+
+- Python, TypeScript and JavaScript — the full engine;
+- Java, Go, Rust and Scala — query-backed: symbols, imports and calls, and
+  **no test edges, no route detection, no configuration or schema edges**, so
+  change preflight on them is materially thinner and no surface may imply
+  otherwise. ADR-0066 (Go import declined) and ADR-0067 (Scala member calls) are
+  cited where a reader will need them;
+- C#, Kotlin, Ruby, PHP, Swift, C/C++ — out, each needing its own §25 approval,
+  with the reason recorded: C# and Kotlin ship no `tags.scm`, the rest were
+  measured and deferred.
+
+## Verification
+
+Every claim checked against source rather than against the documentation that
+already agreed with it:
+
+- **"seven languages" comes from the running registry.** `default_registry()`
+  returns a parser for `python`, `typescript`, `javascript`, `java`, `go`,
+  `rust`, `scala` and `None` for `kotlin`, `csharp`, `ruby`, `php`, `swift`, `c`,
+  `cpp`. Seven, and exactly the seven named.
+- The exclusion list is ADR-0065 line 196, "Explicitly not approved, and still
+  out of scope: test edges, route detection, configuration and schema edges, C#,
+  Kotlin, and the remaining five".
+- The `tags.scm` reason is ADR-0065 line 34.
+- `docs/adr/0066-*.md` and `docs/adr/0067-*.md` confirmed present before citing.
+
+## Two more stale lists, found and deliberately not touched
+
+Both are the same bookkeeping class and neither was in the §5 ask:
+
+- **§6 (approved technical direction)** names Tree-sitter, Python `ast` and TS/JS
+  enrichment, and does not mention the query-backed engine ADR-0065 added.
+- **§19 (testing strategy)** requires fixtures for Python and TS/JS only, while
+  `java_app`, `scala_app`, `go_app` and `rust_app` all exist and are measured.
+
+The Phase checklists in §22 also read "Python, TypeScript, and JavaScript" and
+**must not be updated** — they record what a completed phase delivered, and
+rewriting them would falsify history rather than correct a claim.
+
+**Limitations.**
+
+- **Nothing guards `AGENTS.md` either.** §5 drifted for two days against an ADR
+  the repository itself contained. A guard could derive the language list from
+  `default_registry()` the way `test_readme_claims.py` derives its figures — not
+  written here, because the two lists above mean the contract has more drift than
+  one guard would cover, and half a guard invites trusting the unguarded half.
+- The wording is prose in a contract, so it can still drift in ways no test sees.
+
+- Next: §6 and §19 are the same fix and need no decision. `AGENTS.md` §12 needs
+  yours. P2-D (re-measure packaged performance) and P2-F (two live-path defects)
+  remain.
 
 ### 2026-08-20T20:00:00Z — `SECURITY.md` rewritten; a claim in it was false until it was made true
 

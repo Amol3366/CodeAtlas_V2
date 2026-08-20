@@ -75,14 +75,32 @@ Carried unchanged from the last plan and still the only item needing a decision:
 
 | § | Contract says | Implementation |
 | --- | --- | --- |
-| 5 | "Python, TypeScript, and JavaScript source" | seven languages since ADR-0065 |
+| 5 | ~~"Python, TypeScript, and JavaScript source"~~ **updated 2026-08-20** | seven languages in two tiers, matching the registry |
 | 12.2 | `POST /v1/messages/{id}/retry` and `.../feedback` | mounted under the conversations prefix |
 | 12.3 | `POST /v1/query/stream` | **not implemented** |
 
-**§5 needs no decision** — an approved ADR changed the profile and §5 defers to
-one, so it can be updated as work. **§12 does**: move the contract, or move the
-code. §25 makes a breaking API change an approval matter, so it is not mine to
-pick.
+**§5 needed no decision and is now done (2026-08-20).** An approved ADR changed
+the profile and §5 defers to one, so recording it was bookkeeping — §25 lists
+"new programming-language support" as needing approval, and ADR-0065 *is* that
+approval. The line now carries the two-tier boundary, the ADR-0066 and ADR-0067
+rulings, and why C#, Kotlin and the other five stay out. Verified against the
+running registry rather than the docs: `parser_for` returns a parser for exactly
+seven languages and `None` for every other name tried.
+
+**Two more stale language lists were found in `AGENTS.md` and deliberately left
+alone**, being outside the §5 ask:
+
+- **§6 (approved technical direction)** names Tree-sitter, Python `ast` and
+  TS/JS enrichment, with no mention of the query-backed engine ADR-0065 added.
+- **§19 (testing strategy)** requires fixtures for Python and TS/JS only, while
+  `java_app`, `scala_app`, `go_app` and `rust_app` all exist and are measured.
+
+Both are the same bookkeeping class as §5 and need no decision. The Phase
+checklists at §22 also say "Python, TypeScript, and JavaScript", and those
+**must not** be touched — they record what a completed phase delivered.
+
+**§12 still needs a decision**: move the contract, or move the code. §25 makes a
+breaking API change an approval matter, so it is not mine to pick.
 
 ---
 
@@ -215,7 +233,7 @@ Cheap to run, and it closes a claim that is currently stale rather than wrong.
 ```text
 P1-A Go/Rust cases ──┬── P1-B change cases (same fixtures, reuse them)
                      └── P2-D re-measure perf (artifact already current)
-P1-C §5 ─────────────── work; §12 waits on a decision
+P1-C §5 ─────────────── DONE; §12 waits on a decision
 P2-A, P2-B ──────────── independent; these two are what stop recurrence
 P2-C, P2-E ──────────── independent, minutes each
 ```
