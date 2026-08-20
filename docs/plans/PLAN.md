@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: `SECURITY.md`, the merged branch, `AGENTS.md` §5. **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: `AGENTS.md` §5's language profile — the last of them. `SECURITY.md` is rewritten and the merged branch is deleted locally. **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
 
 ## Deferred Register
 
@@ -293,6 +293,94 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T20:00:00Z — `SECURITY.md` rewritten; a claim in it was false until it was made true
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P2-C closed**, and the branch half of P2-E.
+
+## What it was
+
+The unedited GitHub template, on a public repository carrying a 206-line threat
+model: a support table for `5.1.x` and `4.0.x` — versions that have never
+existed — and the placeholder prose still in place ("Use this section to tell
+people…", "Tell them where to go").
+
+## What it is now
+
+Written against `docs/security/threat-model.md`, which stays the authority; this
+file is the front door.
+
+**No version table, deliberately.** There are no tags and no releases, so a table
+of supported semver lines would be the same fiction as the one removed. `main` is
+the only supported line and reports name a **commit SHA**. `SCHEMA_VERSION`,
+`contract_version` and the parser bundle version are called out explicitly as
+*compatibility* markers rather than releases, because they are the obvious thing
+for a reader to mistake for a version.
+
+**Assumptions before scope.** Loopback-only, single user, no egress without
+per-repository opt-in, repository content is data and never instruction, and
+repository code is never executed. Those are what make a given behaviour a bug or
+not, so they are stated before either scope list.
+
+**Out-of-scope carries reasons.** The local API having no authentication reads as
+a documented assumption with the approval path named, not as an oversight — and
+an argument against it is invited as a threat-model change, which is a different
+conversation from a vulnerability report.
+
+**No response-time promise.** A single-maintainer project publishing an SLA would
+be one more claim with nothing behind it. What is promised is an acknowledgement,
+an assessment against the model, and either a fix carrying a regression test or a
+written reason for declining.
+
+## The claim that was false
+
+The draft directed reporters to GitHub's private vulnerability reporting.
+Checking rather than assuming:
+
+```
+gh api repos/Amol3366/CodeAtlas_V2/private-vulnerability-reporting
+{"enabled":false}
+```
+
+**Pointing people at a channel that does not exist is the same defect as the
+version table**, and it would have shipped inside the commit that fixed the
+version table. Raised as a decision because it changes a setting on a public
+repository rather than any code; enabled on the user's instruction, verified
+`{"enabled":true}`, and only then linked.
+
+## Branch cleanup
+
+`query-backed-language-support` deleted locally (was `7b97acc`) with
+`git branch -d` — the form that refuses anything unmerged, so it checks itself.
+**The remote copy is deliberately still present:** deleting a remote branch is not
+locally reversible and was not authorised. 14 other merged local branches also
+remain; only the one named was in scope.
+
+## Verification
+
+- `tests/unit/test_working_tree_line_endings.py` + `test_readme_claims.py`:
+  10 passed. The LF guard added earlier today covers the rewritten file, which is
+  why it was written with explicit `newline="\n"`.
+- `--host` loopback enforcement confirmed in `src/codeatlas/cli/main.py` before
+  asserting it in prose, not taken from the README.
+- `docs/security/threat-model.md` confirmed to exist before linking it.
+- Template residue grep: the only hit is the deliberate quotation of the old
+  table, which is there to explain why the file changed.
+
+**Limitations.**
+
+- **Nothing guards `SECURITY.md`.** It makes claims that could drift — the
+  loopback rule, the opt-in rule, the repository URL. It is not covered by
+  `test_readme_claims.py`, and no guard was added: the claims are prose about
+  policy rather than figures derivable from source, and a guard that fails on
+  rewording is one people delete. Named here so the gap is known rather than
+  assumed covered.
+- The reporting channel is now enabled but has never been exercised.
+
+- Next: `AGENTS.md` §5's language profile is the last item needing nobody.
+  `AGENTS.md` §12 still needs a user decision, and P2-D (re-measure packaged
+  performance) and P2-F (two live-path defects) remain.
 
 ### 2026-08-20T19:15:00Z — The packaged zip rebuilt; it was two features behind, not merely stale
 

@@ -1842,6 +1842,40 @@ of a status list is how they drift, which is the `--format pr` and
       producing one code is the declared limit, recorded in each case's own
       `limitations` rather than left for a reader to infer.**
 
+- [x] **`SECURITY.md` is no longer the GitHub template (P2-C, 2026-08-20).**
+      It carried a support table for `5.1.x` and `4.0.x` — versions that have
+      never existed — and the placeholder prose, on a public repository with a
+      206-line threat model. Rewritten against that model, which stays the
+      authority.
+
+      **No version table, deliberately.** There are no tags, so a table of
+      supported semver lines would be the same fiction as the one removed.
+      `main` is the only line; reports name a commit SHA. `SCHEMA_VERSION`,
+      `contract_version` and the parser bundle version are called out as
+      *compatibility* markers rather than releases, because they are the
+      obvious thing to mistake for one. **No response-time promise either:**
+      a single-maintainer project publishing an SLA is one more claim with
+      nothing behind it.
+
+      **The lesson is the claim that was false.** The draft directed
+      reporters to GitHub private vulnerability reporting; checking rather
+      than assuming returned `{"enabled":false}`. **Pointing people at a
+      channel that does not exist is the same defect as the version table**,
+      and it would have shipped inside the commit that fixed the version
+      table. Enabled on the user's decision, verified `{"enabled":true}`,
+      then linked. Every other assertion was checked the same way: `--host`
+      loopback enforcement read from `cli/main.py` rather than the README,
+      and the threat-model path confirmed before linking.
+
+      **Known gap, named rather than assumed covered:** nothing guards
+      `SECURITY.md`. Its claims are policy prose, not figures derivable from
+      source, and a guard that fails on rewording is one people delete.
+
+      Branch cleanup with it: `query-backed-language-support` deleted locally
+      (`git branch -d`, the self-checking form). **The remote copy stays** —
+      deleting a remote branch is not locally reversible and was not
+      authorised. 14 other merged local branches also remain.
+
 - [x] **The LF guard now covers the repository, not the corpus (P2-B, 2026-08-20).** `tests/unit/test_working_tree_line_endings.py`, two
       assertions over `git ls-files --eol`. The old guard was scoped to three
       corpus directories, which is why **18 product files drifted to CRLF with
@@ -3147,10 +3181,9 @@ what was missing. **Check what already exists before recording a gap.**
 The plan is `docs/superpowers/plans/2026-08-20-remaining-work.md`.
 **P2-A and P2-B are both done** — the README's claims and the repository's line
 endings are now guarded, and those were the two items whose entire purpose was
-stopping a recurrence. What is left needs nobody and is small: `SECURITY.md`
-(still GitHub boilerplate), deleting the merged `query-backed-language-support`
-branch, and `AGENTS.md` §5's language profile (unwritten work, not a decision —
-an approved ADR already changed it).
+stopping a recurrence. **`SECURITY.md` is rewritten and the merged branch is
+deleted locally**, so the last item needing nobody is `AGENTS.md` §5's language
+profile (unwritten work, not a decision — an approved ADR already changed it).
 
 **The stale `dist/codeatlas-win64.zip` is rebuilt (2026-08-20), and it was not
 what anyone expected.** The guess was that it held the PyInstaller data defect —

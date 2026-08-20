@@ -122,11 +122,31 @@ editing attributes cannot turn it off), a latent `-text` exemption, and a
 mixed-ending file. The corpus guard stays: it reads bytes off disk, so it sees
 an *untracked* fixture that `git ls-files` cannot.
 
-### P2-C · `SECURITY.md` · *work*
+### P2-C · `SECURITY.md` · **DONE 2026-08-20**
 
-Still the untouched GitHub template — "5.1.x ✅ / 4.0.x ✅", "Tell them where to
-go" — on a public repository with a 206-line threat model. Twenty minutes, and
-it is the file a security-minded reader opens first.
+Was the untouched GitHub template — "5.1.x ✅ / 4.0.x ✅", "Tell them where to
+go" — on a public repository with a 206-line threat model.
+
+**Rewritten against the threat model rather than from scratch.** No version
+table: there are no tags, so a table of supported semver lines would be the same
+fiction as the one removed. `main` is the only line and reports name a commit
+SHA. The internal stamps (`SCHEMA_VERSION`, `contract_version`, parser bundle)
+are called out as compatibility markers, *not* releases, because they are the
+obvious thing to mistake for one.
+
+In-scope is the six trust boundaries made concrete; out-of-scope is stated with
+reasons, so the loopback API having no authentication reads as a documented
+assumption rather than an oversight, and an argument against it is invited as a
+model change instead of a report.
+
+**One claim was checked before shipping and was false.** The draft directed
+reporters to GitHub private vulnerability reporting;
+`gh api repos/.../private-vulnerability-reporting` returned `{"enabled":false}`.
+Pointing people at a channel that does not exist is the same defect as the
+version table. Enabled on the user's decision, verified `{"enabled":true}`, and
+only then linked. **Response times are deliberately not promised** — a
+single-maintainer project publishing an SLA would be one more claim nothing
+backs.
 
 ### P2-D · Re-measure packaged performance · *work*
 
@@ -152,8 +172,12 @@ Cheap to run, and it closes a claim that is currently stale rather than wrong.
   present on disk but missing from the archive**. Note the archive was *not*
   extracted and run; the gate's `test_the_packaged_build_parses_a_query_backed_language`
   runs the binary in the tree, and the archive is a file-for-file copy of it.
-- **Delete the merged branch.** `git branch -d` refuses anything unmerged, so
-  the safe form is sufficient. The remote copy too.
+- ~~**Delete the merged branch.**~~ **Local copy deleted 2026-08-20**
+  (`query-backed-language-support`, was `7b97acc`), using `git branch -d` — the
+  form that refuses anything unmerged, so it is self-checking. **The remote copy
+  is deliberately still there:** deleting a remote branch is not locally
+  reversible and was not authorised. 14 other merged local branches also remain;
+  only the one named was in scope.
 - **ADR-0047 cites an ADR-0049 that was never written** — a dangling reference.
 - **`-SkipWeb -Perf` silently skips the measurement and returns 0.** The
   array-splat class is guarded; this one has nothing watching it, in a
