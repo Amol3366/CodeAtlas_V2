@@ -1842,6 +1842,32 @@ of a status list is how they drift, which is the `--format pr` and
       producing one code is the declared limit, recorded in each case's own
       `limitations` rather than left for a reader to infer.**
 
+- [x] **`AGENTS.md` §6 and §19 caught up to the same ADR (2026-08-20).**
+      Both held the stale list §5 did, and **both were found while fixing §5,
+      not by looking for them** — which is the whole argument for a guard.
+
+      **§6.1** now names the query-backed engine and, more usefully, the two
+      limits that are structural rather than incidental: **no shipped
+      `tags.scm` captures an import** (so imports are an authored second query,
+      and this matters because resolution is built on the import graph), and
+      **a purely declarative design would be wrong rather than incomplete**
+      (Go's method receiver is a node *field*, not a lexical ancestor, so a
+      query-only design yields a wrong qualified name). That second point is
+      why `LanguageProfile` and `LanguageAdapter` are split at all, and it
+      belongs in the contract because someone adding a language reads §6 and
+      not the ADR.
+
+      **§19.2** now requires a fixture **per query-backed language, not one
+      shared**: the engine's per-language data is exactly what varies, so a
+      shared fixture would let one language's profile pass on another's
+      evidence. Verified satisfied the day it was written, so the contract does
+      not ship a rule the repository already fails.
+
+      **The distinction that decided what to leave alone:** three sections were
+      stale and §22 looks identical but is correct. A present-tense *rule* can
+      go stale; a past-tense *record* of what a phase delivered cannot, and
+      editing it would falsify history rather than fix a claim.
+
 - [x] **`AGENTS.md` §5 records the profile ADR-0065 approved (2026-08-20).**
       "Python, TypeScript, and JavaScript source" became **seven languages in
       two tiers**, with the query-backed four's exclusions (no test edges, no
@@ -3216,11 +3242,14 @@ endings are now guarded, and those were the two items whose entire purpose was
 stopping a recurrence. **`SECURITY.md` is rewritten, the merged branch is deleted
 locally, and `AGENTS.md` §5 now carries the two-tier language profile.**
 
-Work still needing nobody: `AGENTS.md` **§6 and §19** hold the same stale language
-list §5 did — §6 omits the query-backed engine, §19 requires fixtures for Python
-and TS/JS only while four more exist and are measured. Same bookkeeping fix, no
-decision needed. (The §22 phase checklists say the same thing and **must not** be
-touched: they record what a completed phase delivered.) Then P2-D (re-measure
+**§6 and §19 are done too, so the contract's language drift is closed.** (The
+§22 phase checklists still say "Python, TypeScript, and JavaScript" and **must
+not** be touched: they record what a completed phase delivered.)
+
+Work still needing nobody, best first: **a §5 language-list guard** deriving the
+seven from `default_registry()`, the way `test_readme_claims.py` derives its
+figures — three contract sections drifted against an ADR in this repository and
+all three were found *by accident* while editing a fourth. Then P2-D (re-measure
 packaged performance) and P2-F (two live-path defects).
 
 **The stale `dist/codeatlas-win64.zip` is rebuilt (2026-08-20), and it was not

@@ -87,13 +87,19 @@ rulings, and why C#, Kotlin and the other five stay out. Verified against the
 running registry rather than the docs: `parser_for` returns a parser for exactly
 seven languages and `None` for every other name tried.
 
-**Two more stale language lists were found in `AGENTS.md` and deliberately left
-alone**, being outside the §5 ask:
+**Two more stale language lists were found in `AGENTS.md`. Both are now fixed
+(2026-08-20)**, having been outside the original §5 ask:
 
-- **§6 (approved technical direction)** names Tree-sitter, Python `ast` and
-  TS/JS enrichment, with no mention of the query-backed engine ADR-0065 added.
-- **§19 (testing strategy)** requires fixtures for Python and TS/JS only, while
-  `java_app`, `scala_app`, `go_app` and `rust_app` all exist and are measured.
+- **§6.1** now names the query-backed engine, and records the two limits that
+  are structural rather than incidental — no shipped `tags.scm` captures an
+  import, and Go's receiver being a node *field* means a query-only design is
+  **wrong** rather than incomplete. A new language must expect both, which is
+  the part worth having in the contract instead of only in an ADR.
+- **§19.2** now requires a fixture per query-backed language, **one each rather
+  than one shared** — the engine's per-language data is exactly what varies, so
+  a shared fixture would let one language's profile pass on another's
+  evidence. Verified as satisfied on the day it was written: `java_app`,
+  `scala_app`, `go_app`, `rust_app` all exist and are in `SUPPORTED_FIXTURES`.
 
 Both are the same bookkeeping class as §5 and need no decision. The Phase
 checklists at §22 also say "Python, TypeScript, and JavaScript", and those

@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. `AGENTS.md` §5 is now updated to the two-tier language profile. Work needing nobody: §6 and §19 carry the same stale language list and are the same bookkeeping fix; then P2-D (re-measure packaged performance) and P2-F (two live-path defects). **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. `AGENTS.md` §5, §6 and §19 are all updated — the contract's language drift is closed. Work needing nobody: a §5 language-list guard derived from `default_registry()` (the cheapest preventive item left), P2-D (re-measure packaged performance) and P2-F (two live-path defects). **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
 
 ## Deferred Register
 
@@ -293,6 +293,73 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T21:15:00Z — `AGENTS.md` §6 and §19 catch up to the same ADR
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **the contract's language drift is closed.** `AGENTS.md` §12
+  remains the one open decision.
+
+Both sections held the same stale list §5 did, and both were found while fixing
+§5 rather than by looking for them — which is the argument for a guard, made
+below.
+
+## §6.1 — the engine, and the two limits worth contracting
+
+It named Tree-sitter, Python `ast` and TS/JS enrichment, and did not mention the
+query-backed engine at all. It now does, and carries the part a future language
+author actually needs:
+
+- **No shipped `tags.scm` captures an import** — across every grammar that ships
+  one. Imports are therefore an authored second query (`*.imports.scm`) filled by
+  the adapter, and this matters because resolution is built on the import graph.
+- **A purely declarative design would be wrong, not merely incomplete.** Go's
+  method receiver is a *field* of the method node rather than a lexical ancestor,
+  so a query-only design produces a wrong qualified name rather than a missing
+  one.
+
+That second point is why `LanguageProfile` and `LanguageAdapter` are split at
+all, and it belongs in the contract rather than only in ADR-0065: someone adding
+a language will read §6 and not the ADR. ADR-0067's widening — a profile may
+author a second query where shipped tags omit a relation — is recorded with it.
+
+## §19.2 — a fixture per language, not one shared
+
+It required fixtures for Python and TS/JS only, while `java_app`, `scala_app`,
+`go_app` and `rust_app` had existed and been measured since 2026-08-19.
+
+The requirement is deliberately **one per language, not one shared multi-language
+fixture**: the engine's per-language data is exactly what varies between these
+four, so a shared fixture would let one language's profile pass on another's
+evidence — which is the failure `SUPPORTED_FIXTURES` exists to make impossible.
+
+**Verified satisfied on the day it was written**, so the contract does not ship a
+rule the repository already fails: all four directories exist and all four are in
+`SUPPORTED_FIXTURES` with their admission reasons recorded.
+
+## What was left alone, again
+
+The §22 phase checklists still read "Python, TypeScript, and JavaScript" and
+**must**. They record what a completed phase delivered; editing them would
+falsify history rather than correct a claim. Three sections were stale and one
+that looks identical is correct — the distinction is whether the sentence is a
+present-tense rule or a past-tense record.
+
+**Limitations.**
+
+- **Still nothing guards `AGENTS.md`.** Three sections drifted against an ADR
+  sitting in this repository, and all three were found by accident while editing
+  a fourth. The obvious guard derives the §5 language list from
+  `default_registry()`, the way `test_readme_claims.py` derives its figures — it
+  would have caught §5, and nothing about §6 or §19, both of which are prose
+  about mechanism rather than a list. Worth writing anyway on the §5 list alone,
+  provided its docstring says plainly what it does not cover, since a guard whose
+  scope is unstated gets mistaken for a guarantee.
+- §6 and §19 remain unguardable prose.
+
+- Next: `AGENTS.md` §12 needs a user decision. Then P2-D (re-measure packaged
+  performance) and P2-F (two live-path defects). A §5 language-list guard is the
+  cheapest remaining preventive item.
 
 ### 2026-08-20T20:45:00Z — `AGENTS.md` §5 records the language profile ADR-0065 approved
 

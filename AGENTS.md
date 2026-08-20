@@ -184,6 +184,22 @@ major dependencies as part of unrelated work.
 - Python `ast` enrichment for Python
 - TypeScript/JavaScript language-specific enrichment where it demonstrably
   improves relation accuracy
+- a **query-backed engine** for the second-tier languages of §5 (ADR-0065): each
+  grammar's own shipped `tags.scm` supplies symbols, and a `LanguageProfile`
+  carries the per-language data while a `LanguageAdapter` carries the little
+  behavior no query can express. Two limits are structural rather than
+  incidental, and a new language must expect both:
+  - **no shipped `tags.scm` captures an import**, across every grammar that
+    ships one at all, so imports are authored as a second query
+    (`*.imports.scm`) and filled by the adapter — which matters because
+    resolution is built on the import graph;
+  - **a purely declarative design would be wrong, not merely incomplete**: Go's
+    method receiver is a *field* of the method node rather than a lexical
+    ancestor, so a query-only design yields a wrong qualified name.
+
+  ADR-0067 widened the contract to let a profile author a second query
+  (`scala.references.scm`) where the shipped tags omit a relation the language
+  needs. A language whose grammar ships no `tags.scm` cannot use this engine
 - Git CLI through a non-shell, argument-array subprocess adapter
 - OpenTelemetry-compatible tracing and metrics
 - LanceDB only when optional vector retrieval is admitted
@@ -874,6 +890,9 @@ Maintain small, reviewable fixtures for:
 
 - Python;
 - TypeScript/JavaScript;
+- **each query-backed language of §5** — one per language, not one shared
+  fixture, because the engine's per-language data is exactly what varies and a
+  shared fixture would let one language's profile pass on another's evidence;
 - Markdown/docs;
 - configuration and schemas;
 - mixed-language relationships;
