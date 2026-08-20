@@ -209,9 +209,25 @@ Cheap to run, and it closes a claim that is currently stale rather than wrong.
 
 ### P2-F · Two small live-path defects · *work*
 
-- **The ambiguity message does not disambiguate.** It prints `qualified_name`,
-  identical for both candidates, so "ask again with a qualified name" is
-  followed by `process, process`. `find_exact` tier 2 *does* disambiguate.
+- ~~**The ambiguity message does not disambiguate.**~~ **FIXED 2026-08-20.** It
+  printed `qualified_name`, identical for both candidates, so "ask again with a
+  qualified name" was followed by `process, process` — naming the thing the
+  caller had just typed, twice.
+
+  **The fix reuses the resolver's own vocabulary rather than inventing a display
+  format.** `find_exact` tries `qualified_name`, then
+  `module_path || '.' || qualified_name`; those are the only two forms a caller
+  can type back and have resolve, so the message now uses the shorter one when
+  it already distinguishes the candidates and the module-qualified one when it
+  does not. All-or-nothing rather than per-candidate, because a list mixing
+  `process` with `beta.process` invites reading the difference as meaningful.
+
+  **The test asserts the journey, not a string:** ask again with each name the
+  message offered, and the ambiguity must be gone. That survives a change of
+  display format, and fails correctly if the message ever offers something
+  unqueryable — a file path, most temptingly, which reads as helpful and cannot
+  be typed back in. The pre-existing ambiguity test could not catch the defect
+  because `Alpha.shared` and `Beta.shared` are already distinct.
 - **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with**
   (found 2026-08-19). Not a §4.1 violation — line 3 *is* the import — but the
   label model is inconsistent, because Java emits no module symbol where Python

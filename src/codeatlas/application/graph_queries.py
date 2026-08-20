@@ -88,6 +88,46 @@ _DERIVATION_STRENGTH: tuple[Derivation, ...] = (
 )
 
 
+def _candidate_labels(roots: Sequence[SymbolRecord]) -> list[str]:
+    """Name each candidate in the shortest form the resolver can tell apart.
+
+    `find_exact` tries `qualified_name` first and
+    `module_path || '.' || qualified_name` second, so those are the only two
+    forms a caller can type back and have resolve. Naming a candidate by
+    anything else -- a file path, most temptingly -- reads as helpful and cannot
+    be queried.
+
+    Qualified names are used when they already distinguish the candidates, and
+    the module-qualified form only when they do not. Two module-level `process`
+    functions share a qualified name, and a message that answers "ask again with
+    a qualified name" with `process, process` names the thing the caller just
+    typed, twice.
+
+    The choice is all-or-nothing rather than per-candidate: a list mixing
+    `process` with `beta.process` invites reading the difference as meaningful.
+
+    The empty-`module_path` branch is **defensive and unproven**. Every parser
+    checked derives a non-empty value, Java's adapter falling back to the path
+    deliberately, so the state could not be constructed here and a mutation
+    removing the branch survives. It is kept because `.process` looks like a
+    real name and resolves to nothing, which is a worse answer than an ambiguous
+    one -- but it is not evidence that the case occurs.
+
+    (Java's adapter attributes that fallback to a snapshot-validation
+    requirement. `_validate_snapshot` checks paths, line ranges, versions and
+    chunk coverage, and does not check `module_path`. Noted, not chased.)
+    """
+    qualified = [symbol.qualified_name for symbol in roots]
+    if len(set(qualified)) == len(qualified):
+        return qualified
+    return [
+        f"{symbol.module_path}.{symbol.qualified_name}"
+        if symbol.module_path
+        else symbol.qualified_name
+        for symbol in roots
+    ]
+
+
 @dataclass(frozen=True)
 class GraphQueryRequest:
     """A bounded request for one symbol's neighbourhood."""
@@ -236,7 +276,7 @@ class GraphQueryService:
         if len(roots) > 1:
             # Answering for one of several candidates would silently pick a
             # question the caller did not ask.
-            names = ", ".join(sorted(symbol.qualified_name for symbol in roots))
+            names = ", ".join(sorted(_candidate_labels(roots)))
             return self._empty(
                 request,
                 snapshot,

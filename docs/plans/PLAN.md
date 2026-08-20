@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. `AGENTS.md` §5, §6 and §19 are all updated — the contract's language drift is closed. Work needing nobody: a §5 language-list guard derived from `default_registry()` (the cheapest preventive item left), P2-D (re-measure packaged performance) and P2-F (two live-path defects). **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. `AGENTS.md` §5, §6 and §19 are all updated, and P2-F's ambiguity-message defect is fixed. Work needing nobody: a §5 language-list guard derived from `default_registry()` (the cheapest preventive item left) and P2-D (re-measure packaged performance). **Two rulings wait on the user**: `AGENTS.md` §12, and P2-F's Java `IMPORTS` label — accept the asymmetry or emit a compilation-unit symbol. **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
 
 ## Deferred Register
 
@@ -293,6 +293,91 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T22:00:00Z — The ambiguity message now says something a caller can act on
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **the first half of P2-F is fixed.** The second half (a Java
+  `IMPORTS` edge's label) is a ruling, not work, and is unchanged.
+
+## The defect
+
+`GraphQueryService` built its ambiguity summary from `qualified_name` alone. Two
+module-level functions named `process` share that field, so the message read:
+
+```
+'process' is ambiguous ... and matches 2 symbols: process, process.
+Ask again with a qualified name.
+```
+
+It named the thing the caller had just typed, twice, and then told them to type
+it again. The instruction was not merely unhelpful — it was impossible to follow.
+
+## The fix
+
+**Reuse the resolver's own vocabulary rather than invent a display format.**
+`SymbolStore.find_exact` tries tiers in order: `qualified_name`, then
+`module_path || '.' || qualified_name`, then `name`, then a case-insensitive
+`name`. Only the first two are forms a caller can type back and have resolve
+uniquely, which makes them the only honest things to print.
+
+`_candidate_labels` therefore uses the qualified name when it already
+distinguishes the candidates and the module-qualified form when it does not.
+**All-or-nothing rather than per-candidate**: a list mixing `process` with
+`beta.process` invites reading the difference as meaningful when it is only an
+artifact of which names happened to collide.
+
+## Verification
+
+- **TDD.** Test written first and watched fail on exactly the reported string:
+  `got ['process', 'process']`.
+- **The test asserts the journey, not the text.** It re-issues the query with
+  each name the message offered and requires `SYMBOL_AMBIGUOUS` to be gone. That
+  survives a change of display format, and it fails correctly if the message ever
+  offers something unqueryable — a file path, most temptingly, which reads as
+  helpful and cannot be typed back in.
+- **Mutation-checked in three variants.** Reverting to bare `qualified_name`
+  (the original defect) is **caught**. Two survive, and both are reported rather
+  than hidden:
+  - *always module-qualified* — survives, and is left unpinned deliberately. It
+    is a cosmetic choice, not a correctness one; both forms resolve, and pinning
+    presentation would make the test fail on rewording.
+  - *dropping the empty-`module_path` guard* — survives because **the state could
+    not be constructed**. Every parser derives a non-empty value, Java's adapter
+    falling back to the relative path deliberately. The branch is kept because
+    `.process` looks like a real name and resolves to nothing, but its docstring
+    now says plainly that it is defensive and unproven rather than implying it
+    was tested.
+- The pre-existing `test_an_ambiguous_root_abstains_and_lists_candidates` still
+  passes unchanged: `Alpha.shared` and `Beta.shared` already distinguish, so the
+  short form is still used and the message did not get noisier for the common
+  case.
+
+## One finding, noted and not chased
+
+Java's adapter comments that its path fallback "keeps `module_path` non-empty,
+which snapshot validation requires". `IndexingService._validate_snapshot` checks
+staged file counts, relative paths, symbol and chunk line ranges, versions and
+search-projection coverage — and **does not check `module_path`**. Either the
+requirement lives somewhere else or that comment is inaccurate. Out of scope
+here; recorded so it is not rediscovered from scratch.
+
+**Limitations.**
+
+- The message can still repeat a name if two candidates share both
+  `module_path` and `qualified_name`. No such case could be constructed, and no
+  handling was invented for it — a third form would have to be one `find_exact`
+  accepts, and there is not one.
+- Presentation is unpinned by choice, so the wording can drift.
+
+- Next: P2-F's second half needs a ruling (accept the Java `IMPORTS` label
+  asymmetry, or emit a compilation-unit symbol). `AGENTS.md` §12 still needs a
+  decision. P2-D and a §5 language-list guard need nobody.
+
+## Gate
+
+`scripts/check_phase4.ps1 -SkipSync`, all nine stages, `GATE_LASTEXITCODE=0`.
+Log grepped for `FAILED` / `ERROR` / `Tests failed` / `Traceback`: all absent.
 
 ### 2026-08-20T21:15:00Z — `AGENTS.md` §6 and §19 catch up to the same ADR
 

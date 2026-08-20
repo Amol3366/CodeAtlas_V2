@@ -430,3 +430,55 @@ def test_a_first_hop_claim_is_still_stated_directly(harness: Harness) -> None:
     ]
     assert direct, f"expected a direct claim, got: {_claim_texts(response)}"
     assert "indirectly" not in direct[0]
+
+
+def _candidates_from(summary: str) -> list[str]:
+    """The names the ambiguity message offers, as the caller would read them."""
+    _, _, tail = summary.partition("symbols: ")
+    listed, _, _ = tail.partition(". Ask again")
+    return [name.strip() for name in listed.split(",") if name.strip()]
+
+
+def test_following_the_ambiguity_advice_actually_resolves(
+    harness: Harness,
+) -> None:
+    """The advice has to be followable, or it is not advice.
+
+    Two module-level `process` functions share a `qualified_name`, so a message
+    built from that field says "ask again with a qualified name" and then offers
+    `process, process` -- naming the thing the caller already typed, twice. The
+    existing ambiguity test does not catch this because `Alpha.shared` and
+    `Beta.shared` are already distinct.
+
+    What is asserted is the user's journey rather than a fixed string: **ask
+    again with each name the message offered, and the ambiguity must be gone.**
+    That stays true if the display format changes, and it fails for the right
+    reason if the message ever offers something unqueryable -- a file path, say,
+    which reads as helpful and cannot be typed back in.
+
+    `find_exact` tier 2 already accepts `module_path.qualified_name`, so a form
+    satisfying this exists; the message was simply not using it.
+    """
+    (harness.root / "src" / "alpha.py").write_text(
+        "def process():\n    return 1\n", encoding="utf-8"
+    )
+    (harness.root / "src" / "beta.py").write_text(
+        "def process():\n    return 2\n", encoding="utf-8"
+    )
+    harness.services.indexing.index(harness.repository_id)
+
+    response = harness.services.graph.callers(_request(harness, "process"))
+    assert "SYMBOL_AMBIGUOUS" in response.warnings
+
+    candidates = _candidates_from(response.answer.summary)
+    assert len(set(candidates)) == 2, (
+        f"the message must name two distinguishable candidates, got {candidates} "
+        f"in: {response.answer.summary}"
+    )
+
+    for candidate in candidates:
+        again = harness.services.graph.callers(_request(harness, candidate))
+        assert "SYMBOL_AMBIGUOUS" not in again.warnings, (
+            f"the message offers {candidate!r}, but asking again with it is still "
+            "ambiguous -- so following the instruction does not work"
+        )

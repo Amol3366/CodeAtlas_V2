@@ -1842,6 +1842,46 @@ of a status list is how they drift, which is the `--format pr` and
       producing one code is the declared limit, recorded in each case's own
       `limitations` rather than left for a reader to infer.**
 
+- [x] **The ambiguity message can now be acted on (P2-F, 2026-08-20).** It was
+      built from `qualified_name` alone, so two module-level `process`
+      functions produced *"matches 2 symbols: process, process. Ask again with
+      a qualified name."* — naming what the caller had just typed, twice, then
+      telling them to type it again. Not merely unhelpful: **impossible to
+      follow.**
+
+      **The fix reuses the resolver's vocabulary instead of inventing a
+      display format,** which is the transferable part. `find_exact` tries
+      `qualified_name`, then `module_path || '.' || qualified_name`, then
+      `name`, then case-insensitive `name`. Only the first two are forms a
+      caller can type back and have resolve uniquely — so they are the only
+      honest things to print. The message uses the short one when it already
+      distinguishes and the module-qualified one when it does not,
+      all-or-nothing, because a list mixing `process` with `beta.process`
+      invites reading the difference as meaningful.
+
+      **The test asserts the journey, not the string:** ask again with each
+      name offered, and the ambiguity must be gone. It survives a change of
+      wording and fails correctly if the message ever offers something
+      unqueryable — a file path, most temptingly, which reads as helpful and
+      cannot be typed back in. The **pre-existing** ambiguity test could never
+      have caught this: `Alpha.shared` and `Beta.shared` already differ.
+
+      **Two mutations survive and are recorded rather than hidden.**
+      *Always module-qualified* survives and is deliberately unpinned —
+      presentation, not correctness; pinning it would make the test fail on
+      rewording. *Dropping the empty-`module_path` guard* survives because
+      **the state could not be constructed**: every parser derives a non-empty
+      value. The branch stays (`.process` looks real and resolves to nothing)
+      but its docstring now says it is defensive and unproven rather than
+      implying it was tested.
+
+      **Loose thread, noted not chased:** Java's adapter says its path
+      fallback "keeps `module_path` non-empty, which snapshot validation
+      requires". `_validate_snapshot` checks file counts, relative paths,
+      symbol and chunk line ranges, versions and projection coverage — and
+      **not** `module_path`. Either the requirement is elsewhere or that
+      comment is wrong.
+
 - [x] **`AGENTS.md` §6 and §19 caught up to the same ADR (2026-08-20).**
       Both held the stale list §5 did, and **both were found while fixing §5,
       not by looking for them** — which is the whole argument for a guard.
@@ -3250,7 +3290,13 @@ Work still needing nobody, best first: **a §5 language-list guard** deriving th
 seven from `default_registry()`, the way `test_readme_claims.py` derives its
 figures — three contract sections drifted against an ADR in this repository and
 all three were found *by accident* while editing a fourth. Then P2-D (re-measure
-packaged performance) and P2-F (two live-path defects).
+packaged performance).
+
+**P2-F's first defect is fixed** (the ambiguity message). Its second is a
+**ruling, not work**: a Java `IMPORTS` edge cites line 3, which genuinely *is*
+the import, so it is **not** a §4.1 evidence violation — what is inconsistent is
+the label model, because Java emits no module symbol where Python does. Accept
+the asymmetry, or emit a compilation-unit symbol.
 
 **The stale `dist/codeatlas-win64.zip` is rebuilt (2026-08-20), and it was not
 what anyone expected.** The guess was that it held the PyInstaller data defect —
