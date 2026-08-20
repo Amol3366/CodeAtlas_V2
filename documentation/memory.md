@@ -3148,9 +3148,24 @@ The plan is `docs/superpowers/plans/2026-08-20-remaining-work.md`.
 **P2-A and P2-B are both done** — the README's claims and the repository's line
 endings are now guarded, and those were the two items whose entire purpose was
 stopping a recurrence. What is left needs nobody and is small: `SECURITY.md`
-(still GitHub boilerplate), the stale `dist/codeatlas-win64.zip`, deleting the
-merged `query-backed-language-support` branch, and `AGENTS.md` §5's language
-profile (unwritten work, not a decision — an approved ADR already changed it).
+(still GitHub boilerplate), deleting the merged `query-backed-language-support`
+branch, and `AGENTS.md` §5's language profile (unwritten work, not a decision —
+an approved ADR already changed it).
+
+**The stale `dist/codeatlas-win64.zip` is rebuilt (2026-08-20), and it was not
+what anyone expected.** The guess was that it held the PyInstaller data defect —
+the build where `repo add` and `doctor` died and only `--help` worked. It did
+not. It contained **no `tree_sitter_java`, `_go`, `_rust` or `_scala` at all**,
+no `tags.scm`, no authored queries: it predated ADR-0065 entirely. So it would
+have **run perfectly** while silently supporting only Python and TS/JS, with
+nothing to say four advertised languages were missing. **A quieter failure than
+one that cannot start, and a worse one to ship.** Rebuilt via
+`build_package.ps1`'s own archive step and verified by content rather than exit
+code: 17414 entries against 17378, all four `queries/tags.scm`, all five
+authored `.scm` files, 0 files on disk missing from the archive. It was *not*
+extracted and run — the evidence is that the gate runs the binary in the tree
+and the archive copies that tree file-for-file. **The artifact is untracked, so
+nothing prevents this recurring** the next time a rebuild uses `-SkipZip`.
 
 **One environment note before running anything:** the suite now takes ~16 minutes
 rather than ~6, because a packaged artifact exists and the semantic extras are

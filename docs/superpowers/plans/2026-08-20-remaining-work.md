@@ -19,7 +19,7 @@ most-recorded planning failure — it has produced a wrong plan three times):
 | Which languages have corpus coverage | counting cases per fixture | Java 4q/1c, Scala 4q/0c, **Go and Rust have no fixture at all** |
 | CRLF drift | `git ls-files --eol` | **resolved** — the one remaining is the deliberate ADR-0043 fixture (`attr/-text`) |
 | Merged branch | `git branch --merged` | still present, safe to delete |
-| Packaged zip | file date | **2026-08-17** — predates two rebuilds |
+| Packaged zip | file date | **resolved 2026-08-20** — rebuilt from the verified tree; contents cross-checked, 0 files missing |
 | Working tree | `git status` | clean, `main`, synced |
 
 ## Urgency scale
@@ -138,8 +138,20 @@ Cheap to run, and it closes a claim that is currently stale rather than wrong.
 
 ### P2-E · Small, batchable · *work*
 
-- **The stale zip.** `dist/codeatlas-win64.zip` is dated 2026-08-17 and does not
-  match the folder beside it. Both rebuilds used `-SkipZip`.
+- ~~**The stale zip.**~~ **DONE 2026-08-20.** It was dated 2026-08-17 and did
+  not match the folder beside it, because both rebuilds used `-SkipZip`.
+  **It was worse than "stale":** the archive contained no `tree_sitter_java`,
+  `_go`, `_rust` or `_scala` at all, and no `tags.scm` or authored queries — it
+  predated ADR-0065 entirely. Installing it would have given a CodeAtlas that
+  ran fine while silently supporting only Python and TS/JS, with no error to say
+  the other four were absent. That is a quieter failure than the packaged build
+  which could not start, and a worse one to ship.
+  Rebuilt by reproducing `build_package.ps1`'s own archive step, retry included.
+  Verified by content, not by exit code: 17414 entries against the old 17378,
+  all four `queries/tags.scm`, all five authored `.scm` files, and **0 files
+  present on disk but missing from the archive**. Note the archive was *not*
+  extracted and run; the gate's `test_the_packaged_build_parses_a_query_backed_language`
+  runs the binary in the tree, and the archive is a file-for-file copy of it.
 - **Delete the merged branch.** `git branch -d` refuses anything unmerged, so
   the safe form is sufficient. The remote copy too.
 - **ADR-0047 cites an ADR-0049 that was never written** — a dangling reference.

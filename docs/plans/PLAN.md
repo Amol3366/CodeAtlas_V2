@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: `SECURITY.md`, the stale zip, the merged branch, `AGENTS.md` §5. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: `SECURITY.md`, the merged branch, `AGENTS.md` §5. **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
 
 ## Deferred Register
 
@@ -293,6 +293,63 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T19:15:00Z — The packaged zip rebuilt; it was two features behind, not merely stale
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **the stale-zip item in P2-E is closed.** `dist/` is gitignored, so
+  this commit carries the record, not the artifact.
+
+## It was worse than "stale"
+
+`dist/codeatlas-win64.zip` was dated 2026-08-17 while the tree beside it was
+rebuilt 2026-08-19; both rebuilds had used `-SkipZip`. The expectation was that
+it might be the build with the PyInstaller data defect — the one where `repo add`
+and `doctor` both died and only `--help` worked. **It was not.** Inspecting it
+showed no `tree_sitter_java`, `_go`, `_rust` or `_scala` at all, no `tags.scm`
+and no authored queries: it predated ADR-0065 entirely.
+
+That is a quieter defect and a worse one to ship. The broken build failed loudly
+on first use. This one **runs**, and silently supports only Python and TS/JS,
+with nothing to tell the user that four languages the README advertises are
+simply absent.
+
+## What was done
+
+Rebuilt by reproducing `build_package.ps1`'s own archive step rather than
+inventing one — including its five-attempt retry, which exists because Windows
+Defender's scan of a freshly executed `.exe` holds a handle open past the process
+that ran it, and failing there would report a good build as broken.
+
+## Verification
+
+By content, not by exit code:
+
+- **17414 entries**, against 17378 in the archive it replaced.
+- All four grammar `queries/tags.scm` present (`java`, `go`, `rust`, `scala`).
+- All five authored queries present: the four `*.imports.scm` from ADR-0065 and
+  `scala.references.scm` from ADR-0067.
+- **0 files present on disk but missing from the archive**, comparing the archive
+  listing against a full walk of `dist/codeatlas-win64`.
+
+**What was not done, stated because this project's packaging defect was only ever
+caught by running the artifact:** the archive was not extracted and executed. The
+evidence is indirect — the gate's `test_the_packaged_build_parses_a_query_backed_language`
+runs the binary in the tree, and the archive is a file-for-file copy of that tree.
+A fresh extract-and-run would be direct evidence and is the stronger check if
+this artifact is ever actually distributed.
+
+**Limitations.**
+
+- The archive is untracked and unsigned; nothing in the repository records what
+  is inside it, so the same drift can recur the next time a rebuild uses
+  `-SkipZip`. A guard comparing archive mtime against the tree would close it;
+  not written, because it is only meaningful on a machine that has built.
+- `-SkipWeb -Perf` still silently skips its measurement and returns 0 (P2-E).
+
+- Next: `SECURITY.md`, deleting the merged `query-backed-language-support` branch
+  (local and remote — an irreversible remote change, so it needs a yes), and
+  `AGENTS.md` §5. Only `AGENTS.md` §12 needs a decision.
 
 ### 2026-08-20T18:30:00Z — P2-B: the LF guard now covers the repository
 
