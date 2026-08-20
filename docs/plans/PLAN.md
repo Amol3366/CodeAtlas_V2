@@ -56,7 +56,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: P2-B (widen the LF guard), `SECURITY.md`, the stale zip, the merged branch, `AGENTS.md` §5 |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. Work needing nobody: `SECURITY.md`, the stale zip, the merged branch, `AGENTS.md` §5. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
 
 ## Deferred Register
 
@@ -293,6 +293,109 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-20T18:30:00Z — P2-B: the LF guard now covers the repository
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P2-B closed.** With P2-A, both items whose entire purpose was
+  stopping a recurrence are now in place.
+- New file: `tests/unit/test_working_tree_line_endings.py`, two assertions.
+
+## What was wrong
+
+`test_every_corpus_file_has_lf_endings_in_the_working_tree` is scoped to three
+directories under `tests/evaluation`. It protects the corpus and not the product,
+which is why **18 product files drifted to CRLF with nothing failing**.
+
+`git status` cannot show this. `text=auto` normalises on read, so Git compares LF
+against LF and reports a clean tree while the bytes on disk hold CRLF. Staging a
+CRLF file shows a plain `A`; the endings appear only in a warning nobody keeps.
+That invisibility is why it survived. `git ls-files --eol` reports the working
+tree separately from the index and is the cheap way to see it.
+
+The cost is not cosmetic: the change engine hashes bytes and diffs lines, so
+every line of a CRLF file differs and every symbol in it reports as changed.
+`baseline-phase-7` recorded `changed_symbol_precision` 0.2000 from exactly one
+such file; the true value was 1.0000.
+
+## The design decision
+
+**Scope is derived from `git ls-files --eol`, not from a list of directories.**
+A guard hard-coding "check `src`, `tests`, `scripts`, `apps`" would be the same
+defect it exists to stop — a list that must be extended when something is added,
+with nothing enforcing it. That is now five occurrences: `SUPPORTED_FIXTURES`
+and the two `ROWS` tables (guarded, and each forced a decision), the PyInstaller
+data list (unguarded — shipped a binary that could not run at all), `README.md`
+(unguarded — drifted twice in two days), and this. Deriving from Git covers a new
+directory the day it is committed, with nobody having to remember.
+
+**The two assertions ask different questions**, which is why there are two:
+
+- *Has* anything drifted — no tracked file reports `w/crlf` or `w/mixed`. The one
+  skipped path is **hard-coded**, not read from the `-text` attribute, so editing
+  `.gitattributes` cannot silence it.
+- Is anything *permitted* to — no file carries `-text` except ADR-0043's fixture.
+  This catches a file marked `-text` while its bytes are still LF: invisible to
+  the first assertion, and one commit from being invisible for good.
+
+## Verification
+
+A clean tree makes a guard pass vacuously, so each assertion was **proven to
+fail** against a real offender staged in `src/` and then removed:
+
+1. CRLF product file → first assertion fails, naming it.
+2. Same file plus a `-text` line in `.gitattributes` → **both** fail; the
+   silencing attempt does not work.
+3. `-text` on a file whose bytes are still LF → only the second fails, which is
+   the case it exists for.
+4. Mixed-ending file → Git reports `w/mixed` and it is caught, so that branch of
+   the predicate is reachable rather than decoration.
+
+Working tree confirmed clean after each. The probe was staged with `git add` and
+removed with `git rm --cached`; `git checkout --` was deliberately avoided, since
+it has twice in this project reverted a fix along with the thing it was meant to
+undo (ADR-0022, ADR-0042) — and did exactly that again earlier today during the
+`changed_symbol_precision` mutation check.
+
+**One real finding on the way.** The exemption assertion first failed on
+`tests/fixtures/upgrade/schema_0008.db`, which also carries `-text` — because
+`*.db binary` expands to `-text -diff`. That is correct, not a test bug. Binaries
+report `w/-text`, having no line endings, so they drop out without anyone
+maintaining a list of extensions.
+
+## Files
+
+- `tests/unit/test_working_tree_line_endings.py` — new.
+- `tests/evaluation/test_dataset.py` — the corpus guard now cross-references this
+  one and records why both exist.
+- `docs/superpowers/plans/2026-08-20-remaining-work.md` — P2-A and P2-B marked
+  done, with the design note.
+- `docs/plans/PLAN.md`, `documentation/memory.md` — Active Work, this entry.
+
+**Limitations.**
+
+- **Only tracked files are covered.** An untracked file is invisible to
+  `git ls-files`. That is exactly the gap the corpus guard fills by reading bytes
+  off disk, so the two are kept as a pair rather than one replacing the other —
+  a new fixture is untracked precisely when it is most likely to be wrong.
+- **Marking a source path `binary` would hide it from both assertions.** Stated
+  in the docstring rather than guarded: it is a far louder edit than adding
+  `-text`, and guarding it would mean re-deriving the binary extension list,
+  which is the failure mode this design avoids.
+- The guard shells out to `git`. Every environment that runs this suite is a
+  checkout, but a source tarball without `.git` would error rather than skip.
+
+## Verification (gate)
+
+- `scripts/check_phase4.ps1 -SkipSync`, all nine stages, `GATE_LASTEXITCODE=0`,
+  **2365 passed, 3 skipped** in 503.79 s (8:23) — two more than the previous
+  green run, which are exactly the two added here. Log grepped for `FAILED` /
+  `ERROR` / `Tests failed` / `Traceback`: all absent.
+
+- Next: `SECURITY.md` (still the GitHub template), the merged
+  `query-backed-language-support` branch, and `AGENTS.md` §5. The
+  `dist/codeatlas-win64.zip` staleness is handled in the entry that follows this
+  one. Only `AGENTS.md` §12 needs a user decision.
 
 ### 2026-08-20T17:00:00Z — The dilution decision, resolved: the report now counts exact cases
 

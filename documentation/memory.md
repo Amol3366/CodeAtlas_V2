@@ -1842,6 +1842,47 @@ of a status list is how they drift, which is the `--format pr` and
       producing one code is the declared limit, recorded in each case's own
       `limitations` rather than left for a reader to infer.**
 
+- [x] **The LF guard now covers the repository, not the corpus (P2-B, 2026-08-20).** `tests/unit/test_working_tree_line_endings.py`, two
+      assertions over `git ls-files --eol`. The old guard was scoped to three
+      corpus directories, which is why **18 product files drifted to CRLF with
+      nothing failing**.
+
+      **The scope is derived from Git on purpose.** A guard listing `src`,
+      `tests`, `scripts`, `apps` would be the same defect it exists to stop —
+      a list that must be extended, with nothing enforcing it. Deriving from
+      `git ls-files` covers a new directory the day it is committed.
+
+      **Why `git status` never showed this.** `text=auto` normalises on read,
+      so Git compares LF to LF and reports clean while the disk holds CRLF.
+      Staging a CRLF file shows a plain `A`; the endings appear only in a
+      warning nobody keeps. That invisibility is the whole reason it survived.
+
+      **The second assertion is the one worth remembering.** It asks what is
+      *permitted* to drift, not what has: a file marked `-text` while its
+      bytes are still LF passes the first check and fails this one. That is a
+      silencer one commit before it matters. And the first check skips a
+      **hard-coded** path rather than reading the `-text` attribute, so
+      editing `.gitattributes` cannot turn it off.
+
+      **Proven to fail, four ways**, since a clean tree makes a guard pass
+      vacuously: CRLF drift in `src/`; drift plus a `.gitattributes` silencing
+      attempt (both assertions fire); a latent `-text` exemption on an LF
+      file; and a mixed-ending file, confirming `w/mixed` is reachable rather
+      than decoration.
+
+      **One finding on the way:** `tests/fixtures/upgrade/schema_0008.db` also
+      carries `-text`, because `*.db binary` expands to `-text -diff`. Real,
+      not a test bug. Binaries report `w/-text` and drop out without anyone
+      listing extensions. Residual, stated in the docstring rather than
+      guarded: marking a *source* path `binary` would hide it from both
+      assertions, which is a much louder edit than adding `-text`.
+
+      The corpus guard stays and now cross-references this one. They are not
+      redundant: this derives scope from Git and cannot see an **untracked**
+      fixture, while that reads bytes off disk and catches one the moment it
+      is written. A new fixture is untracked exactly when it is most likely to
+      be wrong.
+
 - [x] **README claims are guarded (P2-A, 2026-08-20).** Eight assertions
       deriving the README's version constants, MCP tool count and corpus counts
       from source. **No mutation had to be invented: the README was already
@@ -3103,10 +3144,13 @@ what was missing. **Check what already exists before recording a gap.**
 
 ### Startable without anyone
 
-The plan is `docs/superpowers/plans/2026-08-20-remaining-work.md`. Next in it:
-**P2-B**, widening the LF guard beyond `tests/evaluation` — the sibling of the
-README guard, and the reason 18 files drifted unnoticed. Then `SECURITY.md`
-(still GitHub boilerplate), the stale zip, the merged branch, and `AGENTS.md` §5.
+The plan is `docs/superpowers/plans/2026-08-20-remaining-work.md`.
+**P2-A and P2-B are both done** — the README's claims and the repository's line
+endings are now guarded, and those were the two items whose entire purpose was
+stopping a recurrence. What is left needs nobody and is small: `SECURITY.md`
+(still GitHub boilerplate), the stale `dist/codeatlas-win64.zip`, deleting the
+merged `query-backed-language-support` branch, and `AGENTS.md` §5's language
+profile (unwritten work, not a decision — an approved ADR already changed it).
 
 **One environment note before running anything:** the suite now takes ~16 minutes
 rather than ~6, because a packaged artifact exists and the semantic extras are

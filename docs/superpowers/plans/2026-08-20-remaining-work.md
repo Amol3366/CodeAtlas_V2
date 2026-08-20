@@ -88,7 +88,7 @@ pick.
 
 ## P2 — scheduled
 
-### P2-A · A guard so README claims cannot drift · *work*
+### P2-A · A guard so README claims cannot drift · **DONE 2026-08-20**
 
 Still the cheapest high-leverage item. Nothing covers `README.md`; that is why
 five figures and a wrong tool count shipped. A test deriving the version
@@ -96,7 +96,7 @@ constants, MCP tool count and quoted metrics from source would have caught every
 one — the same shape as the packaging guard added 2026-08-19, which was written
 after the identical failure.
 
-### P2-B · Widen the LF guard beyond the corpus · *work*
+### P2-B · Widen the LF guard beyond the corpus · **DONE 2026-08-20**
 
 **The cleanup half is done**: every drifted file was normalized as it was
 touched, and the only `w/crlf` left is the deliberate ADR-0043 fixture, held by
@@ -106,6 +106,21 @@ an explicit `-text` attribute.
 `test_every_corpus_file_has_lf_endings_in_the_working_tree` is scoped to
 `tests/evaluation`, so it protects the corpus and not the product — which is why
 18 files drifted unnoticed. Widening it is what stops a third occurrence.
+
+**Done: `tests/unit/test_working_tree_line_endings.py`, two assertions.** The
+scope is derived from `git ls-files --eol`, not from a list of directories —
+deliberately, because a list that must be extended and nothing enforces is the
+defect this project has now hit five times. A directory is covered the day it is
+committed.
+
+The two assertions ask different questions: whether anything *has* drifted, and
+whether anything is *permitted* to. The second catches a file marked `-text`
+while its bytes are still LF — a silencer one commit before it matters, and
+invisible to the first. Both were proven to fail: CRLF drift, drift plus a
+`.gitattributes` silencing attempt (both fire; the skip is a hard-coded path, so
+editing attributes cannot turn it off), a latent `-text` exemption, and a
+mixed-ending file. The corpus guard stays: it reads bytes off disk, so it sees
+an *untracked* fixture that `git ls-files` cannot.
 
 ### P2-C · `SECURITY.md` · *work*
 

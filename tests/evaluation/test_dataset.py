@@ -240,6 +240,15 @@ def test_every_corpus_file_has_lf_endings_in_the_working_tree(root: Path) -> Non
     0.2000 for exactly this reason: one variant file held CRLF, so all five
     functions in it were reported changed against a corpus declaring one. The
     correct value is 1.0000.
+
+    **This guard is corpus-scoped on purpose, and it is no longer the only one.**
+    `tests/unit/test_working_tree_line_endings.py` covers every *tracked* file in
+    the repository via `git ls-files --eol`, which is what the three roots below
+    failed to do while 18 product files drifted. The two are not redundant: that
+    one derives its scope from Git and so cannot see a corpus file nobody has
+    committed yet, while this one reads bytes off disk and catches it the moment
+    it is written. A new fixture is untracked exactly when it is most likely to
+    be wrong.
     """
     offenders = []
     for path in sorted(root.rglob("*")):
