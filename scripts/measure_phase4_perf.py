@@ -39,6 +39,11 @@ from pathlib import Path
 from codeatlas.application.change_analysis import ChangeAnalysisRequest
 from codeatlas.application.container import build_services
 from codeatlas.application.registration import RegisterRepositoryRequest
+from codeatlas.evaluation.quiescence import (
+    CALIBRATION_TOLERANCE,
+    calibrate,
+    unsettled_reason,
+)
 from codeatlas.storage.sqlite.connection import connect
 from codeatlas.storage.sqlite.migrations import apply_migrations
 
@@ -50,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--modules", type=int, default=300)
     parser.add_argument("--runs", type=int, default=20)
     parser.add_argument("--json-output", type=Path, default=None)
+    parser.add_argument("--allow-busy", action="store_true")
     return parser
 
 
@@ -129,6 +135,7 @@ def _p95(samples: list[float]) -> float:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    calibration_before = calibrate()
     with tempfile.TemporaryDirectory(prefix="codeatlas-perf-") as workspace:
         root = Path(workspace) / "repo"
         root.mkdir()
@@ -171,7 +178,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 preflight.append(time.perf_counter() - started)
 
+    calibration_after = calibrate()
     results = {
+        # Probed before and after the samples. A run whose probes disagree
+        # measured two different machines; see
+        # docs/evaluation/phase-7-performance-environment.md (2026-08-21).
+        "calibration_before_s": round(calibration_before, 4),
+        "calibration_after_s": round(calibration_after, 4),
+        "calibration_tolerance": CALIBRATION_TOLERANCE,
+        "machine_settled": unsettled_reason(
+            calibration_before, calibration_after
+        ) is None,
         "modules": args.modules,
         "runs": args.runs,
         "python": platform.python_version(),
@@ -195,6 +212,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             json.dumps(results, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+    if not results["machine_settled"]:
+        print(
+            f"WARNING: {unsettled_reason(calibration_before, calibration_after)}",
+            file=sys.stderr,
+        )
+        if not args.allow_busy:
+            return 2
     return 0 if results["refresh_target_met"] and results["preflight_target_met"] else 1
 
 

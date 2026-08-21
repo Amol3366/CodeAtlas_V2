@@ -50,6 +50,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from codeatlas.evaluation.quiescence import (
+    CALIBRATION_TOLERANCE,
+    calibrate,
+    unsettled_reason,
+)
+
 try:
     from scripts.measure_phase4_perf import (
         _edit_one_file,
@@ -81,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runs", type=int, default=20)
     parser.add_argument("--port", type=int, default=8593)
     parser.add_argument("--json-output", type=Path, default=None)
+    parser.add_argument("--allow-busy", action="store_true")
     parser.add_argument(
         "--artifact",
         type=Path,
@@ -179,6 +186,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.json_output.write_text(
             json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
+    if not results["machine_settled"]:
+        print(
+            "WARNING: "
+            + str(
+                unsettled_reason(
+                    results["calibration_before_s"], results["calibration_after_s"]
+                )
+            ),
+            file=sys.stderr,
+        )
+        if not args.allow_busy:
+            return 2
     met = results["refresh_target_met"] and results["preflight_target_met"]
     return 0 if met else 1
 
@@ -186,6 +205,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _measure(
     workspace: Path, artifact: Path, args: argparse.Namespace
 ) -> dict[str, Any]:
+    calibration_before = calibrate()
     root = workspace / "repo"
     root.mkdir()
     generate_repository(root, args.modules)
@@ -248,6 +268,7 @@ def _measure(
         server.terminate()
         server.wait(timeout=60)
 
+    calibration_after = calibrate()
     refresh_p95 = _p95(refresh)
     preflight_p95 = _p95(preflight)
     return {
@@ -255,6 +276,12 @@ def _measure(
         "artifact": str(artifact.name),
         "artifact_size_bytes": artifact.stat().st_size,
         "artifact_built_at": _utc_text(artifact.stat().st_mtime),
+        "calibration_before_s": round(calibration_before, 4),
+        "calibration_after_s": round(calibration_after, 4),
+        "calibration_tolerance": CALIBRATION_TOLERANCE,
+        "machine_settled": unsettled_reason(
+            calibration_before, calibration_after
+        ) is None,
         "modules": args.modules,
         "runs": args.runs,
         # The *harness* interpreter. The packaged build carries its own, which

@@ -104,6 +104,48 @@ Candidates still open: the resolver's declared-module index
 something unrelated to ADR-0065 that landed in the same window. **Bisect the two
 parser bumps or time the stages inside the refresh path; do not guess.**
 
+### The harness now refuses a run the machine moved under (2026-08-21)
+
+`measure_phase4_perf.py`, `measure_phase6_perf.py` and `measure_phase7_perf.py`
+each take a **calibration probe before and after** the samples — a fixed
+CPU-bound workload of about 0.2 s, stdlib only, no new dependency
+(`codeatlas.evaluation.quiescence`).
+
+**Enforced:** the machine did not change speed *during* the run. If the two
+probes disagree by more than **20%**, the run is **blocked**: Phase 7 writes
+`measurement_status: "blocked"` with `reason: "machine_not_settled"` and exits
+2, matching what it already does for a missing artifact or an unavailable
+provider. A blocked payload **does not carry `refresh_target_met`** — the
+figures are kept under `measured_but_discarded` so the run stays diagnosable.
+Publishing a pass/fail from a run the machine moved under is the exact defect
+this exists for. `--allow-busy` overrides, and cannot be silent: the artifact
+records `machine_settled: false` either way.
+
+**Recorded, not enforced:** absolute machine speed. Every artifact now carries
+`calibration_before_s`, `calibration_after_s` and `calibration_tolerance`, so
+two runs can be compared for machine state — **the check that would have caught
+the 2026-08-21 error in seconds**. An absolute "fast enough" threshold is
+deliberately not invented: the right value is hardware-specific and this project
+has no reference for the machines it might run on, so a constant here would be a
+number chosen to be passed (ADR-0032, ADR-0048).
+
+**Known limit, stated rather than discovered later.** A *constant* background
+load throughout a run passes the drift check — both probes are equally slow. The
+recorded durations are what make that visible, and comparing them across
+artifacts is the manual step that remains. Detecting it automatically needs a
+per-machine reference this project does not have.
+
+**Proven, not assumed.** Against 24 busy worker processes the probe moved
+**0.215 s → 0.374 s (74% drift)** and was refused with an actionable message.
+The wiring is mutation-checked three ways — disabling the refusal, letting a
+blocked run publish a verdict, and ignoring `--allow-busy` — each caught by the
+intended test. A real end-to-end run on a quiet machine reports
+`machine_settled: true` at 5.5% drift, refresh p95 **1.681 s**, target met,
+exit 0. That is a third quiet reading (1.759 / 1.722 / 1.681) after the
+retraction below.
+
+---
+
 ### RETRACTED 2026-08-21: the target is met, and the miss was machine load
 
 **Everything in the two sections below is superseded.** They are kept because

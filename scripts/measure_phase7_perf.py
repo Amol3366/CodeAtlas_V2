@@ -38,6 +38,12 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from codeatlas.evaluation.quiescence import (
+    CALIBRATION_TOLERANCE,
+    calibrate,
+    unsettled_reason,
+)
+
 try:
     from scripts.measure_phase4_perf import (
         _edit_one_file,
@@ -93,6 +99,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=8597)
     parser.add_argument("--json-output", type=Path, default=None)
     parser.add_argument(
+        "--allow-busy",
+        action="store_true",
+        help=(
+            "Report the figures even if the machine moved during the run. "
+            "The artifact records machine_settled false either way."
+        ),
+    )
+    parser.add_argument(
         "--artifact",
         type=Path,
         default=_ARTIFACT,
@@ -135,8 +149,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(str(error), file=sys.stderr)
         return 2
 
+    unsettled = unsettled_reason(
+        results["calibration_before_s"], results["calibration_after_s"]
+    )
+    if unsettled and not args.allow_busy:
+        # Blocked, not failed. The same distinction the artifact-missing and
+        # provider-unavailable paths already make: the product is not being
+        # reported on, the measurement is. Reporting `refresh_target_met` from a
+        # run the machine moved under is how a passing target got published as a
+        # miss on 2026-08-21.
+        blocked = _blocked_payload(
+            artifact, args, reason="machine_not_settled", detail=unsettled
+        )
+        blocked["calibration_before_s"] = results["calibration_before_s"]
+        blocked["calibration_after_s"] = results["calibration_after_s"]
+        blocked["measured_but_discarded"] = {
+            "refresh_p95_s": results["refresh_p95_s"],
+            "preflight_p95_s": results["preflight_p95_s"],
+        }
+        _maybe_write(args.json_output, blocked)
+        print(unsettled, file=sys.stderr)
+        return 2
+
     for key, value in results.items():
         print(f"{key}: {value}")
+    if unsettled:
+        print(f"WARNING: {unsettled}", file=sys.stderr)
+        print("Reported anyway because --allow-busy was given.", file=sys.stderr)
     _maybe_write(args.json_output, results)
     met = (
         results["refresh_target_met"]
@@ -149,6 +188,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _measure(
     workspace: Path, artifact: Path, args: argparse.Namespace
 ) -> dict[str, Any]:
+    # Probe the machine before any work, and again after the samples are taken.
+    # Two runs minutes apart share a machine state rather than sampling it, so a
+    # figure near the threshold means nothing without this. 2026-08-21: a loaded
+    # run reported 2.407 s and a missed target where a quiet one reported
+    # 1.759 s and a met one, from the same artifact.
+    calibration_before = calibrate()
+
     root = workspace / "repo"
     root.mkdir()
     generate_repository(root, args.modules)
@@ -213,6 +259,7 @@ def _measure(
         server.terminate()
         server.wait(timeout=60)
 
+    calibration_after = calibrate()
     refresh_p95 = _p95(refresh)
     preflight_p95 = _p95(preflight)
     semantic_target = (
@@ -236,6 +283,17 @@ def _measure(
         "artifact_built_at": _utc_text(artifact.stat().st_mtime),
         "modules": args.modules,
         "runs": args.runs,
+        # The machine's own speed, probed before and after. A run whose two
+        # probes disagree measured two different machines; a run whose probes
+        # differ from another run's was taken on a busier or quieter box, which
+        # is what makes two artifacts comparable at all. See ADR-less record in
+        # docs/evaluation/phase-7-performance-environment.md, 2026-08-21.
+        "calibration_before_s": round(calibration_before, 4),
+        "calibration_after_s": round(calibration_after, 4),
+        "calibration_tolerance": CALIBRATION_TOLERANCE,
+        "machine_settled": unsettled_reason(
+            calibration_before, calibration_after
+        ) is None,
         "harness_python": platform.python_version(),
         "platform": platform.platform(),
         "machine": platform.machine(),
