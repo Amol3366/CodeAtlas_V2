@@ -3092,6 +3092,34 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   count. Corrected by hand; the guard extension is unwritten and is the same
   class as the still-unwritten §5 language-list guard.
 
+- **Changed-file refresh p95 now MISSES its <= 2 s target: 2.407 s against 0.799 s
+  in August** (P2-D, 2026-08-21). Cause **unattributed**. Preflight doubled too
+  (2.243 -> 4.376 s) but still clears <= 10 s.
+- **A slow machine and a real regression look identical in one run.** The first
+  measurement had every number 1.3x-3.3x worse and `model_test.latency_ms` — a
+  path with no changed CodeAtlas code — at 76,089 ms against August's 42,474 ms.
+  That is textbook environment contamination and it was recorded as such. **The
+  second run disproved it**: `model_test` came back at **21,403 ms**, half the
+  August figure, and the cold index beat August (18.877 s vs 21.295 s), while
+  refresh reproduced within **26 ms**. The machine was *faster than baseline on
+  unchanged paths* while refresh stayed 3x slower. **Take two runs, and promote
+  the one whose unchanged-path indicators are good** — that is the run a reader
+  cannot wave away.
+- **`build_registry()` is not the cause, and it was the obvious one.** ADR-0065
+  added four grammars and every parser is constructed eagerly, so a fixed startup
+  cost was the natural story for a fixed +1.6 s. Measured: `default_registry()`
+  is **0.09-0.16 s**. An order of magnitude short. This project has already spent
+  three ADRs' worth of remedies on a stage that was 2.5% of the cost (ADR-0060 to
+  ADR-0064); the lesson is the same one and it held this time.
+- **A measurement writes to scratch before it writes to the record.** Promoting a
+  contaminated or blocked run would corrupt a tracked artifact that a gate reads
+  byte-for-byte. Measure to a scratch path, diff, then promote.
+- **Three README claims are hand-maintained and unguarded**: the perf figures,
+  the test count, and the ADR count. `test_readme_claims.py` derives versions,
+  the MCP tool count and corpus counts only. All three unguarded ones have now
+  drifted at least once — ADR count on 2026-08-21 (66 vs 67), test count the same
+  day (2350 vs 2370), perf figures for eleven days.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake

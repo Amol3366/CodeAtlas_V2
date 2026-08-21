@@ -48,6 +48,67 @@ The first tiny semantic-package run missed refresh p95 because it rebuilt the
 local sentence-transformers provider on every index. P7-12 fixed that by caching
 the local provider process-wide; the recorded full run above includes that fix.
 
+## Re-measured 2026-08-21 — refresh p95 now MISSES its target
+
+The table above is the **2026-07-30 gate record and is deliberately unedited.**
+This section records the re-measurement P2-D asked for, because `-Perf` had not
+run since 2026-08-10 while the artifact was rebuilt twice across two
+`PARSER_BUNDLE_VERSION` bumps (1.4.0 -> 1.5.0 -> 1.6.0). The tracked artifact
+`baseline-phase-7-perf.json` now holds the run below.
+
+Same method: packaged semantic-local artifact, its own `/v1` API, 300 generated
+modules, watcher off, 20 samples per target, `provider: local`, coverage 1.0.
+
+| Metric | 2026-08-10 | 2026-08-21 | Target | Met |
+| --- | ---: | ---: | ---: | --- |
+| Changed-file refresh p95 | 0.799 s | **2.407 s** | <= 2 s | **NO** |
+| Changed-file refresh p50 | 0.689 s | 2.298 s | — | — |
+| Warm preflight p95 | 2.243 s | 4.376 s | <= 10 s | yes |
+| Cold start to first answer | 1.060 s | 2.327 s | reported | n/a |
+| Cold index, 300 modules | 21.295 s | 18.877 s | reported | n/a |
+| Semantic coverage | 1.0000 | 1.0000 | complete | yes |
+| onedir package tree | 1,052,540,446 B | 1,058,201,846 B | reported | n/a |
+
+**Read the fourth and fifth rows before concluding anything about the machine.**
+The first attempt at this measurement looked like environment contamination:
+everything was 1.3x-3.3x slower and `model_test.latency_ms` — which loads a
+sentence-transformers model and embeds a probe, a path containing no CodeAtlas
+code that has changed — had gone 42,474 ms -> 76,089 ms. That reading was
+recorded and then **disproved by re-running.**
+
+In the promoted run, `model_test.latency_ms` is **21,403 ms**, half the
+2026-08-10 figure, and the cold index is **faster** than the 2026-08-10 baseline
+(18.877 s against 21.295 s). **The machine was demonstrably quicker than
+baseline on unchanged paths while refresh was still three times slower.** That is
+what makes this a regression rather than a slow afternoon, and it is why two runs
+were taken rather than one.
+
+| Run | refresh p95 | model_test | cold index |
+| --- | ---: | ---: | ---: |
+| 1 | 2.433 s | 76,089 ms | 27.211 s |
+| 2 (promoted) | 2.407 s | 21,403 ms | 18.877 s |
+
+Refresh reproduces within 26 ms across a 3.6x swing in the machine-speed
+indicator. The regression is not load.
+
+**The cause is not attributed, and one plausible story was measured and
+rejected.** Refresh is +1.6 s and preflight +2.1 s, which looks like a fixed
+per-operation cost rather than proportional work; the obvious suspect was
+ADR-0065's four extra grammars, since `build_registry()` constructs every parser
+eagerly. Timed directly: `default_registry()` costs **0.09-0.16 s**, an order of
+magnitude short of explaining it. Recorded so the next investigation does not
+spend itself there again (the ADR-0064 lesson).
+
+Candidates still open: the resolver's declared-module index
+(`RESOLVER_VERSION` 1.4.0 -> 1.5.0), ADR-0067's additional Scala references, or
+something unrelated to ADR-0065 that landed in the same window. **Bisect the two
+parser bumps or time the stages inside the refresh path; do not guess.**
+
+**What this does not say.** Preflight still clears its target with margin, the
+deterministic corpus metrics are untouched (all three `--check` baselines
+reproduce byte-for-byte), and no evidence, snapshot, or contract behaviour is
+implicated. This is a latency regression on one measured path.
+
 ## Blocked is a gate result
 
 `measure_phase7_perf.py` exits 2 and writes `measurement_status: "blocked"` when

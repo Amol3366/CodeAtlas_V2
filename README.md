@@ -15,7 +15,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.6.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2350 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, exit 0, 2026-08-20. **No xfails**: the two ADR-0065 limits were ruled and closed (ADR-0066, ADR-0067) |
+| **Tests** | **2370 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, exit 0, 2026-08-21. **No xfails**: the two ADR-0065 limits were ruled and closed (ADR-0066, ADR-0067) |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -694,7 +694,7 @@ caveats live in `docs/evaluation/*-baseline-environment.md`.
 | Unsupported factual claim rate | 0.0000 | `baseline-phase-4.json` |
 | Containing-evidence Recall@10 | **1.0000** | `baseline-phase-4.json` |
 | Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) | `baseline-phase-4.json` |
-| Packaged refresh p95 · preflight p95 | **0.799 s · 2.243 s** (semantic-local, on the artifact; cold start 1.060 s, coverage 1.0) | `baseline-phase-7-perf.json`, 2026-08-10 |
+| Packaged refresh p95 · preflight p95 | **2.407 s · 4.376 s** (semantic-local, on the artifact; cold start 2.327 s, coverage 1.0). **Refresh now MISSES its ≤ 2 s target** — see the limitation below | `baseline-phase-7-perf.json`, 2026-08-21 |
 
 Corpus: **80 query cases, 32 change cases, 11 fixtures** — plus a separate
 invariant corpus (`tests/evaluation/invariant_cases/`) that asserts a boolean
@@ -767,6 +767,24 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   unit, integration, and security tests are their only coverage. This is the
   largest open gap in ADR-0065, and gold data must be declared before the engine
   is run against it (ADR-0003, ADR-0036).
+- **Changed-file refresh p95 now misses its ≤ 2 s target: 2.407 s, measured
+  2026-08-21.** It was 0.799 s on 2026-08-10, and the cause is **not
+  attributed**. This is a real regression, not a slow machine: it reproduces
+  across two runs within 26 ms while `model_test` — a path containing no
+  CodeAtlas code that has changed — swung 76,089 ms → 21,403 ms, and the
+  promoted run's cold index (18.9 s) is *faster* than the August baseline
+  (21.3 s). The machine was quicker on unchanged paths while refresh stayed 3×
+  slower.
+
+  One plausible cause was measured and **rejected**: ADR-0065 added four
+  grammars and `build_registry()` builds every parser eagerly, but
+  `default_registry()` costs 0.09–0.16 s, nowhere near the +1.6 s. Still open:
+  the resolver's declared-module index (`RESOLVER_VERSION` 1.4.0 → 1.5.0),
+  ADR-0067's extra Scala references, or something unrelated that landed in the
+  same window. Preflight still clears its ≤ 10 s target at 4.376 s, and no
+  corpus metric moved — all three `--check` baselines reproduce byte-for-byte.
+  Full method and both runs: `docs/evaluation/phase-7-performance-environment.md`.
+
 - **The packaged executable is unsigned**, so SmartScreen warns on first run.
   This needs a purchased certificate — a purchasing decision, not an engineering
   task.

@@ -76,6 +76,7 @@ with verification.
 | **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible |
 | ~~**ADR-0065's two declared limits: Go imports and Scala member calls**~~ | **BOTH CLOSED 2026-08-19 by user ruling, and they were ruled in opposite directions on purpose.** **Go (ADR-0066): declined, permanently.** The module prefix lives in `go.mod`, which a single-file parse cannot read, so closing it needs a *matching policy* rather than more parsing — and the cost is asymmetric: trimming too far makes a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing** a relationship §4.1 forbids. The `strict` xfail is **inverted rather than deleted** (ADR-0045's precedent) and now pins both halves: the import is recorded, and it is not resolved. **Scala (ADR-0067): closed.** `LanguageProfile` gained an optional `references_query`; Scala authors `scala.references.scm` capturing the `field_expression`'s `field`. **What separates the two rulings is where the missing information lives** — Go's is in a file the parser is not allowed to read, Scala's was in the syntax tree all along and only a query was missing. Declaring a limit that nine lines of query closes would have recorded an absence of work as a property of the language. `PARSER_BUNDLE_VERSION` **1.5.0 -> 1.6.0** (Scala yields references it did not before); `RESOLVER_VERSION` deliberately unchanged, because resolution draws the same conclusions from a reference as it always did. **The corpus carries no xfails at all now.** | Someone wants a Go matching policy (supersede ADR-0066), or a fourth language needs a supplementary query |
 | **`changed_symbol_precision` now reads 0.9531 and `unmet_targets` is EMPTY — by dilution, not by any fix** | **CLOSED 2026-08-20 — the defect was in the reporting, and the reporting is what changed.** For the first time the Phase 4 baseline reports `targets_met: true` with **no unmet targets**. **Nothing was fixed.** The structural cause is untouched: c020, c021 and c022 each still score **exactly 0.50**, for the reason recorded since Phase 4 — they split one physical `git_changes` diff into three single-symbol cases, so the engine correctly reporting both affected symbols has each case count the other's against it. The aggregate crossed 0.95 because P1-B's three change cases took the denominator **29 -> 32**, diluting three imperfect cases: (29x1.0 + 3x0.5)/32 = **0.9531**, where (26x1.0 + 3x0.5)/29 = 0.9483. **Pure arithmetic.** **The cases were not added to move it** — they exist to measure Scala, Go and Rust, which had no change coverage at all — but the effect is that a real, known, per-case defect is **no longer visible in the aggregate**. **Correction, 2026-08-20:** this row first read "no longer visible to the gate", and that was wrong. `tests/evaluation/test_change_adapter.py` has pinned c020-c022 per-case since Phase 4, two-sided — an allowlist that fails if a fourth case drops below 1.0 and equally if one of the three is quietly "fixed" — so the gate never stopped seeing them. What went blind was the *aggregate*, and every report built on it. The error mattered: it made this row read as a lost regression guard, which is a far more urgent thing than the reporting gap it actually was. That is the mirror of ADR-0032/ADR-0033: there a threshold could not express a miss; here the denominator has grown until a miss cannot register. **Do not cite "all Section 19.3 targets met" without this row.** The engine is exactly as accurate as it was yesterday. **Resolved by the second option, because the first was already true.** `changed_symbol_exact_cases` is now emitted beside the mean and rendered with it, so the Phase 4 row reads `0.9531 (29/32 cases exact)` and the aggregate can no longer be read as "every case is exact". The 0.95 threshold is deliberately unchanged and the three cases are not "fixed": their 0.50 is the honest full diff (ADR-0003). A count cannot be diluted by adding cases that already pass, so the pair says what neither number says alone. Mutation-checked in five variants; one residual is recorded in the test docstring — no change case declares more than one expected changed symbol, so precision can only be `1/n` and a `> 0.5` mutation is unreachable through this corpus | — |
+| **Changed-file refresh p95 misses its ≤ 2 s target: 2.407 s, and the cause is unattributed** | **OPEN — found 2026-08-21 by P2-D, which existed to re-measure a stale claim and found a live one.** `-Perf` had not run since 2026-08-10 while the artifact was rebuilt twice across two `PARSER_BUNDLE_VERSION` bumps. Refresh p95 has gone **0.799 s -> 2.407 s** and now fails the §19.3 target; preflight doubled (2.243 -> 4.376 s) but still clears <= 10 s. **It is not a slow machine, and proving that took the second run.** The first looked exactly like environment contamination — everything 1.3x-3.3x slower with `model_test` (a path holding no CodeAtlas code that has changed) at 76,089 ms against 42,474 ms in August — and that reading was written down before being **disproved**. In the promoted run `model_test` is **21,403 ms**, *half* the August figure, and the cold index is **faster** than August (18.877 s vs 21.295 s), while refresh reproduces within **26 ms** of run 1. The machine was quicker than baseline on unchanged paths and refresh was still 3x slower. **One cause was measured and rejected**: `build_registry()` constructs every parser eagerly and ADR-0065 added four grammars, but `default_registry()` costs **0.09-0.16 s**, an order of magnitude short of the +1.6 s — recorded so the next investigation does not spend itself there (ADR-0064's lesson). The shape (+1.6 s refresh, +2.1 s preflight) suggests a **fixed per-operation cost**, not proportional work. Still open: `RESOLVER_VERSION` 1.4.0 -> 1.5.0's declared-module index, ADR-0067's extra Scala references, or something unrelated that landed in the same window. **Nothing about evidence, snapshots or contracts is implicated** — all three `--check` baselines reproduce byte-for-byte. Method and both runs: `docs/evaluation/phase-7-performance-environment.md` | Someone bisects the two parser bumps or times the stages inside the refresh path. **Do not guess — one plausible cause has already been eliminated by measurement** |
 | Pid-reuse detection in crash recovery                                                                            | **CLOSED** — ADR-0037. The stated blocker ("no portable source without a new dependency") was half right; `GetProcessTimes` sits beside the `OpenProcess` the module already called                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —                                                                                                                                                                          |
 | `relation_path_correctness` measured precision                                                                 | **CLOSED** — ADR-0038. It penalised the engine for obeying ADR-0020. Recall added beside it; precision retained so no baseline changes meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | q010: does`IMPORTS` target the module or the bound class?                                                      | **CLOSED** — ADR-0039. The class. The case contradicted itself, already naming `IdempotencyStore` in `expected_symbols`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                                                                                                          |
@@ -293,6 +294,105 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-21T02:00:00Z — P2-D: the stale perf claim was re-measured, and refresh now misses its target
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P2-D done, and it found a live regression rather than the stale
+  number it went looking for.** New Deferred Register row, open.
+
+## What P2-D was for, and what it turned up
+
+`-Perf` had not run since **2026-08-10** while the packaged artifact was rebuilt
+twice across two `PARSER_BUNDLE_VERSION` bumps (1.4.0 -> 1.5.0 -> 1.6.0). The
+README and the tracked artifact described a build that no longer existed. The
+task was bookkeeping.
+
+**Changed-file refresh p95 is 2.407 s against a §19.3 target of <= 2 s.** It was
+**0.799 s** in August. `refresh_target_met` is now `false` in the tracked
+artifact. Preflight also doubled — 2.243 -> 4.376 s — but clears <= 10 s with
+margin.
+
+## Proving it is a regression and not a slow afternoon
+
+**The first run was read wrong, and the record says so rather than hiding it.**
+Everything came back 1.3x-3.3x slower and `model_test.latency_ms` — which loads a
+sentence-transformers model and embeds a probe, containing no CodeAtlas code that
+has changed since August — had gone 42,474 -> **76,089 ms**. That is the exact
+signature of a slow machine, it was written down as such, and a second run
+disproved it.
+
+| Run | refresh p95 | `model_test` | cold index |
+| --- | ---: | ---: | ---: |
+| 1 | 2.433 s | 76,089 ms | 27.211 s |
+| 2 (**promoted**) | 2.407 s | **21,403 ms** | **18.877 s** |
+| 2026-08-10 | 0.799 s | 42,474 ms | 21.295 s |
+
+In the promoted run the machine is **faster than the August baseline on unchanged
+paths** — `model_test` at half the August figure, cold index beating it — while
+refresh stays 3x slower and reproduces **within 26 ms** across a 3.6x swing in
+that indicator. Run 2 was promoted precisely because it is the run that cannot be
+dismissed as load.
+
+**This is why two runs were taken.** ADR-0061 records the same trap from the
+other side: "the machine moved 343 s -> 549 s on an untouched path mid-session,
+so wall-clock comparison was worthless."
+
+## One cause measured and rejected
+
+The shape — **+1.6 s refresh, +2.1 s preflight** — looks like a fixed
+per-operation cost rather than proportional work. The obvious suspect was
+ADR-0065's four new grammars, since `build_registry()` constructs every parser
+eagerly, which the packaging notes already record.
+
+Timed directly: `default_registry()` costs **0.09-0.16 s** across three calls,
+plus 0.287 s to import the module. An **order of magnitude short** of explaining
++1.6 s. Recorded so the next investigation does not spend itself there — this
+project has three ADRs' worth of remedies aimed at a stage that turned out to be
+2.5% of the cost (ADR-0060 through ADR-0064).
+
+**Still open:** `RESOLVER_VERSION` 1.4.0 -> 1.5.0's declared-module index,
+ADR-0067's additional Scala references, or something unrelated that landed in the
+same window. Bisect the bumps or time the stages inside refresh. Do not guess.
+
+## Scope of the claim
+
+Nothing about evidence, snapshots, or contracts is implicated. All three
+`--check` baselines reproduce byte-for-byte, semantic coverage is 1.0 with 1,200
+embedded, and preflight still meets its target. **This is a latency regression on
+one measured path**, and it is stated as one.
+
+## What was recorded
+
+- `docs/evaluation/baseline-phase-7-perf.json` — promoted run 2, carrying
+  `refresh_target_met: false`. The measurement wrote to a scratch path first so a
+  blocked or contaminated run could not clobber the record.
+- `docs/evaluation/phase-7-performance-environment.md` — a new section with both
+  runs, the rejected cause, and the machine-speed argument. **The 2026-07-30 gate
+  table above it is deliberately unedited.**
+- `README.md` — the perf row now reads 2.407 s / 4.376 s and names the miss; a
+  known-limits entry carries the full reasoning. The Tests row moved 2350 ->
+  **2370** (2026-08-21), which was stale prose, not a guarded figure.
+- `docs/plans/PLAN.md` — the register row above, and this entry.
+
+**Sequencing was the user's call**: record the miss now with the cause
+unattributed, and investigate as its own task — over investigating first and
+recording once. The README was advertising a figure known to be wrong, and
+§19.3 requires a missed target to be reported as missed.
+
+**Limitations.**
+
+- **The cause is unattributed.** This entry closes a measurement, not a defect.
+- **The artifact predates ADR-0068 by one commit** (routing only; it cannot
+  affect index or preflight timing). The measured build is not byte-identical to
+  `main`, and making it so needs a package rebuild.
+- `test_readme_claims.py` guards versions, the MCP tool count and corpus counts —
+  **not** the perf figures, the test count, or the ADR count. All three are hand
+  maintained and all three have now drifted at least once.
+
+- Next: the investigation. Time the stages inside the refresh path, or bisect
+  1.4.0 -> 1.5.0 -> 1.6.0. Separately, the §5 language-list guard is still
+  unwritten and is the cheapest preventive item.
 
 ### 2026-08-21T00:00:00Z — `AGENTS.md` §12 and the implementation agree (ADR-0068)
 
