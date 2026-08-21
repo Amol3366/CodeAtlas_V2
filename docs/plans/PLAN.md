@@ -295,6 +295,105 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-21T04:00:00Z — The contract's language list and two README figures are now derived, not typed
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **the §5 language-list guard is written**, and widened to the two
+  README figures that drifted this session. This was the cheapest remaining
+  preventive item and is now done.
+- New file: `tests/unit/test_contract_language_profile.py` (4 assertions).
+  Extended: `tests/unit/test_readme_claims.py` (+3). New public API:
+  `ParserRegistry.languages`.
+
+## The assertion that matters is about what a document omits
+
+Three of the four §5 checks — "everything it names is supported", "everything it
+excludes is absent", "the count matches" — **would all have passed on
+2026-08-19** while §5 was two days stale against ADR-0065. Everything it *named*
+was still true. The defect was the four languages it did **not** name.
+
+`test_no_source_language_is_missing_from_the_contract` is the one that catches
+that shape, and writing it required a new public accessor:
+`ParserRegistry.languages`. `parser_for` answers "do you handle X?" and cannot
+enumerate, and reaching into `_parsers` from a test would have put the guard's
+correctness at the mercy of a private field.
+
+**Scope is stated rather than implied.** §6.1 and §19.2 drifted the same way and
+are **not** guarded — they are prose about mechanism, not lists of names. The
+module says so in its docstring, because a guard whose scope is unstated gets
+mistaken for a guarantee.
+
+## The README half
+
+Two figures that drifted this session are now derived:
+
+- **ADR count** — from `docs/adr/*.md`. It read 66 against 67, wrong from the day
+  ADR-0067 landed, found only by counting while adding ADR-0068. Files are
+  listed rather than inferred from numbering, because ADR-0049 is
+  reserved-but-never-written.
+- **Packaged p95 figures** — from `baseline-phase-7-perf.json`, the artifact the
+  README's own source column already names. These sat **eleven days stale**
+  across two `PARSER_BUNDLE_VERSION` bumps.
+- **And whether the target is met** — a third assertion, because the figure alone
+  reads as a result rather than as a miss. It is two-sided: it fails if the
+  artifact says missed and the README does not, *and* if the README declares a
+  miss the artifact does not record.
+
+**A docstring was corrected rather than left standing.** `test_readme_claims.py`
+argued the measured-results table needed no guard because "the figures in that
+table already name the artifact each came from so the check is cheap by hand."
+Events refuted that — nobody did the cheap check for eleven days — and the
+docstring now records the reasoning as tested and failed.
+
+## Verification
+
+- **TDD.** The new module was written first and watched fail with
+  `AttributeError: 'ParserRegistry' object has no attribute 'languages'` — a
+  genuine RED for the accessor, since the two `parser_for`-only assertions
+  passed immediately against a contract that was already correct.
+- **Mutation-checked, eight for eight**, because every one of these guards
+  passed on its first run and therefore proved nothing until broken:
+
+| Mutation | Caught by |
+| --- | --- |
+| §5 reverted to the pre-ADR-0065 tier list | `test_no_source_language_is_missing_from_the_contract` |
+| §5 claims Kotlin is supported | `..._supports_resolves_to_a_parser` |
+| §5 says Rust is out while a parser exists | `..._excludes_has_no_parser` |
+| §5 says eight languages | `..._count_matches_the_registry` |
+| README ADR count reverted to 66 | `..._adr_count_matches_the_directory` |
+| README p95 figures reverted to August | `..._performance_figures_match_the_tracked_artifact` |
+| README drops the missed-target sentence | `..._says_whether_the_refresh_target_is_met` |
+| artifact flipped to `refresh_target_met: true` | `..._says_whether_the_refresh_target_is_met` |
+
+Each was caught by **exactly** the intended assertion and no other (1 failed, N
+passed every time), and `AGENTS.md`, `README.md` and the perf artifact were each
+verified restored **byte-identical** afterwards.
+
+- `ruff check src tests scripts apps`: **All checks passed!**
+- `mypy` over the registry and both test modules: **no issues, 3 files**.
+- `pytest tests/unit`: **902 passed, 3 skipped** before the README additions;
+  the two guard modules together: **15 passed**.
+
+**Limitations.**
+
+- **The README's test count remains underivable** and is now stale-and-corrected
+  twice. It comes from running the suite, not from reading source; a hard-coded
+  assertion would need editing on every run. Stated in the module rather than
+  faked.
+- **§6.1 and §19.2 are unguarded** and drifted identically two days ago. No
+  assertion can derive prose about mechanism.
+- `DOCUMENT_AND_CONFIG_FORMATS` is a small hand-maintained set. A new document
+  format would surface as a "source language missing from §5" failure — a false
+  positive, but one that forces a decision, which is the behaviour
+  `SUPPORTED_FIXTURES` is valued for.
+- The guard reads `AGENTS.md` by regex, so a reformat of §5 fails it loudly
+  rather than silently. That is the intended direction.
+
+- Next: the refresh-regression investigation — time per-request service
+  construction inside the **running packaged server**, which is the measurement
+  the `doctor` comparison could not make. P2-E's two remainders (ADR-0047's
+  dangling ADR-0049 citation, `-SkipWeb -Perf` silently skipping) are small.
+
 ### 2026-08-21T02:00:00Z — P2-D: the stale perf claim was re-measured, and refresh now misses its target
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

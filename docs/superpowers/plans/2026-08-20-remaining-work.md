@@ -315,10 +315,17 @@ P2-D re-measure perf ── OPEN, needs nobody  ← the only work item left here
 P2-E remainder ──────── ADR-0049 dangling cite; `-SkipWeb -Perf` silent skip
 ```
 
-**Nothing in this plan now needs a decision.** P2-D is the only substantive work
-item left and needs nobody; P2-F's second half is a ruling, not work. A §5
-language-list guard derived from `default_registry()` remains the cheapest
-preventive item and is not yet written.
+**Nothing in this plan now needs a decision.** P2-D is **DONE 2026-08-21** and
+found a live regression rather than the stale number it went looking for — see
+the Deferred Register. The **§5 language-list guard is DONE too**, widened to the
+README's ADR count and packaged perf figures, all three of which had drifted:
+`tests/unit/test_contract_language_profile.py` and three additions to
+`test_readme_claims.py`, eight mutations, eight caught. P2-F's second half is a
+ruling, not work.
+
+**What is left:** the refresh-regression investigation (register row names the
+next measurement), and P2-E's two remainders — ADR-0047's dangling ADR-0049
+citation, and `-SkipWeb -Perf` silently skipping its measurement.
 
 ## What is deliberately not here
 

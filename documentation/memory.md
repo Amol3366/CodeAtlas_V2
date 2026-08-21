@@ -3138,6 +3138,36 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   drifted at least once — ADR count on 2026-08-21 (66 vs 67), test count the same
   day (2350 vs 2370), perf figures for eleven days.
 
+- **`AGENTS.md` §5's language list is now derived from the registry**
+  (`tests/unit/test_contract_language_profile.py`, 2026-08-21), and the README's
+  ADR count and packaged perf figures from their own authorities. All three had
+  drifted; two were found only by counting.
+- **The assertion that matters is the one about what a document OMITS.** Three
+  of the four §5 checks would have passed on 2026-08-19 while the contract was
+  two days stale, because everything it *named* was still true — the defect was
+  the four languages it did not name. `test_no_source_language_is_missing_from_the_contract`
+  is the one that catches that shape, and it needed a new public
+  `ParserRegistry.languages`, because `parser_for` answers "do you handle X?"
+  and cannot enumerate.
+- **A guard written against a correct document proves nothing until mutated.**
+  All eight new assertions passed on the first run. Each was then broken
+  deliberately — §5 reverted to the pre-ADR-0065 wording, a language claimed
+  that is not registered, a registered language declared out of scope, the count
+  falsified, the ADR count reverted to 66, the perf figures reverted to August,
+  the missed-target sentence deleted, and the artifact flipped to
+  `refresh_target_met: true` — and all eight were caught by exactly the intended
+  assertion, with both files restored byte-identical.
+- **A docstring's reasoning can be refuted by events, and should then be
+  corrected rather than left.** `test_readme_claims.py` argued the
+  measured-results table needed no guard because "the figures already name the
+  artifact each came from so the check is cheap by hand". The perf figures then
+  sat eleven days stale. The docstring now records that the reasoning was tested
+  and failed.
+- **Some claims are genuinely underivable, and saying so is part of the guard.**
+  The README's test count comes from running the suite, not from reading source.
+  It has now been stale twice and corrected by hand twice; that is the accepted
+  cost, stated in the module rather than papered over with a hard-coded number.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake

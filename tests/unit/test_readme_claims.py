@@ -23,18 +23,27 @@ on ordinary rewording teaches people to delete it.
 
 **When one of these fails, the README is usually the thing that is wrong.**
 
-**What is deliberately not guarded, and why.** The README's test count is a
-*measurement* -- it comes from running the suite, not from reading source -- so
-no assertion here can derive it, and one that hard-coded it would need editing
-on every run. It was stale when these tests were written too, and was corrected
-by hand. Prose, structure and the measured-results table are likewise unguarded:
-a guard that fails on ordinary rewording is one people learn to delete, and the
+**Corrected 2026-08-21: the measured-results table is now partly guarded.**
+This docstring used to argue the whole table was fine unguarded, because "the
 figures in that table already name the artifact each came from so the check is
-cheap by hand.
+cheap by hand". That reasoning was tested by events and failed: the packaged
+performance figures sat **eleven days stale** while the artifact was rebuilt
+twice, and the ADR count was wrong from the day ADR-0067 landed. Both were found
+by counting, not by anyone doing the cheap check. The two that are *derivable*
+are now derived.
+
+**What remains deliberately unguarded, and why.** The README's test count is a
+*measurement* -- it comes from running the suite, not from reading source -- so
+no assertion here can derive it, and one that hard-coded it would need editing on
+every run. It was stale when these tests were written and stale again on
+2026-08-21; both times it was corrected by hand, and that is the accepted cost.
+Prose and structure stay unguarded too: a guard that fails on ordinary rewording
+is one people learn to delete.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -50,6 +59,8 @@ from codeatlas.storage.sqlite.migrations import SCHEMA_VERSION
 
 README = Path("README.md")
 DATASET_ROOT = Path("tests/evaluation/cases")
+ADR_DIRECTORY = Path("docs/adr")
+PERF_ARTIFACT = Path("docs/evaluation/baseline-phase-7-perf.json")
 
 
 def _readme() -> str:
@@ -132,3 +143,78 @@ def test_the_readme_corpus_counts_match_the_dataset() -> None:
         f"README says {stated.groups()} (query, change, fixtures); "
         f"the dataset has {actual}."
     )
+
+
+def test_the_readme_adr_count_matches_the_directory() -> None:
+    """The count of accepted ADRs is counted, not transcribed.
+
+    It read 66 against 67 on disk, wrong from the day ADR-0067 landed and found
+    a week later only because someone counted while adding ADR-0068. The
+    template and the index are excluded; ADR-0049 is reserved-but-never-written,
+    so numbering is not a proxy for the count and the files must be listed.
+    """
+    stated = re.search(r"(\d+) accepted records", _readme())
+    assert stated, "the README no longer states an ADR count"
+
+    actual = len(
+        [
+            path
+            for path in ADR_DIRECTORY.glob("*.md")
+            if path.name != "README.md" and not path.name.startswith("0000-")
+        ]
+    )
+    assert int(stated.group(1)) == actual, (
+        f"README says {stated.group(1)} accepted ADRs; {ADR_DIRECTORY} holds {actual}."
+    )
+
+
+def test_the_readme_performance_figures_match_the_tracked_artifact() -> None:
+    """The packaged p95 figures come from the artifact that recorded them.
+
+    These went stale for eleven days across two `PARSER_BUNDLE_VERSION` bumps
+    while the README advertised a passing refresh target that the artifact
+    already recorded as missed. The artifact is the authority; it is written by
+    `measure_phase7_perf.py` and is the file the README's own source column
+    names.
+    """
+    stated = re.search(
+        r"\*\*([0-9.]+) s · ([0-9.]+) s\*\* \(semantic-local, on the artifact; "
+        r"cold start ([0-9.]+) s",
+        _readme(),
+    )
+    assert stated, (
+        "the README no longer states packaged p95 figures in the expected form"
+    )
+
+    recorded = json.loads(PERF_ARTIFACT.read_text(encoding="utf-8"))
+    actual = (
+        recorded["refresh_p95_s"],
+        recorded["preflight_p95_s"],
+        recorded["cold_start_s"],
+    )
+    assert tuple(float(g) for g in stated.groups()) == actual, (
+        f"README states {stated.groups()} (refresh p95, preflight p95, cold start); "
+        f"{PERF_ARTIFACT} records {actual}."
+    )
+
+
+def test_the_readme_says_whether_the_refresh_target_is_met() -> None:
+    """A missed target is stated as missed (`AGENTS.md` §19.3).
+
+    The artifact carries `refresh_target_met`. When it is false the README must
+    say so, because the figure alone reads as a result rather than as a miss --
+    which is exactly how it read for eleven days.
+    """
+    recorded = json.loads(PERF_ARTIFACT.read_text(encoding="utf-8"))
+    says_missed = "MISSES its ≤ 2 s target" in _readme()
+
+    if recorded["refresh_target_met"]:
+        assert not says_missed, (
+            "the artifact records refresh_target_met true, but the README still "
+            "declares the target missed."
+        )
+    else:
+        assert says_missed, (
+            "the artifact records refresh_target_met false; the README must say "
+            "the target is missed rather than quoting the figure alone."
+        )

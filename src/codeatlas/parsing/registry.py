@@ -120,6 +120,18 @@ class ParserRegistry:
         """Return the parser for ``language``, or ``None`` when unsupported."""
         return self._parsers.get(language)
 
+    @property
+    def languages(self) -> frozenset[str]:
+        """Every language this registry can parse.
+
+        `parser_for` answers "do you handle X?", which cannot enumerate. The
+        contract's §5 language profile is guarded by deriving the list from
+        here, so a language registered without the contract hearing about it
+        fails a test rather than sitting unnoticed for two days as ADR-0065's
+        four did.
+        """
+        return frozenset(self._parsers)
+
 
 def default_registry() -> ParserRegistry:
     """Build the registry: Python, TypeScript/JavaScript, documents, config."""
