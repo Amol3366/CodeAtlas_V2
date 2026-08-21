@@ -145,6 +145,52 @@ per-request service construction**, which is what the HTTP-driven harnesses
 exercise. It measured one-shot process startup instead. The next investigation
 should time construction inside the **running** packaged server.
 
+### Corrected: the attribution was reached badly, then measured properly
+
+**The 2x2 above mixed two instruments, and that is a method error worth keeping
+rather than deleting.** Its source cell came from `measure_phase4_perf.py`, which
+calls `build_services` **in-process**; both packaged cells came from
+`measure_phase6_perf.py`, which drives the server over **HTTP**. Subtracting one
+from the other conflates packaging with transport, so "+0.60 s of packaging" did
+not follow from those numbers even though it landed close to the truth.
+
+**Two hypotheses were then killed by measurement, in order.**
+
+1. **Per-request service construction.** `GET /v1/repositories` against an empty
+   database, 25 warm requests each: **packaged 184.9 ms, source 186.3 ms**
+   (median), a difference of **-1.5 ms**. `build_registry()`, the `os.walk` for
+   each grammar's `tags.scm`, and per-request `build_services` are all cleared.
+2. **The earlier candidates**, already recorded above: the semantic layer, the
+   resolver's declared-module index, ADR-0067's Scala references. All live in the
+   source path, and the source path passes.
+
+**Re-measured on one instrument.** `measure_phase6_perf.py` accepts `--artifact`,
+so the source build was driven over HTTP through the *same* harness using the
+venv console script `.venv/Scripts/codeatlas.exe`:
+
+| Both over HTTP, same harness, same day | refresh p95 | target |
+| --- | ---: | --- |
+| source (`.venv/Scripts/codeatlas.exe`) | **1.525 s** | **met** |
+| packaged (`dist/codeatlas-win64/codeatlas.exe`) | **2.266 s** | **MISSED** |
+| **packaging cost** | **+0.741 s** | — |
+
+**The corrected figure is larger than the unsound one**, so the error was
+understatement, not exaggeration. It was bounded because the two harnesses
+measure the **same operation** — edit one file, then re-index
+(`services.indexing.index` against `POST /v1/repositories/{id}/index`) — and
+differ only by the transport whose cost is the ~185 ms measured above.
+
+**What this establishes.** Source over HTTP **meets** the ≤ 2 s target with
+margin; the packaged build does not. **Packaging alone causes the miss.** And
+because a request that parses nothing shows no packaged penalty at all, the cost
+sits in the **index path** and scales with files indexed rather than with
+requests served.
+
+**What it does not establish.** Why. Per-file parse cost inside the frozen build
+is the shape that fits — it would scale with files and vanish on a request that
+parses nothing — but nothing here measures it. That is the next step, and the
+Deferred Register names it.
+
 **What this does not say.** Preflight still clears its target with margin, the
 deterministic corpus metrics are untouched (all three `--check` baselines
 reproduce byte-for-byte), and no evidence, snapshot, or contract behaviour is

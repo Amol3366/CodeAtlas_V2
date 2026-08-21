@@ -776,19 +776,22 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   (21.3 s). The machine was quicker on unchanged paths while refresh stayed 3×
   slower.
 
-  **Narrowed the same day to the packaged artifact.** Four measurements taken
-  together: source deterministic **1.668 s** (passes, +17% since July), packaged
-  deterministic **2.266 s** (fails, +75% since July), packaged semantic
-  **2.407 s**. So packaging costs **+0.60 s** and embeddings only **+0.14 s** —
-  and in July the packaged build was *faster* than source (1.295 vs 1.426 s),
-  where today it is 0.6 s slower. The semantic layer, the resolver's
-  declared-module index and ADR-0067's Scala references are all **cleared**: they
-  live in the source path, and the source path is fine. Leading hypothesis,
-  **unproven**: ADR-0065 added four grammars and the engine reads each `tags.scm`
-  off disk with `os.walk` while services are built per request. Preflight still
-  clears its ≤ 10 s target at 4.376 s, and no corpus metric moved — all three
-  `--check` baselines reproduce byte-for-byte. Full method, all four runs, and a
-  confirmation attempt that failed:
+  **Attributed to packaging, measured on one instrument.** Driving *both* sides
+  over HTTP through the same harness: **source 1.525 s — which meets the target —
+  against packaged 2.266 s, which does not.** Packaging costs **+0.741 s**, and
+  packaging alone is what causes the miss. Embeddings add only **+0.14 s** on top
+  (packaged semantic 2.407 s).
+
+  **The cost is in the index path, not in request handling.** A trivial endpoint
+  costs **184.9 ms packaged against 186.3 ms source** — identical — so
+  per-request service construction, `build_registry()` and the `os.walk` for
+  `tags.scm` are all cleared, along with the semantic layer, the resolver's
+  declared-module index and ADR-0067's Scala references. A request that parses
+  nothing pays nothing; the penalty scales with files indexed. Per-file parse
+  cost inside the frozen build is the shape that fits, and it is **not yet
+  attributed**. Preflight still clears its ≤ 10 s target at 4.376 s, and no
+  corpus metric moved — all three `--check` baselines reproduce byte-for-byte.
+  Full method, every run, and two hypotheses killed by measurement:
   `docs/evaluation/phase-7-performance-environment.md`.
 
 - **The packaged executable is unsigned**, so SmartScreen warns on first run.

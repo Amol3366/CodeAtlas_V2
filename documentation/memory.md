@@ -3105,18 +3105,34 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   unchanged paths* while refresh stayed 3x slower. **Take two runs, and promote
   the one whose unchanged-path indicators are good** — that is the run a reader
   cannot wave away.
-- **The refresh regression is in the PACKAGED artifact, not the code and not the
-  semantic layer** (narrowed 2026-08-21, same session). A 2x2 taken the same day:
-  source deterministic **1.668 s** (passes), packaged deterministic **2.266 s**
-  (fails), packaged semantic **2.407 s**. **Packaging costs +0.60 s; embeddings
-  cost +0.14 s.** In July packaged was *faster* than source (1.295 vs 1.426 s);
+- **The refresh regression is in the PACKAGED artifact, and specifically in its
+  INDEX path** (2026-08-21). Measured on one instrument — both sides driven over
+  HTTP through `measure_phase6_perf.py`, source via the venv console script:
+  **source 1.525 s (target MET), packaged 2.266 s (target MISSED), so packaging
+  costs +0.741 s.** Packaging alone causes the miss.
+- **Two wrong turns on the way, both corrected by measurement.** First, a "+0.60 s
+  packaging" figure was produced by subtracting an **in-process** source number
+  (`measure_phase4_perf.py` calls `build_services` directly) from an **HTTP**
+  packaged number (`measure_phase6_perf.py`) — two instruments, so the
+  subtraction was unsound even though it landed close. Second, the natural
+  hypothesis was per-request cost, and it is **refuted**: a trivial endpoint
+  costs **184.9 ms packaged against 186.3 ms source**. `build_registry()`, the
+  `os.walk` for `tags.scm`, and per-request `build_services` are all cleared.
+  **The cost is in indexing, because a request that parses nothing pays
+  nothing.**
+- **Check the transport before subtracting two harnesses.** They measured the
+  same *operation* — edit one file, re-index — which is why the error was bounded
+  at roughly the 185 ms of transport rather than fatal. The corrected figure came
+  out *larger* than the unsound one.
+- **The old claim, kept:** packaged semantic **2.407 s** vs packaged deterministic
+  **2.266 s**, so **embeddings cost +0.14 s.** In July packaged was *faster* than source (1.295 vs 1.426 s);
   today it is 0.6 s slower — that inversion is the finding. `cold_start_s` agrees:
   1.627 -> 2.393 s. **This refutes two candidates the register itself had named**
   — the resolver's declared-module index and ADR-0067's Scala references both
   live in the source path, and the source path is clean.
-- **Build the 2x2 from same-day numbers.** Every cell above was measured within
-  one session; the July/August figures are used only as direction. Cross-date
-  wall-clock comparison is what ADR-0061 had to throw away.
+- **Build the 2x2 from same-day numbers AND one instrument.** Same-day was not
+  enough; the first attempt was same-day and still wrong, because two cells came
+  from a different harness.
 - **A confirmation attempt can fail without refuting anything, and should be
   recorded as a failed test.** Timing `codeatlas doctor` gave packaged 1.624 s
   against source 1.769 s — packaged faster, apparently against the hypothesis. It
