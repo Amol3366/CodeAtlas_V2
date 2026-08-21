@@ -15,7 +15,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.6.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2370 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, exit 0, 2026-08-21. **No xfails**: the two ADR-0065 limits were ruled and closed (ADR-0066, ADR-0067) |
+| **Tests** | **2389 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, 2026-08-21. **No xfails**: the two ADR-0065 limits were ruled and closed (ADR-0066, ADR-0067). The last *complete* gate run exited 0 at **2386**; the three tests added after it were verified by running all nine stages individually, because two full runs were killed on duration rather than failing |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
