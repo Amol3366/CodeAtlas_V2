@@ -114,7 +114,7 @@ with verification.
 | ~~original entry~~                                                                                              | **OPEN — found 2026-08-16 while verifying ADR-0050, pre-existing and unrelated to it.** `run_phase7_baseline.py --check` exits **5**. The whole difference is one **added metric key**: `finding_count_correctness` entered the report model in `fc7af34` (2026-08-14, "a repeated finding is visible to the score"), and the artifact was last regenerated in `7b2f8ab`, which `git merge-base --is-ancestor` confirms is an **ancestor** of it. Phases 0, 3 and 4 all carry the field; Phase 7 alone does not. **No metric value differs** — regenerating adds two lines, both `"finding_count_correctness": 1.0`. **Why nobody saw it: the semantic block is `-Semantic`-gated and opt-in**, so `check_phase7 -SkipSync` never reaches that step, which is precisely the ADR-0022 process note ("it happened to pass, because the corpora are disjoint — luck, not diligence"). Deliberately **not** regenerated here: ADR-0022's rule is that a gated artifact which stops reproducing is reviewed, not absorbed, and this is outside the ADR-0050 change                                                                                                                                                                                                                                                    | Someone regenerates it as its own reviewed commit, or makes the semantic step non-optional                                                                                  |
 | ~~**The packaged web bundle is five days behind `apps/web/dist`**~~                                           | **CLOSED 2026-08-16.** Rebuilt with `scripts/build_package.ps1 -SemanticLocal`. **The flag mattered:** the existing package carried `torch` and `lancedb`, so building without it would have silently turned a semantic artifact into a deterministic-only one — a change nobody asked for. The zip was rebuilt too (335 MB → 370 MB) rather than left inconsistent with the folder beside it. `tests/end_to_end/test_packaged_build.py` **6 passed**, and the build script's own verification step reports "web assets match apps/web/dist". Original entry follows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                                                                                          |
 | ~~original entry~~                                                                                              | **OPEN — environmental, found 2026-08-16, not a repository regression.** `test_the_packaged_web_assets_match_the_source_build` fails, which aborts `check_phase4` and `check_phase7` at their *first* step. Both directories are **gitignored build output** — `git ls-files` returns 0 tracked files for each — so this is local state, and a fresh clone skips the test because `apps/web/dist` would be absent. Source built **2026-08-16 02:02**, package built **2026-08-11 19:14**; they differ by one hashed JS asset and the `index.html` naming it. The count corroborates: 2240 passed at `e07c5ff`, now 2239 passed / 1 failed of the same 2240. **The guard is correct and is reporting real staleness** — the packaged executable would serve a five-day-old UI, the 2026-08-05 Settings incident's exact shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `scripts/build_package.ps1` is run                                                                                                                                        |
-| **ADR-0047 forward-references an ADR-0049 that was never written**                                         | **OPEN — a dangling citation, not a defect.** ADR-0047 line 39 cites "ADR-0049" for the `target/` ignore collision, contrasting it as a *faulty instrument* against its own *absent decision*. Ruling 2 landed as a fixture-local `.codeatlasignore` without an ADR, so 0049 is reserved-but-empty. **ADR-0050 deliberately skipped it** rather than hijacking the number, which would have made ADR-0047's sentence describe the wrong record. The ADR README index was also stale by two records (0047, 0048 absent); all three added                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Someone writes the`target/` ignore-collision record as 0049                                                                                                               |
+| ~~**ADR-0047 forward-references an ADR-0049 that was never written**~~ | **CLOSED 2026-08-21 — ADR-0049 written.** The record ADR-0047 line 39 cites now exists: the `git_changes` fixture's `target/` side collides with a build-output ignore default, so a *query* case indexing the fixture root could not see half the fixture and **q034's recall was structurally 0 and always had been**. Re-included by a fixture-local `.codeatlasignore` with `overrides=True`, leaving the builtin default untouched for every real repository. Written five days after the decision and **says so in its own header**, because a record dated later than the ruling it describes invites exactly the wrong reading. **ADR-0050's deliberate skip of the number turned out to be right** — taking it would have made ADR-0047's sentence point at an unrelated record. The README's ADR count 67 -> 68 was caught by the guard added earlier the same day rather than by remembering | — |
 | ~~**q006: the engine cites a line that does not prove the claim**~~                                       | **CLOSED 2026-08-16 — ADR-0051. Not an engine defect; the case is mis-typed.** Both halves of the recorded hypothesis are false. `claim` **does** have an outgoing edge (`CALLS add`, line 8), and evidence is built one-per-edge from `edge.start_line` (`graph_queries.py:305-318`) — no chunk or lexical fallback. And the engine's claim is *"IdempotencyStore.claim calls add at idempotency.py:8"*, which line 8 proves exactly; it simply does not answer the *question*. Line 7 holds no relation, so no correct `TRACE_FLOW` can ever cite it. **The product's own classifier routes the question to `text`**, whose result (`5-9`) contains line 7. Re-typed to `CONCEPTUAL` and **q064 added in the same change**, because `TRACE_FLOW` is a symbol intent and removing q006 alone drops the denominator 50 → 49, where one miss scores 0.9796 and fails the gate. `containing_evidence_recall_at_10` 0.9824 → **0.9941**; margin held. **Ninth consecutive instrument finding**, reached by reading the claim against its cited lines and running the classifier, not by reflex                                                                                                                                                                                                                   | —                                                                                                                                                                          |
 | **The `TRACE_FLOW` label may be systemically wrong**                                                     | **OPEN — raised by ADR-0051, deliberately not settled with it.** All three `TRACE_FLOW` cases examined so far — q003, q006, q035 — classify as **`text`** in the product's own `classify()`, so the corpus's declared intent disagrees with the classifier for every one checked. Six carry the label. q006 was re-typed; **q003 and q035 were left alone on purpose** — q035 was settled by ADR-0050 hours earlier and reopening it the same day on a different axis would discard that evidence, and q003 currently passes. The harness bypasses the classifier by design (`_query_term`: "not question understanding"), which is legitimate, but it means **a declared intent no classifier would produce is never cross-checked**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Someone audits all six`TRACE_FLOW` cases together                                                                                                                         |
 | ~~original entry~~                                                                                              | **OPEN — a candidate ENGINE finding, the first in this investigation that is not the instrument.** Surfaced 2026-08-16 by applying ADR-0047. The claim is "duplicate keys are handled"; the line that proves it is `return "duplicate"` (`idempotency.py:7`). The engine cites line 8, `self._keys.add(key)`. **Not proven to be a defect** — the trace answer may be selecting a chunk line rather than the claim-bearing one. Recorded because the reflex the rulings warned about would have declared line 8 "because the engine says so", matched the predicted number, and buried it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Someone investigates why trace evidence selects that line                                                                                                                   |
@@ -294,6 +294,87 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-21T10:00:00Z — P2-E closed: one record written, one item that was already done
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P2-E's two remainders are closed.** One needed an ADR; the other
+  needed nothing but a check.
+
+## `-SkipWeb -Perf` was fixed already, and the row said otherwise
+
+The entry read "silently skips the measurement and returns 0 ... **this one has
+nothing watching it**, in a repository with a history of green runs that measured
+nothing." Checked instead of believed:
+
+- `check_phase7.ps1:41-42` **refuses the combination outright**, with a message
+  naming why the work would be skipped.
+- `tests/unit/test_gate_flag_combinations.py` guards it — **9 passing tests**.
+- Both landed in `ba64b0e`.
+
+**The guard is better than the row assumed.** It is generic rather than
+phase-7-specific: it globs `check_phase*.ps1`, parametrises over every gate
+script, and carries a self-test proving its own detector fires. Checked the
+siblings too — `check_phase5.ps1` has `-SkipWeb` and *no* refusal, and that is
+**correct**, because its only other switch is `-SkipSync` and everything after
+its early exit *is* the web section. No flag's work can be silently cancelled,
+so there is nothing to refuse.
+
+**This is the second time a gap was written down without checking the suite
+first.** The `changed_symbol_precision` dilution row was the first, and its
+lesson — *check what already exists before recording a gap* — is already in
+`memory.md`. Recording it once did not prevent the repeat.
+
+## ADR-0049 written, five days late, and it says so
+
+ADR-0047 line 39 cites "the `target/` ignore collision, ADR-0049" to contrast a
+**faulty instrument** against its own **absent decision** — the sentence turns on
+that difference. The record did not exist: Ruling 2 shipped as a fixture-local
+`.codeatlasignore` carrying its reasoning in a comment, and ADR-0050
+**deliberately skipped the number** rather than hijack it.
+
+**That skip was right, and this closes the loop it left open.** Taking 0049 would
+have made ADR-0047's sentence point at an unrelated record.
+
+The decision recorded: `git_changes` has `base/` and `target/` sides whose names
+`_resolve_side` matches literally, while `target/` is also a build-output ignore
+default. Change cases index one side and never consult it; **query cases index
+the fixture root, so half the fixture was invisible and q034's recall was
+structurally 0 and always had been.** Fixed with `!target/` in a fixture-local
+`.codeatlasignore` (`overrides=True`), leaving the builtin default untouched for
+every real repository. Renaming was rejected (it would break the ref grammar),
+and marking the cases unmeasured was rejected (it would make ADR-0024's signal
+mean two things). The cost was paid immediately: a second `process` entered the
+index, q035 became ambiguous and abstained, and **ADR-0050 settled that**.
+
+The record is dated five days after the ruling and states that in its header,
+because a record dated later than the decision it describes otherwise reads as a
+later decision.
+
+## The ADR-count guard caught its own consequence
+
+Adding ADR-0049 took `docs/adr/` to 68 while `README.md` said 67.
+`test_the_readme_adr_count_matches_the_directory` — written hours earlier —
+**failed unprompted**, on exactly the drift it was built for. Second time today
+one of those guards caught something real rather than only passing.
+
+## Files
+
+`docs/adr/0049-a-fixture-re-includes-a-directory-an-ignore-default-excludes.md`
+(new), `docs/adr/README.md` (index row, inserted in numeric order), `README.md`
+(67 -> 68), `docs/plans/PLAN.md`, `docs/superpowers/plans/2026-08-20-remaining-work.md`,
+`documentation/memory.md`. **No source change, no fixture change, no migration.**
+
+**Limitations.**
+
+- ADR-0049 documents a decision taken five days ago from the `.codeatlasignore`
+  comment, the register rows and the handoff of that date. It is a faithful
+  record of what those say; nobody re-derived the ruling from scratch.
+- The `-SkipWeb -Perf` row is closed on inspection, not on a fresh run of the
+  refused combination.
+
+- Next: nothing in the remaining-work plan needs anybody. The Java `IMPORTS`
+  label ruling is still open and still blocks nothing.
 
 ### 2026-08-21T08:00:00Z — RETRACTION: there is no refresh regression, and no packaging cost
 

@@ -3165,6 +3165,28 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   It has now been stale twice and corrected by hand twice; that is the accepted
   cost, stated in the module rather than papered over with a hard-coded number.
 
+- **A register row can be stale in the direction of MORE work, not less, and
+  that costs a session too.** P2-E carried "`-SkipWeb -Perf` silently skips the
+  measurement and returns 0 ... this one has nothing watching it". Checked
+  2026-08-21: `check_phase7.ps1:41-42` refuses the combination outright and
+  `tests/unit/test_gate_flag_combinations.py` guards it with 9 passing tests,
+  both landed in `ba64b0e`. **Second occurrence** — the
+  `changed_symbol_precision` dilution row was the first, and its own lesson was
+  *check what already exists before recording a gap*. Recording it once did not
+  stop it happening again; the habit has to be checking, not remembering.
+- **That guard is the shape to copy.** It globs `check_phase*.ps1`, parametrises
+  over every gate script rather than naming phase 7, and carries a self-test
+  proving its detector detects. `check_phase5.ps1` has `-SkipWeb` and no
+  refusal, and the guard correctly passes it: nothing gated on another flag sits
+  after its early exit, so there is no combination to refuse.
+- **A missing ADR is written where the citation already says it is** (ADR-0049,
+  2026-08-21). ADR-0047 cited a record that did not exist; ADR-0050 had
+  deliberately skipped the number rather than hijack it, and that turned out to
+  be right — taking 0049 would have made ADR-0047's sentence describe an
+  unrelated decision. The new record is dated five days after the ruling and
+  **says so in its own header**, because a record dated later than the decision
+  it describes otherwise reads as a decision made later.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake

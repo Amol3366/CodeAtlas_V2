@@ -254,10 +254,8 @@ Cheap to run, and it closes a claim that is currently stale rather than wrong.
   is deliberately still there:** deleting a remote branch is not locally
   reversible and was not authorised. 14 other merged local branches also remain;
   only the one named was in scope.
-- **ADR-0047 cites an ADR-0049 that was never written** — a dangling reference.
-- **`-SkipWeb -Perf` silently skips the measurement and returns 0.** The
-  array-splat class is guarded; this one has nothing watching it, in a
-  repository with a history of green runs that measured nothing.
+- ~~**ADR-0047 cites an ADR-0049 that was never written**~~ **DONE 2026-08-21.** Written as `0049-a-fixture-re-includes-a-directory-an-ignore-default-excludes.md`, five days after the decision and saying so in its own header. ADR-0050's deliberate skip of the number was the right call: taking it would have made ADR-0047's sentence point at an unrelated record.
+- ~~**`-SkipWeb -Perf` silently skips the measurement and returns 0.**~~ **ALREADY DONE — this entry was stale and needed no work.** Checked rather than assumed on 2026-08-21: `check_phase7.ps1:41-42` refuses the combination outright, and `tests/unit/test_gate_flag_combinations.py` guards it with 9 passing tests, both landed in `ba64b0e`. The guard is **generic** — it globs `check_phase*.ps1`, parametrises over every gate script, and self-tests its own detector. `check_phase5.ps1` has `-SkipWeb` and no refusal, which is **correct**: nothing gated on another flag sits after its exit. The claim that "this one has nothing watching it" had not been true for some time. **Second time a gap was recorded without checking the suite first**, after the `changed_symbol_precision` row.
 
 ### P2-F · Two small live-path defects · *work*
 
@@ -312,7 +310,7 @@ P2-A, P2-B ──────────── DONE 2026-08-20; these two are w
 P2-C, P2-E ──────────── DONE 2026-08-20 (zip, branch, SECURITY.md)
 P2-F ────────────────── ambiguity message DONE; Java IMPORTS label needs a ruling
 P2-D re-measure perf ── OPEN, needs nobody  ← the only work item left here
-P2-E remainder ──────── ADR-0049 dangling cite; `-SkipWeb -Perf` silent skip
+P2-E remainder ──────── DONE 2026-08-21 (ADR-0049 written; -SkipWeb -Perf was already fixed)
 ```
 
 **Nothing in this plan now needs a decision.** P2-D is **DONE 2026-08-21** and
