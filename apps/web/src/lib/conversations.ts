@@ -175,9 +175,7 @@ export function useRetryMessage(conversationId: string | null) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (messageId: string) =>
-      api.post<MessageSubmission>(
-        `/v1/conversations/messages/${messageId}/retry`,
-      ),
+      api.post<MessageSubmission>(`/v1/messages/${messageId}/retry`),
     onSuccess: () =>
       client.invalidateQueries({
         queryKey: keys.messages(conversationId ?? ""),

@@ -39,6 +39,14 @@ from codeatlas.domain.conversations import (
 
 router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
 
+# Message-scoped operations are addressed as messages, not as conversations
+# (ADR-0068). `retry` and `feedback` take a message id and carry no conversation
+# id, so the conversations prefix scoped them by a resource they never named —
+# and `cancel`, the third operation on the same run lifecycle, has always sat at
+# the top level in `stream.py`. A second router is the smallest way to say that;
+# re-prefixing this one would rewrite ten unrelated handlers.
+message_router = APIRouter(prefix="/v1/messages", tags=["conversations"])
+
 _LIMIT = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT)
 _CURSOR = Query(default=None)
 _INCLUDE_ARCHIVED = Query(default=False)
@@ -151,7 +159,7 @@ def submit_message(
     return _submission(result)
 
 
-@router.post("/messages/{message_id}/retry", status_code=status.HTTP_201_CREATED)
+@message_router.post("/{message_id}/retry", status_code=status.HTTP_201_CREATED)
 def retry_message(
     request: Request, services: Services, message_id: str
 ) -> MessageSubmission:
@@ -160,8 +168,8 @@ def retry_message(
     )
 
 
-@router.post(
-    "/messages/{message_id}/feedback", status_code=status.HTTP_204_NO_CONTENT
+@message_router.post(
+    "/{message_id}/feedback", status_code=status.HTTP_204_NO_CONTENT
 )
 def submit_feedback(
     services: Services, message_id: str, body: FeedbackRequest

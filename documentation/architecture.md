@@ -285,9 +285,13 @@ UTC timestamps, cursor pagination.
 
 - Repositories: register, list, get, delete, index, status, files, diagnostics,
   active snapshot, semantic status
-- Conversations: CRUD, messages, `GET .../stream`, retry, cancel, feedback
-- Intelligence: `POST /v1/query`, `/v1/query/stream`, evidence, files, symbols,
-  symbol relations, search (files / symbols / text)
+- Conversations: CRUD, messages, `GET .../stream`, cancel. Retry and feedback
+  are message-scoped and live at `POST /v1/messages/{message_id}/...`
+  (ADR-0068) — they take a message id and never a conversation id
+- Intelligence: `POST /v1/query`, evidence, files, symbols,
+  symbol relations, search (files / symbols / text). There is no
+  `POST /v1/query/stream`; ADR-0068 removed it from the contract rather than
+  build an endpoint nothing had asked for in seven phases
 - Change analysis: working-tree, commits, get, report
 - Settings and providers: settings, models, model test, embedding-model
   validation, embedding migrations

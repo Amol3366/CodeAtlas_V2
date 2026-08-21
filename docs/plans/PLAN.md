@@ -50,13 +50,13 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | **none - closed.** Phases 0-7 are all `complete`. Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed; that condition has since been met under a corrected metric (ADR-0027), and the correction must be cited with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Active task     | **none - closed.** Phases 0-7 remain complete. The post-ADR-0065 program (`docs/superpowers/plans/2026-08-20-remaining-work.md`) has delivered its P0 and P1: merged, both limits ruled, all four languages measured on query *and* change sides, the package rebuilt, and the README guarded. **One decision waits on the user** — the `AGENTS.md` §12 divergence. The `changed_symbol_precision` dilution is **closed**: it was a reporting defect, not a lost guard, and the report now carries `changed_symbol_exact_cases` beside the mean |
+| Active task     | **none - closed.** Phases 0-7 remain complete. The post-ADR-0065 program (`docs/superpowers/plans/2026-08-20-remaining-work.md`) has delivered its P0 and P1: merged, both limits ruled, all four languages measured on query *and* change sides, the package rebuilt, and the README guarded. **No decision now waits on the user**: the `AGENTS.md` §12 divergence was ruled and implemented 2026-08-21 (ADR-0068) — retry and feedback moved to `/v1/messages/{message_id}/...`, and `POST /v1/query/stream` left the contract rather than being built. The `changed_symbol_precision` dilution is **closed**: it was a reporting defect, not a lost guard, and the report now carries `changed_symbol_exact_cases` beside the mean |
 | Task status     | `complete` - Phase 7 stays approved; everything since is post-gate work. `SCHEMA_VERSION` **14**, `contract_version` **1.1**, parser bundle **1.6.0**, chunker **1.1.0**, resolver **1.5.0**. Corpus **80 query / 32 change over 11 fixtures**. Last gate: `check_phase4.ps1 -SkipSync` exit 0, **2350 passed, 3 skipped, no xfails** |
 | Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote |
 | Policy filename | The authoritative coding-agent contract is exposed as**`AGENTS.md` / `CLAUDE.md`**. `AGENTS.md` holds the maintained contract body; `CLAUDE.md` is the Claude entry point for the same contract and forwards agents to `AGENTS.md` to avoid duplicated text drifting. Citations to either name mean the same policy lineage. Only the *live* pointers were updated (this file's header and rule 1, the README, and the compatibility entry); historical ADRs, completed phase plans, baselines, handoff entries, and source comments were deliberately **not** rewritten, because rewriting the evidence a gate was approved on is not a rename, and a repository-wide reference sweep is exactly the unrelated refactor Section 4.5 forbids. |
-| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. `AGENTS.md` §5, §6 and §19 are all updated, and P2-F's ambiguity-message defect is fixed. Work needing nobody: a §5 language-list guard derived from `default_registry()` (the cheapest preventive item left) and P2-D (re-measure packaged performance). **Two rulings wait on the user**: `AGENTS.md` §12, and P2-F's Java `IMPORTS` label — accept the asymmetry or emit a compilation-unit symbol. **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
+| Next gate       | none - the Section 20 development order is finished and the closeout stands. **New work requires an explicit user decision.** One is outstanding and is named in the Deferred Register: the `AGENTS.md` §12 divergence. The `changed_symbol_precision` **dilution** is closed — c020-c022 were pinned per-case all along, so what was lost was the *aggregate's* signal, and the report now states `0.9531 (29/32 cases exact)`. `AGENTS.md` §5, §6 and §19 are all updated, and P2-F's ambiguity-message defect is fixed. Work needing nobody: a §5 language-list guard derived from `default_registry()` (the cheapest preventive item left) and P2-D (re-measure packaged performance). **§12 is closed (ADR-0068, 2026-08-21), so the contract and the implementation now agree everywhere.** **One ruling still waits on the user** and blocks nothing: P2-F's Java `IMPORTS` label — accept the asymmetry or emit a compilation-unit symbol. **The stale zip is rebuilt** — it turned out to predate ADR-0065 entirely, so it shipped a CodeAtlas silently missing all four query-backed languages. **P2-A and P2-B are both done** — README claims and repo-wide LF endings are now guarded, which were the two items whose whole purpose was stopping recurrence |
 
 ## Deferred Register
 
@@ -293,6 +293,127 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-21T00:00:00Z — `AGENTS.md` §12 and the implementation agree (ADR-0068)
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **P1-C is closed, and with it the last item in the post-ADR-0065
+  program that needed a decision.** Both halves of the §12 divergence were ruled
+  by the user and implemented in the same session.
+
+## The finding that settled it, which neither prior record carried
+
+Both `2026-08-20-remaining-work.md` and the Active Work block posed §12.2 as
+"move the contract, or move the code" with no evidence for either side. Checking
+source supplied it in one line:
+
+**`/v1/conversations/messages/{message_id}/retry` contains no conversation id.**
+It names `conversations` and then never identifies one. The prefix is inherited
+from `APIRouter(prefix="/v1/conversations")` (`conversations.py:40`) because that
+is the file the handlers landed in — not a containment decision.
+
+The sibling completes the diagnosis. `cancel` is the third operation on the same
+run lifecycle and has always sat at `/v1/message-runs/{run_id}/cancel`, exactly
+as the contract says, because it lives in `stream.py` whose router is prefixed
+`/v1`. **The implementation disagreed with itself along the axis of which file a
+handler was written in.** That is not a design, and ratifying it in the contract
+would have made `cancel` permanently inconsistent with its two siblings for a
+reason nobody could state.
+
+## Ruled and done
+
+**§12.2 — move the code.** `retry` and `feedback` now answer at
+`POST /v1/messages/{message_id}/...`, served by a second router
+(`message_router`). A second router rather than re-prefixing the existing one:
+re-prefixing would have rewritten ten unrelated handlers, which is the §4.5
+refactor. `stream.py` already demonstrates the pattern.
+
+**§12.3 — remove `POST /v1/query/stream`** rather than build it. Specified in
+Phase 0, never implemented, never missed across seven phases. Accept-then-stream
+covers a conversation turn and `POST /v1/query` covers a one-shot question. A
+documented endpoint that does not exist is the `SECURITY.md` version table again.
+
+## Why a breaking change was decidable in one pass
+
+§25 gates breaking contract changes because external consumers exist. They were
+**counted before the ruling rather than asserted**: loopback-only, single user,
+no tagged releases; the only caller of either path was `apps/web`, whose types
+are generated; and **`feedback` had no caller at all** — no web, no CLI, no test.
+
+**Neither route had a Python test either.** That absence is what let the
+addressing stay wrong for five phases: nothing exercised it, so nothing objected.
+
+`contract_version` stays **`1.1`, deliberately.** Where an operation is addressed
+changed; no request or response body did. Bumping it would tell every consumer
+their parsing had changed when it has not — which is the distinction ADR-0008
+bumped it *for*.
+
+## Verification
+
+- **TDD.** Four tests written first and watched fail, each the mirror of what it
+  now asserts: the old paths returned `MESSAGE_NOT_FOUND` (route present) where
+  the test wanted `INVALID_REQUEST`, and the new paths the reverse. That RED also
+  proved the discriminator works in both directions before any code moved.
+- **The discriminator is the error code, not the status.** Both shapes answer
+  404: an unregistered `/v1` path returns `INVALID_REQUEST` from the app-level
+  handler P6-08 added, a registered route with an unknown id returns
+  `MESSAGE_NOT_FOUND`. Asserting the status alone would pass either way.
+- **Two-sided on purpose, and mutation-checked.** Stacking both decorators so the
+  old path is re-added *alongside* the new one fails
+  `test_the_conversation_nested_retry_path_is_gone` **alone** while the new-path
+  test still passes — which is the "added without removing" failure a one-sided
+  test would permit. Reverted and re-verified green.
+- `tests/contract` + `test_stream_lifecycle.py`: **356 passed**.
+- `apps/web` `Thread.test.tsx`: **24 passed** (includes the retry path).
+- `ruff check src tests scripts apps`: **All checks passed!**
+  `mypy src/codeatlas/api` + the new test: **no issues, 15 files**.
+- Web types regenerated via `scripts/generate_web_types.ps1`; the old nested
+  paths are gone from `api-types.gen.ts` and `openapi.json`.
+
+**One defect introduced and fixed inside this session, recorded because it is
+this repository's own documented trap.** Editing `docs/adr/README.md` and
+`documentation/memory.md` through Python `write_text` converted both to **CRLF**
+— 139 and 3,676 line endings. That is ADR-0022's defect and the exact mechanism
+`phase-6-baseline-environment.md` records for `measure_phase7_perf.py`. Git
+warned on `diff`; P2-B's guard would have failed the gate. Normalized, and
+`test_working_tree_line_endings.py` passes with every touched file reporting
+`w/lf`. **Use `newline="
+"` or the Edit tool; `write_text` is not safe here.**
+
+**A self-correction worth keeping.** Checking the two *new* files with
+`grep -c $''` reported 151 and 89 CR bytes. That was the *check* being wrong,
+not the files — `$''` did not expand in that shell, so grep matched every line.
+Python byte counts show both were LF-only from the start. Confirm a line-ending
+claim with byte counts, not with a shell escape.
+
+**Live pointers updated; historical records deliberately not.** `README.md`,
+`documentation/architecture.md` and `AGENTS.md` §12.3 now describe the shipped
+surface. The blueprint's §12.2 list, the superseded post-ADR-0065 program, and
+the handoff entries below that name the old paths were **left as written** —
+rewriting the evidence a decision was recorded against is not a rename.
+
+**Also corrected, and it was stale before this session:** `README.md` claimed
+**66** accepted ADRs against **67** on disk — drifted when ADR-0067 landed, found
+only by counting while adding ADR-0068. `test_readme_claims.py` derives versions,
+the MCP tool count and quoted metrics, but **not** the ADR count.
+
+**Limitations.**
+
+- **No compatibility alias for the old paths**, deliberately. An alias would
+  preserve exactly the shape this change removes, and a deprecation window has
+  nobody to serve on a single-user local product. Anyone holding an old URL gets
+  `INVALID_REQUEST`.
+- **`feedback` still has no client.** It is now tested and correctly addressed,
+  and still nothing calls it.
+- The gate was **started, then stopped and re-run**: the first run began before
+  the documentation edits and the CRLF fix, so it was measuring a moving tree.
+  Do not read a gate that overlapped an edit.
+
+- Next: nothing in the plan needs a decision. **P2-D** (re-measure packaged
+  performance — stale since 2026-08-10 across two parser bumps) is the only
+  substantive work item left, and a **§5 language-list guard** derived from
+  `default_registry()`, widened to the ADR count, is the cheapest preventive one.
+  P2-F's Java `IMPORTS` label still wants a ruling and blocks nothing.
 
 ### 2026-08-20T22:00:00Z — The ambiguity message now says something a caller can act on
 

@@ -151,7 +151,7 @@ describe("Thread", () => {
           next_cursor: null,
         },
       },
-      "POST /v1/conversations/messages/msg_2/retry": {
+      "POST /v1/messages/msg_2/retry": {
         status: 201,
         body: submission(),
       },

@@ -486,7 +486,7 @@ diagnostic line there would break every scripted caller.
 **Conversations** — `POST|GET /v1/conversations` · `GET|PATCH|DELETE
 /v1/conversations/{id}` · `GET|POST /v1/conversations/{id}/messages` ·
 `GET /v1/conversations/{id}/stream` · `POST
-/v1/conversations/messages/{message_id}/retry` · `.../feedback` ·
+/v1/messages/{message_id}/retry` · `.../feedback` ·
 `POST /v1/message-runs/{run_id}/cancel`
 
 **Intelligence** — `POST /v1/query` · `GET /v1/evidence/{evidence_id}` ·
@@ -955,7 +955,7 @@ blunt version. The ones that bite most often:
 
 **Decisions and measurement**
 
-`docs/adr/README.md` — 66 accepted records and their rationale ·
+`docs/adr/README.md` — 67 accepted records and their rationale ·
 `docs/evaluation/` — baselines and the environment documents that say how to read
 them · `docs/security/threat-model.md`
 

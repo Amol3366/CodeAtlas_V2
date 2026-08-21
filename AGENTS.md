@@ -604,7 +604,6 @@ Return IDs immediately, then stream or poll status.
 
 ```text
 POST   /v1/query
-POST   /v1/query/stream
 GET    /v1/evidence/{evidence_id}
 GET    /v1/files/{file_id}
 GET    /v1/symbols/{symbol_id}
@@ -613,6 +612,13 @@ GET    /v1/search/files
 GET    /v1/search/symbols
 GET    /v1/search/text
 ```
+
+`POST /v1/query/stream` was listed here and never implemented, through all seven
+phases. It was removed rather than built (ADR-0068): accept-then-stream covers a
+conversation turn and `POST /v1/query` covers a one-shot question, so nothing
+asked for a third shape. A documented endpoint that does not exist is the same
+defect as a supported-version table for versions that never shipped. Adding it
+later is a §25 matter and needs a stated need first.
 
 ### 12.4 Change analysis
 

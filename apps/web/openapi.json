@@ -3584,93 +3584,6 @@
         ]
       }
     },
-    "/v1/conversations/messages/{message_id}/feedback": {
-      "post": {
-        "operationId": "submit_feedback_v1_conversations_messages__message_id__feedback_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "message_id",
-            "required": true,
-            "schema": {
-              "title": "Message Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeedbackRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Submit Feedback",
-        "tags": [
-          "conversations"
-        ]
-      }
-    },
-    "/v1/conversations/messages/{message_id}/retry": {
-      "post": {
-        "operationId": "retry_message_v1_conversations_messages__message_id__retry_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "message_id",
-            "required": true,
-            "schema": {
-              "title": "Message Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageSubmission"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Retry Message",
-        "tags": [
-          "conversations"
-        ]
-      }
-    },
     "/v1/conversations/{conversation_id}": {
       "delete": {
         "operationId": "delete_conversation_v1_conversations__conversation_id__delete",
@@ -4217,6 +4130,93 @@
           }
         },
         "summary": "Cancel Run",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/messages/{message_id}/feedback": {
+      "post": {
+        "operationId": "submit_feedback_v1_messages__message_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Feedback",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/messages/{message_id}/retry": {
+      "post": {
+        "operationId": "retry_message_v1_messages__message_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSubmission"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Message",
         "tags": [
           "conversations"
         ]

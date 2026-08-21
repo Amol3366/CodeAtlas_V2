@@ -3050,6 +3050,48 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   all — `scope_node_types` is empty. The hook that justified rejecting a purely
   declarative design is the hook the second language runs entirely on.
 
+- **A route's prefix can be inherited rather than chosen, and the tell is a path
+  segment that identifies nothing** (ADR-0068, 2026-08-21). `retry` and
+  `feedback` sat at `/v1/conversations/messages/{message_id}/...` — naming
+  `conversations` and then never identifying one. The prefix came from
+  `APIRouter(prefix="/v1/conversations")` because that is the file the handlers
+  landed in. `cancel`, the third operation on the same run lifecycle, was at the
+  contract path all along because it lives in `stream.py`, whose router is
+  prefixed `/v1`. **The implementation disagreed with itself along the axis of
+  which file a handler was written in**, which is not a design and was not worth
+  ratifying. Moved the code. A second router, not a re-prefix — re-prefixing
+  would have rewritten ten unrelated handlers, which is the §4.5 refactor.
+- **"Breaking API change" is a question about consumers, and consumers are
+  countable** (ADR-0068). §25 gates breaking contract changes because external
+  clients exist. Here: loopback-only, single user, no tagged releases, one
+  client whose types are *generated*, and `feedback` had **no caller at all** —
+  no web, no CLI, no test. Measuring the blast radius before the ruling turned
+  "breaking, therefore approval" into "breaking, and here is exactly what
+  breaks", which is what made it decidable in one pass.
+- **`contract_version` describes the payload, not the address** (ADR-0068). Two
+  published paths moved and the version deliberately stayed `1.1`. Bumping it
+  would have told every consumer their parsing had changed when nothing about
+  any request or response body moved. ADR-0008 bumped it because
+  accept-then-stream changed what came back; this did not.
+- **An unimplemented endpoint is deleted from the contract, not annotated.**
+  `POST /v1/query/stream` was specified in Phase 0 and never built through seven
+  phases. Same defect as `SECURITY.md`'s table of versions that never shipped:
+  a reader of §12.3 reads a list of endpoints, not a list of intentions.
+- **Two routes had zero HTTP-level coverage and nobody noticed for five
+  phases.** The absence is what let the addressing stay wrong. The replacement
+  test is **two-sided** — new path reachable *and* old path gone — because
+  registering the new one while leaving the old is not what was ruled and a
+  one-sided test permits it. Mutation-checked by stacking both decorators: the
+  "is gone" half fails while the "works" half still passes, which is the
+  failure mode the pair exists for. Same shape as ADR-0066's inverted xfail and
+  the working-tree line-ending guard.
+- **A doc count drifts the moment nobody derives it.** `README.md` said "66
+  accepted records" while `docs/adr/` held 67 — stale since ADR-0067 landed,
+  and found only by counting while adding ADR-0068. `test_readme_claims.py`
+  guards versions, the MCP tool count and quoted metrics, but **not** the ADR
+  count. Corrected by hand; the guard extension is unwritten and is the same
+  class as the still-unwritten §5 language-list guard.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
@@ -3250,12 +3292,21 @@ Corpus is **80 query / 32 change cases over 11 fixtures**. Versions: parser
 `contract_version` `1.1`. Last gate: `check_phase4.ps1 -SkipSync` exit 0,
 **2350 passed, 3 skipped, no xfails**.
 
-### One decision is waiting on the user
+### No decision is waiting on the user
 
-1. **`AGENTS.md` §12 disagrees with the implementation** on two route shapes and
-   one unimplemented endpoint. Move the contract or move the code; §25 makes it
-   an approval matter. (§5's language profile needs no decision — an approved
-   ADR changed it — and is simply unwritten work.)
+~~1. **`AGENTS.md` §12 disagrees with the implementation.**~~ **CLOSED
+   2026-08-21 — ADR-0068, both halves ruled.** §12.2: **move the code**, because
+   the nested path carried no conversation id and `cancel` already sat at the
+   contract path, so the implementation disagreed with itself along the axis of
+   which file a handler was written in. §12.3: **remove `POST /v1/query/stream`**
+   rather than build it. Breaking, and the blast radius was measured before the
+   ruling rather than asserted — one generated-types client, and `feedback` had
+   no caller at all. `contract_version` stays `1.1`: the address moved, no
+   payload did.
+
+   **One ruling still open, and it is not this one:** P2-F's Java `IMPORTS`
+   label — accept the asymmetry, or emit a compilation-unit symbol. It is not
+   a §4.1 violation, so nothing is blocked on it.
 
 ~~2. **`unmet_targets` is empty and nothing was fixed.**~~ **CLOSED 2026-08-20,
 and the framing was half wrong.** `changed_symbol_precision` did cross 0.95 by
@@ -3286,11 +3337,17 @@ locally, and `AGENTS.md` §5 now carries the two-tier language profile.**
 §22 phase checklists still say "Python, TypeScript, and JavaScript" and **must
 not** be touched: they record what a completed phase delivered.)
 
+**§12 is closed too (ADR-0068, 2026-08-21), so the contract and the
+implementation now agree everywhere and no item in that plan needs a decision.**
+
 Work still needing nobody, best first: **a §5 language-list guard** deriving the
 seven from `default_registry()`, the way `test_readme_claims.py` derives its
 figures — three contract sections drifted against an ADR in this repository and
-all three were found *by accident* while editing a fourth. Then P2-D (re-measure
-packaged performance).
+all three were found *by accident* while editing a fourth. **Widen it to the ADR
+count while you are there**: `README.md` said "66 accepted records" against 67
+on disk, stale since ADR-0067 and found only by counting while writing
+ADR-0068 — the same drift class, one directory listing away from being
+underivable-by-hand. Then P2-D (re-measure packaged performance).
 
 **P2-F's first defect is fixed** (the ambiguity message). Its second is a
 **ruling, not work**: a Java `IMPORTS` edge cites line 3, which genuinely *is*

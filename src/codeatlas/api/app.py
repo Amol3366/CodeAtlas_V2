@@ -136,6 +136,7 @@ def create_app(
     app.include_router(graph.router)
     app.include_router(change_analysis.router)
     app.include_router(conversations.router)
+    app.include_router(conversations.message_router)
     app.include_router(settings.router)
     app.include_router(stream.router)
 

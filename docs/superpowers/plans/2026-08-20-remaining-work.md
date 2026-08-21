@@ -37,7 +37,23 @@ blocked on a decision, and saying so is more useful than inventing urgency.
 
 ## P1 — next
 
-### P1-A · Finish language coverage: Go and Rust cases · *work*
+### P1-A · Finish language coverage: Go and Rust cases · **DONE 2026-08-20**
+
+`go_app` and `rust_app` were admitted and the corpus went **73 → 80 query
+cases**, completing coverage of all four ADR-0065 languages. The only source
+edit was `SUPPORTED_FIXTURES`. **Every moved metric moved up**, which had not
+happened on previous corpus growth, and the 0.98 denominator tripwire fired
+again without margin being bought: 51 → 66 scored cases, one miss still clears.
+
+**Go deliberately gets no import case, and refusing to write one was the
+finding.** ADR-0066 rules a Go import stays `external`; an external edge carries
+no `target_symbol_id`, so it never appears in a `relation_path` (ADR-0057). The
+corpus vocabulary cannot express the ruled outcome, so a case written anyway
+would pass whatever the engine did. q080 is the control instead — Rust's `crate`
+is a keyword, so its import *does* resolve, which is the contrast that diagnosed
+Go in the first place.
+
+The original entry follows, kept because the traps it names are still real.
 
 **Go and Rust have no evaluation fixture at all** — not thin coverage, none. Of
 the four languages ADR-0065 shipped, two are measured and two are invisible to
@@ -59,7 +75,22 @@ its own — it is the contrast that diagnosed Go.
 0.98; adding ~8 keeps that. The corpus has grown 51 → 59 without buying slack,
 and that property should survive this too.
 
-### P1-B · Change cases for Scala, Go and Rust · *work*
+### P1-B · Change cases for Scala, Go and Rust · **DONE 2026-08-20**
+
+Corpus **29 → 32 change cases**; all four ADR-0065 languages now have change
+coverage. No source change at all — variant overlays, three cases, counts.
+
+**c030 measures ADR-0067 on the change side**: mutating the extractor to ignore
+the supplementary references query fails c030 *alone*, because Java, Go and Rust
+ship member-call patterns and Scala does not. So Scala's impact analysis depends
+on that ruling, not merely its symbol lookup.
+
+**This is where `unmet_targets` emptied by dilution** — `changed_symbol_precision`
+0.9483 → 0.9531 with c020–c022 still scoring exactly 0.50 each. Settled the same
+day by emitting `changed_symbol_exact_cases` beside the mean; see P2 and the
+Deferred Register. **Never cite "all §19.3 targets met" without it.**
+
+The original entry follows.
 
 `scala_app` has **zero** change cases and `java_app` has one. Changed-symbol
 detection is the headline ADR-0065 capability and is measured for exactly one
@@ -105,8 +136,29 @@ Both are the same bookkeeping class as §5 and need no decision. The Phase
 checklists at §22 also say "Python, TypeScript, and JavaScript", and those
 **must not** be touched — they record what a completed phase delivered.
 
-**§12 still needs a decision**: move the contract, or move the code. §25 makes a
-breaking API change an approval matter, so it is not mine to pick.
+~~**§12 still needs a decision**~~ **RULED 2026-08-21 — ADR-0068. P1-C is
+closed, and with it the last item in this plan that needed anybody.**
+
+**§12.2: move the code.** The table above recorded the divergence without
+evidence for either side. Checking source supplied it: the nested path
+`/v1/conversations/messages/{message_id}/retry` **carries no conversation id**,
+so the prefix was inherited from `APIRouter(prefix="/v1/conversations")` rather
+than chosen — and `cancel`, the third operation on the same run lifecycle,
+already sat at `/v1/message-runs/...` because it lives in `stream.py`. The
+implementation disagreed with itself along the axis of which file a handler was
+written in. Both routes moved to `/v1/messages/{message_id}/...`.
+
+**§12.3: remove `POST /v1/query/stream`** rather than build it — specified in
+Phase 0, never implemented, never missed. A documented endpoint that does not
+exist is the `SECURITY.md` version table again.
+
+Breaking, and that is why it needed the ruling. Blast radius was measured before
+the change, not asserted: loopback-only, no tagged releases, one client with
+generated types, and `feedback` had **no caller at all**. Neither route had a
+Python test either, which is why nothing ever objected — they have one now, and
+it is two-sided, so registering the new path while leaving the old one fails.
+`contract_version` stays `1.1` deliberately: where an operation is addressed
+changed, no payload did.
 
 ---
 
@@ -253,15 +305,20 @@ Cheap to run, and it closes a claim that is currently stale rather than wrong.
 ## Sequencing
 
 ```text
-P1-A Go/Rust cases ──┬── P1-B change cases (same fixtures, reuse them)
-                     └── P2-D re-measure perf (artifact already current)
-P1-C §5 ─────────────── DONE; §12 waits on a decision
-P2-A, P2-B ──────────── independent; these two are what stop recurrence
-P2-C, P2-E ──────────── independent, minutes each
+P1-A Go/Rust cases ──── DONE 2026-08-20
+P1-B change cases ───── DONE 2026-08-20
+P1-C §5 · §6 · §19 ──── DONE 2026-08-20; §12 DONE 2026-08-21 (ADR-0068)
+P2-A, P2-B ──────────── DONE 2026-08-20; these two are what stop recurrence
+P2-C, P2-E ──────────── DONE 2026-08-20 (zip, branch, SECURITY.md)
+P2-F ────────────────── ambiguity message DONE; Java IMPORTS label needs a ruling
+P2-D re-measure perf ── OPEN, needs nobody  ← the only work item left here
+P2-E remainder ──────── ADR-0049 dangling cite; `-SkipWeb -Perf` silent skip
 ```
 
-**One task in progress at a time.** P1-A is the substantive one; P2-C and P2-E
-are the ones to take when a short slot is what is available.
+**Nothing in this plan now needs a decision.** P2-D is the only substantive work
+item left and needs nobody; P2-F's second half is a ruling, not work. A §5
+language-list guard derived from `default_registry()` remains the cheapest
+preventive item and is not yet written.
 
 ## What is deliberately not here
 
