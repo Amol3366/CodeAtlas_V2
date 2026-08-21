@@ -73,7 +73,7 @@ with verification.
 
 | Item                                                                                                             | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Reopens when                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible |
+| **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible **MEASURED 2026-08-21 — the scope is wider than this row says, and its own reopen trigger has already fired.** It is **not Java-specific**: every one of the four query-backed languages does it. Indexed each fixture and compared each `IMPORTS` edge's cited line against its source symbol's span — **java_app** `CLASS OrderService` 5-15, import cited at **3**; **go_app** 7-9 at **3**; **rust_app** 3-5 at **1**; **scala_app** 5-9 at **3**. **4 of 4 outside.** The contrast is exact and falls on the tier boundary: Python and TS/JS attach an import to a **`MODULE`** symbol spanning the whole file (`src.payments.service` 1-11 cited at 1, `src.client` 1-5 at 1) — **3 of 3 inside**. So the choice is not about Java: accepting it accepts it for the whole query-backed tier, and fixing it is **one engine change rather than four adapters**, since no query-backed adapter emits a compilation-unit symbol (only `rust.py` maps `definition.module`, and that is a Rust `mod` declaration, not a file). This row's trigger reads "or a second query-backed language makes the inconsistency user-visible" — three have.  **COST MEASURED 2026-08-22 by prototype, and it is much higher than this row implied.** A compilation-unit symbol was implemented in the shared engine, measured, and reverted (engine restored byte-identical; both baselines re-`--check`ed). **It works**: imports attach to a `MODULE` and land inside it, **4 of 4**, one engine change covering all four languages. **But it fails the Phase 4 gate.** `targets_met: false`, unmet **`exact_symbol_resolution` 1.0000 -> 0.9545** (§19.3 target 0.98) and **`relation_path_recall` 1.0000 -> 0.9062** (ADR-0058 gates this at **1.0 absolutely**). **Twelve metrics move and every one moves down** — `abstention_correctness` 1.0000 -> 0.9605, `containing_evidence_recall_at_10` 1.0000 -> 0.9720, `ndcg_at_10` 0.9246 -> 0.9004, and the rest — because a per-file `MODULE` is an extra retrieval candidate that dilutes top-1 ranking and enters relation paths. **Two predictions in the plan were wrong**: the corpus cardinality guards do **not** fire (the whole evaluation suite passes, 125 tests — those guards count *cases*, not symbols), and it is not a clean six-line change — a naive whole-file range **fails snapshot validation** ("a staged symbol has a line range outside its file"), because tree-sitter's root node ends one line past a trailing newline, so the range needs clamping. Symbols +1 per file (+47% on the two-file fixtures). Phase 3 baseline moves too; Phase 0 does not. **So the real choice is: accept the tier difference, or pay a corpus-expectation update alongside the engine change** — not a version bump and a reindex |
 | ~~**ADR-0065's two declared limits: Go imports and Scala member calls**~~ | **BOTH CLOSED 2026-08-19 by user ruling, and they were ruled in opposite directions on purpose.** **Go (ADR-0066): declined, permanently.** The module prefix lives in `go.mod`, which a single-file parse cannot read, so closing it needs a *matching policy* rather than more parsing — and the cost is asymmetric: trimming too far makes a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing** a relationship §4.1 forbids. The `strict` xfail is **inverted rather than deleted** (ADR-0045's precedent) and now pins both halves: the import is recorded, and it is not resolved. **Scala (ADR-0067): closed.** `LanguageProfile` gained an optional `references_query`; Scala authors `scala.references.scm` capturing the `field_expression`'s `field`. **What separates the two rulings is where the missing information lives** — Go's is in a file the parser is not allowed to read, Scala's was in the syntax tree all along and only a query was missing. Declaring a limit that nine lines of query closes would have recorded an absence of work as a property of the language. `PARSER_BUNDLE_VERSION` **1.5.0 -> 1.6.0** (Scala yields references it did not before); `RESOLVER_VERSION` deliberately unchanged, because resolution draws the same conclusions from a reference as it always did. **The corpus carries no xfails at all now.** | Someone wants a Go matching policy (supersede ADR-0066), or a fourth language needs a supplementary query |
 | **`changed_symbol_precision` now reads 0.9531 and `unmet_targets` is EMPTY — by dilution, not by any fix** | **CLOSED 2026-08-20 — the defect was in the reporting, and the reporting is what changed.** For the first time the Phase 4 baseline reports `targets_met: true` with **no unmet targets**. **Nothing was fixed.** The structural cause is untouched: c020, c021 and c022 each still score **exactly 0.50**, for the reason recorded since Phase 4 — they split one physical `git_changes` diff into three single-symbol cases, so the engine correctly reporting both affected symbols has each case count the other's against it. The aggregate crossed 0.95 because P1-B's three change cases took the denominator **29 -> 32**, diluting three imperfect cases: (29x1.0 + 3x0.5)/32 = **0.9531**, where (26x1.0 + 3x0.5)/29 = 0.9483. **Pure arithmetic.** **The cases were not added to move it** — they exist to measure Scala, Go and Rust, which had no change coverage at all — but the effect is that a real, known, per-case defect is **no longer visible in the aggregate**. **Correction, 2026-08-20:** this row first read "no longer visible to the gate", and that was wrong. `tests/evaluation/test_change_adapter.py` has pinned c020-c022 per-case since Phase 4, two-sided — an allowlist that fails if a fourth case drops below 1.0 and equally if one of the three is quietly "fixed" — so the gate never stopped seeing them. What went blind was the *aggregate*, and every report built on it. The error mattered: it made this row read as a lost regression guard, which is a far more urgent thing than the reporting gap it actually was. That is the mirror of ADR-0032/ADR-0033: there a threshold could not express a miss; here the denominator has grown until a miss cannot register. **Do not cite "all Section 19.3 targets met" without this row.** The engine is exactly as accurate as it was yesterday. **Resolved by the second option, because the first was already true.** `changed_symbol_exact_cases` is now emitted beside the mean and rendered with it, so the Phase 4 row reads `0.9531 (29/32 cases exact)` and the aggregate can no longer be read as "every case is exact". The 0.95 threshold is deliberately unchanged and the three cases are not "fixed": their 0.50 is the honest full diff (ADR-0003). A count cannot be diluted by adding cases that already pass, so the pair says what neither number says alone. Mutation-checked in five variants; one residual is recorded in the test docstring — no change case declares more than one expected changed symbol, so precision can only be `1/n` and a `> 0.5` mutation is unreachable through this corpus | — |
 | ~~**Changed-file refresh p95 misses its ≤ 2 s target**~~ **RETRACTED 2026-08-21 — the target is met; the miss was machine load, and this row is kept for the reasoning error that produced it** | **CLOSED, wrongly opened.** Measured on a quiet machine the same day: refresh p95 **1.759 s** and **1.722 s**, `refresh_target_met: true`, against the **2.433 s / 2.407 s** recorded that morning. Same artifact, same harness, same module count. The full spread observed across the day was **1.413-2.433 s**, which straddles the target — so no single run can decide it. **The reasoning error is the reusable part.** The morning pair agreed within **26 ms**, and that tightness was treated as proof the result was real; the quiet pair agrees within **37 ms** at a value 0.68 s lower. **Within-session reproducibility is not cross-session validity**, and it was the load-bearing argument for the whole finding. A second error compounded it: `model_test.latency_ms` came back *faster* than August on one run, and that single unchanged-path indicator was generalised into "the machine is fine" for a different workload. **Two published corrections were also wrong** — a "+0.60 s packaging cost" from subtracting across two harnesses (in-process vs HTTP), then "+0.741 s" from an uncontrolled cross-session pair. Measured back to back, packaging costs **3 ms** (packaged 1.416 s, source 1.413 s). **Four hypotheses were killed by measurement on the way and stay killed**: `build_registry()` (0.09-0.16 s), per-request service construction (184.9 ms vs 186.3 ms), per-file parse cost (packaged cold index is *faster*), and a differing bundled SQLite (DLLs byte-identical). **What survives as a real finding:** `measure_phase7_perf.py` has **no quiescence check**, stamps `refresh_target_met` from whatever the machine can do at that moment, and is quoted in the README as a release figure | Someone gives the perf harness a quiescence check, or a documented protocol — idle machine, two runs separated by other work, a figure near the threshold treated as unresolved. **Do not re-open the regression without a controlled pair** |
@@ -293,6 +293,87 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-22T00:00:00Z — The `IMPORTS` label: scope widened, cost measured, ruling still open
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: the register row is **not closed**. The ruling is still the user's;
+  what changed is that it can now be made on measurement instead of estimate.
+- **No source change.** A prototype was applied, measured, and reverted; the
+  engine is byte-identical to `HEAD` and both live baselines re-`--check` clean.
+
+## It was never a Java problem
+
+The row read "a **Java** `IMPORTS` edge cites a line outside the symbol it is
+labelled with". Measured across the fixtures, **all four query-backed languages
+do it**:
+
+| Fixture | Source symbol | Span | Import cited at |
+| --- | --- | ---: | ---: |
+| java_app | `CLASS OrderService` | 5-15 | **3** |
+| go_app | `CLASS OrderService` | 7-9 | **3** |
+| rust_app | `CLASS OrderService` | 3-5 | **1** |
+| scala_app | `CLASS OrderService` | 5-9 | **3** |
+
+**4 of 4 outside.** The contrast falls exactly on the tier boundary: Python and
+TS/JS attach an import to a **`MODULE`** spanning the whole file — `src.payments.service`
+1-11 cited at 1, `src.client` 1-5 at 1 — **3 of 3 inside**. No query-backed
+adapter emits a compilation-unit symbol; only `rust.py` maps `definition.module`,
+and that is a Rust `mod` declaration, not a file.
+
+**This row's own reopen trigger was "or a second query-backed language makes the
+inconsistency user-visible". Three had.**
+
+## The cost, measured rather than estimated
+
+A compilation-unit symbol was implemented in the shared engine — one change, not
+four adapters — and it **works**: imports attach to a `MODULE` and land inside
+it, 4 of 4.
+
+**It also fails the Phase 4 gate.** `targets_met: false`, with two §19.3 targets
+unmet:
+
+| Metric | Now | Prototype | Gate |
+| --- | ---: | ---: | --- |
+| `exact_symbol_resolution` | 1.0000 | **0.9545** | 0.98 — **missed** |
+| `relation_path_recall` | 1.0000 | **0.9062** | 1.0 absolute (ADR-0058) — **missed** |
+
+**Twelve metrics move and every one moves down** — `abstention_correctness`
+1.0000 -> 0.9605, `containing_evidence_recall_at_10` 1.0000 -> 0.9720,
+`ndcg_at_10` 0.9246 -> 0.9004, `relation_path_correctness` 0.8932 -> 0.7995, and
+the rest. The mechanism is not subtle: a per-file `MODULE` is an extra retrieval
+candidate, so it dilutes top-1 ranking and enters relation paths.
+
+## Two predictions this disproved
+
+**The corpus cardinality guards do not fire.** The plan and the row both expected
+them to. The whole evaluation suite passes — **125 tests** — because those guards
+count *cases*, not symbols. Nothing in the corpus notices; only the *metrics* do.
+
+**It is not a clean six-line change.** A naive whole-file range **fails snapshot
+validation** — "a staged symbol has a line range outside its file" — because
+tree-sitter's root node ends one line past a trailing newline. The range needs
+clamping. Found by running it, not by reading it.
+
+## What this reframes
+
+The row offered "accept it, or emit one (a `PARSER_BUNDLE_VERSION` bump and a
+reindex)". **The second option costs more than that**: it needs the engine
+change *plus* corpus-expectation work to restore two release targets, and that
+work has to be justified under ADR-0003 rather than done to make a number go
+back up. That is a materially different decision from the one the row described.
+
+**Limitations.**
+
+- Measured on the four two-file fixtures. The +47% symbol growth is an artifact
+  of their size; a real repository's ratio would be far smaller. **The metric
+  movement is the part that generalises**, not the symbol count.
+- The prototype attached the module symbol naively. A more careful design — say,
+  excluding `MODULE` from symbol-intent ranking — might recover the metrics, and
+  was not attempted.
+- Phase 3's baseline also moves; Phase 0's does not.
+
+- Next: the ruling is the user's and now has numbers under it.
 
 ### 2026-08-21T12:00:00Z — The register audited: five stale rows in a day, and the catchable class guarded
 
