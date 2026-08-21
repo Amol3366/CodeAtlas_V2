@@ -3187,6 +3187,30 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   **says so in its own header**, because a record dated later than the decision
   it describes otherwise reads as a decision made later.
 
+- **The Deferred Register itself goes stale, and an audit found FIVE rows in one
+  day** (2026-08-21). Two were hit sideways while doing other work
+  (`changed_symbol_precision`, `-SkipWeb -Perf`); three more came from actually
+  looking: "cold-indexing takes 343 s" survived ADR-0064 taking it to 32.64 s
+  *with the ADR-0064 row two screens away*, the ambiguity-message row outlived
+  its own fix in `4926e71` by a day, and **q032 was listed twice** — struck
+  through as closed by ADR-0055, and still open below it.
+- **Roughly a sixth of the open rows were describing a world that no longer
+  existed.** The register is this project's single authority on what is open, so
+  a reader trusting it was being misled about which work remained. Two of the
+  five pointed at work that was already done.
+- **Only the duplicate is mechanically catchable**, and
+  `tests/unit/test_deferred_register.py` catches it: one item, one disposition.
+  Prose staleness is not derivable and the module says so rather than implying
+  coverage it lacks.
+- **`~~original entry~~` rows are exempt deliberately.** The register preserves a
+  superseded row's text beneath its correction under that placeholder, so the
+  same words legitimately recur eight times. A first draft flagged all eight;
+  that guard would have been deleted within a week.
+- **Guard the guard when the assertion can pass on an empty list.** This one
+  locates its section by two literal headings, so a rename would silently
+  disable it. A third assertion requires the section to parse more than 30 rows —
+  renaming the heading now fails all three instead of passing vacuously.
+
 ## Known Issues
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
