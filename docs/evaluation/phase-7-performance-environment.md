@@ -104,6 +104,67 @@ Candidates still open: the resolver's declared-module index
 something unrelated to ADR-0065 that landed in the same window. **Bisect the two
 parser bumps or time the stages inside the refresh path; do not guess.**
 
+### RETRACTED 2026-08-21: the target is met, and the miss was machine load
+
+**Everything in the two sections below is superseded.** They are kept because
+the way the conclusion went wrong is worth more than the conclusion was.
+
+Measured on a quiet machine, same artifact, same harness, same 300-module
+profile, 20 runs:
+
+| Run | refresh p95 | `refresh_target_met` |
+| --- | ---: | --- |
+| morning, minutes after an 11-minute gate | 2.433 s | false |
+| morning, second run | 2.407 s | false |
+| **afternoon, quiet** | **1.759 s** | **true** |
+| **afternoon, quiet, second run** | **1.722 s** | **true** |
+
+The tracked artifact now holds the **1.759 s** run — the *less* flattering of the
+two quiet ones. Observed spread across the day: **1.413 s to 2.433 s** on one
+machine, one artifact, one harness. **That range straddles the ≤ 2 s target, so
+no single run can decide it.**
+
+#### The reasoning error
+
+The morning pair agreed **within 26 ms**, and that was the argument that the
+regression was real rather than environmental. The quiet pair agrees **within
+37 ms**, at a value 0.68 s lower. **Within-session reproducibility is not
+cross-session validity.** Two runs minutes apart share a machine state; they do
+not sample it.
+
+A second error compounded it. `model_test.latency_ms` — a path containing no
+changed CodeAtlas code — came back *faster* than August on the loaded run, and
+that single indicator was generalised into "the machine is fine". Model loading
+and incremental indexing do not respond to load the same way.
+
+#### Both published corrections were also wrong
+
+- **"+0.60 s packaging"** was reached by subtracting an **in-process** source
+  number from an **HTTP** packaged number — two harnesses.
+- **"+0.741 s packaging"** replaced it, measured on one instrument but from an
+  **uncontrolled cross-session pair**.
+
+Measured back to back, 300 modules, 20 runs each: **packaged 1.416 s, source
+1.413 s — a difference of 3 ms. There is no packaging cost.** A 50-module pair
+run the same way gave 50 ms, and its cold-index direction *reversed* against the
+300-module pair, which was the signal that the earlier pairs were uncontrolled.
+
+#### What survives
+
+**Four hypotheses killed by measurement, and they stay killed:**
+`build_registry()` (0.09-0.16 s), per-request service construction (184.9 ms
+packaged against 186.3 ms source), per-file parse cost (packaged cold index is
+*faster*), and a differing bundled SQLite (DLLs byte-identical, same SHA-256).
+
+**And one real finding, which is not a regression:**
+`measure_phase7_perf.py` has **no quiescence check**. It measures whatever the
+machine can do at that moment and stamps `refresh_target_met` from it — a field
+quoted in the README as a release figure. **Protocol until that changes:** idle
+machine, at least two runs separated by other work, and any figure near the
+threshold treated as unresolved rather than reported.
+
+---
+
 ### Narrowed the same day: it is the packaged artifact
 
 Four measurements, **all taken on 2026-08-21** so no cross-date comparison is

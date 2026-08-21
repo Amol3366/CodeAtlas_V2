@@ -3092,53 +3092,34 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   count. Corrected by hand; the guard extension is unwritten and is the same
   class as the still-unwritten §5 language-list guard.
 
-- **Changed-file refresh p95 now MISSES its <= 2 s target: 2.407 s against 0.799 s
-  in August** (P2-D, 2026-08-21). Cause **unattributed**. Preflight doubled too
-  (2.243 -> 4.376 s) but still clears <= 10 s.
-- **A slow machine and a real regression look identical in one run.** The first
-  measurement had every number 1.3x-3.3x worse and `model_test.latency_ms` — a
-  path with no changed CodeAtlas code — at 76,089 ms against August's 42,474 ms.
-  That is textbook environment contamination and it was recorded as such. **The
-  second run disproved it**: `model_test` came back at **21,403 ms**, half the
-  August figure, and the cold index beat August (18.877 s vs 21.295 s), while
-  refresh reproduced within **26 ms**. The machine was *faster than baseline on
-  unchanged paths* while refresh stayed 3x slower. **Take two runs, and promote
-  the one whose unchanged-path indicators are good** — that is the run a reader
-  cannot wave away.
-- **The refresh regression is in the PACKAGED artifact, and specifically in its
-  INDEX path** (2026-08-21). Measured on one instrument — both sides driven over
-  HTTP through `measure_phase6_perf.py`, source via the venv console script:
-  **source 1.525 s (target MET), packaged 2.266 s (target MISSED), so packaging
-  costs +0.741 s.** Packaging alone causes the miss.
-- **Two wrong turns on the way, both corrected by measurement.** First, a "+0.60 s
-  packaging" figure was produced by subtracting an **in-process** source number
-  (`measure_phase4_perf.py` calls `build_services` directly) from an **HTTP**
-  packaged number (`measure_phase6_perf.py`) — two instruments, so the
-  subtraction was unsound even though it landed close. Second, the natural
-  hypothesis was per-request cost, and it is **refuted**: a trivial endpoint
-  costs **184.9 ms packaged against 186.3 ms source**. `build_registry()`, the
-  `os.walk` for `tags.scm`, and per-request `build_services` are all cleared.
-  **The cost is in indexing, because a request that parses nothing pays
-  nothing.**
-- **Check the transport before subtracting two harnesses.** They measured the
-  same *operation* — edit one file, re-index — which is why the error was bounded
-  at roughly the 185 ms of transport rather than fatal. The corrected figure came
-  out *larger* than the unsound one.
-- **The old claim, kept:** packaged semantic **2.407 s** vs packaged deterministic
-  **2.266 s**, so **embeddings cost +0.14 s.** In July packaged was *faster* than source (1.295 vs 1.426 s);
-  today it is 0.6 s slower — that inversion is the finding. `cold_start_s` agrees:
-  1.627 -> 2.393 s. **This refutes two candidates the register itself had named**
-  — the resolver's declared-module index and ADR-0067's Scala references both
-  live in the source path, and the source path is clean.
-- **Build the 2x2 from same-day numbers AND one instrument.** Same-day was not
-  enough; the first attempt was same-day and still wrong, because two cells came
-  from a different harness.
-- **A confirmation attempt can fail without refuting anything, and should be
-  recorded as a failed test.** Timing `codeatlas doctor` gave packaged 1.624 s
-  against source 1.769 s — packaged faster, apparently against the hypothesis. It
-  tests nothing: the source side carries `uv run` overhead, and neither side
-  isolates *per-request* service construction, which is what the HTTP harnesses
-  exercise. Wrong instrument, not evidence.
+- **The refresh "regression" was machine load, and I recorded it as a missed
+  release target before it reproduced across sessions** (2026-08-21). Quiet
+  machine: **1.759 s / 1.722 s, target met.** Loaded machine, same artifact and
+  harness: 2.433 s / 2.407 s, target missed. Full spread across one day:
+  **1.413-2.433 s**, straddling the target.
+- **Within-session reproducibility is NOT cross-session validity, and this is the
+  mistake worth remembering.** The loaded pair agreed within **26 ms**; that
+  tightness was the load-bearing argument that the regression was real. The quiet
+  pair agrees within **37 ms**, 0.68 s lower. Two runs minutes apart share a
+  machine state; they do not sample it.
+- **One unchanged-path indicator does not clear the machine for a different
+  workload.** `model_test.latency_ms` came back faster than August on the loaded
+  run, and that was generalised into "the machine is fine". Model loading and
+  incremental indexing do not respond to load the same way.
+- **Two published corrections were themselves wrong.** "+0.60 s packaging" came
+  from subtracting an in-process harness from an HTTP one; "+0.741 s" came from
+  an uncontrolled cross-session pair. Back to back, packaging costs **3 ms**
+  (packaged 1.416 s, source 1.413 s). **Run the controlled experiment first, not
+  after two uncontrolled ones.**
+- **The real finding: `measure_phase7_perf.py` has no quiescence check.** It
+  stamps `refresh_target_met` from whatever the machine can do at that moment,
+  and that field is quoted in the README as a release figure. Measure on an idle
+  machine, take two runs separated by other work, and treat anything near the
+  threshold as unresolved.
+- **Four hypotheses killed by measurement, and they stay killed**: `build_registry()`
+  (0.09-0.16 s, an order of magnitude short), per-request service construction
+  (184.9 ms packaged vs 186.3 ms source), per-file parse cost (packaged cold index
+  is *faster*), and a differing bundled SQLite (DLLs byte-identical, same SHA-256).
 - **`build_registry()` is not the cause, and it was the obvious one.** ADR-0065
   added four grammars and every parser is constructed eagerly, so a fixed startup
   cost was the natural story for a fixed +1.6 s. Measured: `default_registry()`

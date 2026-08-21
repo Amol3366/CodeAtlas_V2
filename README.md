@@ -694,7 +694,7 @@ caveats live in `docs/evaluation/*-baseline-environment.md`.
 | Unsupported factual claim rate | 0.0000 | `baseline-phase-4.json` |
 | Containing-evidence Recall@10 | **1.0000** | `baseline-phase-4.json` |
 | Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) | `baseline-phase-4.json` |
-| Packaged refresh p95 · preflight p95 | **2.407 s · 4.376 s** (semantic-local, on the artifact; cold start 2.327 s, coverage 1.0). **Refresh now MISSES its ≤ 2 s target** — see the limitation below | `baseline-phase-7-perf.json`, 2026-08-21 |
+| Packaged refresh p95 · preflight p95 | **1.759 s · 2.981 s** (semantic-local, on the artifact; cold start 1.805 s, coverage 1.0). Both targets met; **read the load-sensitivity note below before comparing this to an older figure** | `baseline-phase-7-perf.json`, 2026-08-21 |
 
 Corpus: **80 query cases, 32 change cases, 11 fixtures** — plus a separate
 invariant corpus (`tests/evaluation/invariant_cases/`) that asserts a boolean
@@ -767,32 +767,28 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   unit, integration, and security tests are their only coverage. This is the
   largest open gap in ADR-0065, and gold data must be declared before the engine
   is run against it (ADR-0003, ADR-0036).
-- **Changed-file refresh p95 now misses its ≤ 2 s target: 2.407 s, measured
-  2026-08-21.** It was 0.799 s on 2026-08-10, and the cause is **not
-  attributed**. This is a real regression, not a slow machine: it reproduces
-  across two runs within 26 ms while `model_test` — a path containing no
-  CodeAtlas code that has changed — swung 76,089 ms → 21,403 ms, and the
-  promoted run's cold index (18.9 s) is *faster* than the August baseline
-  (21.3 s). The machine was quicker on unchanged paths while refresh stayed 3×
-  slower.
+- **This performance measurement is load-sensitive enough that a single run
+  cannot decide a pass/fail, and that is the finding.** On 2026-08-21 refresh p95
+  was measured at **1.413 s to 2.433 s** on one machine, one artifact, one
+  harness — a range that straddles the ≤ 2 s target. Runs taken minutes after a
+  full test suite reported ~2.4 s and a missed target; runs on the same artifact
+  once the machine was quiet reported **1.759 s and 1.722 s**, both passing.
 
-  **Attributed to packaging, measured on one instrument.** Driving *both* sides
-  over HTTP through the same harness: **source 1.525 s — which meets the target —
-  against packaged 2.266 s, which does not.** Packaging costs **+0.741 s**, and
-  packaging alone is what causes the miss. Embeddings add only **+0.14 s** on top
-  (packaged semantic 2.407 s).
+  **Within-session agreement is not evidence of validity.** The loaded pair
+  agreed within 26 ms and the quiet pair within 37 ms — tight both times, 0.68 s
+  apart. Reproducing a number twice in one sitting says nothing about whether the
+  machine was representative.
 
-  **The cost is in the index path, not in request handling.** A trivial endpoint
-  costs **184.9 ms packaged against 186.3 ms source** — identical — so
-  per-request service construction, `build_registry()` and the `os.walk` for
-  `tags.scm` are all cleared, along with the semantic layer, the resolver's
-  declared-module index and ADR-0067's Scala references. A request that parses
-  nothing pays nothing; the penalty scales with files indexed. Per-file parse
-  cost inside the frozen build is the shape that fits, and it is **not yet
-  attributed**. Preflight still clears its ≤ 10 s target at 4.376 s, and no
-  corpus metric moved — all three `--check` baselines reproduce byte-for-byte.
-  Full method, every run, and two hypotheses killed by measurement:
-  `docs/evaluation/phase-7-performance-environment.md`.
+  **`measure_phase7_perf.py` has no quiescence check**, so it will report
+  whatever the machine can do at that moment and stamp `refresh_target_met`
+  accordingly. Measure on an idle machine, take at least two runs separated by
+  other work, and treat a single figure near the threshold as unresolved.
+
+  A packaging cost was investigated and **does not exist**: the best-controlled
+  comparison — both builds driven over HTTP through the same harness, back to
+  back — gives packaged 1.416 s against source 1.413 s, a difference of **3 ms**.
+  Full account, including four hypotheses killed by measurement and two
+  retracted claims: `docs/evaluation/phase-7-performance-environment.md`.
 
 - **The packaged executable is unsigned**, so SmartScreen warns on first run.
   This needs a purchased certificate — a purchasing decision, not an engineering
