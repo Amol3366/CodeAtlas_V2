@@ -104,6 +104,47 @@ Candidates still open: the resolver's declared-module index
 something unrelated to ADR-0065 that landed in the same window. **Bisect the two
 parser bumps or time the stages inside the refresh path; do not guess.**
 
+### Narrowed the same day: it is the packaged artifact
+
+Four measurements, **all taken on 2026-08-21** so no cross-date comparison is
+load-bearing:
+
+| | deterministic | semantic |
+| --- | ---: | ---: |
+| **source** | **1.668 s** (target met) | not measurable by these harnesses |
+| **packaged** | **2.266 s** (target MISSED) | **2.407 s** (target MISSED) |
+
+Reading across the packaged row: **embeddings cost +0.14 s.** Reading down the
+deterministic column: **packaging costs +0.60 s.** Against the historical
+figures, packaged deterministic regressed **1.295 -> 2.266 s (+75%)** while
+source deterministic moved **1.426 -> 1.668 s (+17%)** and still passes.
+
+**In July the packaged build was faster than source** (1.295 s against 1.426 s,
+a difference the Phase 6 document explains as the snapshot-retention fix).
+**Today it is 0.6 s slower.** That inversion is the finding.
+
+`cold_start_s` agrees independently: **1.627 s -> 2.393 s**, +0.77 s of setup.
+
+**Two candidates this document named earlier are now refuted.** The resolver's
+declared-module index and ADR-0067's additional Scala references are both in the
+source path, and the source path measures clean. They are not the cause.
+
+**Leading hypothesis, explicitly unproven.** ADR-0065 added four grammars, and
+`docs/operations/packaging-and-install.md` records that the engine reads each
+grammar's `tags.scm` **off disk with `os.walk`** — data PyInstaller cannot find
+by analysis, which is why it is carried explicitly. Services are built per
+request. An `os.walk` over a frozen onedir tree, per parser construction, per
+request, would be packaged-only, fixed-cost, and dated to exactly the right
+change. Every number above is consistent with it. **None of them tests it.**
+
+**A confirmation attempt that failed, recorded as such.** Timing `codeatlas
+doctor` gave packaged **1.624 s** against source **1.769 s** — packaged faster.
+That does not refute the hypothesis, because the source side carries `uv run`
+environment-resolution overhead and, more importantly, **neither side isolates
+per-request service construction**, which is what the HTTP-driven harnesses
+exercise. It measured one-shot process startup instead. The next investigation
+should time construction inside the **running** packaged server.
+
 **What this does not say.** Preflight still clears its target with margin, the
 deterministic corpus metrics are untouched (all three `--check` baselines
 reproduce byte-for-byte), and no evidence, snapshot, or contract behaviour is

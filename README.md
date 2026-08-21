@@ -776,14 +776,20 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   (21.3 s). The machine was quicker on unchanged paths while refresh stayed 3×
   slower.
 
-  One plausible cause was measured and **rejected**: ADR-0065 added four
-  grammars and `build_registry()` builds every parser eagerly, but
-  `default_registry()` costs 0.09–0.16 s, nowhere near the +1.6 s. Still open:
-  the resolver's declared-module index (`RESOLVER_VERSION` 1.4.0 → 1.5.0),
-  ADR-0067's extra Scala references, or something unrelated that landed in the
-  same window. Preflight still clears its ≤ 10 s target at 4.376 s, and no
-  corpus metric moved — all three `--check` baselines reproduce byte-for-byte.
-  Full method and both runs: `docs/evaluation/phase-7-performance-environment.md`.
+  **Narrowed the same day to the packaged artifact.** Four measurements taken
+  together: source deterministic **1.668 s** (passes, +17% since July), packaged
+  deterministic **2.266 s** (fails, +75% since July), packaged semantic
+  **2.407 s**. So packaging costs **+0.60 s** and embeddings only **+0.14 s** —
+  and in July the packaged build was *faster* than source (1.295 vs 1.426 s),
+  where today it is 0.6 s slower. The semantic layer, the resolver's
+  declared-module index and ADR-0067's Scala references are all **cleared**: they
+  live in the source path, and the source path is fine. Leading hypothesis,
+  **unproven**: ADR-0065 added four grammars and the engine reads each `tags.scm`
+  off disk with `os.walk` while services are built per request. Preflight still
+  clears its ≤ 10 s target at 4.376 s, and no corpus metric moved — all three
+  `--check` baselines reproduce byte-for-byte. Full method, all four runs, and a
+  confirmation attempt that failed:
+  `docs/evaluation/phase-7-performance-environment.md`.
 
 - **The packaged executable is unsigned**, so SmartScreen warns on first run.
   This needs a purchased certificate — a purchasing decision, not an engineering

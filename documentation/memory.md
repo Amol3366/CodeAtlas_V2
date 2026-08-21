@@ -3105,6 +3105,24 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   unchanged paths* while refresh stayed 3x slower. **Take two runs, and promote
   the one whose unchanged-path indicators are good** — that is the run a reader
   cannot wave away.
+- **The refresh regression is in the PACKAGED artifact, not the code and not the
+  semantic layer** (narrowed 2026-08-21, same session). A 2x2 taken the same day:
+  source deterministic **1.668 s** (passes), packaged deterministic **2.266 s**
+  (fails), packaged semantic **2.407 s**. **Packaging costs +0.60 s; embeddings
+  cost +0.14 s.** In July packaged was *faster* than source (1.295 vs 1.426 s);
+  today it is 0.6 s slower — that inversion is the finding. `cold_start_s` agrees:
+  1.627 -> 2.393 s. **This refutes two candidates the register itself had named**
+  — the resolver's declared-module index and ADR-0067's Scala references both
+  live in the source path, and the source path is clean.
+- **Build the 2x2 from same-day numbers.** Every cell above was measured within
+  one session; the July/August figures are used only as direction. Cross-date
+  wall-clock comparison is what ADR-0061 had to throw away.
+- **A confirmation attempt can fail without refuting anything, and should be
+  recorded as a failed test.** Timing `codeatlas doctor` gave packaged 1.624 s
+  against source 1.769 s — packaged faster, apparently against the hypothesis. It
+  tests nothing: the source side carries `uv run` overhead, and neither side
+  isolates *per-request* service construction, which is what the HTTP harnesses
+  exercise. Wrong instrument, not evidence.
 - **`build_registry()` is not the cause, and it was the obvious one.** ADR-0065
   added four grammars and every parser is constructed eagerly, so a fixed startup
   cost was the natural story for a fixed +1.6 s. Measured: `default_registry()`
