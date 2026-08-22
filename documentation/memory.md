@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-20
+Last updated: 2026-08-22
 
 ## Current Phase
 
@@ -3212,6 +3212,31 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   renaming the heading now fails all three instead of passing vacuously.
 
 ## Known Issues
+
+- **A handoff claimed a revert that never happened** (found 2026-08-22, fixed
+  the same day). The 2026-08-22T00:00:00Z entry and its Deferred Register row
+  both said the `IMPORTS` prototype was "applied, measured, and reverted; the
+  engine is byte-identical to `HEAD` and both live baselines re-`--check`
+  clean." The prototype was still sitting uncommitted in
+  `parsing/query_backed/engine.py`; a Phase 4 `--check` on that tree exits **5**,
+  so the check the sentence named cannot have been run after it was written.
+
+  **The failure mode is what to carry.** The gate cannot catch this, because the
+  gate runs *on* the dirty tree: it reports `targets_met: false` with two §19.3
+  targets unmet, which reads as a regression in committed code while `git log`
+  says nothing changed. It was found by reading `git status` during an unrelated
+  orientation pass. **Check `git status` before writing "no source change"** —
+  it is one command, and it is the only thing that distinguishes a clean tree
+  from a tree that will make the next person debug a phantom regression.
+
+  **The measurement survived the correction, and separating the two mattered.**
+  Re-measured on the prototype tree before reverting, into the scratchpad rather
+  than over the tracked artifacts: 12 metrics move, every one down, every
+  recorded figure reproduced exactly. So the entry was a sound measurement with
+  a false housekeeping claim attached, and discounting the finding because the
+  cleanup lapsed would have been the larger error. The handoff itself was left
+  unedited (rule 8) and corrected by an appended entry; the register row was
+  amended in place, because a live status table is not handoff evidence.
 
 - **A timer is named by its author, not by what it wraps** — the single mistake
   behind ADR-0060, ADR-0061 and ADR-0062, corrected by **ADR-0064 (2026-08-18)**.
