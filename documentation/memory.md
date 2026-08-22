@@ -3213,6 +3213,38 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 ## Known Issues
 
+- **Indexing a real repository FAILS: two symbols, one `symbol_id`** (found
+  2026-08-22, **open, awaiting a ruling**). `symbol_id` is
+  `hash(repository_id, relative_path, qualified_name, kind)` with no
+  disambiguator, and `symbols` is keyed `(snapshot_id, symbol_id)` -- so two
+  symbols sharing a file, name and kind raise `UNIQUE constraint failed`,
+  `INTERNAL_ERROR`, exit 6, and **no snapshot at all**.
+
+  **Six of seven languages**, six reasons: Python (`@property` + `@x.setter`,
+  and redefinition), Java/Scala (overloads), Go (function-local `type`), Rust
+  (one method name for two traits). TypeScript is the passing control.
+  `google/gson` collides in 55 files / 264 symbols -- `Gson.fromJson` x11.
+
+  **It is NOT an ADR-0065 defect.** `python_parser.py:314` and
+  `query_backed/engine.py:154` make the identical call, so it has been latent
+  **since Phase 1 in the flagship language**: an eight-line Python file with a
+  property and its setter cannot be indexed.
+
+  **The reusable lesson is why seven phases of gates missed it.** Every fixture
+  is a two-file toy and this repository uses no property setters, so a probe
+  over `src/codeatlas` finds zero collisions. **A corpus that cannot express the
+  defect reads as coverage** -- ADR-0062 recorded exactly this shape (a
+  generated corpus with no Markdown hid a quadratic) and it recurred anyway.
+  **Run the product on real repositories.** ADR-0041 to ADR-0045 and ADR-0064
+  all came that way; the corpus and register work produces better rulers, not
+  better products.
+
+  Not fixed unilaterally: no single disambiguator fixes all six (arity misses Go
+  and Rust; scope misses overloads; an ordinal breaks the stability
+  `domain/ids.py` promises), and any choice bumps `PARSER_BUNDLE_VERSION`. That
+  is a §1.3 decision. Diagnosis and reproduction:
+  `tests/unit/test_symbol_identity_collisions.py`.
+
 - **A handoff claimed a revert that never happened** (found 2026-08-22, fixed
   the same day). The 2026-08-22T00:00:00Z entry and its Deferred Register row
   both said the `IMPORTS` prototype was "applied, measured, and reverted; the

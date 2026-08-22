@@ -15,7 +15,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.6.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2389 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, 2026-08-21. **No xfails**: the two ADR-0065 limits were ruled and closed (ADR-0066, ADR-0067). The last *complete* gate run exited 0 at **2386**; the three tests added after it were verified by running all nine stages individually, because two full runs were killed on duration rather than failing |
+| **Tests** | **2389 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, 2026-08-21. **5 `strict` xfails since 2026-08-22**, all one defect: [symbol-identity collisions](#known-limits--stated-not-hidden) block indexing in six of seven languages, awaiting a ruling on the disambiguator. The last *complete* gate run exited 0 at **2386**; the three tests added after it were verified by running all nine stages individually, because two full runs were killed on duration rather than failing |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -720,6 +720,36 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
 
 ### Known limits — stated, not hidden
 
+- **Two symbols in one file that share a qualified name and a kind collapse onto
+  one `symbol_id`, and indexing fails outright** (found 2026-08-22). It is not a
+  degraded answer: `symbols` is keyed `(snapshot_id, symbol_id)`, so the second
+  symbol raises `UNIQUE constraint failed`, the CLI reports `INTERNAL_ERROR`
+  and exit 6, and **no snapshot is produced**. The repository cannot be indexed
+  by any surface.
+
+  **Six of seven languages are affected, for six different reasons** — Python
+  (`@property` with its `@x.setter`, and plain redefinition), Java and Scala
+  (method overloads), Go (function-local `type` declarations), Rust (one method
+  name implemented for two traits). TypeScript is unaffected. Measured on real
+  repositories: `google/gson` collides in **55 files / 264 symbols**, including
+  `Gson.fromJson` (×11) and `Gson.toJson` (×8) — the library's entire public
+  API; `spf13/cobra` and `gin-gonic/gin` both collide too.
+
+  **This is not an ADR-0065 defect.** `python_parser.py` and the query-backed
+  engine construct the id with the identical call, so it has been latent since
+  Phase 1 in the flagship language. **An eight-line Python file using a plain
+  property cannot be indexed.** It stayed invisible because every fixture is a
+  two-file toy and no file in this repository uses those constructs — a probe
+  over `src/codeatlas` and `apps/web/src` finds zero collisions, which is how
+  every gate passed.
+
+  No single disambiguator fixes all six: arity resolves Python, Java and Scala
+  but not Go or Rust; enclosing scope resolves Go and Rust but not the
+  overloads. Any fix changes symbol identity, so it needs a
+  `PARSER_BUNDLE_VERSION` bump and a reindex. Reproduction, per-language
+  diagnosis, and the passing TypeScript control are in
+  `tests/unit/test_symbol_identity_collisions.py`; the ruling is open in the
+  Deferred Register.
 - **Language coverage is two tiers, and the second tier is thinner.** Python,
   TypeScript, and JavaScript get the full engine — hand-written parsers, test
   edges, route detection, and configuration/schema edges. **Java, Go, Rust, and
@@ -744,10 +774,10 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   far would make a third-party `github.com/foo/payments` resolve onto a local
   `payments`, inventing a relationship §4.1 forbids — a miss is the safe
   direction. Rust's `crate` is a language *keyword*, so Rust imports do resolve;
-  that contrast is the whole diagnosis. And **Scala captures only calls to a
-  bare identifier**, not `obj.method(x)`, because its shipped `tags.scm` lacks
-  the member-call pattern the other three have. The last two are `strict`
-  xfails carrying their diagnosis in the test file, awaiting a ruling.
+  that contrast is the whole diagnosis. **Both of these were ruled and closed**
+  — ADR-0066 declined a Go import policy permanently, and ADR-0067 closed
+  Scala's member-call gap with a second authored query — so neither is an open
+  limit and neither is an xfail any more.
 
   Two kind mappings are approximate for the same reason: a **Go interface reads
   as `CLASS`** and a **Scala method reads as `FUNCTION`**, because neither
@@ -763,10 +793,11 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   Swift/C++/C on having no references at all. See ADR-0065 and
   `docs/superpowers/specs/2026-08-19-query-backed-language-support-design.md`.
 
-  **No evaluation case measures any of the four**, so no metric covers them —
-  unit, integration, and security tests are their only coverage. This is the
-  largest open gap in ADR-0065, and gold data must be declared before the engine
-  is run against it (ADR-0003, ADR-0036).
+  **All four now carry query *and* change evaluation cases** (`java_app`,
+  `go_app`, `rust_app`, `scala_app`), added 2026-08-20. What remains true is
+  that every fixture is a **two-file toy**, so no measurement here says anything
+  about real code — which is exactly how the symbol-identity collision below
+  reached a shipped release unnoticed.
 - **This performance measurement is load-sensitive enough that a single run
   cannot decide a pass/fail, and that is the finding.** On 2026-08-21 refresh p95
   was measured at **1.413 s to 2.433 s** on one machine, one artifact, one

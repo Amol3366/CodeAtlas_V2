@@ -73,6 +73,7 @@ with verification.
 
 | Item                                                                                                             | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Reopens when                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Two symbols in one file that share a qualified name and a kind collapse onto one `symbol_id`, and indexing FAILS** | **OPEN — the most severe defect found since the closeout, and it is not an ADR-0065 defect.** Found 2026-08-22 by indexing **real repositories** instead of fixtures, the same route that produced ADR-0041 to ADR-0045 and ADR-0064. `symbol_id` is `hash(repository_id, relative_path, qualified_name, kind)` (`domain/ids.py:62`) with **no disambiguator**, and `symbols` is keyed `(snapshot_id, symbol_id)` — so the second symbol raises `sqlite3.IntegrityError: UNIQUE constraint failed` inside `_stage` (`application/indexing.py:547` -> `storage/sqlite/stores.py:436`), which `cli/main.py:1466` converts to `INTERNAL_ERROR` and exit 6. **It is not a degraded answer: no snapshot is produced and the repository cannot be indexed by any surface.** **Six of seven languages, six different reasons:** Python (`@property` + `@x.setter`, and plain redefinition), Java and Scala (overloads), Go (function-local `type` declarations), Rust (one method name implemented for two traits). TypeScript is unaffected and is the passing control. **Measured on real code:** `google/gson` collides in **55 files / 264 excess symbols** — `Gson.fromJson` x11 and `Gson.toJson` x8, the library's entire public API; `spf13/cobra` (`type key struct{}` in four test functions); `gin-gonic/gin` (3 files). **Latent since Phase 1, not since ADR-0065:** `python_parser.py:314` and `query_backed/engine.py:154` build the id with the identical call, and **an eight-line Python file using a plain property cannot be indexed** — reproduced end to end. **Why every gate passed:** a probe over `src/codeatlas` and `apps/web/src` finds **zero** collisions, and every fixture is a two-file toy, so nothing in the corpus contains the constructs. This is the ADR-0062 lesson again — a corpus that cannot express the defect measures dishonestly and reads as coverage. **The ruling is which disambiguator, and no single one fixes all six:** arity resolves Python, Java and Scala but not Go or Rust; enclosing scope resolves Go and Rust but not overloads; an ordinal is uniform but makes an id unstable under reordering, which `domain/ids.py` promises it is not. Any choice changes symbol identity — `PARSER_BUNDLE_VERSION` bump and a reindex. **Deliberately not fixed unilaterally:** it is a symbol-identity design decision under AGENTS.md §1.3, so it is measured and left for a ruling, exactly as the `IMPORTS` prototype was. Reproduction and per-language diagnosis: `tests/unit/test_symbol_identity_collisions.py` (5 `strict` xfails + 1 passing control) | A ruling picks the disambiguator; **or a user reports that indexing their repository fails**, which is the likelier order |
 | **A Java `IMPORTS` edge cites a line outside the symbol it is labelled with** | **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible **MEASURED 2026-08-21 — the scope is wider than this row says, and its own reopen trigger has already fired.** It is **not Java-specific**: every one of the four query-backed languages does it. Indexed each fixture and compared each `IMPORTS` edge's cited line against its source symbol's span — **java_app** `CLASS OrderService` 5-15, import cited at **3**; **go_app** 7-9 at **3**; **rust_app** 3-5 at **1**; **scala_app** 5-9 at **3**. **4 of 4 outside.** The contrast is exact and falls on the tier boundary: Python and TS/JS attach an import to a **`MODULE`** symbol spanning the whole file (`src.payments.service` 1-11 cited at 1, `src.client` 1-5 at 1) — **3 of 3 inside**. So the choice is not about Java: accepting it accepts it for the whole query-backed tier, and fixing it is **one engine change rather than four adapters**, since no query-backed adapter emits a compilation-unit symbol (only `rust.py` maps `definition.module`, and that is a Rust `mod` declaration, not a file). This row's trigger reads "or a second query-backed language makes the inconsistency user-visible" — three have.  **COST MEASURED 2026-08-22 by prototype, and it is much higher than this row implied.** A compilation-unit symbol was implemented in the shared engine and measured. **The revert this row claimed did not happen — corrected 2026-08-22, later the same day.** The prototype sat uncommitted in `engine.py` for a day; `git status` showed it modified, `git stash` was empty, and a Phase 4 `--check` on that tree exited **5**, so "both baselines re-`--check`ed" cannot have been run after the claim was written. Actually reverted 2026-08-22T14:00Z, and both baselines re-`--check` exit **0** — see the handoff of that date. **The measurement below is unaffected and was independently reproduced** on the prototype tree before reverting: the same 12 metrics, the same figures. **It works**: imports attach to a `MODULE` and land inside it, **4 of 4**, one engine change covering all four languages. **But it fails the Phase 4 gate.** `targets_met: false`, unmet **`exact_symbol_resolution` 1.0000 -> 0.9545** (§19.3 target 0.98) and **`relation_path_recall` 1.0000 -> 0.9062** (ADR-0058 gates this at **1.0 absolutely**). **Twelve metrics move and every one moves down** — `abstention_correctness` 1.0000 -> 0.9605, `containing_evidence_recall_at_10` 1.0000 -> 0.9720, `ndcg_at_10` 0.9246 -> 0.9004, and the rest — because a per-file `MODULE` is an extra retrieval candidate that dilutes top-1 ranking and enters relation paths. **Two predictions in the plan were wrong**: the corpus cardinality guards do **not** fire (the whole evaluation suite passes, 125 tests — those guards count *cases*, not symbols), and it is not a clean six-line change — a naive whole-file range **fails snapshot validation** ("a staged symbol has a line range outside its file"), because tree-sitter's root node ends one line past a trailing newline, so the range needs clamping. Symbols +1 per file (+47% on the two-file fixtures). Phase 3 baseline moves too; Phase 0 does not. **So the real choice is: accept the tier difference, or pay a corpus-expectation update alongside the engine change** — not a version bump and a reindex |
 | ~~**ADR-0065's two declared limits: Go imports and Scala member calls**~~ | **BOTH CLOSED 2026-08-19 by user ruling, and they were ruled in opposite directions on purpose.** **Go (ADR-0066): declined, permanently.** The module prefix lives in `go.mod`, which a single-file parse cannot read, so closing it needs a *matching policy* rather than more parsing — and the cost is asymmetric: trimming too far makes a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing** a relationship §4.1 forbids. The `strict` xfail is **inverted rather than deleted** (ADR-0045's precedent) and now pins both halves: the import is recorded, and it is not resolved. **Scala (ADR-0067): closed.** `LanguageProfile` gained an optional `references_query`; Scala authors `scala.references.scm` capturing the `field_expression`'s `field`. **What separates the two rulings is where the missing information lives** — Go's is in a file the parser is not allowed to read, Scala's was in the syntax tree all along and only a query was missing. Declaring a limit that nine lines of query closes would have recorded an absence of work as a property of the language. `PARSER_BUNDLE_VERSION` **1.5.0 -> 1.6.0** (Scala yields references it did not before); `RESOLVER_VERSION` deliberately unchanged, because resolution draws the same conclusions from a reference as it always did. **The corpus carries no xfails at all now.** | Someone wants a Go matching policy (supersede ADR-0066), or a fourth language needs a supplementary query |
 | **`changed_symbol_precision` now reads 0.9531 and `unmet_targets` is EMPTY — by dilution, not by any fix** | **CLOSED 2026-08-20 — the defect was in the reporting, and the reporting is what changed.** For the first time the Phase 4 baseline reports `targets_met: true` with **no unmet targets**. **Nothing was fixed.** The structural cause is untouched: c020, c021 and c022 each still score **exactly 0.50**, for the reason recorded since Phase 4 — they split one physical `git_changes` diff into three single-symbol cases, so the engine correctly reporting both affected symbols has each case count the other's against it. The aggregate crossed 0.95 because P1-B's three change cases took the denominator **29 -> 32**, diluting three imperfect cases: (29x1.0 + 3x0.5)/32 = **0.9531**, where (26x1.0 + 3x0.5)/29 = 0.9483. **Pure arithmetic.** **The cases were not added to move it** — they exist to measure Scala, Go and Rust, which had no change coverage at all — but the effect is that a real, known, per-case defect is **no longer visible in the aggregate**. **Correction, 2026-08-20:** this row first read "no longer visible to the gate", and that was wrong. `tests/evaluation/test_change_adapter.py` has pinned c020-c022 per-case since Phase 4, two-sided — an allowlist that fails if a fourth case drops below 1.0 and equally if one of the three is quietly "fixed" — so the gate never stopped seeing them. What went blind was the *aggregate*, and every report built on it. The error mattered: it made this row read as a lost regression guard, which is a far more urgent thing than the reporting gap it actually was. That is the mirror of ADR-0032/ADR-0033: there a threshold could not express a miss; here the denominator has grown until a miss cannot register. **Do not cite "all Section 19.3 targets met" without this row.** The engine is exactly as accurate as it was yesterday. **Resolved by the second option, because the first was already true.** `changed_symbol_exact_cases` is now emitted beside the mean and rendered with it, so the Phase 4 row reads `0.9531 (29/32 cases exact)` and the aggregate can no longer be read as "every case is exact". The 0.95 threshold is deliberately unchanged and the three cases are not "fixed": their 0.50 is the honest full diff (ADR-0003). A count cannot be diluted by adding cases that already pass, so the pair says what neither number says alone. Mutation-checked in five variants; one residual is recorded in the test docstring — no change case declares more than one expected changed symbol, so precision can only be `1/n` and a `> 0.5` mutation is unreachable through this corpus | — |
@@ -293,6 +294,141 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-22T18:00:00Z — Indexing a real repository fails: one `symbol_id` for two symbols, in six of seven languages
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: a new Deferred Register row, **OPEN**, awaiting a ruling. No fix
+  applied — the choice is a symbol-identity design decision (§1.3), so it is
+  measured and left, exactly as the `IMPORTS` prototype was.
+- **No source change.** One new test module, three documentation records.
+
+## What happened
+
+The recommendation was to stop working the records and run the product on real
+repositories, on the evidence that ADR-0041 to ADR-0045 and ADR-0064 all came
+that way while the corpus work produced better rulers. Three real repositories
+were cloned — `google/gson` (Java), `spf13/cobra` and `gin-gonic/gin` (Go) — and
+registered against a scratchpad database.
+
+**The first index failed. So did the second and third.**
+
+```
+sqlite3.IntegrityError: UNIQUE constraint failed: symbols.snapshot_id, symbols.symbol_id
+```
+
+`symbol_id` is `hash(repository_id, relative_path, qualified_name, kind)`
+(`domain/ids.py:62`) and carries **no disambiguator**, while `symbols` is keyed
+`(snapshot_id, symbol_id)`. Two symbols that legitimately share a file, a
+qualified name and a kind therefore collide, and `_stage` raises. `cli/main.py`
+catches `sqlite3.Error`, prints `INTERNAL_ERROR`, and exits 6.
+
+**This is not a degraded answer.** No snapshot is produced. The repository
+cannot be indexed by any surface — CLI, REST, MCP or web.
+
+## It is not an ADR-0065 defect, and that is the important part
+
+The obvious reading is "the new tier is broken". It is wrong.
+`python_parser.py:314` and `query_backed/engine.py:154` construct the id with
+the **identical call**. Tested directly, six of seven languages collide:
+
+| Language | Construct | Result |
+| --- | --- | --- |
+| Python | `@property` + `@value.setter` | **collides** |
+| Python | plain redefinition | **collides** |
+| Java, Scala | method overloads | **collides** |
+| Go | function-local `type` declarations | **collides** |
+| Rust | one method name for two traits (`Display::fmt`, `Debug::fmt`) | **collides** |
+| TypeScript | overload signatures over one implementation | ok — the control |
+
+So the defect has been latent **since Phase 1, in the flagship language**.
+Reproduced end to end: an eight-line Python file containing nothing but a
+property and its setter registers fine and then **fails to index**.
+
+## Why seven phases of gates never saw it
+
+A probe over `src/codeatlas` and `apps/web/src` finds **zero** collisions — this
+repository happens to use no property setters — and every evaluation fixture is
+a **two-file toy** containing none of the constructs above.
+
+**This is ADR-0062's lesson repeating.** That record was fitted on a generated
+corpus with no Markdown, hence no mentions, hence none of the references
+carrying the quadratic term, and it produced a confident wrong exponent. Same
+shape here: a corpus that cannot express the defect measures dishonestly, and
+reads as coverage while doing it. The README even said so in stale form — "no
+evaluation case measures any of the four" — while the true gap was that the
+cases which *do* exist run on fixtures too small to contain real constructs.
+
+## Measured, on real code
+
+| Repository | Collisions |
+| --- | --- |
+| `google/gson` | **55 files, 264 excess symbols.** `Gson.fromJson` x11, `Gson.toJson` x8 — the library's entire public API |
+| `gin-gonic/gin` | 3 files, 4 excess symbols |
+| `spf13/cobra` | `type key struct{}` declared inside four different test functions |
+
+## Why no fix was applied
+
+**No single disambiguator fixes all six.** Arity resolves Python, Java and
+Scala; it does nothing for Go's local types or Rust's two-trait case, where the
+signatures are identical. Enclosing scope resolves Go and Rust; it does nothing
+for overloads, which share a scope by definition. An ordinal is uniform but
+makes an id unstable under reordering, and `domain/ids.py` promises the
+opposite in the function's own docstring.
+
+Any choice changes symbol identity, needs a `PARSER_BUNDLE_VERSION` bump and a
+reindex, and changes how many symbols a Java API presents. That is a §1.3
+"materially different product behaviours" decision, not a defect with one
+obvious repair — so it is measured and left for a ruling.
+
+## Files
+
+`tests/unit/test_symbol_identity_collisions.py` (new — 5 `strict` xfails
+carrying the per-language diagnosis, plus the passing TypeScript control that
+stops the module going green on a parser returning nothing), `README.md`
+(new known limit; three stale passages corrected — see below), `docs/plans/PLAN.md`,
+`documentation/memory.md`. **No source change, no migration, no contract change.**
+
+**Three stale README passages were found while writing this** and corrected: it
+claimed "**No xfails**" in the header table while also claiming two ADR-0065
+limits were still `strict` xfails "awaiting a ruling" — a self-contradiction
+within one document, both halves pre-dating ADR-0066/0067 — and it claimed "no
+evaluation case measures any of the four" when all four have carried query and
+change cases since 2026-08-20. `test_readme_claims.py` cannot catch these: it
+derives **figures**, not prose. That is the same limitation the 2026-08-21
+register audit recorded and did not apply to the README.
+
+## Verification
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `codeatlas index` on gson / cobra / gin | **6** | `INTERNAL_ERROR`, no snapshot |
+| `codeatlas index` on an 8-line Python property file | **6** | same — the end-to-end proof it is not tier-specific |
+| `pytest tests/unit/test_symbol_identity_collisions.py` | 0 | **1 passed, 5 xfailed** |
+| same, `--runxfail` on the Java case | 1 | `AssertionError: java: 1 symbol(s) share an id ... ['Codec.write']` — a real RED, not an error |
+| `pytest tests/unit/test_readme_claims.py` | 0 | 11 passed |
+| `pytest tests/unit/test_deferred_register.py` | 0 | 3 passed |
+
+**Limitations.**
+
+- **No fix, so the product is unusable on most real Java and Go repositories
+  today** and on any Python repository using a property setter. The severity is
+  stated rather than reduced.
+- The real repositories were cloned at `--depth 50` into the scratchpad and
+  indexed against a **scratchpad database**; the user's real database was never
+  opened. Nothing was measured for performance, because indexing never completed.
+- Rust and Scala were confirmed by direct construct, **not** by a real
+  repository — no Rust or Scala repository was cloned. The mechanism is the
+  same and the constructs are idiomatic, but that is inference, not measurement.
+- The full suite was not run. The four test modules above were.
+- **The `IMPORTS` ruling was deliberately not written up**, though it had been
+  agreed. Both fixes touch the query-backed engine and both need a
+  `PARSER_BUNDLE_VERSION` bump, so recording "accept permanently" hours before a
+  ruling that may reshape symbol naming risks an ADR that needs reopening. The
+  recommendation is unchanged and rests on its own metrics, not on reindex cost.
+
+- Next: **a ruling on the disambiguator.** Nothing else in the register comes
+  close to this in severity.
 
 ### 2026-08-22T14:00:00Z — The prototype was never reverted; the claim was, and the measurement survives
 
