@@ -285,12 +285,12 @@ Every Phase 1 task is `complete`; details live in the
 - Design: `docs/superpowers/specs/2026-09-01-deferred-register-program-design.md`
 - Plan: `docs/superpowers/plans/2026-09-01-deferred-register-program.md`
 
-**This plan has not been approved by the user.** Under Rule 11 every task below
-stays `ready` and none may move to `in_progress` until it is.
+**Approved by the user 2026-09-01**, who also chose inline execution over
+subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 
 | Task  | Deliverable                                                                                  | Dependencies | Status  |
 | ----- | -------------------------------------------------------------------------------------------- | ------------ | ------- |
-| DR-01 | Register staleness audit; committed collision census; flake capture recipes; decision brief   | —            | `ready` |
+| DR-01 | Register staleness audit; committed collision census; flake capture recipes; decision brief   | —            | `in_progress` |
 | DR-02 | Preflight re-measured post-ADR-0064; realistic perf profile; resolution residual profiled or declined | DR-01 | `ready` |
 | DR-03 | Scala companion declaration form — 908 groups; ADR-0072; `PARSER_BUNDLE_VERSION` 1.9.0        | DR-01        | `ready` |
 | DR-04 | Rust trait discriminator — 21 groups; ADR-0073; `PARSER_BUNDLE_VERSION` 1.10.0                | DR-03        | `ready` |
