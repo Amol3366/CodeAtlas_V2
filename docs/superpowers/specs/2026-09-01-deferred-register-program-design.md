@@ -130,8 +130,9 @@ that superseded it. "Looks stale" closes nothing. That is the standard the
 - A **capture recipe** for each of the three flakes in cluster D, so the next
   recurrence is diagnosable instead of merely noticed.
 - A **decision brief** for the open rulings — framed, with evidence and options,
-  for the user to answer. Expected to be **three**, not four: the parse
-  invalidation ruling should be withdrawn by this task.
+  for the user to answer. Expected to be the **four** listed under "Open
+  questions" below, not five: the parse invalidation ruling is withdrawn by this
+  task rather than put to the user.
 
 **Done when:** every open row is confirmed live, corrected, or closed with a
 citation; PLAN.md is appended to, never rewritten; a handoff records the audit

@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## Current Phase
 
@@ -17,6 +17,17 @@ an explicit user decision.
 `docs/plans/PLAN.md`.** Do not restate it here or in `phases.md` — two copies
 of a status list is how they drift, which is the `--format pr` and
 `_SEVERITY_ORDER` lesson applied to documentation.
+
+**2026-09-01: a program over that open tail is planned but NOT approved.** Six
+tasks, DR-01 to DR-06, boarded in `docs/plans/PLAN.md` with every task `ready`;
+Rule 11 keeps them there until the user approves the plan. Design and plan are
+in `docs/superpowers/`. Read the board, not this line, for status.
+
+The one thing worth carrying here rather than looking up: **planning found two
+register rows already stale**, both superseded by ADR-0064 hours after they were
+written, and one of them asks for a ruling that should be withdrawn rather than
+answered. That is the third such find in two weeks. **Audit a row's date against
+the ADRs that landed after it before building anything on what it says.**
 
 ## Completed
 

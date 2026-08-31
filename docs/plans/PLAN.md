@@ -280,6 +280,40 @@ Every Phase 2 task is `complete`; details live in the
 Every Phase 1 task is `complete`; details live in the
 [Phase 1 plan](phases/phase-01-repository-truth-vertical-slice.md).
 
+### Deferred Register Program Task Board
+
+- Design: `docs/superpowers/specs/2026-09-01-deferred-register-program-design.md`
+- Plan: `docs/superpowers/plans/2026-09-01-deferred-register-program.md`
+
+**This plan has not been approved by the user.** Under Rule 11 every task below
+stays `ready` and none may move to `in_progress` until it is.
+
+| Task  | Deliverable                                                                                  | Dependencies | Status  |
+| ----- | -------------------------------------------------------------------------------------------- | ------------ | ------- |
+| DR-01 | Register staleness audit; committed collision census; flake capture recipes; decision brief   | —            | `ready` |
+| DR-02 | Preflight re-measured post-ADR-0064; realistic perf profile; resolution residual profiled or declined | DR-01 | `ready` |
+| DR-03 | Scala companion declaration form — 908 groups; ADR-0072; `PARSER_BUNDLE_VERSION` 1.9.0        | DR-01        | `ready` |
+| DR-04 | Rust trait discriminator — 21 groups; ADR-0073; `PARSER_BUNDLE_VERSION` 1.10.0                | DR-03        | `ready` |
+| DR-05 | Go enclosing scope — 5 groups; ADR-0074; `PARSER_BUNDLE_VERSION` 1.11.0                       | DR-04        | `ready` |
+| DR-06 | Fixture shapes the evaluation corpus cannot currently express                                  | DR-01        | `ready` |
+
+**DR-03 through DR-05 each force a reindex.** Bundling them would remove two of
+the three, and ADR-0071 rejected that because it would hide which mechanism
+moved which ids.
+
+**Deliberately not tasks**, with the reason recorded in the design: the three
+test-infrastructure flakes (two have no reproduction; DR-01 gives each a capture
+recipe instead), the unsigned executable (a certificate purchase), the Chromium
+Playwright skips (an unresolved upstream renderer crash), the 1.05 GB semantic
+tree (accepted at the Phase 7 activation gate), and the two gate targets already
+approved as missed — Phase 7 recall@10 0.6667 and Phase 4
+`changed_symbol_precision` 0.9375.
+
+**Not covered by any task:** gson's 47 Java collision groups. ADR-0071's three
+mechanisms account for 934 of the 981 groups it left on the ordinal, not all of
+them, and it names no remedy for the remainder. DR-01 characterises them; no
+task here fixes them.
+
 ## Handoff Schema
 
 Every handoff entry contains:
@@ -294,6 +328,89 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-01T00:00:00Z — The gate re-run green, and the open tail planned; two register rows found stale before any of it
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **no task moved.** The Deferred Register Program board is added
+  with every task `ready`; under Rule 11 none may start until the user approves
+  the plan.
+- No product code changed. `SCHEMA_VERSION` 14, `contract_version` 1.1,
+  `PARSER_BUNDLE_VERSION` 1.8.0, `CHUNKER_VERSION` 1.1.0, `RESOLVER_VERSION`
+  1.5.0 all unchanged.
+
+## The gate was re-run on an unchanged tree
+
+`scripts/check_phase4.ps1 -SkipSync` against a clean tree at `7c8250f`:
+
+```text
+GATE_EXIT_CODE=0
+Tests   2398 passed, 3 skipped, 1 warning in 1402.84s
+Lint    clean · Types clean over 389 files
+Contract freshness, dataset validation, Phase 0/3/4 baselines, ADR-0016 invariants — all clean
+```
+
+**2398, not the 2397 of the previous entry**, is the expected +1 from `6cc97e9`;
+its passing is what proves the README figure and the collected count agree.
+
+**1402.84 s against 486.78 s — 2.9x — is recorded, not explained away.** Reads
+ran against the repository throughout, so this is *read* as machine load rather
+than measured as one. The register already carries a 2026-08-21 retraction where
+exactly this was written up as a perf regression before being withdrawn, so the
+solo re-run belongs in DR-02 rather than in an assumption made here.
+
+## Two register rows were stale before the planning started
+
+Both preflight rows are dated 2026-08-18 and were written against ADR-0060's
+attribution. **ADR-0064 was accepted later the same day and explicitly corrects
+ADR-0060, ADR-0061 and ADR-0062**: a timer named `parse_base` wrapped
+`_analyze_state`, which lists, reads, parses *and* resolves. Parsing is **2.5%**
+of preflight (8.14 s), resolution was **97%** (310.24 s), and after the fix
+preflight is **21.56 s** against 635.59 s.
+
+So the row claiming "632 s of a 635 s preflight is `parse_base` +
+`parse_target`" is superseded, and the ruling the neighbouring row asks for —
+*what invalidates a stored parse* — **should be withdrawn rather than answered**,
+because ADR-0063 killed the change it authorises on arithmetic and ADR-0064
+killed it on proportion. Neither correction is applied here; both are DR-01's
+work, so they land with the audit's evidence rather than ahead of it.
+
+**This is the third time.** The 2026-08-21 audit found five stale rows in a day,
+and the last two handoffs each recorded a task whose premise was the defect. Two
+more were found in one cluster in about ten minutes, which is why the audit is
+DR-01 and not a later step.
+
+## A second finding: ADR-0071's three mechanisms do not cover its own 981
+
+They cover **934**. Scala companions 908, Rust traits 21, Go local types 5. The
+remaining **47 are Java groups in gson** that a signature did not separate — gson
+had 99 and signature separated 52 — and **ADR-0071 names no remedy for them.**
+No task invents one; DR-01 characterises what they are.
+
+## A third, smaller finding: the register's notation is ambiguous
+
+An item titled `~~original entry~~` means either "reworded, still open" (the
+preflight rows) or "archived original, closed by the row above" (the
+nested-config row closed by ADR-0041). Only a pointer in the preceding row
+distinguishes them, and reading top-down mistakes a closed defect for an open
+one. DR-01 makes the distinction explicit.
+
+## Files
+
+- `docs/superpowers/specs/2026-09-01-deferred-register-program-design.md` — new.
+- `docs/superpowers/plans/2026-09-01-deferred-register-program.md` — new.
+- `docs/plans/PLAN.md` — this entry and the task board, both appended.
+
+## Verification
+
+The gate above. No test was added or changed, and no claim of new behaviour is
+made in this entry.
+
+## Next
+
+**The plan needs the user's approval before DR-01 may start.** Nothing is in
+progress.
+
 
 ### 2026-08-31T22:00:00Z — Task 6: the follow-up's own claim was the thing that needed measuring
 
