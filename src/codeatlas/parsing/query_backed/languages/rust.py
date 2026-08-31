@@ -121,6 +121,18 @@ class RustAdapter:
                     end_line=path.end_point[0] + 1,
                 )
 
+    def signature(self, node: Any, source: bytes) -> str | None:
+        """None: a signature cannot separate the collisions Rust produces.
+
+        Rust has no overloading either. Its collisions are one method name
+        implemented for two traits -- `Display::fmt` and `Debug::fmt` in
+        ripgrep -- whose parameter lists are **byte-identical**
+        `(&self, f: &mut fmt::Formatter)`, measured 2026-08-31. Only the trait
+        separates them, and the trait is not a parameter (ADR-0071).
+        """
+        return None
+
+
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         for child in node.children:
             if child.type == "visibility_modifier":

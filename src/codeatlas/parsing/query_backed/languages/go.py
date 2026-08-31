@@ -114,6 +114,19 @@ class GoAdapter:
                     end_line=path.end_point[0] + 1,
                 )
 
+    def signature(self, node: Any, source: bytes) -> str | None:
+        """None: a signature cannot separate the collisions Go produces.
+
+        Go has no overloading, so two same-named functions in one file are
+        function-local `type` declarations in different function bodies --
+        `type key struct{}` in four test functions of cobra. A type declares no
+        parameters, so a signature is None for both members of every such group
+        and cannot distinguish them. What separates them is enclosing scope,
+        which is a different change and is not made here (ADR-0071).
+        """
+        return None
+
+
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         """Go's own rule: an identifier is exported iff it starts uppercase."""
         return "public" if name[:1].isupper() else "private"

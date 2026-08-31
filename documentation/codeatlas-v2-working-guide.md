@@ -495,7 +495,7 @@ features include:
   with both of its declared limits since ruled (ADR-0066, ADR-0067) and all
   four languages covered by query *and* change evaluation cases.
 
-Schema version is 14. Contract version is 1.1. Parser bundle 1.7.0, chunker 1.1.0, resolver 1.5.0.
+Schema version is 14. Contract version is 1.1. Parser bundle 1.8.0, chunker 1.1.0, resolver 1.5.0.
 
 ## Known Limits and Open Gaps
 

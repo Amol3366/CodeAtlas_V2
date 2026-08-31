@@ -228,7 +228,7 @@ class TagsBackedParser:
             name=name,
             qualified_name=qualified_name,
             module_path=module_path,
-            signature=None,
+            signature=self._adapter.signature(node, request.content),
             start_line=node.start_point[0] + 1,
             end_line=node.end_point[0] + 1,
             start_byte=node.start_byte,

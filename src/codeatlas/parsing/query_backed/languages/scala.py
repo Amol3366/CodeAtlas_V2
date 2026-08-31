@@ -115,6 +115,36 @@ class ScalaAdapter:
                     end_line=statement.end_point[0] + 1,
                 )
 
+    def signature(self, node: Any, source: bytes) -> str | None:
+        """The method's parameter types, comma-joined per parameter list.
+
+        Scala overloads collide exactly as Java's do and are separated the same
+        way. **Companion `trait`/`object` pairs are not** -- neither declares
+        parameters, so both yield None and fall back to the ordinal. That is
+        the larger share of scalaz's 2204 collisions and it is measured, not
+        assumed (ADR-0071).
+
+        Every parameter list is collected, not just the first: `def f(a: Int)(b: Int)`
+        declares two, and taking one would make the two halves of a curried
+        overload pair look identical.
+        """
+        lists = [
+            child for child in node.named_children if child.type == "parameters"
+        ]
+        if not lists:
+            return None
+        rendered: list[str] = []
+        for parameters in lists:
+            types: list[str] = []
+            for child in parameters.named_children:
+                declared = child.child_by_field_name("type")
+                if declared is None:
+                    continue
+                types.append(_text(declared, source))
+            rendered.append("(" + ",".join(types) + ")")
+        return "".join(rendered)
+
+
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         """Scala is public by default; only an explicit modifier narrows it."""
         for child in node.children:

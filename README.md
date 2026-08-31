@@ -14,7 +14,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Platform** | Windows 11 primary (loopback only, single user) |
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
-| **Component versions** | Parser bundle `1.7.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
+| **Component versions** | Parser bundle `1.8.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
 | **Tests** | **2389 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, 2026-08-21, plus the 6 added by ADR-0069. **No xfails.** The last *complete* gate run exited 0 at **2386**; tests added after it were verified by running the stages individually, because two full runs were killed on duration rather than failing |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
@@ -332,7 +332,7 @@ active → superseded
 
 Vector coverage is tracked separately and can **never** block deterministic
 activation. Component versions are stamped into each snapshot — parser bundle
-`1.7.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
+`1.8.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
 existing snapshots stale and forces a reindex. The parser and resolver bumps
 landed together in ADR-0065 deliberately: both invalidate every snapshot, so
 shipping them in one change costs users one reindex rather than two.
@@ -1027,7 +1027,7 @@ blunt version. The ones that bite most often:
 
 **Decisions and measurement**
 
-`docs/adr/README.md` — 70 accepted records and their rationale ·
+`docs/adr/README.md` — 71 accepted records and their rationale ·
 `docs/evaluation/` — baselines and the environment documents that say how to read
 them · `docs/security/threat-model.md`
 
