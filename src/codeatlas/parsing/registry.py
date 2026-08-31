@@ -44,7 +44,13 @@ from codeatlas.domain.symbols import SymbolRecord
 # bundle is stale. RESOLVER_VERSION is deliberately NOT moved: resolution draws
 # the same conclusions from a reference as it always did; only the set of
 # references changed.
-PARSER_BUNDLE_VERSION: str = "1.6.0"
+# 1.7.0 (ADR-0070): every query-backed file emits a compilation-unit MODULE
+# symbol, and an import is attributed to it *and* to the file's first
+# definition. A file therefore yields one symbol and one IMPORTS edge it did
+# not before, so every symbol version derived by the 1.6.0 bundle is stale.
+# RESOLVER_VERSION is deliberately NOT moved, on the ADR-0067 precedent:
+# resolution draws the same conclusions from a reference as it always did.
+PARSER_BUNDLE_VERSION: str = "1.7.0"
 
 
 @dataclass(frozen=True)

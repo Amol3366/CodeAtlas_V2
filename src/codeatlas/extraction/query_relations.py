@@ -17,7 +17,7 @@ from typing import Any
 
 from tree_sitter import QueryCursor
 
-from codeatlas.contracts import RelationKind
+from codeatlas.contracts import RelationKind, SymbolKind
 from codeatlas.domain.relations import SymbolReference
 from codeatlas.domain.symbols import SymbolRecord
 from codeatlas.parsing.query_backed.profile import LanguageAdapter
@@ -61,6 +61,35 @@ def extract_query_references(
         return ()
     module_symbol_id = symbols[0].symbol_id
     references = list(adapter.imports(root, source, request.file_id, module_symbol_id))
+
+    # An import is attributed to the compilation unit AND to the file's first
+    # definition, because both statements are true and each answers a question
+    # the other cannot.
+    #
+    # The module edge is the structurally correct one: its cited line sits
+    # *inside* the symbol it is labelled with, which is what Python and TS/JS
+    # have always done and what the query-backed tier did not.
+    #
+    # The class edge is the one a caller asks for. Measured 2026-08-31: routing
+    # imports to the module *alone* made q069, q073 and q080 abstain outright,
+    # because "what does OrderService import" stopped having an answer. Java's
+    # one-public-class-per-file convention makes the class a truthful importer,
+    # so dropping that edge trades three working answers for label tidiness.
+    #
+    # Both edges cite the same line and differ only in source, so they carry
+    # distinct `relation_id`s and neither hides the other.
+    definition_owner = next(
+        (
+            symbol.symbol_id
+            for symbol in symbols
+            if symbol.kind is not SymbolKind.MODULE
+        ),
+        None,
+    )
+    if definition_owner is not None and definition_owner != module_symbol_id:
+        references.extend(
+            adapter.imports(root, source, request.file_id, definition_owner)
+        )
     parts: dict[tuple[str, RelationKind, str, int], int] = {}
     # The grammar's shipped query, then this repository's supplementary one
     # when a language has it (ADR-0067). Both use the same
