@@ -13,6 +13,7 @@ resolves a name, or executes anything (``AGENTS.md`` section 4.4).
 from __future__ import annotations
 
 import hashlib
+from pathlib import PurePosixPath
 from typing import Any
 
 from tree_sitter import Parser as TreeSitterParser
@@ -59,10 +60,20 @@ class TagsBackedParser:
         module_path = self._adapter.module_path(
             tree.root_node, request.content, request.relative_path
         )
+        # PROTOTYPE (measurement only, 2026-08-31): a compilation-unit symbol
+        # placed FIRST, because `extract_query_references` attributes imports to
+        # `symbols[0].symbol_id`. That is the whole fix -- an import then lands
+        # inside the symbol it is labelled with, as it already does in Python
+        # and TS/JS, instead of citing a line outside the class it attaches to.
+        # Not for merge: this branch exists to measure the cost.
+        #
         # Before references, deliberately: reference extraction binds to
         # `symbols[0].symbol_id`, so the ids must be final by the time it runs.
         symbols = ensure_unique_symbol_ids(
-            tuple(self._definitions(tree.root_node, request, module_path)),
+            (
+                self._compilation_unit(tree.root_node, request, module_path),
+                *self._definitions(tree.root_node, request, module_path),
+            ),
             PARSER_BUNDLE_VERSION,
         )
         references = extract_query_references(
@@ -75,6 +86,55 @@ class TagsBackedParser:
             symbols=symbols,
             diagnostics=(),
             references=references,
+        )
+
+    def _compilation_unit(
+        self, root: Any, request: ParseRequest, module_path: str
+    ) -> SymbolRecord:
+        """One MODULE symbol covering the whole file.
+
+        PROTOTYPE, for measurement only. Python and TS/JS attach a file-level
+        import to a MODULE spanning the file, so the import line sits *inside*
+        its source symbol. No query-backed adapter emits such a symbol, so an
+        import attaches to the class instead and cites a line outside it -- 4 of
+        4 query-backed languages, against 3 of 3 inside for the full-engine
+        tier.
+
+        **The range is clamped, and that is not incidental.** tree-sitter's root
+        node ends one line past a trailing newline, so a naive whole-file range
+        fails snapshot validation with "a staged symbol has a line range outside
+        its file". That was measured on 2026-08-22 and is the reason this is not
+        the six-line change it looks like.
+        """
+        content = request.content
+        line_count = content.count(b"\n") + (0 if content.endswith(b"\n") else 1)
+        end_line = max(1, min(root.end_point[0] + 1, line_count))
+        qualified_name = module_path or PurePosixPath(request.relative_path).stem
+        name = qualified_name.rsplit(".", 1)[-1]
+        content_hash = hashlib.sha256(content).hexdigest()
+        logical_id = symbol_id(
+            request.repository_id,
+            request.relative_path,
+            qualified_name,
+            SymbolKind.MODULE.value,
+        )
+        return SymbolRecord(
+            symbol_id=logical_id,
+            symbol_version_id=symbol_version_id(
+                logical_id, content_hash, PARSER_BUNDLE_VERSION
+            ),
+            file_id=request.file_id,
+            kind=SymbolKind.MODULE,
+            name=name,
+            qualified_name=qualified_name,
+            module_path=module_path,
+            signature=None,
+            start_line=1,
+            end_line=end_line,
+            start_byte=0,
+            end_byte=len(content),
+            content_hash=content_hash,
+            visibility="public",
         )
 
     def _definitions(
