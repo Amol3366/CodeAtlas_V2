@@ -778,6 +778,29 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   as `CLASS`** and a **Scala method reads as `FUNCTION`**, because neither
   grammar's `tags.scm` distinguishes them.
 
+  **A fourth limit was closed on 2026-08-31 (ADR-0070), and it requires a
+  reindex.** Until then no query-backed file emitted a compilation-unit symbol,
+  so an import attached to the *class* and cited a line outside it —
+  `OrderService` spanning lines 5–15 with its `IMPORTS` evidence at line 3, 4 of
+  4 languages, against 3 of 3 *inside* for Python and TS/JS. That was never a
+  §4.1 violation, because line 3 genuinely is the import; the **label model**
+  was inconsistent, not the evidence. Every query-backed file now emits a
+  `MODULE` symbol and an import is attributed to **both** it and the file's
+  first definition: the module edge cites a line inside the symbol it is
+  labelled with, and the definition edge remains the one a caller asks for.
+  `PARSER_BUNDLE_VERSION` moved **1.6.0 → 1.7.0**, so **every existing snapshot
+  is stale and must be reindexed**.
+
+  Two things about that change are worth stating plainly. **The cost had been
+  recorded wrongly**: an earlier prototype was blamed on module symbols diluting
+  top-1 ranking, and per-case measurement showed no dilution at all — only 3 of
+  80 corpus cases moved, all by *abstaining*, because routing imports to the
+  module alone deleted the class's import relationship. Keeping both edges costs
+  nothing measured. And **the definition edge attaches to the file's first
+  definition whatever its kind**, so where that is a function rather than a
+  class — common in Go and Rust — `Go IMPORTS payments` reads oddly. That is
+  unchanged pre-existing behaviour, recorded rather than fixed.
+
   **Why these four and not eleven.** A spike on 2026-08-19 measured Tree-sitter's
   shipped `tags.scm` files rather than assuming: all eleven requested grammars
   install, only **nine ship a `tags.scm`** (C# and Kotlin ship none), and **not

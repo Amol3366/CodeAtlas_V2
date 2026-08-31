@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-22
+Last updated: 2026-08-31
 
 ## Current Phase
 
@@ -3212,6 +3212,54 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   renaming the heading now fails all three instead of passing vacuously.
 
 ## Known Issues
+
+- **An import now names both its file and its class** (ADR-0070, 2026-08-31,
+  merged `65e51e0`). Every query-backed file emits a compilation-unit `MODULE`
+  and an import is attributed to it *and* to the file's first definition.
+  **`PARSER_BUNDLE_VERSION` 1.6.0 -> 1.7.0, so every snapshot is stale and users
+  must reindex.**
+
+  **The recorded cost was wrong, and that is the reusable part.** The Deferred
+  Register had blamed an earlier prototype on "a per-file `MODULE` diluting
+  top-1 ranking", and that stood as fact from 2026-08-22. Per-case measurement
+  found **no dilution at all**: only 3 of 80 corpus cases moved -- q069, q073,
+  q080 -- and all three *abstained*, because routing imports to the module alone
+  deleted the class's import relationship. They accounted for every one of the
+  12 movements exactly. **An aggregate told us the size of the damage and
+  nothing about its shape; one per-case diff settled it, and nobody had run
+  one.**
+
+  The corpus was deliberately **not** updated. Re-declaring q069 would have
+  restored every number while declaring a worse answer -- laundering a
+  regression into a passing metric (ADR-0003).
+
+- **A plan's premise went stale in hours, and the premises table did not catch
+  it** (2026-08-31). `docs/superpowers/plans/2026-08-31-post-adr-0069-program.md`
+  asserted `measure_phase7_perf.py` had no quiescence check. It has had one
+  since `e9952bb`, **2026-08-21T17:38 -- the same day** as the Deferred Register
+  row claiming otherwise, which was never updated.
+
+  The plan opened with a "premises, checked rather than assumed" table and this
+  premise was not in it. **A guard only covers what you think to put in it**,
+  and the register was believed rather than read. Fourth stale-premise instance
+  in this project's record; first produced by a plan built to prevent them.
+  One `grep quiescence scripts/measure_phase7_perf.py` disproves it.
+
+- **A construct present in a fixture is not a construct the fixture exercises**
+  (2026-08-31, found by mutation). `test_colliding_constructs_index.py` included
+  `package-info.java` to cover ADR-0069's invented-owner defect, and the
+  mutation restoring that defect **passed**. The file held only `package app;`,
+  so with no reference to attribute there was no dangling endpoint. Adding an
+  import made it fail as intended. **Mutation-check every regression test
+  written for a fix that already landed** -- it passes on the first run whether
+  or not it asserts anything.
+
+- **A piped exit code is not the command's exit code** (three occurrences,
+  2026-08-31). `cmd | tail; echo $?` reports *tail's* status. A gate that failed
+  with README-guard errors reported `GATE_EXIT_CODE=0` this way and would have
+  been merged on it. Related: `git checkout -- <path>` cannot revert an
+  **untracked** file and errors instead, while a following unconditional
+  `echo "reverted"` claims success. **Read the output, not the wrapper.**
 
 - **Indexing a real repository FAILED: two symbols, one `symbol_id`** (found
   and **fixed 2026-08-22, ADR-0069**). `symbol_id` is

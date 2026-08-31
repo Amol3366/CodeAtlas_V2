@@ -295,6 +295,121 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-08-31T20:00:00Z — The post-ADR-0069 program: five tasks, and an import now names both its file and its class
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: `docs/superpowers/plans/2026-08-31-post-adr-0069-program.md`
+  Tasks 1-5 **complete**; Task 6 stays **blocked on a user decision**. Two
+  Deferred Register rows closed, one corrected.
+- **`PARSER_BUNDLE_VERSION` 1.6.0 -> 1.7.0 (ADR-0070). Every existing snapshot
+  is stale and users must reindex.** `SCHEMA_VERSION` stays 14,
+  `contract_version` stays `1.1`, `CHUNKER_VERSION` 1.1.0, `RESOLVER_VERSION`
+  1.5.0.
+- **This entry covers Tasks 2-5.** Task 1 has its own entry below. Writing one
+  entry per task was the rule and was not followed during the run; recording
+  that here rather than backdating four separate entries, because the omission
+  is itself the kind of thing this log exists to show.
+
+## What landed
+
+**Task 2 — `tests/integration/test_colliding_constructs_index.py`.** The
+existing collision test asserts at the *parser* level, and all three defects
+ADR-0069 found behind the first one lived below that line. This indexes a
+repository holding every known construct and asserts an **active snapshot**.
+Mutation-checked in four variants, each reproducing a distinct recorded
+failure. **The third mutation initially passed**: the fixture's
+`package-info.java` held only `package app;`, so with no reference to attribute
+there was no dangling endpoint and the file was decoration rather than
+coverage. **A construct present in a fixture is not a construct the fixture
+exercises.**
+
+**Task 3 — `scripts/check_real_repos.{py,ps1}`.** Five pinned repositories,
+deliberately outside every gate because a gate that needs the internet is not
+trustworthy offline. **Four of the five reproduce ADR-0069's recorded figures
+exactly**, which turns a hand-run claim into one command. Three defects were
+found in it *by using it*: `git remote add` is not idempotent, a reused SQLite
+database raised `RepositoryAlreadyRegisteredError`, and a floor mutation's
+revert silently failed because `git checkout --` cannot restore an untracked
+file while the command printed "reverted" regardless.
+
+**Task 4 — nothing was built, because it already existed.** The plan's premise
+was **stale**: `measure_phase7_perf.py:41` has imported
+`codeatlas.evaluation.quiescence` since `e9952bb`, 2026-08-21T17:38+0530 — the
+same day as the register row asserting it did not. What exists is better than
+what the plan specified. The genuinely missing half was the *documented
+protocol*, now in `docs/operations/release-validation.md`.
+
+**Task 5 — ADR-0070, ruled by the user.** See below.
+
+## The IMPORTS ruling, and the measurement that changed it
+
+The register framed the choice as *accept the tier difference, or pay a
+corpus-expectation update*, attributing the prototype's cost to "a per-file
+`MODULE` diluting top-1 ranking". **Both halves were wrong.**
+
+Re-measuring per-case reproduced all 12 figures and then asked what nobody had
+asked — *which cases moved?* **Only 3 of 80: q069, q073, q080, and all three
+ABSTAINED.** They account for every movement exactly (`63/66 = 0.9545`,
+`29/32 = 0.9062`). **There is no ranking dilution at all.** The import edge had
+moved off the class, so "what does `OrderService` import" stopped having an
+answer.
+
+**The corpus was deliberately not updated.** Re-declaring q069 as
+`app IMPORTS PaymentService` restores every number while declaring a *worse*
+answer — laundering a regression into a passing metric (ADR-0003).
+
+The user ruled **option 2**: emit the compilation unit **and** keep the class
+edge. Both are true; the module edge cites a line inside its labelled symbol
+(**4 of 4**), the class edge is the one a caller asks for. **It costs nothing
+measured** — every Phase 4 metric byte-identical, `targets_met` true, 0 of 80
+cases differ.
+
+## Verification
+
+```text
+scripts/check_phase4.ps1 -SkipSync        GATE_EXIT_CODE=0
+2397 passed, 3 skipped, 1 warning in 596.65s
+Lint    All checks passed!
+Types   Success: no issues found in 389 source files
+Phase 0 / Phase 3 / Phase 4 baselines --check clean; ADR-0016 invariants
+
+scripts/check_real_repos.ps1              REAL_REPOS_EXIT=0
+gson 312/4414 · cobra 65/854 · gin 130/2045 · ripgrep 229/4320 · scalaz 590/17795
+```
+
+Each repository gains exactly one symbol per query-backed **source** file and
+no files. Both exit codes were read from the output, not from the shell
+wrapper: **three times this session a piped `$?` reported 0 while the real gate
+exited 1**, including once on a run whose README-guard failure would otherwise
+have been merged.
+
+**The README claims guard fired twice** on this change — the parser bundle
+version, then the ADR count — both real drift, neither something a human would
+check by hand.
+
+## Limitations
+
+- **"Costs nothing measured" is not "costs nothing."** Eleven two-file toy
+  fixtures may simply never rank a module symbol into a top-10. That is the
+  blind spot that let ADR-0069 ship; `check_real_repos.py` is the only
+  instrument here that speaks to real code.
+- **The definition edge attaches to the file's first definition whatever its
+  kind**, so `Go IMPORTS payments` reads oddly where that is a function.
+  Unchanged pre-existing behaviour, recorded rather than fixed.
+- **The evidence branch `imports-compilation-unit-measurement` (`dbb09fd`) is
+  cited by ADR-0070 and was local-only.** It is now pushed, because an accepted
+  ADR citing a commit that exists in one clone is the ADR-0047/ADR-0049
+  dangling-citation defect waiting to happen.
+
+## Next
+
+**Task 6 — teach the query-backed engine to emit `signature`.** Still blocked
+on a user decision, and **now cheaper**: users are already reindexing for
+1.7.0, so bundling it costs one reindex rather than two. Verified against the
+code, not assumed: `domain/symbols.py` hashes the signature into a colliding
+symbol's id and `engine.py` reports `signature is None`, so emitting one moves
+ids that are storable today.
+
 ### 2026-08-31T12:00:00Z — ADR-0069 lands, nine days late, with the formatter's contribution taken back out
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.
