@@ -56,7 +56,15 @@ from codeatlas.domain.symbols import SymbolRecord
 # query-backed languages left NULL, so the 1.7.0 bundle's rows are stale.
 # Go and Rust deliberately emit None: measured, a signature separates none of
 # the collisions they actually produce. RESOLVER_VERSION unchanged again.
-PARSER_BUNDLE_VERSION: str = "1.8.0"
+# 1.9.0 (ADR-0074): a `discriminator` joins the signature in symbol identity --
+# the declaration a symbol sits inside, or its own form where it has one. Java,
+# Scala, Go and Rust supply one; it is never stored, only hashed. Measured over
+# five real repositories, separation rises from 221 of 1202 collision groups to
+# **419**. Ids move only for groups whose members carry distinct discriminators,
+# so every other symbol keeps the id the 1.8.0 bundle gave it -- but the bundle
+# version gates staleness, so **every snapshot must be re-indexed**.
+# RESOLVER_VERSION is unchanged again: resolution draws the same conclusions.
+PARSER_BUNDLE_VERSION: str = "1.9.0"
 
 
 @dataclass(frozen=True)

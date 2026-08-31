@@ -36,21 +36,27 @@ def test_a_java_overload_pair_is_one_group_separated_by_signature(
     assert report.by_language == {"java": (1, 1, 0)}
 
 
-def test_a_scala_class_object_companion_is_left_on_the_ordinal(
+def test_a_scala_class_object_companion_is_separated_by_its_form(
     tmp_path: Path,
 ) -> None:
     """`class Other` and `object Other` both map to CLASS, so they collide.
 
     Neither declares parameters, so both yield `signature is None` (ADR-0071)
-    and identity falls to document order.
+    and identity fell to document order until **ADR-0074**, which gave a
+    top-level declaration its own form as a discriminator.
+
+    **This test asserted `separated == 0` until ADR-0074 landed**, and its
+    failure was the intended signal rather than a regression: the census
+    measures `(signature, discriminator)` now, and this pair is exactly what the
+    second half of that pair was added to reach.
     """
     (tmp_path / "Other.scala").write_text(
         "package p\nclass Other\nobject Other\n", encoding="utf-8"
     )
     report = report_collisions(tmp_path)
     assert report.groups == 1
-    assert report.separated == 0
-    assert report.ordinal == 1
+    assert report.separated == 1
+    assert report.ordinal == 0
 
 
 def test_a_scala_trait_object_companion_does_not_collide_at_all(

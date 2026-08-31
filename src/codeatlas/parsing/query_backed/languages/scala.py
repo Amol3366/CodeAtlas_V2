@@ -50,6 +50,10 @@ _SCOPE_NODE_TYPES = frozenset(
 )
 
 
+_ENCLOSING_FORMS = frozenset(
+    {"class_definition", "trait_definition", "object_definition"}
+)
+
 class ScalaAdapter:
     """Package paths, imports, and visibility for Scala."""
 
@@ -144,6 +148,33 @@ class ScalaAdapter:
             rendered.append("(" + ",".join(types) + ")")
         return "".join(rendered)
 
+
+    def discriminator(self, node: Any, source: bytes) -> str | None:
+        """A declaration form: the symbol's own if it has one, else its parent's.
+
+        A `trait` and its companion `object` render the same qualified-name
+        prefix, so `Align.max` declared in both collides on name and kind while
+        neither declares a parameter. The *parents* do not collide -- a trait is
+        an INTERFACE and an object is a CLASS -- which is where ADR-0071 went
+        wrong. 772 of the 981 groups it left on the ordinal are these members
+        (ADR-0072).
+
+        The form, not the name: the name is already in the qualified name, and
+        the form is what actually differs between the two parents.
+        """
+        if node.type in _ENCLOSING_FORMS:
+            # A parent's OWN form. `class Align` and `object Align` both map to
+            # CLASS and collide at top level, where there is no enclosing
+            # declaration at all -- 114 of scalaz's groups, measured. A `trait`
+            # maps to INTERFACE and never collided with either, which is the
+            # pair ADR-0071 named and ADR-0072 corrected.
+            return str(node.type).removesuffix("_definition")
+        current = node.parent
+        while current is not None:
+            if current.type in _ENCLOSING_FORMS:
+                return str(current.type).removesuffix("_definition")
+            current = current.parent
+        return None
 
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         """Scala is public by default; only an explicit modifier narrows it."""

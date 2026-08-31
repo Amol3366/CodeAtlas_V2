@@ -32,6 +32,10 @@ _SCOPE_NODE_TYPES = frozenset(
 )
 
 
+_ENCLOSING_SCOPES = frozenset(
+    {"enum_constant", "method_declaration", "constructor_declaration"}
+)
+
 class JavaAdapter:
     """Module paths, qualified names, imports, and visibility for Java."""
 
@@ -100,6 +104,25 @@ class JavaAdapter:
         """
         return _parameter_types(node, source)
 
+
+    def discriminator(self, node: Any, source: bytes) -> str | None:
+        """The enum constant or method a declaration is nested inside.
+
+        gson overrides one method in seven enum-constant bodies --
+        `FieldNamingPolicy.translateName`, every one of them `(Field)`. They are
+        *overrides*, so the signature is required to match and can never
+        separate them; what differs is the constant each sits in. 47 of the 981
+        groups ADR-0071 left on the ordinal are these, and ADR-0071 recorded
+        that they had no remedy (ADR-0072 corrects that).
+        """
+        current = node.parent
+        while current is not None:
+            if current.type in _ENCLOSING_SCOPES:
+                named = current.child_by_field_name("name")
+                if named is not None:
+                    return _text(named, source)
+            current = current.parent
+        return None
 
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         for child in node.children:

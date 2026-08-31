@@ -311,8 +311,8 @@ subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 | DR-01 | Register staleness audit; committed collision census; flake capture recipes; decision brief   | —            | `complete` **with a stated remainder** |
 | DR-01b | **The register sweep DR-01 did not finish** — the dated cross-check over the ~18 open rows it did not reach | DR-01 | `ready` |
 | DR-02 | Preflight re-measured post-ADR-0064; realistic perf profile; resolution residual profiled or declined | DR-01 | `complete` |
-| DR-03 | **Enclosing-declaration discriminator — 845 groups** (scalaz 772, gson 47, ripgrep 21, gin+cobra 5); ADR-0074; `PARSER_BUNDLE_VERSION` 1.9.0 | DR-01 | `ready` |
-| DR-04 | **Own declaration form — 135 groups** (scalaz `CLASS` companion parents); ADR-0075; `PARSER_BUNDLE_VERSION` 1.10.0 | DR-03 | `ready` |
+| DR-03 | **Enclosing-declaration discriminator** — predicted 845, **measured 65**; ADR-0074 | DR-01 | `complete` |
+| DR-04 | **Own declaration form** — predicted 135, **measured 133**; bundled with DR-03 into **one** reindex by user ruling; ADR-0074; `PARSER_BUNDLE_VERSION` **1.9.0** | DR-03 | `complete` |
 | ~~DR-05~~ | ~~Go enclosing scope as a separate task~~ — **retired 2026-09-01 by ADR-0072.** Go's 5 groups are one language of DR-03's mechanism, not a mechanism of their own | — | `n/a` |
 | DR-06 | Fixture shapes the evaluation corpus cannot currently express                                  | DR-01        | `ready` |
 | DR-07 | **Ruling 2 (ADR-0073):** relation precision excludes cases declaring no relations — **moves a reported number**, so the affected baseline is regenerated as its own reviewed commit | DR-01 | `ready` |
@@ -397,6 +397,94 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-01T23:00:00Z — DR-03 and DR-04: the mechanisms work, and my own estimate of them was wrong by 5x
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-03 and DR-04 both `complete`**, bundled into one reindex by
+  user ruling. DR-05 stays retired.
+- **`PARSER_BUNDLE_VERSION` 1.8.0 -> 1.9.0 (ADR-0074). Users must reindex.**
+  `SCHEMA_VERSION` 14, `contract_version` 1.1, `CHUNKER_VERSION` 1.1.0,
+  `RESOLVER_VERSION` 1.5.0 all unchanged. **No migration** — a discriminator is
+  an id-construction input like the ordinal, not stored evidence.
+
+#### What was built
+
+`LanguageAdapter.discriminator`: the declaration a symbol sits inside, or its
+own form where it has one. Java, Scala, Go and Rust supply one.
+
+Two details carry it. **The discriminator is appended to the id hash only when
+non-empty**, so a group whose members return `None` keeps byte-identical ids and
+each language moves for its own reason. And **ADR-0069's "the first member of a
+group keeps its id" shortcut no longer applies where a discriminator exists** —
+that shortcut is itself ordinal-dependent, so inserting a member above the first
+displaces it, which is the instability the whole mechanism exists to remove.
+
+#### The measurement, and the correction to ADR-0072
+
+| Repository | Separated before | After | Still ordinal |
+| --- | ---: | ---: | ---: |
+| gson (Java) | 52 | **76** | 23 |
+| cobra (Go) | 0 | **1** | **0** |
+| gin (Go) | 0 | **4** | **0** |
+| ripgrep (Rust) | 0 | **4** | 17 |
+| scalaz (Scala) | 169 | **334** | 743 |
+| **Total** | **221** | **419** | **783** |
+
+**198 groups gained position-independent identity. ADR-0072 predicted 980.**
+
+**I wrote ADR-0072, and it was wrong for a nameable reason:** it classified the
+981 groups by *sampling* them and inferring a mechanism, never checking whether
+the enclosing declaration **differs between the colliding members**. Usually it
+does not. About **718 of scalaz's remaining 743 are two declarations sharing a
+name, a kind, and one enclosing scope** — `TimeInstances.max` twice inside one
+trait. One scope, so no enclosing-based mechanism can reach them. Rust's
+remaining 17 are methods sharing one `impl`, not two-trait pairs.
+
+**Third time in this lineage** that an inherited count was the defect: ADR-0071
+disproved ADR-0069's follow-up, ADR-0072 disproved ADR-0071's, this disproves
+ADR-0072's. The instrument now exists; what was missing was running it *before*
+writing the estimate.
+
+#### A test that passed before the fix existed
+
+The first draft of `test_symbol_identity_stability.py` asserted that the set of
+ids seen before an insertion was a **subset** of the set seen after. That passes
+on the broken code, because the ordinal scheme *reuses* the id values and hands
+them to different symbols — **all five assertions passed before a line of the
+fix was written.** Members are now followed by `content_hash`, and each fixture
+body is deliberately distinct so the hash can do that.
+
+#### Files
+
+- `src/codeatlas/domain/symbols.py`, `parsing/query_backed/{profile,engine}.py`,
+  and the four language adapters.
+- `src/codeatlas/parsing/registry.py` — bundle 1.9.0.
+- `scripts/report_symbol_collisions.py` — now measures
+  `(signature, discriminator)`; before this it could not have seen the mechanism
+  work.
+- `tests/unit/test_symbol_identity_stability.py` — new, 9 tests.
+- `docs/adr/0074-a-symbol-is-identified-by-the-declaration-it-sits-in.md`.
+
+#### Verification
+
+```text
+scripts/check_phase4.ps1 -SkipSync        GATE_EXIT_CODE=0
+2413 passed, 3 skipped, 1 warning in 671.38s (0:11:11)
+Lint clean · Types clean over 393 files · all baselines --check clean
+```
+
+Every tracked baseline still reproduces byte-for-byte despite the bundle bump,
+which is the expected result: the baselines measure evaluation metrics, not
+symbol ids.
+
+#### Next
+
+**783 groups remain on the ordinal**, and the largest class — ~718 — is two
+declarations sharing one scope. **No mechanism proposed, and it may not be an
+identity defect at all**: if `Align.F` renders one qualified name for two
+members a reader would call distinct, the qualified name is what is wrong. Not
+started. DR-01b, DR-06, DR-07, DR-08 and DR-09 remain.
 
 ### 2026-09-01T20:00:00Z — Four rulings given (ADR-0073); three of them authorise work, one closes its row
 

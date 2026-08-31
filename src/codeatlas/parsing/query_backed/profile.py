@@ -107,3 +107,27 @@ class LanguageAdapter(Protocol):
         that. See ADR-0071.
         """
         ...
+
+    def discriminator(self, node: Any, source: bytes) -> str | None:
+        """The enclosing declaration that separates this symbol, or ``None``.
+
+        The companion to ``signature``, for collisions a parameter list cannot
+        reach. ADR-0072 measured 845 of the 981 groups ADR-0071 left on the
+        ordinal as separable this way:
+
+        - **Scala**, 772 -- a ``trait`` and its ``object`` render the same
+          qualified-name prefix, so members declared in both collide. The
+          *parents* do not collide, which ADR-0071 got wrong.
+        - **Java**, 47 -- one method overridden in several enum-constant bodies
+          or anonymous classes. Overrides, so the signature must match.
+        - **Rust**, 21 -- the trait of the enclosing ``impl``.
+        - **Go**, 5 -- the function a local ``type`` is declared in.
+
+        Return something that identifies the enclosing declaration and **does
+        not vary with position**: a form, a name, or a trait. An ordinal here
+        would reintroduce the instability this exists to remove.
+
+        **Not stored**, so no column and no migration. It does change identity,
+        so an adapter that starts returning one bumps ``PARSER_BUNDLE_VERSION``.
+        """
+        ...

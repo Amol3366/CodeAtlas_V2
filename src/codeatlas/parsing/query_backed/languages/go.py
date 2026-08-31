@@ -38,6 +38,8 @@ _KIND_BY_CAPTURE = {
 }
 
 
+_ENCLOSING_SCOPES = frozenset({"function_declaration", "method_declaration"})
+
 class GoAdapter:
     """Module paths, receivers, imports, and visibility for Go."""
 
@@ -126,6 +128,23 @@ class GoAdapter:
         """
         return None
 
+
+    def discriminator(self, node: Any, source: bytes) -> str | None:
+        """The function a local declaration is nested inside.
+
+        Replaces the `None` ADR-0071 recorded here. Go has no overloading, so a
+        signature separates none of its collisions; `type key struct{}` inside
+        two functions differs by the function. cobra declares it in four test
+        functions, which is the reproduction ADR-0069 was found with.
+        """
+        current = node.parent
+        while current is not None:
+            if current.type in _ENCLOSING_SCOPES:
+                named = current.child_by_field_name("name")
+                if named is not None:
+                    return _text(named, source)
+            current = current.parent
+        return None
 
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         """Go's own rule: an identifier is exported iff it starts uppercase."""
