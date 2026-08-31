@@ -89,3 +89,21 @@ class LanguageAdapter(Protocol):
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         """Whether the symbol is visible outside its module."""
         ...
+
+    def signature(self, node: Any, source: bytes) -> str | None:
+        """The parameter types this definition declares, or ``None``.
+
+        Feeds symbol identity: ``ensure_unique_symbol_ids`` disambiguates a
+        collision group by signature first and by ordinal only when signatures
+        match, so a language that supplies one gets identity that survives a
+        same-named sibling being inserted above it (ADR-0069, ADR-0071).
+
+        **Types only, never parameter names.** A rename must not change
+        identity, and including names would make a renamed parameter look like
+        a deleted symbol and a new one.
+
+        Returning ``None`` is correct wherever a signature cannot separate the
+        collisions the language actually produces -- Go and Rust, measured, do
+        that. See ADR-0071.
+        """
+        ...

@@ -50,7 +50,13 @@ from codeatlas.domain.symbols import SymbolRecord
 # not before, so every symbol version derived by the 1.6.0 bundle is stale.
 # RESOLVER_VERSION is deliberately NOT moved, on the ADR-0067 precedent:
 # resolution draws the same conclusions from a reference as it always did.
-PARSER_BUNDLE_VERSION: str = "1.7.0"
+# 1.8.0 (ADR-0071): Java and Scala emit a `signature` -- parameter types only,
+# never parameter names -- so an overload's identity survives a same-named
+# sibling being inserted above it. Every symbol row now carries a value where
+# query-backed languages left NULL, so the 1.7.0 bundle's rows are stale.
+# Go and Rust deliberately emit None: measured, a signature separates none of
+# the collisions they actually produce. RESOLVER_VERSION unchanged again.
+PARSER_BUNDLE_VERSION: str = "1.8.0"
 
 
 @dataclass(frozen=True)

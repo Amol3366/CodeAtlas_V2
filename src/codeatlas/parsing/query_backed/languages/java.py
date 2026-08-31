@@ -90,6 +90,17 @@ class JavaAdapter:
                 end_line=statement.end_point[0] + 1,
             )
 
+    def signature(self, node: Any, source: bytes) -> str | None:
+        """The method's parameter types, dotted and comma-joined.
+
+        Java overloads are the collision ADR-0069 measured most of in real
+        code -- `Gson.fromJson` x11 and `Gson.toJson` x8 in gson, the library's
+        whole public API -- and a parameter type list separates every one of
+        them. Types only: a renamed parameter must not change identity.
+        """
+        return _parameter_types(node, source)
+
+
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         for child in node.children:
             if child.type == "modifiers" and b"public" in source[
@@ -101,3 +112,21 @@ class JavaAdapter:
 
 def _text(node: Any, source: bytes) -> str:
     return source[node.start_byte : node.end_byte].decode("utf-8", "replace")
+
+
+def _parameter_types(node: Any, source: bytes) -> str | None:
+    """`(String,int)` for a node declaring parameters, else None.
+
+    A class or field declares none, so it returns None and falls back to the
+    ordinal -- which is right, because a class cannot be overloaded.
+    """
+    parameters = node.child_by_field_name("parameters")
+    if parameters is None:
+        return None
+    types: list[str] = []
+    for child in parameters.named_children:
+        declared = child.child_by_field_name("type")
+        if declared is None:
+            continue
+        types.append(_text(declared, source))
+    return "(" + ",".join(types) + ")"
