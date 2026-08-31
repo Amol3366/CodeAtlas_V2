@@ -60,12 +60,11 @@ class TagsBackedParser:
         module_path = self._adapter.module_path(
             tree.root_node, request.content, request.relative_path
         )
-        # PROTOTYPE (measurement only, 2026-08-31): a compilation-unit symbol
-        # placed FIRST, because `extract_query_references` attributes imports to
-        # `symbols[0].symbol_id`. That is the whole fix -- an import then lands
-        # inside the symbol it is labelled with, as it already does in Python
-        # and TS/JS, instead of citing a line outside the class it attaches to.
-        # Not for merge: this branch exists to measure the cost.
+        # The compilation unit is placed FIRST, because
+        # `extract_query_references` attributes imports to
+        # `symbols[0].symbol_id` (ADR-0070). An import then lands inside the
+        # symbol it is labelled with, as it already does in Python and TS/JS,
+        # instead of citing a line outside the class it attaches to.
         #
         # Before references, deliberately: reference extraction binds to
         # `symbols[0].symbol_id`, so the ids must be final by the time it runs.
@@ -93,7 +92,7 @@ class TagsBackedParser:
     ) -> SymbolRecord:
         """One MODULE symbol covering the whole file.
 
-        PROTOTYPE, for measurement only. Python and TS/JS attach a file-level
+        ADR-0070. Python and TS/JS attach a file-level
         import to a MODULE spanning the file, so the import line sits *inside*
         its source symbol. No query-backed adapter emits such a symbol, so an
         import attaches to the class instead and cites a line outside it -- 4 of
