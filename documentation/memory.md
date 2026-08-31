@@ -3213,6 +3213,29 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 ## Known Issues
 
+- **A signature separates overloads and nothing else** (ADR-0071, 2026-08-31,
+  merged `a75fa4f`). Java and Scala emit parameter **types**; Go and Rust emit
+  `None`, having no overloading. **`PARSER_BUNDLE_VERSION` 1.7.0 -> 1.8.0, so
+  users must reindex** -- marginal after ADR-0070's bump the same day, a second
+  reindex for anyone who already took the first.
+
+  **The task's premise was the defect, for the second time in one program.**
+  ADR-0069's follow-up called this "the one change that converts the ordinal
+  fallback into stable identity for four languages", and that sentence was
+  copied into the plan as settled sizing. Measured: **221 of 1202 real collision
+  groups (18.4%)**, and **0%** for Go and Rust. `Display::fmt` and `Debug::fmt`
+  have byte-identical parameter lists and differ only by the trait.
+
+  **A claim inside an accepted ADR reads as measured even when it is an
+  estimate.** A follow-up section is where sizing goes to be believed later. Ten
+  lines probing four grammars disproved it before any code was written.
+
+  Types only, never parameter names: including names separates more collisions
+  while making a renamed parameter look like a delete-plus-add. 981 groups
+  remain positional; what would fix them -- declaration form for Scala
+  companions, enclosing scope for Go, the trait for Rust -- is in ADR-0071 and
+  deliberately unstarted.
+
 - **An import now names both its file and its class** (ADR-0070, 2026-08-31,
   merged `65e51e0`). Every query-backed file emits a compilation-unit `MODULE`
   and an import is attributed to it *and* to the file's first definition.

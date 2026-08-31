@@ -779,6 +779,20 @@ ruling, not a change.
 
 ## Task 6: Emit `signature` in the query-backed engine
 
+> **DONE 2026-08-31 — ADR-0071, merged `a75fa4f`. The sizing below was wrong
+> and measuring it was the work.** This task inherited ADR-0069's follow-up
+> claim that emitting a signature "converts the ordinal fallback into stable
+> identity for four languages". Measured over the five real repositories, it
+> separates **221 of 1202 collision groups (18.4%)** and **zero** in two of the
+> four — Go and Rust have no overloading, so a signature is inapplicable there,
+> not merely unhelpful.
+>
+> The cost analysis below **was** right: emitting a signature does move ids that
+> are storable today, and `PARSER_BUNDLE_VERSION` went 1.7.0 -> 1.8.0. Landed as
+> a strict improvement rather than a fix, with what remains unfixed recorded in
+> ADR-0071 rather than implied to be finished.
+
+
 **Do not start this without an explicit decision.** ADR-0069 lists it as a
 follow-up, and the follow-up note reads as though it were free. Verified against
 the code on 2026-08-31, it is not.

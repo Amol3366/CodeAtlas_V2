@@ -51,7 +51,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | **none - closed.** Phases 0-7 are all `complete`. Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed; that condition has since been met under a corrected metric (ADR-0027), and the correction must be cited with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Active task     | **none - closed.** Phases 0-7 remain complete. The post-ADR-0065 program (`docs/superpowers/plans/2026-08-20-remaining-work.md`) has delivered its P0 and P1: merged, both limits ruled, all four languages measured on query *and* change sides, the package rebuilt, and the README guarded. **No decision now waits on the user**: the `AGENTS.md` §12 divergence was ruled and implemented 2026-08-21 (ADR-0068) — retry and feedback moved to `/v1/messages/{message_id}/...`, and `POST /v1/query/stream` left the contract rather than being built. The `changed_symbol_precision` dilution is **closed**: it was a reporting defect, not a lost guard, and the report now carries `changed_symbol_exact_cases` beside the mean |
-| Task status     | `complete` - Phase 7 stays approved; everything since is post-gate work. `SCHEMA_VERSION` **14**, `contract_version` **1.1**, parser bundle **1.6.0**, chunker **1.1.0**, resolver **1.5.0**. Corpus **80 query / 32 change over 11 fixtures**. Last gate: `check_phase4.ps1 -SkipSync` exit 0, **2395 passed, 3 skipped, no xfails** (2026-08-31, one complete run of 10:47 rather than stitched stage runs). **ADR-0069 is committed**; no version moved and no reindex is required |
+| Task status     | `complete` - Phase 7 stays approved; everything since is post-gate work. `SCHEMA_VERSION` **14**, `contract_version` **1.1**, parser bundle **1.8.0**, chunker **1.1.0**, resolver **1.5.0**. Corpus **80 query / 32 change over 11 fixtures**. Last gate: `check_phase4.ps1 -SkipSync` exit 0, **2395 passed, 3 skipped, no xfails** (2026-08-31, one complete run of 10:47 rather than stitched stage runs). **ADR-0069, ADR-0070 and ADR-0071 are all committed and merged.** `PARSER_BUNDLE_VERSION` 1.6.0 -> **1.8.0** across ADR-0070 and ADR-0071, so **users must reindex**. The post-ADR-0069 program is **closed, all six tasks complete**, and nothing waits on the user |
 | Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
 | Git state       | Branch `main`, clean, synced with `origin/main`. **ADR-0065 merged 2026-08-19** (`--no-ff`, 26 commits). Since: ADR-0066 and ADR-0067 (both ADR-0065 limits ruled), evaluation cases for all four languages, a **critical packaging fix** (the artifact could not run at all), gate-level packaging guards, and a README claims guard. The branch `query-backed-language-support` is merged but **not deleted**, locally or on the remote. **2026-08-31: ADR-0069 committed after nine days uncommitted**, with the formatter's unrelated reflow stripped from four files and two files (`java.py`, `scala.py`) reverted whole because they held nothing else. Live plan: `docs/superpowers/plans/2026-08-31-post-adr-0069-program.md`, which supersedes the 2026-08-20 one |
@@ -294,6 +294,80 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-08-31T22:00:00Z — Task 6: the follow-up's own claim was the thing that needed measuring
+
+- Agent: Claude Code `claude-opus-5`, branch `main`, merged `a75fa4f`
+  (`--no-ff`).
+- Transition: post-ADR-0069 program **Task 6 complete**. **All six tasks are
+  now complete and the plan is closed.**
+- **`PARSER_BUNDLE_VERSION` 1.7.0 -> 1.8.0 (ADR-0071). Users must reindex.**
+  `SCHEMA_VERSION` 14, `contract_version` 1.1, `CHUNKER_VERSION` 1.1.0,
+  `RESOLVER_VERSION` 1.5.0 all unchanged.
+
+## What was asked, and what measuring it found
+
+ADR-0069's follow-up read: *"Teach the query-backed engine to emit `signature`.
+**It is the one change that converts the ordinal fallback into stable identity
+for four languages.**"* This plan repeated that sizing.
+
+**It is wrong.** A signature separates only what *overloading* produces, and
+two of the four languages have no overloading at all. Probed against the
+grammars first, then measured over the five real repositories:
+
+| Repository | Collision groups | Separated | Still ordinal |
+| --- | ---: | ---: | ---: |
+| gson (Java) | 99 | **52 (52.5%)** | 47 |
+| scalaz (Scala) | 1077 | 169 (15.7%) | 908 |
+| ripgrep (Rust) | 21 | **0** | 21 |
+| gin (Go) | 4 | **0** | 4 |
+| cobra (Go) | 1 | **0** | 1 |
+| **Total** | **1202** | **221 (18.4%)** | **981** |
+
+Rust is the sharpest case: `Display::fmt` and `Debug::fmt` have **byte-identical**
+parameter lists and differ only by the trait, which is not a parameter.
+
+**The claim would have been inherited unexamined** — it sits in an accepted
+ADR's follow-up section, was copied into this plan's Task 6, and reads as
+settled. It was disproved by a ten-line probe of four grammars before any code
+was written. **Second time in this program that a task's premise was the defect**
+(Task 4 was the first).
+
+## Landed anyway, as a strict improvement rather than a fix
+
+221 groups gain identity that survives a same-named sibling being inserted
+above them, including gson's public API overloads — the most user-visible
+collision measured. **981 do not.** ADR-0071 records what would fix them:
+declaration form for Scala companions (908 of the 981), enclosing scope for Go,
+the trait for Rust. **None is started**, because bundling would hide which
+mechanism moved which ids — the reason ADR-0069 kept this work out of its own
+fix.
+
+**Types only, never parameter names.** `(String,int)`, not `(String s,int i)`.
+Names separate strictly more and break identity on a rename, trading one
+instability for another. Go and Rust return `None`, not `""`, because an empty
+string would claim a discriminator exists.
+
+## Verification
+
+```text
+scripts/check_phase4.ps1 -SkipSync        GATE_EXIT_CODE=0
+2397 passed, 3 skipped, 1 warning in 486.78s
+Lint clean · Types clean over 389 files · all baselines --check clean
+
+scripts/check_real_repos.ps1              REAL_REPOS_EXIT=0
+gson 312/4414 · cobra 65/854 · gin 130/2045 · ripgrep 229/4320 · scalaz 590/17795
+```
+
+**The symbol counts are identical to the ADR-0070 run**, which is the check that
+matters here: a signature change must move ids and not counts, and it did.
+
+## Next
+
+**Nothing is in progress and nothing waits on the user.** The post-ADR-0069
+program is closed. The three remaining identity mechanisms above are recorded
+in ADR-0071 and are not scheduled; each needs its own reindex and its own
+decision.
 
 ### 2026-08-31T20:00:00Z — The post-ADR-0069 program: five tasks, and an import now names both its file and its class
 
