@@ -2846,6 +2846,39 @@ minutes to redo.
 
 ## Decisions Made
 
+- **A measurement's *total* can be derived even when its pass/fail cannot**
+  (2026-08-31, `tests/unit/test_readme_claims.py`). The README's test count had
+  been **deliberately unguarded**, on the recorded grounds that it "comes from
+  running the suite, not from reading source", so nothing could derive it and a
+  hard-coded assertion "would need editing on every run". It went stale and was
+  hand-corrected **three times**.
+
+  **Both halves were wrong in the same way.** A collected test either passes,
+  fails, or is skipped, so `passed + skipped` **is the collected count** for any
+  green run -- and the README only ever quotes a green run. Collection is a pure
+  function of the source. Deriving it that way also answers the second
+  objection: the guard fires only when the count genuinely changes, which is
+  exactly when the README is stale.
+
+  **The reusable shape: "not derivable" often means "not derivable the way I
+  first framed it."** The framing here was *run the suite and read the result*.
+  The cheaper framing -- *collect it* -- was available the whole time and needs
+  no execution at all.
+
+  Two mechanics worth keeping: it collects in a **subprocess**, because the
+  outer run may have selected a subset while the README quotes the whole suite,
+  so asking the current session makes the verdict depend on how it was invoked;
+  and it passes `--basetemp` so `conftest.pytest_configure` returns early and
+  allocates no session directory.
+
+  **It caught a real error on its first run, unplanned** -- README 2400 vs 2401
+  collected, the extra one being the guard itself. A guard that is self-inclusive
+  proves its own failing direction without a synthetic mutation.
+
+  The module docstring's "deliberately unguarded" paragraph was **corrected, not
+  left**: a document explaining why something cannot be done, sitting above the
+  code doing it, is the same defect class as a stale register row.
+
 Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 - **Local, deterministic, modular monolith** (ADR-0001). SQLite is the system of
