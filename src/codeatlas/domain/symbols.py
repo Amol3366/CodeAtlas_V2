@@ -64,9 +64,14 @@ def ensure_unique_symbol_ids(
     signature first means a parser that knows it degrades gracefully: Python
     tells a property from its setter by ``(self)`` against ``(self, v)``, so
     those two stay stable when a third method is inserted between them. The
-    query-backed tier reports ``signature is None`` for every language, so
-    there the ordinal carries it alone, and inserting a same-named sibling
-    above another shifts the later one's id. That is the known cost, and it is
+    query-backed tier reported ``signature is None`` for every language until
+    ADR-0071; **Java and Scala now supply one, Go and Rust deliberately do
+    not** -- measured, a signature separates none of the collisions those two
+    produce. Where it is ``None`` the ordinal carries identity alone, and
+    inserting a same-named sibling above another shifts the later one's id.
+    ADR-0072 measured what is left: 981 groups over five real repositories, of
+    which 845 need the enclosing declaration and 135 the symbol's own
+    declaration form. That is the known cost, and it is
     a smaller one than a repository that cannot be indexed: over-reporting a
     change is recoverable, a missing snapshot is not.
 
