@@ -29,6 +29,19 @@ written, and one of them asks for a ruling that should be withdrawn rather than
 answered. That is the third such find in two weeks. **Audit a row's date against
 the ADRs that landed after it before building anything on what it says.**
 
+**DR-01 complete 2026-09-01 (ADR-0072), with a stated remainder.** The census is
+committed at `scripts/report_symbol_collisions.py` — **any claim about collision
+counts is made with it, not by probe.** It reproduced ADR-0071's 1202/221/981
+exactly and disproved the explanation: a Scala `trait`/`object` pair never
+collided, their members do, and gson's 47 "no remedy" groups are separated by
+the enclosing scope. DR-01b carries the ~18 register rows the sweep did not
+reach; DR-05 is retired.
+
+Two habits this task earned the hard way: **`pathlib.write_text` on Windows
+converts LF to CRLF** and the working tree forbids it — use the editing tools,
+not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
+README guard** until the counts are updated; that is the guard working.
+
 ## Completed
 
 - [x] Phase 0 — contracts, fixtures, evaluation runner, ADR process
