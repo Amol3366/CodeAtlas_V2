@@ -32,19 +32,26 @@ twice, and the ADR count was wrong from the day ADR-0067 landed. Both were found
 by counting, not by anyone doing the cheap check. The two that are *derivable*
 are now derived.
 
-**What remains deliberately unguarded, and why.** The README's test count is a
-*measurement* -- it comes from running the suite, not from reading source -- so
-no assertion here can derive it, and one that hard-coded it would need editing on
-every run. It was stale when these tests were written and stale again on
-2026-08-21; both times it was corrected by hand, and that is the accepted cost.
-Prose and structure stay unguarded too: a guard that fails on ordinary rewording
-is one people learn to delete.
+**The test count is guarded too, and the reasoning that once excused it was half
+wrong.** This paragraph used to say the count could not be derived because it
+comes from running the suite. Only *pass/fail* needs a run: `passed + skipped` is
+the **collected** count, and collection is a pure function of the source. The
+guard below collects in a subprocess and compares, so it fails only when the
+count genuinely changes -- which is exactly when the README has gone stale --
+rather than on every run, which was the other half of the old objection. The
+number was hand-corrected three times before anyone tried deriving it.
+
+**What remains deliberately unguarded.** Prose and structure: a guard that fails
+on ordinary rewording is one people learn to delete.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -218,3 +225,62 @@ def test_the_readme_says_whether_the_refresh_target_is_met() -> None:
             "the artifact records refresh_target_met false; the README must say "
             "the target is missed rather than quoting the figure alone."
         )
+
+
+def test_the_readme_test_count_matches_what_the_suite_collects() -> None:
+    """The README's ``N passed, M skipped`` must equal what pytest collects.
+
+    **Only pass/fail requires running the suite; the total does not.** A
+    collected test either passes, fails, or is skipped, so ``passed + skipped``
+    is the collected count for any green run -- and the README only ever quotes
+    a green run. Collection is a pure function of the source, which is what
+    makes this derivable at all, and deriving it is what stops the row going
+    stale a fourth time.
+
+    Collected in a **subprocess** rather than from this session, because the
+    outer run may have selected a subset while the README quotes the whole
+    suite. Asking the outer session would make the guard's verdict depend on how
+    it was invoked.
+
+    ``--basetemp`` is passed so ``conftest.pytest_configure`` returns early.
+    Without it the nested run allocates a session directory and calls
+    ``_prune_old_sessions``; that prune is age-based with 24-hour retention and
+    could not touch a live session, but not creating the directory is cheaper
+    than having to know that.
+    """
+    stated = re.search(r"\*\*(\d+) passed, (\d+) skipped\*\*", _readme())
+    assert stated, "the README no longer states 'N passed, M skipped'"
+    claimed = int(stated.group(1)) + int(stated.group(2))
+
+    with tempfile.TemporaryDirectory(prefix="readme-collect-") as basetemp:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests",
+                "--collect-only",
+                "-q",
+                "--basetemp",
+                basetemp,
+                "-p",
+                "no:cacheprovider",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert completed.returncode == 0, (
+        "collecting the suite failed, so the count could not be checked: "
+        f"{completed.stdout[-2000:]} {completed.stderr[-2000:]}"
+    )
+    collected = re.search(r"(\d+) tests? collected", completed.stdout)
+    assert collected, (
+        f"pytest reported no collected count: {completed.stdout[-2000:]}"
+    )
+    assert claimed == int(collected.group(1)), (
+        f"README claims {stated.group(1)} passed + {stated.group(2)} skipped "
+        f"= {claimed}, but the suite collects {collected.group(1)}. Re-run the "
+        "gate and update the Tests row with the figures it prints."
+    )
