@@ -33,7 +33,11 @@ from codeatlas.chunking.retrieval_text import (
     build_symbol_retrieval_text,
 )
 from codeatlas.contracts import SymbolKind
-from codeatlas.domain.chunks import ChunkRole, LogicalChunk
+from codeatlas.domain.chunks import (
+    ChunkRole,
+    LogicalChunk,
+    ensure_unique_chunk_ids,
+)
 from codeatlas.domain.ids import chunk_version_id, logical_chunk_id
 from codeatlas.domain.repository import FileRecord
 from codeatlas.domain.symbols import SymbolRecord
@@ -113,7 +117,12 @@ class CodeChunker:
                     boundaries=boundaries,
                 )
             )
-        return tuple(chunks)
+        # After every chunk for this file exists, for the reason the
+        # symbol pass runs before references: identity must be final
+        # before anything downstream binds to it.
+        return ensure_unique_chunk_ids(
+            tuple(chunks), PARSER_BUNDLE_VERSION, CHUNKER_VERSION
+        )
 
     def _file_summary(
         self,

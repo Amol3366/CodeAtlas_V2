@@ -15,7 +15,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.6.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2389 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, 2026-08-21. **5 `strict` xfails since 2026-08-22**, all one defect: [symbol-identity collisions](#known-limits--stated-not-hidden) block indexing in six of seven languages, awaiting a ruling on the disambiguator. The last *complete* gate run exited 0 at **2386**; the three tests added after it were verified by running all nine stages individually, because two full runs were killed on duration rather than failing |
+| **Tests** | **2389 passed, 3 skipped** — `check_phase4.ps1 -SkipSync`, 2026-08-21, plus the 6 added by ADR-0069. **No xfails.** The last *complete* gate run exited 0 at **2386**; tests added after it were verified by running the stages individually, because two full runs were killed on duration rather than failing |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -720,36 +720,31 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
 
 ### Known limits — stated, not hidden
 
-- **Two symbols in one file that share a qualified name and a kind collapse onto
-  one `symbol_id`, and indexing fails outright** (found 2026-08-22). It is not a
-  degraded answer: `symbols` is keyed `(snapshot_id, symbol_id)`, so the second
-  symbol raises `UNIQUE constraint failed`, the CLI reports `INTERNAL_ERROR`
-  and exit 6, and **no snapshot is produced**. The repository cannot be indexed
-  by any surface.
+- **Symbol identity used to collapse two same-named symbols, and indexing failed
+  outright — fixed 2026-08-22 (ADR-0069).** `symbol_id` carried no
+  disambiguator, so a Python property and its setter, a Java overload pair, a
+  Scala companion, a Go function-local type, or a Rust method implemented for
+  two traits produced `UNIQUE constraint failed` and **no snapshot at all**.
+  Six of seven languages were affected and it had been latent **since Phase 1**:
+  an eight-line Python file using a plain property could not be indexed.
 
-  **Six of seven languages are affected, for six different reasons** — Python
-  (`@property` with its `@x.setter`, and plain redefinition), Java and Scala
-  (method overloads), Go (function-local `type` declarations), Rust (one method
-  name implemented for two traits). TypeScript is unaffected. Measured on real
-  repositories: `google/gson` collides in **55 files / 264 symbols**, including
-  `Gson.fromJson` (×11) and `Gson.toJson` (×8) — the library's entire public
-  API; `spf13/cobra` and `gin-gonic/gin` both collide too.
+  It was found by indexing **real repositories** rather than fixtures — all five
+  failed. `scalaz` collided in 270 files, `google/gson` in 55 (including
+  `Gson.fromJson` ×11 — the library's whole public API). Fixing it exposed two
+  more defects behind it: a reference attributed to an **invented** owner id
+  when a file defined nothing, and a grouped Go/Rust import citing the
+  declaration's line rather than its own.
 
-  **This is not an ADR-0065 defect.** `python_parser.py` and the query-backed
-  engine construct the id with the identical call, so it has been latent since
-  Phase 1 in the flagship language. **An eight-line Python file using a plain
-  property cannot be indexed.** It stayed invisible because every fixture is a
-  two-file toy and no file in this repository uses those constructs — a probe
-  over `src/codeatlas` and `apps/web/src` finds zero collisions, which is how
-  every gate passed.
+  All five now index — gson 312 files / 4135 symbols, scalaz 590 / 17226,
+  ripgrep 229 / 4210 — and `Gson.fromJson` resolves to every overload under the
+  name a caller would type, because the fix moves the **id** and deliberately
+  leaves `qualified_name` alone. No reindex was needed: the first member of a
+  colliding group keeps its id, so nothing storable today changed.
 
-  No single disambiguator fixes all six: arity resolves Python, Java and Scala
-  but not Go or Rust; enclosing scope resolves Go and Rust but not the
-  overloads. Any fix changes symbol identity, so it needs a
-  `PARSER_BUNDLE_VERSION` bump and a reindex. Reproduction, per-language
-  diagnosis, and the passing TypeScript control are in
-  `tests/unit/test_symbol_identity_collisions.py`; the ruling is open in the
-  Deferred Register.
+  **The lesson outlives the bug.** Every fixture is a two-file toy containing
+  none of these constructs, so a probe over `src/codeatlas` finds zero
+  collisions and every gate passed for seven phases. A corpus that cannot
+  express a defect reads as coverage — the same shape ADR-0062 recorded.
 - **Language coverage is two tiers, and the second tier is thinner.** Python,
   TypeScript, and JavaScript get the full engine — hand-written parsers, test
   edges, route detection, and configuration/schema edges. **Java, Go, Rust, and
@@ -1009,7 +1004,7 @@ blunt version. The ones that bite most often:
 
 **Decisions and measurement**
 
-`docs/adr/README.md` — 68 accepted records and their rationale ·
+`docs/adr/README.md` — 69 accepted records and their rationale ·
 `docs/evaluation/` — baselines and the environment documents that say how to read
 them · `docs/security/threat-model.md`
 

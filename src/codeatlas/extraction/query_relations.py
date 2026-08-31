@@ -39,8 +39,27 @@ def extract_query_references(
     adapter: LanguageAdapter,
     symbols: tuple[SymbolRecord, ...],
 ) -> tuple[SymbolReference, ...]:
-    """Every reference this file states, attributed to its enclosing symbol."""
-    module_symbol_id = symbols[0].symbol_id if symbols else f"module_{request.file_id}"
+    """Every reference this file states, attributed to its enclosing symbol.
+
+    A file with no captured definition states references that belong to
+    nothing. The previous fallback minted ``module_{file_id}`` -- a symbol id
+    that is never stored, because no such symbol exists -- and every reference
+    attributed to it became a relation with a dangling endpoint. Snapshot
+    validation refuses those, so a Java repository containing even one such
+    file (``package-info.java`` is the common shape) failed to index with
+    "A staged relation references a symbol outside the snapshot".
+
+    Emitting nothing is the honest answer and the one section 4.1 requires: a
+    reference the parser cannot attribute is not a reference it may invent an
+    owner for. It costs the imports of a file that defines nothing, which by
+    construction no relation could have pointed at anyway.
+
+    Found 2026-08-22, after the symbol-identity fix stopped indexing failing
+    earlier and let real Java repositories reach validation for the first time.
+    """
+    if not symbols:
+        return ()
+    module_symbol_id = symbols[0].symbol_id
     references = list(adapter.imports(root, source, request.file_id, module_symbol_id))
     parts: dict[tuple[str, RelationKind, str, int], int] = {}
     # The grammar's shipped query, then this repository's supplementary one

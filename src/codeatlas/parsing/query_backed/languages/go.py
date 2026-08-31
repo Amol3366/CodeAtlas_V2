@@ -89,7 +89,6 @@ class GoAdapter:
             paths = captures.get("import.path", ())
             if not statements or not paths:
                 continue
-            statement = statements[0]
             for path in paths:
                 quoted = _text(path, source)
                 specifier = quoted.strip('"')
@@ -105,8 +104,14 @@ class GoAdapter:
                     kind=RelationKind.IMPORTS,
                     target_hint=bound,
                     module_hint=specifier.replace("/", "."),
-                    start_line=statement.start_point[0] + 1,
-                    end_line=statement.end_point[0] + 1,
+                    # The spec's own line, not the declaration's. A grouped
+                    # import puts every path under one statement node, so
+                    # using the statement made each path cite the opening
+                    # line -- which does not contain the import -- and made
+                    # two paths sharing a bound name collide on relation_id
+                    # (`crypto/rand` and `math/rand` in gin, 2026-08-22).
+                    start_line=path.start_point[0] + 1,
+                    end_line=path.end_point[0] + 1,
                 )
 
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:

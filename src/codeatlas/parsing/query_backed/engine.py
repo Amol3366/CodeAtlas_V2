@@ -20,7 +20,7 @@ from tree_sitter import QueryCursor
 
 from codeatlas.contracts import SymbolKind
 from codeatlas.domain.ids import symbol_id, symbol_version_id
-from codeatlas.domain.symbols import SymbolRecord
+from codeatlas.domain.symbols import SymbolRecord, ensure_unique_symbol_ids
 from codeatlas.extraction.query_relations import extract_query_references
 from codeatlas.parsing.query_backed.profile import LanguageAdapter
 from codeatlas.parsing.registry import (
@@ -59,7 +59,12 @@ class TagsBackedParser:
         module_path = self._adapter.module_path(
             tree.root_node, request.content, request.relative_path
         )
-        symbols = tuple(self._definitions(tree.root_node, request, module_path))
+        # Before references, deliberately: reference extraction binds to
+        # `symbols[0].symbol_id`, so the ids must be final by the time it runs.
+        symbols = ensure_unique_symbol_ids(
+            tuple(self._definitions(tree.root_node, request, module_path)),
+            PARSER_BUNDLE_VERSION,
+        )
         references = extract_query_references(
             tree.root_node, request.content, request, self._adapter, symbols
         )

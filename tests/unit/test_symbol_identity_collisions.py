@@ -50,10 +50,19 @@ scope-based fix resolves Go and Rust but not the overloads. Any fix changes
 symbol identity and therefore needs a ``PARSER_BUNDLE_VERSION`` bump and a
 reindex.
 
-The failing cases are ``strict`` xfails carrying their diagnosis here, the
-pattern ADR-0065 used for a declared limit awaiting a ruling (ADR-0066 and
-ADR-0067 then closed both). Strict means a fix turns these red until the marks
-come off, so the ruling cannot land silently.
+**Fixed 2026-08-22 by ADR-0069**; these were ``strict`` xfails for the hours
+between finding and fixing, and every one of them XPASSed the moment
+``ensure_unique_symbol_ids`` landed -- which is what strict is for. They are now
+ordinary regression tests.
+
+TypeScript is the one language that never needed the fix, because
+``tsjs_parser._disambiguate_repeated_symbols`` already suffixes repeated
+*anonymous* members. That solves a different problem and its answer would be
+wrong here: it appends position to ``qualified_name``, which is right for a
+member with no name of its own and wrong for ``Gson.fromJson``, since
+``Gson.fromJson#L850`` is no longer findable by the name a caller would type.
+``ensure_unique_symbol_ids`` leaves ``qualified_name`` alone and moves only the
+id.
 """
 
 from __future__ import annotations
@@ -109,12 +118,6 @@ export function write(value: number): void;
 export function write(value: unknown): void {}
 """
 
-_STRICT_XFAIL = pytest.mark.xfail(
-    strict=True,
-    reason="symbol_id omits any disambiguator for same-file, same-name, "
-    "same-kind symbols; awaiting the ruling recorded in the Deferred Register",
-)
-
 
 @pytest.mark.parametrize(
     ("language", "relative_path", "source"),
@@ -123,35 +126,30 @@ _STRICT_XFAIL = pytest.mark.xfail(
             "python",
             "thing.py",
             _PROPERTY_AND_SETTER,
-            marks=_STRICT_XFAIL,
             id="python-property-and-setter",
         ),
         pytest.param(
             "java",
             "Codec.java",
             _JAVA_OVERLOADS,
-            marks=_STRICT_XFAIL,
             id="java-method-overloads",
         ),
         pytest.param(
             "go",
             "local.go",
             _GO_FUNCTION_LOCAL_TYPES,
-            marks=_STRICT_XFAIL,
             id="go-function-local-types",
         ),
         pytest.param(
             "rust",
             "s.rs",
             _RUST_TWO_TRAIT_IMPLS,
-            marks=_STRICT_XFAIL,
             id="rust-two-trait-impls",
         ),
         pytest.param(
             "scala",
             "Codec.scala",
             _SCALA_OVERLOADS,
-            marks=_STRICT_XFAIL,
             id="scala-method-overloads",
         ),
         pytest.param(

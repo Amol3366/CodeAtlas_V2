@@ -27,7 +27,7 @@ from tree_sitter_python import language as python_language
 from codeatlas.contracts import SymbolKind
 from codeatlas.domain.ids import symbol_id, symbol_version_id
 from codeatlas.domain.repository import FileClassification
-from codeatlas.domain.symbols import SymbolRecord, Visibility
+from codeatlas.domain.symbols import SymbolRecord, Visibility, ensure_unique_symbol_ids
 from codeatlas.extraction.python_relations import extract_python_references
 from codeatlas.parsing.registry import (
     PARSER_BUNDLE_VERSION,
@@ -121,7 +121,7 @@ class PythonParser:
                 parser_name=self.name,
                 parser_version=self.version,
                 success=False,
-                symbols=recovered,
+                symbols=ensure_unique_symbol_ids(recovered, PARSER_BUNDLE_VERSION),
                 diagnostics=(
                     ParseDiagnostic(
                         code="PARSE_SYNTAX_ERROR",
@@ -174,7 +174,7 @@ class PythonParser:
             parser_name=self.name,
             parser_version=self.version,
             success=True,
-            symbols=tuple(symbols),
+            symbols=ensure_unique_symbol_ids(tuple(symbols), PARSER_BUNDLE_VERSION),
             diagnostics=extraction.diagnostics,
             references=extraction.references,
         )

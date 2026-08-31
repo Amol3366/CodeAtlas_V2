@@ -3213,8 +3213,8 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 ## Known Issues
 
-- **Indexing a real repository FAILS: two symbols, one `symbol_id`** (found
-  2026-08-22, **open, awaiting a ruling**). `symbol_id` is
+- **Indexing a real repository FAILED: two symbols, one `symbol_id`** (found
+  and **fixed 2026-08-22, ADR-0069**). `symbol_id` is
   `hash(repository_id, relative_path, qualified_name, kind)` with no
   disambiguator, and `symbols` is keyed `(snapshot_id, symbol_id)` -- so two
   symbols sharing a file, name and kind raise `UNIQUE constraint failed`,
@@ -3244,6 +3244,27 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   `domain/ids.py` promises), and any choice bumps `PARSER_BUNDLE_VERSION`. That
   is a §1.3 decision. Diagnosis and reproduction:
   `tests/unit/test_symbol_identity_collisions.py`.
+
+  **It took three fixes, each revealing the next, and that is the part worth
+  carrying.** Fixing `symbol_id` moved the failure to `chunks`
+  (`logical_chunk_id` has the identical shape); fixing that let Java reach
+  snapshot validation, which refused a relation whose source was the *invented*
+  id `module_{file_id}` that `query_relations` minted for a file defining
+  nothing; fixing that exposed `relations.relation_id`, where `crypto/rand` and
+  `math/rand` both bound `rand` and both reported the `import (` line, because
+  Go and Rust attributed every path in a grouped import to the **declaration**.
+  **One systematic gap -- identity derived from names that are not unique --
+  sitting at four layers.** When a fix moves an error rather than removing it,
+  expect the same gap one layer down.
+
+  **The fix keeps `qualified_name` and moves only the id.** The TS/JS prior art
+  (`_disambiguate_repeated_symbols`) does the opposite, appending `#L103` to the
+  name -- correct for an anonymous union member, wrong for `Gson.fromJson`,
+  which would stop resolving under the name a caller types. Two problems that
+  look identical and have opposite answers.
+
+  **No reindex, by design:** the first member of a colliding group keeps its id,
+  so nothing storable today moved and no version bumped.
 
 - **A handoff claimed a revert that never happened** (found 2026-08-22, fixed
   the same day). The 2026-08-22T00:00:00Z entry and its Deferred Register row
