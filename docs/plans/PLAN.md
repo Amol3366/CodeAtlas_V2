@@ -155,9 +155,9 @@ read as unaudited, not as settled.
 | ~~archived original — closed by the row above~~ | **Superseded 2026-09-01.** Retained as history: "OPEN — the remaining design question, unchanged by ADR-0061. Caching within one call removes the duplicate pass, not the pass: preflight is still O(repository). Going below that means taking symbols from the stored index, which needs a ruling on when they may be trusted — parser version, normalisation version and content identity all become inputs. **`SnapshotStateView` is not the vehicle**: it is unused *and* still reads and hashes every file (ADR-0060)" | — archived |
 | ~~archived original — closed by the row above~~ | **Superseded 2026-09-01.** Retained as history: "OPEN — the real cost, now quantified (ADR-0060). 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060" | — archived |
 | ~~**Cold-indexing this repository takes 343 s**~~ | **CLOSED — stale since 2026-08-18, found by audit 2026-08-21.** ADR-0064 took a cold index of this repository from **~343 s to 32.64 s**, and the register's *own* ADR-0064 row records that number two screens away. The row survived the fix that obsoleted it. Its trigger — "someone measures where index time goes" — had fired: the measurement is in ADR-0064, and the answer was resolution scanning every symbol per reference, not indexing being inherently slow | — |
-| **A synthetic corpus measures dishonestly whenever the dominant term is carried by a file type it does not emit**                                    | **OPEN - a stated limit of `measure_phase4_perf.py`'s generated profile, found 2026-08-18 and WIDENED the same day by ADR-0064.** Its modules are ~15 lines each, so at 800 modules `file_diff` looked like the largest stage (1339 ms of 3367 ms) and parsing looked secondary; **an earlier draft of ADR-0060 repeated those proportions as fact.** The original row then said the *exponents* held up and that proportions were the only casualty. **That was too generous, and ADR-0064 disproved it:** ADR-0062 fitted a resolution exponent of **1.14** here and concluded resolution was linear, when it was **quadratic in mentions x symbols** - the corpus emits no Markdown, so it has no document sections, no mentions and no routes, and the entire quadratic term was **structurally absent from the sweep**. A clean exponent from a corpus missing the dominant reference class is not weak evidence, it is no evidence. (The real proportions are in ADR-0064, not the "99.5% parsing" this row used to quote from ADR-0060: parsing is **2.5%**) | Someone gives the perf harness a profile with realistic file sizes and a Markdown-heavy tree |
-| **Resolution's remaining 3.55 s is unprofiled**                                                 | **OPEN - stated by ADR-0064 rather than claimed away.** 3.55 s across 161,343 references on 706 files is a 88x improvement and is *not* known to be optimal. The profile after the fix still shows `_derive_config_edges` and `_RouteIndex.handlers` as the two largest items, and neither has been examined since. **No claim is made that resolution is now cheap** - only that it is no longer the bottleneck | Someone profiles resolution again, or preflight regresses above ~60 s |
-| ~~original entry~~                                                   | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone measures it properly, or a user reports it                                                                                                                          |
+| **A synthetic corpus measures dishonestly whenever the dominant term is carried by a file type it does not emit**                                    | **OPEN - a stated limit of `measure_phase4_perf.py`'s generated profile, found 2026-08-18 and WIDENED the same day by ADR-0064.** Its modules are ~15 lines each, so at 800 modules `file_diff` looked like the largest stage (1339 ms of 3367 ms) and parsing looked secondary; **an earlier draft of ADR-0060 repeated those proportions as fact.** The original row then said the *exponents* held up and that proportions were the only casualty. **That was too generous, and ADR-0064 disproved it:** ADR-0062 fitted a resolution exponent of **1.14** here and concluded resolution was linear, when it was **quadratic in mentions x symbols** - the corpus emits no Markdown, so it has no document sections, no mentions and no routes, and the entire quadratic term was **structurally absent from the sweep**. A clean exponent from a corpus missing the dominant reference class is not weak evidence, it is no evidence. (The real proportions are in ADR-0064, not the "99.5% parsing" this row used to quote from ADR-0060: parsing is **2.5%**) | **CLOSED 2026-09-01 (DR-02).** `measure_phase4_perf.py --profile realistic` emits Markdown mentioning the symbols the modules define; the synthetic profile is byte-identical and guarded, since the tracked baseline rests on it. Measured: at 160 modules the realistic corpus costs **3.60x** the synthetic one, log-log slope **0.898 against 0.602**. **Not comparable to ADR-0062's 1.14** -- that swept to 800 modules, this to 160, where fixed costs depress every slope. New finding: the <= 2 s refresh target is **missed on the realistic corpus from 80 modules up** |
+| **Resolution's remaining 3.55 s is unprofiled**                                                 | **OPEN - stated by ADR-0064 rather than claimed away.** 3.55 s across 161,343 references on 706 files is a 88x improvement and is *not* known to be optimal. The profile after the fix still shows `_derive_config_edges` and `_RouteIndex.handlers` as the two largest items, and neither has been examined since. **No claim is made that resolution is now cheap** - only that it is no longer the bottleneck | **CLOSED 2026-09-01 (DR-02) -- profiled, no fix proposed.** Proportions of one cProfile'd preflight (inflated 90.5 s vs 32.7 s, so shares only): `resolve` **38%**, of which `_derive_config_edges` is **20%** -- the site ADR-0064 de-quadraticised, still over half of resolution. **The surprise is beside it:** `sqlite3.executemany` **21%** and ignore-rule `fnmatch`/`re.match` **9%**. A task optimising resolution alone would attack 38% while ignoring 30% next to it. Committing to a fix off one profile is exactly what ADR-0060 to ADR-0062 did three times |
+| ~~original entry~~                                                   | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | **CLOSED 2026-09-01 (DR-02) -- measured.** Working-tree preflight p95 **34.37 s** on this 769-file repository, commit-range **29.70 s**, 1.62 s of which is CLI startup. **Not a target miss:** condition 7 scopes the <= 10 s target to the declared fixture, where p95 is 5.151 s and met. A real repository costs **6.7x the fixture it was gated on**, which is the number nobody had. The 10-12 minute `impact` runs this row recorded are **~20x stale** -- observed 2026-08-13, five days before ADR-0064                                                                                                                          |
 | ~~**An oversized tracked file fails the whole comparison**~~                                              | **CLOSED 2026-08-15 — ADR-0045.** Ruled by the user: **skip it like the scanner does, and declare the omission**. One committed 3 MB CSV used to make a repository impossible to preflight while the directory scan merely skipped the same file. `archive` now skips and names oversized entries; `read_blob` still raises, because it is asked for one specific blob and answering "here is nothing" would be worse; `StateView.excluded_files()` carries the names and the engine emits a `FILE_TOO_LARGE` warning plus a limitation naming the files. **The directory side was silently omitting them too** — the scanner had recorded `TOO_LARGE` since Phase 1 and nothing ever surfaced it. Only oversize is declared; an *ignored* file stays unreported, because ADR-0044 already ruled it outside the index                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | ~~ADR-0030 module-granularity ruling~~                                                                          | **CLOSED 2026-08-15 — ADR-0046.** Ruled by the user: **a module-level answer satisfies a conceptual question**, and **no ranking change is made**. ADR-0030 had already found no defect; ruling the other way would have declared one, spent real risk on a metric ungated on the retrieval profile (ADR-0023), and traded an evidence hit for a symbol hit. A conceptual expectation naming only the implementing symbol may be *widened*, never replaced, and only on the ADR-0031/0036 justification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                                                                                          |
 | **Duplicate findings, and false findings on a clean tree**                                                 | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                                                                          |
@@ -310,7 +310,7 @@ subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 | ----- | -------------------------------------------------------------------------------------------- | ------------ | ------- |
 | DR-01 | Register staleness audit; committed collision census; flake capture recipes; decision brief   | —            | `complete` **with a stated remainder** |
 | DR-01b | **The register sweep DR-01 did not finish** — the dated cross-check over the ~18 open rows it did not reach | DR-01 | `ready` |
-| DR-02 | Preflight re-measured post-ADR-0064; realistic perf profile; resolution residual profiled or declined | DR-01 | `ready` |
+| DR-02 | Preflight re-measured post-ADR-0064; realistic perf profile; resolution residual profiled or declined | DR-01 | `complete` |
 | DR-03 | **Enclosing-declaration discriminator — 845 groups** (scalaz 772, gson 47, ripgrep 21, gin+cobra 5); ADR-0073; `PARSER_BUNDLE_VERSION` 1.9.0 | DR-01 | `ready` |
 | DR-04 | **Own declaration form — 135 groups** (scalaz `CLASS` companion parents); ADR-0074; `PARSER_BUNDLE_VERSION` 1.10.0 | DR-03 | `ready` |
 | ~~DR-05~~ | ~~Go enclosing scope as a separate task~~ — **retired 2026-09-01 by ADR-0072.** Go's 5 groups are one language of DR-03's mechanism, not a mechanism of their own | — | `n/a` |
@@ -394,6 +394,88 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-01T18:00:00Z — DR-02: the real repository costs 6.7x the fixture it was gated on, and resolution is no longer the only problem
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: DR-02 `in_progress -> complete`. Three register rows closed.
+- No product code changed; `measure_phase4_perf.py` gains a second corpus
+  profile and the synthetic one is byte-identical. No version moves.
+
+#### Preflight, measured on a real repository for the first time
+
+769 files, 727 parsed, isolated database, three runs each:
+
+```text
+commit-range (HEAD~5..HEAD)   median 29.52 s   p95 29.70 s   (27.90 s less startup)
+working tree                  median 34.29 s   p95 34.37 s   (32.67 s less startup)
+codeatlas --help                                  1.62 s     startup floor
+```
+
+Spreads of 0.31 s and 0.21 s, so this is not machine load.
+
+**This is not a missed target, and saying so was the first thing worth
+checking.** Phase 4 condition 7 scopes warm preflight p95 <= 10 s **"on the
+declared fixture and named hardware"**, and the fixture reads 5.151 s, met. What
+is true is that **a real repository costs 6.7x the fixture the gate was taken
+on** — the number the register row asked for and nobody had.
+
+**The 10-12 minute `impact` runs the register recorded are ~20x stale**, exactly
+as predicted: observed 2026-08-13, five days before ADR-0064's 29x.
+
+#### The synthetic corpus, and what it was hiding
+
+`--profile realistic` emits Markdown that mentions the symbols the modules
+define. A document with no symbol names would produce sections and no
+`<mention>` references — the same blindness in a new costume. The synthetic
+profile is untouched and regression-guarded, because the tracked baseline rests
+on it.
+
+At 160 modules the realistic corpus costs **3.60x** the synthetic one, and the
+log-log slope is **0.898 against 0.602**. **These are not comparable to
+ADR-0062's 1.14** — that sweep ran to 800 modules, this one stops at 160 where
+fixed costs still depress every slope below 1. Stated because quoting 0.898
+against 1.14 is precisely the kind of comparison this lineage keeps getting
+wrong.
+
+**New finding:** the <= 2 s changed-file refresh target is **missed on the
+realistic corpus from 80 modules upward** (2.153 s, 4.587 s at 160). Fixture-
+scoped and met on the fixture, so not a gate failure — a statement about what
+the fixture cannot see.
+
+#### Resolution's residual, profiled — and the finding is what sits beside it
+
+ADR-0064 invited this and it is now done. cProfile inflates the run to 90.5 s
+against 32.7 s, so **only proportions are evidence**:
+
+| Stage | Share |
+| --- | ---: |
+| `resolution.resolve` | **38%** |
+| — `_derive_config_edges` | 20% |
+| `sqlite3.executemany` | **21%** |
+| `ignore_rules.is_ignored` | 9% |
+| `scanner.scan` | 8% |
+
+`_derive_config_edges` is over half of resolution — the same site ADR-0064
+de-quadraticised, still dominant. **But a task optimising resolution alone would
+attack 38% of the cost while ignoring 30% sitting next to it** in persistence
+and ignore matching, neither of which anyone has looked at.
+
+**No optimisation is proposed and none is scheduled.** Committing to a fix off a
+single profile is what ADR-0060 through ADR-0062 did three times before ADR-0064
+measured properly.
+
+#### Files
+
+- `scripts/measure_phase4_perf.py` — `--profile`, recorded in the JSON output.
+- `tests/unit/test_perf_corpus_profile.py` — new, three tests, written first.
+- `docs/evaluation/phase-4-baseline-environment.md` — the measurements.
+- `docs/plans/PLAN.md` — three rows closed, this entry.
+
+#### Next
+
+**DR-03** (enclosing-declaration discriminator, 845 groups) or **DR-01b** (the
+register sweep). Four rulings still await the user and block neither.
 
 ### 2026-09-01T12:00:00Z — DR-01: ADR-0071 measured right and explained wrong, and the gate caught three of my own defects
 

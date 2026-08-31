@@ -56,11 +56,43 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runs", type=int, default=20)
     parser.add_argument("--json-output", type=Path, default=None)
     parser.add_argument("--allow-busy", action="store_true")
+    parser.add_argument(
+        "--profile",
+        choices=("synthetic", "realistic"),
+        default="synthetic",
+        help=(
+            "Corpus shape. `synthetic` is the tracked Phase 4 baseline. "
+            "`realistic` emits Markdown that mentions the symbols the "
+            "modules define, so the reference class ADR-0064 found to "
+            "dominate real cost is present at all."
+        ),
+    )
     return parser
 
 
-def generate_repository(root: Path, modules: int) -> None:
-    """A deterministic Python tree with cross-package imports and calls."""
+def generate_repository(
+    root: Path, modules: int, profile: str = "synthetic"
+) -> None:
+    """A deterministic Python tree with cross-package imports and calls.
+
+    ``profile`` selects what the tree is made of.
+
+    ``synthetic`` is the original and is **kept byte-identical**, because the
+    tracked Phase 4 baseline was taken on it and must stay reproducible.
+
+    ``realistic`` exists because ADR-0064 showed the synthetic one cannot
+    measure what dominates a real repository. ``DOCUMENTS`` is 117,471 of
+    160,687 references there and ``<mention>`` alone is 112,265 of them, while
+    this generator emits no Markdown at all -- so the quadratic term ADR-0062
+    fitted a 1.14 exponent against was not merely under-represented, it was
+    absent. The realistic profile emits documents that mention the symbols the
+    modules define, and modules with enough body to have a realistic size.
+    """
+    if profile not in ("synthetic", "realistic"):
+        raise ValueError(f"unknown profile {profile!r}")
+    if profile == "realistic":
+        _generate_realistic(root, modules)
+        return
     packages = ("core", "services", "adapters")
     for name in packages:
         package_dir = root / "src" / name
@@ -102,6 +134,97 @@ def generate_repository(root: Path, modules: int) -> None:
         target.write_text("\n".join(lines), encoding="utf-8")
 
 
+_HELPERS_PER_MODULE = 8
+_MODULES_PER_DOCUMENT = 2
+
+
+def _generate_realistic(root: Path, modules: int) -> None:
+    """Larger modules, plus Markdown that mentions the symbols they define.
+
+    The document-to-code ratio is deliberately generous rather than tuned to a
+    real repository: the point is that the dominant reference class is *present*
+    and scales with the corpus, not that its share matches any one codebase.
+    Claiming a calibrated ratio would repeat ADR-0062's error in the other
+    direction.
+    """
+    packages = ("core", "services", "adapters")
+    for name in packages:
+        package_dir = root / "src" / name
+        package_dir.mkdir(parents=True)
+        (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (root / "docs").mkdir(parents=True)
+
+    for index in range(modules):
+        package = packages[index % len(packages)]
+        lines = ["from __future__ import annotations", ""]
+        for offset in (1, 2):
+            other = index - offset
+            if other >= 0:
+                other_package = packages[other % len(packages)]
+                lines.append(
+                    f"from src.{other_package}.mod_{other:03d} import "
+                    f"handle_{other:03d}"
+                )
+        lines += [
+            "",
+            f"def handle_{index:03d}(value: str) -> str:",
+            f'    """Transform ``value`` for module {index:03d}."""',
+            f'    marker = "m{index:03d}"',
+        ]
+        for offset in (1, 2):
+            other = index - offset
+            if other >= 0:
+                lines.append(f"    value = handle_{other:03d}(value)")
+        lines += ['    return f"{marker}:{value}"', ""]
+
+        # Body, so a module has a realistic size rather than fifteen lines.
+        for helper in range(_HELPERS_PER_MODULE):
+            lines += [
+                f"def step_{index:03d}_{helper:02d}(value: str) -> str:",
+                f'    """Step {helper} of module {index:03d}."""',
+                "    if not value:",
+                '        raise ValueError("value is required")',
+                f'    prefix = "s{helper:02d}"',
+                "    parts = [prefix, value.strip()]",
+                "    if len(parts) > 1:",
+                '        return "-".join(parts)',
+                "    return value",
+                "",
+            ]
+        lines += [
+            f"def check_{index:03d}(value: str) -> str:",
+            "    if not value:",
+            '        raise ValueError("value is required")',
+            f"    return handle_{index:03d}(value)",
+            "",
+        ]
+        target = root / "src" / package / f"mod_{index:03d}.py"
+        target.write_text("\n".join(lines), encoding="utf-8")
+
+    for start in range(0, modules, _MODULES_PER_DOCUMENT):
+        covered = range(start, min(start + _MODULES_PER_DOCUMENT, modules))
+        prose = [f"# Modules {start:03d}-{max(covered):03d}", ""]
+        for index in covered:
+            prose += [
+                f"## Module {index:03d}",
+                "",
+                f"`handle_{index:03d}` transforms a value and delegates to the "
+                f"two modules below it. `check_{index:03d}` rejects an empty "
+                "value before calling it.",
+                "",
+                "### Steps",
+                "",
+            ]
+            prose += [
+                f"- `step_{index:03d}_{helper:02d}` prefixes and joins the parts."
+                for helper in range(_HELPERS_PER_MODULE)
+            ]
+            prose.append("")
+        (root / "docs" / f"modules_{start:03d}.md").write_text(
+            "\n".join(prose), encoding="utf-8"
+        )
+
+
 def _git(root: Path, *arguments: str) -> None:
     subprocess.run(
         ["git", *arguments],
@@ -139,7 +262,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="codeatlas-perf-") as workspace:
         root = Path(workspace) / "repo"
         root.mkdir()
-        generate_repository(root, args.modules)
+        generate_repository(root, args.modules, args.profile)
         _git(root, "init", "--quiet")
         _git(root, "config", "user.email", "perf@example.invalid")
         _git(root, "config", "user.name", "CodeAtlas Perf")
@@ -189,6 +312,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "machine_settled": unsettled_reason(
             calibration_before, calibration_after
         ) is None,
+        "profile": args.profile,
         "modules": args.modules,
         "runs": args.runs,
         "python": platform.python_version(),
