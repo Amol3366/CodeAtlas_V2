@@ -319,6 +319,42 @@ subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 | DR-08 | **Ruling 3 (ADR-0073):** traversal depth becomes part of each case — an evaluation **dataset contract change**, the loader, and every graph case | DR-01 | `ready` |
 | DR-09 | **Ruling 4 (ADR-0073):** audit all six `TRACE_FLOW` cases together; the outcome is evidence, and the ruling follows it | DR-01 | `ready` |
 
+#### Where to resume (written 2026-09-01, end of session)
+
+**Branch `plan/deferred-register-program`, pushed, working tree clean, gate
+green at `56e3b30`.** Not merged to `main`, deliberately: the program is five
+tasks from done and the branch carries a reindex-forcing bundle bump.
+
+**Read first:** ADR-0072 then ADR-0074. The second corrects the first, and the
+correction is the thing a fresh reader will otherwise re-inherit.
+
+**Start with DR-09** unless directed otherwise. It is the cheapest of the five,
+it is pure evidence-gathering, and its outcome may be an engine defect rather
+than a corpus limit — so it is the one most likely to change what the rest of
+the program should be.
+
+**Nothing waits on the user.** All four rulings were given and are recorded in
+ADR-0073; the decision brief above them is now history, not a queue.
+
+**Two open questions no task owns**, both raised by evidence rather than
+speculation:
+
+1. **783 collision groups remain on the ordinal, ~718 of them two declarations
+   sharing a name, a kind and one enclosing scope.** No mechanism is proposed
+   *on purpose*: it may not be an identity defect at all, and guessing at the
+   mechanism is what produced ADR-0072's five-fold error.
+2. **Two Phase 4 release targets are green on a fixture that provably cannot
+   contain the dominant cost** (DR-02, ADR-0064). Whether to re-gate on the
+   realistic profile is a scope decision about the gate itself.
+
+**Practical notes for the next session.** The five pinned repositories must be
+re-fetched — they lived in a scratch directory, not the repo; the SHAs are in
+`scripts/check_real_repos.py`. Use `scripts/report_symbol_collisions.py` for any
+claim about collision counts rather than a fresh probe. And **edit tracked text
+with the editing tools, not `pathlib.write_text`**: it converts LF to CRLF on
+Windows and `test_no_tracked_file_carries_crlf_into_the_working_tree` will fail
+the gate ten minutes later.
+
 **DR-03 and DR-04 each force a reindex.** Bundling them would remove one, and
 ADR-0071's reason for keeping mechanisms apart — bundling hides which one moved
 which ids — still applies. ADR-0072 leaves that choice to the implementing task,

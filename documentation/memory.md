@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-01
+Last updated: 2026-09-01 (end of session)
 
 ## Current Phase
 
@@ -41,6 +41,30 @@ Two habits this task earned the hard way: **`pathlib.write_text` on Windows
 converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
+
+## Resume point — 2026-09-01, end of session
+
+**Branch `plan/deferred-register-program` at `56e3b30`, pushed, tree clean, gate
+green. Not merged to `main`** — the program has five tasks left and the branch
+carries a reindex-forcing bundle bump (`PARSER_BUNDLE_VERSION` 1.9.0).
+
+Status lives in the Deferred Register Program board in `docs/plans/PLAN.md`,
+which has a **"Where to resume"** block. Do not restate the board here.
+
+Four tasks done tonight: DR-01 (audit + committed census), DR-02 (first real
+preflight measurement), DR-03 and DR-04 (symbol identity, bundled into one
+reindex by user ruling). Four rulings given, recorded as ADR-0073.
+
+**Read ADR-0072 and then ADR-0074 before touching identity work.** The second
+corrects the first by a factor of five, and a reader who stops at ADR-0072 will
+re-inherit the wrong number — which is precisely how this lineage has gone wrong
+three times now.
+
+The lesson that generalises past this program: **an estimate taken by sampling
+is not a measurement.** ADR-0072 classified 981 collision groups from samples
+and predicted 980 would be fixed; 198 were. The census exists so the next
+estimate can be run instead of reasoned — **run it before writing the number,
+not after.**
 
 ## Completed
 
