@@ -88,6 +88,44 @@ Phase 7 adds `scripts/measure_phase7_perf.py`, which writes
 be measured. If it writes `measurement_status: blocked` or exits 2, the Phase 7
 packaging/performance gate is not satisfied in that environment.
 
+### How to take a performance measurement
+
+The harness refuses a run the machine moved under
+(`src/codeatlas/evaluation/quiescence.py`): it takes a calibration probe before
+and after, records both, and blocks with `machine_not_settled` when they differ
+by more than `CALIBRATION_TOLERANCE`. The figures it discarded are kept under
+`measured_but_discarded`, so a blocked run still tells you what it saw.
+
+**That check enforces less than it appears to, and the difference matters.** It
+proves the machine did not change speed *during* a run. It does **not** prove
+the machine was fast, because the right absolute threshold is hardware-specific
+and this project has no reference for the machines it might run on — inventing
+one would be a number chosen to be passed (ADR-0032, ADR-0048). **A constant
+background load therefore passes the drift check.** Only the protocol below
+covers that.
+
+1. **Measure on an idle machine.** Close the test suite, the dev server, and the
+   browser. The harness cannot detect a load that was already there.
+2. **Take at least two runs, separated by other work.** Not back to back.
+3. **Treat a figure within 15% of its threshold as unresolved**, not as a pass
+   or a fail. Re-measure later rather than recording it.
+4. **Never quote a figure from a run that was blocked or given `--allow-busy`.**
+   The flag exists to let someone see a number, not to license publishing it.
+5. **Compare the recorded calibration durations** when two runs disagree. They
+   are in the artifact precisely so machine state can be compared afterwards.
+
+**Why this exists.** On 2026-08-21 a packaged refresh p95 of 2.407 s was
+recorded as a missed release target and defended on the grounds that two runs
+agreed within **26 ms**. On a quiet machine the same artifact measured 1.759 s
+and 1.722 s — agreeing within **37 ms**, and passing. The observed spread across
+that one day was **1.413–2.433 s**, wider than the threshold being compared
+against, and the claim was retracted.
+
+**Within-session agreement is not evidence of validity.** Two runs minutes apart
+share a machine state; they do not sample it. Reproducing a number twice in one
+sitting says nothing about whether the machine was representative — that was the
+load-bearing argument for the whole retracted finding, and it was wrong.
+
 ## Known qualifications
 
 These are stated at the gate rather than in a footnote, because a green run

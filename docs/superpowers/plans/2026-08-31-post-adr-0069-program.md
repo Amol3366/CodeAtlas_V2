@@ -610,6 +610,32 @@ git push
 
 ## Task 4: Give the perf harness a quiescence check
 
+> **HALF OF THIS TASK WAS ALREADY DONE, AND THIS PLAN'S PREMISE WAS STALE.**
+> Corrected 2026-08-31 on discovering `measure_phase7_perf.py:41` already
+> imports `codeatlas.evaluation.quiescence`. The check landed in `e9952bb` on
+> **2026-08-21 at 17:38+0530 — the same day** as the Deferred Register row
+> asserting it did not exist, and the row was never updated.
+>
+> **The premise came from that row and was never checked against the code**,
+> despite this plan opening with a "premises, checked rather than assumed"
+> table. One `grep quiescence scripts/measure_phase7_perf.py` would have
+> disproved it. That is the fourth stale-premise instance in this project's
+> record and the first produced by a plan that explicitly guards against them —
+> the guard works only on the premises you think to put in it.
+>
+> **What existed is better than what Steps 1-3 below specify**, which is the
+> other reason not to have built it: it calibrates *before and after* so it
+> catches a machine that moved mid-run, and it deliberately refuses to enforce
+> an absolute speed threshold, because a hardware number with no reference
+> would be one chosen to be passed (ADR-0032, ADR-0048). Steps 1-3 are
+> therefore **not done and must not be**; they would have replaced a better
+> design with a worse one.
+>
+> **Step 4 was genuinely outstanding** and is now done: the trigger read "a
+> quiescence check, **or** a documented protocol", and only the first half had
+> fired. The protocol is in `docs/operations/release-validation.md`.
+
+
 **Why.** `measure_phase7_perf.py` stamps `refresh_target_met` from whatever the
 machine can do at that instant. On 2026-08-21 it produced a published
 regression claim that was retracted the same day: refresh p95 measured
