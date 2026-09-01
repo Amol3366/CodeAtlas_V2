@@ -44,8 +44,10 @@ README guard** until the counts are updated; that is the guard working.
 
 ## Resume point — 2026-09-03 (the register tail is finished)
 
-**Branch `plan/register-tail`, seven tasks RW-01 to RW-07, not merged.** Design
-and plan are dated 2026-09-02 under `docs/superpowers/`. **No version constant
+**Seven tasks RW-01 to RW-07, merged to `main` 2026-09-03** as `c208397`
+(`--no-ff`); branch `plan/register-tail` kept. Gate green on the merged content
+before pushing: exit 0, **2472 passed, 3 skipped**. Design and plan are dated
+2026-09-02 under `docs/superpowers/`. **No version constant
 moved, so no reindex.** Board and the full findings live in `docs/plans/PLAN.md`
 — do not restate them here.
 

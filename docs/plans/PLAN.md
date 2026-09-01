@@ -323,8 +323,12 @@ subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 
 #### Where to resume (updated 2026-09-03 — the register tail is finished)
 
-**The register-tail program is complete: RW-01 to RW-07**, on branch
-`plan/register-tail`, **not yet merged**. Design and plan are
+**The register-tail program is complete: RW-01 to RW-07**, and **merged to
+`main` 2026-09-03** as `c208397` (`--no-ff`, 7 commits). The merged tree was
+**byte-identical** to the branch tip and `main` had not moved, so the gate taken
+on the branch carries over exactly: `check_phase4.ps1 -SkipSync` **exit 0, 2472
+passed, 3 skipped**, 9m40s. The branch is **kept**, following the
+`query-backed-language-support` precedent. Design and plan are
 `docs/superpowers/specs/2026-09-02-register-tail-design.md` and
 `docs/superpowers/plans/2026-09-02-register-tail.md`; the 02:00Z handoff below
 carries the findings. **No version constant moved, so no reindex.**
