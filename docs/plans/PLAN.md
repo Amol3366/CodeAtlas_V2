@@ -345,6 +345,14 @@ recorded here rather than left to look like an inconsistency.
 All three were implemented against premises that turned out to be wrong, and
 each records the correction rather than working around it.
 
+**Superseded 2026-09-02 by the register-tail plan.** What follows was written
+when the program closed; the tail it describes is now designed and planned in
+`docs/superpowers/specs/2026-09-02-register-tail-design.md` and
+`docs/superpowers/plans/2026-09-02-register-tail.md`, **awaiting user review.
+Nothing is started.** Two of the items below turned out to be already done --
+see the 23:30 handoff entry -- and the `-Semantic` ruling is **refused as
+posed** there, with a narrower fix that does not trade against gate condition 2.
+
 **Two rulings wait on the user and block nothing:**
 
 1. Close the `TRACE_FLOW` row as a working corpus convention (DR-09's audit
@@ -352,12 +360,16 @@ each records the correction rather than working around it.
    `EXACT_SYMBOL` does).
 2. Whether the `-Semantic` `--check` steps should stop being opt-in. This now
    matters more: those artifacts went stale twice, and DR-06 moved them again.
+   **Now answered by RW-03's design: no, and the ruling as phrased has no good
+   answer** -- making it mandatory makes the deterministic gate depend on
+   torch, which gate condition 2 exists to catch.
 
 **Two open questions own no task**, both raised by evidence: the **783 ordinal
 collision groups** (~718 sharing a name, a kind *and* one enclosing scope — no
 mechanism proposed on purpose), and whether to **re-gate Phase 4 on the
 realistic performance profile**, where the ≤ 2 s refresh target is missed from
-80 modules up.
+80 modules up. **Both now own a task** -- RW-05 and RW-06 -- and RW-05 still
+proposes no mechanism.
 
 #### Superseded resume note (2026-09-02, mid-session)
 
@@ -528,6 +540,115 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-02T23:30:00Z — The register tail, planned; and two of its six items were already done
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **No task status moved.** A design and a plan were written for
+  everything the register still carries after the Deferred Register Program.
+  **Nothing is approved and nothing is started**; the plan awaits user review.
+- Outcome: no product code changed, no version constant moved, **no reindex**.
+
+#### The finding, which is the same finding as last time
+
+The register holds **26 rows whose disposition reads `OPEN`; only nine are
+live.** The rest are archived originals or rows whose closure sits in a later
+column. The design was written by *parsing* the table rather than grepping for
+the word, which is the only reason the count is right.
+
+**Two of the six items reported as remaining work are not remaining work.**
+
+1. **The `relation_path_recall` threshold was already chosen.** Row 121 asks
+   for someone to "choose the threshold against the 24-case denominator".
+   **ADR-0058 chose it on 2026-08-17** — gated **absolutely at 1.0**, user as
+   decision owner, implemented at `runner.py:861`. Absolute is a shape no
+   denominator arithmetic can influence, so the 24 never selected anything.
+   What *is* stale is a comment: the denominator is now **27 measured of 35
+   declaring, 44 edges** (DR-07 moved it), against the comment's "24 ... 21
+   declare one edge, and one each declare two, three and five".
+2. **The query-backed engine already emits signatures.** Row 93's follow-up
+   proposes "teaching it signatures ... for four languages". `registry.py`
+   records that **ADR-0071 (bundle 1.8.0) gave Java and Scala one**, and that
+   **Go and Rust emit `None` deliberately — measured, a signature separates
+   none of the collisions they actually produce.** ADR-0074 then added a
+   discriminator for all four. The remedy shipped; only the 783-group residual
+   remains, and that is a measurement.
+
+That is the fourth and fifth time in two programs that a task premise has died
+on first contact with one command. The plan's first task is therefore
+correcting the record, before anything is planned against it.
+
+#### A defect found while reading, not looked for
+
+`engine_adapter.py` carries the five-line comment beginning *"The case's own
+depth, never the request default (ADR-0073 ruling 3)"* **twice, verbatim** —
+introduced by DR-08, this agent's own work. Queued in RW-01.
+
+#### The plan
+
+Seven tasks: **four instruments, one guard, one hygiene pass, one brief.**
+
+- **RW-01** correct the two stale rows and two stale comments.
+- **RW-02** a routing-fidelity instrument — re-score the corpus routed by
+  `classify(case.question)`. The `Trace ...` gap cannot honestly be fixed
+  before this exists: the corpus bypasses the classifier by design, so
+  widening the regex today would be tuning against one hand-run example.
+- **RW-03** an inputs digest stamped into the `-Semantic` artifacts, with a
+  no-extras guard. **This refuses the ruling as posed.** Making the semantic
+  block mandatory would make the deterministic gate depend on torch, which
+  gate condition 2 exists to catch. The real gap is narrower and closes
+  without extras. Records ADR-0078.
+- **RW-04** re-measure ranking sensitivity, which ADR-0075 unblocked.
+- **RW-05** classify the 783 residual and **propose no mechanism**.
+- **RW-06** the Phase 4 realistic-profile brief.
+- **RW-07** close out.
+
+#### Files
+
+- Created: `docs/superpowers/specs/2026-09-02-register-tail-design.md`,
+  `docs/superpowers/plans/2026-09-02-register-tail.md`.
+- Changed: this log.
+
+#### Contracts and migrations
+
+None. No contract, schema, or version constant moves anywhere in the plan.
+
+#### Verification
+
+Every claim above was measured, not recalled:
+
+- denominator — `load_dataset` over `tests/evaluation/cases`: 35 declaring, 27
+  measured, 44 edges, distribution 30/3/1/1;
+- signatures — `parsing/registry.py` bundle history, 1.8.0 and 1.9.0;
+- threshold — `runner.py:861` and ADR-0058's front matter;
+- live-row count — the disposition column parsed, not grepped.
+
+The plan itself was self-reviewed against the spec and three defects in it were
+fixed: a missing `relation_paths=[]` in a `QueryPrediction` fixture, a
+`--fetch-only` flag on `check_real_repos.py` **that does not exist** (it is
+`--workspace`), and a step that described `--residual-detail` instead of
+showing it.
+
+#### Limitations
+
+- **RW-03 step 5 needs the semantic extras** to regenerate both artifacts. If
+  they cannot be installed, that task stops there — a digest must never be
+  hand-stamped into an artifact nobody regenerated.
+- **RW-05 needs the five pinned repositories re-fetched**; they were never in
+  the repo. SHAs are in `scripts/check_real_repos.py`.
+- **RW-06 is machine-specific.** Its JSON outputs must not be committed.
+
+#### Next
+
+**The user reviews the plan.** Three rulings remain theirs and block nothing:
+widening the classifier (RW-02's number is the input), re-gating Phase 4
+(RW-06's brief), and closing the `TRACE_FLOW` row (DR-09 recommends yes).
+
+**Three flakes are deliberately unplanned** — the Firefox cross-suite leak, the
+concurrent full-suite failure, and the `check_phase7` exit-1 run. Each has a
+capture recipe and none has reproduced. Chasing one without a capture produces
+a guess, which is what the recipes exist to prevent.
+
 
 ### 2026-09-02T21:00:00Z — DR-06 finished: three rows closed, and two of the three needed a shape rather than a case
 
