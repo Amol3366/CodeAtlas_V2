@@ -15,7 +15,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.9.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2413 passed, 3 skipped** — one *complete* `check_phase4.ps1 -SkipSync` run, exit 0, 2026-09-01, 11m11s. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the seven Chromium Playwright skips, which live in the browser suites and are not part of this gate |
+| **Tests** | **2420 passed, 3 skipped** — one *complete* `check_phase4.ps1 -SkipSync` run, exit 0, 2026-09-02. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the seven Chromium Playwright skips, which live in the browser suites and are not part of this gate |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
