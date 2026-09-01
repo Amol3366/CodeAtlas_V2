@@ -321,6 +321,36 @@ subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 | DR-08 | **Ruling 3 (ADR-0073):** traversal depth becomes part of each case — an evaluation **dataset contract change**, the loader, and every graph case | DR-01 | `ready` |
 | DR-09 | **Ruling 4 (ADR-0073):** audit the `TRACE_FLOW` cases together; the outcome is evidence, and the ruling follows it. **There are five, not six** — ADR-0051 re-typed q006 | DR-01 | `complete` — **the label is not systemically wrong**; `TRACE_FLOW` agrees 1/5 against `EXACT_SYMBOL`'s 0/36. Instrument committed. One separate product finding opened as its own row; **the closing ruling is the user's** |
 
+#### Where to resume (updated 2026-09-02)
+
+**Branch `plan/deferred-register-program` at `574569d`, pushed, tree clean, gate
+green** — `check_phase4.ps1 -SkipSync` exit 0, **2420 passed, 3 skipped**, 8m32s.
+Still not merged to `main`; the reindex-forcing bundle bump stands.
+
+**DR-09 and DR-01b are `complete`. DR-06 is untouched. DR-07 and DR-08 are both
+blocked on a user decision**, and neither blocker is in the code:
+
+- **DR-07 — ADR-0073 ruling 2 contradicts itself.** It rules "exclude cases
+  declaring no relations" and predicts a smaller denominator and a moved number.
+  `runner.py:662` has filtered `if case.expected_relations` since before the
+  ruling, so **exclusion is the status quo and nothing moves**. The options are
+  also inverted: `_precision(predicted, ∅)` returns **0.0**, so *keeping* such a
+  case is what would make a broadened answer visible, and excluding is what keeps
+  it invisible — the complaint the row was opened on. **Implementing either
+  reading without a ruling produces the opposite of the other.**
+- **DR-08 — the measurement is unanimous and that is the finding.** All **31**
+  graph cases have every declared relation satisfied at **depth 1**; none needs
+  depth 2. Declaring 1 everywhere raises relation precision and **removes the
+  ranking sensitivity ADR-0059 preserved on purpose** — depth-2 distractors are
+  what make `exact_symbol_resolution` a ranking gate, and q003, q005, q015 and
+  q053 are sensitive only through them. ADR-0073 says ruling 3 *extends*
+  ADR-0059; depth 1 everywhere **overturns** it. Unanticipated fork, needs a
+  ruling.
+
+**Do DR-06 next if you want unblocked work.** It depends on neither decision,
+though it adds cases and therefore moves denominators, so it is cheaper *after*
+DR-07 and DR-08 settle than before.
+
 #### Where to resume (written 2026-09-01, end of session)
 
 **Branch `plan/deferred-register-program`, pushed, working tree clean, gate

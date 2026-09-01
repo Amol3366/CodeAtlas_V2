@@ -42,6 +42,45 @@ converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
 
+## Resume point — 2026-09-02
+
+**Branch `plan/deferred-register-program` at `574569d`, pushed, tree clean,
+gate green** (`check_phase4.ps1 -SkipSync` exit 0, **2420 passed, 3 skipped**,
+8m32s). Not merged to `main` — the branch still carries the reindex-forcing
+`PARSER_BUNDLE_VERSION` 1.9.0.
+
+**DR-09 and DR-01b are complete.** DR-06 is untouched. **DR-07 and DR-08 are
+both blocked on a decision, and neither blocker is about the code.**
+
+**DR-07's ruling contradicts itself, and the code already does what it says.**
+ADR-0073 ruling 2 says "exclude cases declaring no relations from relation
+precision" and predicts the denominator shrinks and the number moves.
+`runner.py:662` has filtered `if case.expected_relations` all along, so
+excluding is the *status quo* and nothing moves. Worse, the options are
+inverted: **keeping** a vacuous case would make broadening visible, because
+`_precision(predicted, ∅)` returns **0.0** — excluding is what keeps it
+invisible, which is the very complaint the row was opened on. Do not implement
+either reading without asking; they are opposites.
+
+**DR-08's measurement came out unanimous and that is the problem.** All **31**
+graph cases have every declared relation satisfied at **depth 1** — none needs
+depth 2. So "declare each case's depth" means declaring 1 everywhere, which
+would raise relation precision *and* **delete the ranking sensitivity ADR-0059
+deliberately preserved**: depth-2 distractors are what make
+`exact_symbol_resolution` a ranking gate rather than a resolution gate, and
+q003, q005, q015 and q053 are sensitive only because of them. ADR-0073 says
+ruling 3 "extends ADR-0059 rather than overturning it" — depth 1 everywhere
+overturns it. That fork was not anticipated and needs a ruling.
+
+**Two habits this session earned.** A background gate was started and then
+tracked files were edited while it ran, including one a test reads — **that run
+was void and was discarded rather than cited**; never edit the tree a gate is
+measuring. And the first DR-08 derivation used "all expected symbols returned",
+which marked 15 of 31 cases unsatisfiable — until reading them showed most
+expect *their own subject*, the class ADR-0073 ruling 1 made permanently
+unsatisfiable on purpose. **A criterion that disagrees with a standing ruling is
+the criterion's bug.**
+
 ## Resume point — 2026-09-01, end of session
 
 **Branch `plan/deferred-register-program` at `56e3b30`, pushed, tree clean, gate
