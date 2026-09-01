@@ -115,11 +115,11 @@ read as unaudited, not as settled.
 | **`restart-persistence` on Firefox can see another suite's conversation** | **OPEN — an intermittent cross-suite state leak, observed once with its mechanism visible, and NOT reproduced in three attempts.** Seen 2026-08-19 in the post-merge gate on `main`: `restart-persistence.spec.ts:15` expected its own question `IdempotencyStore.claim` in `message-user` and the locator resolved five times to **`PaymentService.capture`** — another suite's question. So it is **not a timeout or a timing flake**; the page showed a conversation the test did not create. The suites share one `.e2e-tmp` database and run `workers: 1, fullyParallel: false`, and `restart-persistence` is skipped on Chromium — so on Firefox it always runs after Chromium has already created state. **Not caused by the merge or by the skip that preceded it**: the merged tree is byte-identical to a tip that passed `check_phase7` with 14 e2e passes, and a skip only removes work from Chromium. **Three full clean runs of both projects afterwards were 8 skipped / 14 passed / exit 0.** **More was captured than last time.** The register's earlier flake row recorded that *which* tests failed was lost to a truncating pipe; here the assertion text names the mechanism. **Not chased further** — it did not reproduce, and hunting an intermittent through a 6-minute gate is a poor loop | **Capture recipe (DR-01):** keep the Playwright trace, the full worker log, and a copy of `.e2e-tmp` taken BEFORE the run is torn down -- the conversation rows are the evidence and teardown deletes them. Record the worker index and whether the suites ran in parallel |
 | ~~**Chromium Playwright tests now FAIL, not just skip**~~ | **CLOSED 2026-08-19 — reproduced, mechanism named, then ruled by the user.** **The mechanism:** Chromium's renderer *crashes* (`Protocol error (Runtime.callFunctionOn): Page crashed`) while rendering the Settings **Embedding provider** fieldset for a repository whose policy transmits; the trace shows `goto /settings` completing and the `settings-repository` assertion *passing* first, so the page mounts before the renderer dies. It is a crash, not a failed expectation. **The row's own prime suspect was wrong.** Residue is ruled out — it reproduces with `.e2e-tmp` deleted; so is a stale bundle (freshly built `dist`), a flake (**five runs, five failures**), and the headless shell (`--headed` crashes identically). Firefox renders the identical tree correctly. **Third recorded instance of a written-down diagnosis being wrong: a remedy in this register is still a hypothesis.** **It falsified the claim that shaped the test** — `end-to-end-tests.md` and the spec's own docstring both said a full page load renders the branch correctly on both engines, which is why this test used `page.goto` and stayed unskipped. Corrected in both, with the probes that produced the original claim kept rather than deleted. **Ruled by the user: skip it like the other seven.** Applied through a *separate* helper, `skipChromiumSettingsCrash`, because the existing reason string says "conversation-route navigation" and would have mislabelled this crash in the report. `rules.md` forbids skipping a test to make a build pass, so this was applied only on the ruling and is recorded as one. **After: chromium 8 skipped / 3 passed / 0 failed (exit 0); firefox 11 passed / 0 skipped / 0 failed (exit 0)** — so no assertion was lost, only the engine it is proven on | Chromium ships a build that renders the branch — delete the helper call and run `playwright test settings.spec.ts --project=chromium` |
 | **A `CALLERS` expectation may name its own subject**                                                        | **OPEN — narrower than what ADR-0059 ruled, and deliberately left.** q005 expects `IdempotencyStore.claim` among the callers of `IdempotencyStore.claim`, and q053 expects `OrderPipeline.advance` among its own; nothing calls itself here, so both lose recall for declaring it. **This is not the ADR-0018 violation it first appears to be** — that record explicitly allows a self-referential case ("absent means `expected_symbols[0]`, which is correct for every exact, lexical, and self-referential case") and separately records that module-scoped queries *do* return the subject first. **A first reading that nine cases contradicted ADR-0018 was wrong and is corrected here rather than acted on** | **CLOSED 2026-09-01 -- ADR-0073, ruling 1. Ruled by the user: leave both as declared.** The recall cost is accepted as a stated limit, not fixed: q005 and q053 permanently score below what the engine achieves, and `relation_path_recall` understates it by that margin. Correcting the cases and changing the engine were both on the table and neither was chosen                                                                       |
-| ~~original entry~~                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | **RULED 2026-09-01 -- ADR-0073, ruling 3: traversal depth becomes part of each case.** Authorises **DR-08**. Extends ADR-0059 rather than overturning it; it is a dataset contract change, not a case edit                                                                                                                    |
+| ~~original entry~~                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | **CLOSED 2026-09-02 -- ADR-0075, and the measurement pointed the other way.** `QueryCase` gains `traversal_depth`, required for the five graph intents and **forbidden** elsewhere, and the adapter passes it instead of taking the default. **Every graph case declares 2 -- the value it already had.** Measured: all **31** satisfy their declared relations at depth **1**, and depth 1 was **rejected** because it removes every depth-2 result, and those are the corpus's only distractors: `exact_symbol_resolution` would stop being a ranking gate, the four reversal-sensitive cases would stop being sensitive, and ADR-0052's indirect-claim rendering would stop being exercised. ADR-0073 says ruling 3 *extends* ADR-0059; depth 1 would have overturned it. **Both baselines reproduce byte-for-byte**, which is the evidence no answer changed. A first derivation using "all expected symbols returned" called 15 of 31 unsatisfiable -- wrong, because most expect **their own subject**, the class ADR-0073 ruling 1 made permanently unsatisfiable on purpose                                                                                                                    |
 | **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | **CORRECTED 2026-09-02 (DR-01b), not closed -- the count is stale by one and the citation is ADR-0059.** "Reversing the ranking fails **0 of 23**" was true when written on 2026-08-15 and stopped being true two days later: `git log -S` confirms **q053 was added in `9f919f0`**, the very commit that added those 23, and **ADR-0059 states "q053 becomes the first post-2026-08-15 case to be reversal-sensitive"**. So it is **1 of 23**, not 0. **The row's substance survives** -- 22 of 23 still are not ranking-sensitive, and corpus growth still raised the count more than the coverage. **DR-08 changes what this row measures**: ADR-0073 ruling 3 makes traversal depth part of each case, and depth is exactly what decides whether a returned symbol is a distractor. Re-measure after DR-08, not before                                                                                                   |
 | ~~`relation_path_recall` has no gate target~~                                                                      | **CLOSED 2026-08-17 — ADR-0058. Gated at 1.0, absolutely.** Absolute for ADR-0032's reason: a deterministic emission question, not a ranking one, and **no tolerance has a named cause** — a bounded traversal or `MAX_RELATION_PATHS` truncation that lost a declared edge would be a defect to fail on, not luck to absorb. The denominator is **24 and not uniform** (21 declare one edge; one each two, three, five), so reachable values below 1.0 are 0.9917 / 0.9861 / 0.9792 / 0.9583 — 0.99 would privilege q060 by accident of its edge count and 0.95 would buy a tolerance nobody can justify. **Registered on the `retrieval` profile only, and that is load-bearing:** the semantic corpus declares zero relations, so its aggregate is `None` and `_unmet_targets` counts `None` as a miss — a shared entry would have failed the Phase 7 gate on a metric that corpus cannot express (ADR-0023's mistake). **Mutation-checked:** regressing ADR-0057 drove recall 1.0 → 0.875 and the gate caught it. `baseline-phase-0` gains the entry, correctly — a gate the null baseline does not miss asks nothing | —                                                                                             |
 | ~~original entry~~                                                                      | **STILL OPEN, but its blocker is discharged (ADR-0057, 2026-08-17).** ADR-0038 deferred the threshold because one of ADR-0034's four causes was unsettled; that cause is now ruled and implemented, and **`relation_path_recall` reads 1.0000** over a denominator of **24** measured cases that declare a relation. The user deliberately deferred choosing the threshold until the number was known, so this is now a live decision rather than a blocked one. **Compute what one miss is worth before picking it:** at 24 cases a single miss scores 0.9583, so a 0.98 target would be as inexpressible as the ones ADR-0032 and ADR-0033 had to correct | Someone chooses the threshold against the 24-case denominator                                                                                                             |
-| **A lexical answer can broaden with no metric moving**                                                          | **OPEN — a stated limit of the instrument, found 2026-08-17 by ADR-0057.** q006 and q031 now emit **true** edges the corpus does not declare, so their per-case precision falls 1.00 → 0.00 — and **the aggregate cannot see it**, because `relation_scores` is built only from cases where `case.expected_relations` is non-empty. A case declaring nothing cannot measure relation accuracy, which is defensible, but it means this change made two answers broader with **no number moving anywhere**, and a future change making them broader still would be equally invisible. **Deliberately not fixed:** declaring relations on q006/q031 to make them visible would be editing the corpus in response to an engine change (ADR-0003) | **RULED 2026-09-01 -- ADR-0073, ruling 2: exclude them.** Authorises **DR-07**. The denominator shrinks, so the reported number moves and a tracked baseline must be regenerated as its own reviewed commit -- a metric that moves because its denominator changed is not an improvement (ADR-0053)                                                                                 |
+| **A lexical answer can broaden with no metric moving**                                                          | **OPEN — a stated limit of the instrument, found 2026-08-17 by ADR-0057.** q006 and q031 now emit **true** edges the corpus does not declare, so their per-case precision falls 1.00 → 0.00 — and **the aggregate cannot see it**, because `relation_scores` is built only from cases where `case.expected_relations` is non-empty. A case declaring nothing cannot measure relation accuracy, which is defensible, but it means this change made two answers broader with **no number moving anywhere**, and a future change making them broader still would be equally invisible. **Deliberately not fixed:** declaring relations on q006/q031 to make them visible would be editing the corpus in response to an engine change (ADR-0003) | **CLOSED 2026-09-02 -- ADR-0076, and the ruling's premise was already false.** `runner.py` has excluded cases declaring no relations since before ADR-0073, so "exclude them" was the **status quo** and could move nothing; and the options carried each other's consequences, since `_precision(predicted, empty)` returns **0.0**, making *keeping* such a case the thing that would expose broadening. Re-put to the user with that evidence; they chose the third option -- **a case whose answer carries relations declares them.** Exactly three did not: q003, q006, q031, now declaring seven edges **read off the fixture source rather than transcribed from the engine** (ADR-0003). `relation_path_correctness` **0.8932 -> 0.9024**, entirely because the denominator grew **24 -> 27** with three cases at 1.0 -- **no engine change, no answer change**, and recorded so it is never cited as uplift (ADR-0053). Recall holds **1.0**, so ADR-0058's absolute gate stands, which is also the check on the gold: seven edges declared from source, seven emitted. Guarded corpus-derived, mutation-checked                                                                                 |
 | **ADR-0057's withheld-step branch is unreachable from the fixtures**                                            | **OPEN — a stated limit of what the suite exercises, not a defect.** A step whose edge falls outside every returned chunk is withheld rather than shown with a gap. Mutating that branch to cite a fabricated id leaves the suite green, because in every corpus fixture each edge lands inside a returned chunk. **It is not dead code** — a bounded result set or a chunk dropped by evidence validation reaches it. `_containing` is pinned by a direct unit test instead, including both rejection cases the fixtures cannot produce. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it (ADR-0055) | Someone adds a fixture where a matched symbol's edge sits outside every returned chunk                                                                                     |
 | ~~RRF coarse-chunk bias~~                                                                                            | **CLOSED 2026-08-17 — ADR-0056, measured corpus-wide at three penalty strengths. The answer is that the lever is a pure loss.** ADR-0030 predicted a *trade* — an evidence hit for a symbol hit. **It is not a trade:** `symbol_recall_at_10` falls **0.9286 → 0.8571** alongside `containing_evidence_recall_at_10` **1.0000 → 0.8667**, and **every metric that moves, moves down, at every strength**. The cause is a case ADR-0030 did not anticipate — **s013's expected answer `OrderStatus` is itself a class chunk**, so the penalty demotes the answer it exists to promote (7 → 28), while s001 loses its only containment hit (1 → 11) exactly as predicted. The single gain in the corpus is s007, 8 → 7 — already inside the top 10, so it cannot improve any Recall@10, and its ~0.001 of MRR is swamped by the losses. Incidence today: a coarse chunk outranks the declared evidence in **2 of 14 cases**, both still inside the top 10, so the bias costs **zero** recall. Result is monotone against the lever — both losses occur because the *expected* chunk is coarse, so widening the definition can only demote them further. Instrument validated against three figures recorded before it existed (s013 rank 7, s001 symbol rank 12, `symbol_recall_at_10` 0.9286) and agrees with all three                                                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                             |
 | **The corpus that fusion runs on never grew, and the task premise said it had**                                  | **OPEN — a stated limit of what any fusion measurement can show, found 2026-08-17 by ADR-0056.** Task 7 was scoped as measuring the bias "now the corpus is larger". It is not larger. `_fuse` is gated on `SEMANTIC_INTENTS` (`{PROJECT_OVERVIEW, TEXT}`) and the Phase 4 path `predict_exact_symbols` attaches no fusion at all, so **WS-1's growth of `tests/evaluation/cases` 27 → 50 reached a corpus fusion never touches.** The only corpus that reaches it is `tests/evaluation/semantic_cases` — **14 cases over one fixture**, `queries.json` and `changes.json` byte-identical since `38cc393` (2026-07-31), the sole change anywhere in that tree being ADR-0023's two-line `target_profile`. **Another stale premise** — recorded under Tasks 1, 2, 3, 6 and both WS-1 sub-tasks, with **Task 4 still the only one that checked out**. ADR-0056's conclusion is unaffected but rests on 14 cases, not 50, and must not be quoted as though the corpus had grown | Someone gives the semantic corpus a second fixture — a fixture shape, not a case |
@@ -317,8 +317,8 @@ subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 | DR-04 | **Own declaration form** — predicted 135, **measured 133**; bundled with DR-03 into **one** reindex by user ruling; ADR-0074; `PARSER_BUNDLE_VERSION` **1.9.0** | DR-03 | `complete` |
 | ~~DR-05~~ | ~~Go enclosing scope as a separate task~~ — **retired 2026-09-01 by ADR-0072.** Go's 5 groups are one language of DR-03's mechanism, not a mechanism of their own | — | `n/a` |
 | DR-06 | Fixture shapes the evaluation corpus cannot currently express                                  | DR-01        | `ready` |
-| DR-07 | **Ruling 2 (ADR-0073):** relation precision excludes cases declaring no relations — **moves a reported number**, so the affected baseline is regenerated as its own reviewed commit | DR-01 | `ready` |
-| DR-08 | **Ruling 3 (ADR-0073):** traversal depth becomes part of each case — an evaluation **dataset contract change**, the loader, and every graph case | DR-01 | `ready` |
+| DR-07 | **Ruling 2 (ADR-0073), re-ruled 2026-09-02 — ADR-0076.** The ruling's premise was false (exclusion was already the behaviour); re-put to the user, who chose *cases declare their relations*. q003, q006, q031 declare seven source-derived edges | DR-01 | `complete` — `relation_path_correctness` **0.8932 → 0.9024** by denominator growth **24 → 27**, not by any engine change |
+| DR-08 | **Ruling 3 (ADR-0073) — ADR-0075.** `traversal_depth` added to the dataset contract, required for graph intents and forbidden elsewhere; all 31 graph cases declare **2** | DR-01 | `complete` — **no number moves and both baselines reproduce byte-for-byte.** Depth 1, which the measurement supports, was rejected: it deletes the corpus's only distractors |
 | DR-09 | **Ruling 4 (ADR-0073):** audit the `TRACE_FLOW` cases together; the outcome is evidence, and the ruling follows it. **There are five, not six** — ADR-0051 re-typed q006 | DR-01 | `complete` — **the label is not systemically wrong**; `TRACE_FLOW` agrees 1/5 against `EXACT_SYMBOL`'s 0/36. Instrument committed. One separate product finding opened as its own row; **the closing ruling is the user's** |
 
 #### Where to resume (updated 2026-09-02)
@@ -465,6 +465,128 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-02T15:00:00Z — DR-08 and DR-07: one ruling's premise was false, and the other's measurement argued against itself
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-08 and DR-07 both `complete`** (ADR-0075, ADR-0076). Two
+  register rows closed. **DR-06 is the only task left.**
+- `SCHEMA_VERSION` **14**, `contract_version` **1.1**, `PARSER_BUNDLE_VERSION`
+  **1.9.0**, chunker **1.1.0**, resolver **1.5.0** — all unchanged. No
+  migration. The evaluation dataset contract stays at **1.0**.
+
+#### DR-08: the measurement said depth 1, and depth 1 was refused
+
+ADR-0073 ruling 3 made traversal depth part of each case but did not say what
+depth. Measured across depths 1–3, checking the smallest that returns every
+relation a case declares: **31 of 31 satisfied at depth 1. None needs 2.**
+
+Read literally that means declaring 1 everywhere. **It was rejected**, because
+depth 1 also removes every depth-2 result and those are the corpus's only
+distractors. Without them `exact_symbol_resolution` stops being a *ranking* gate
+and becomes a resolution gate, the four reversal-sensitive cases stop being
+sensitive, and ADR-0052's indirect-claim rendering stops being exercised by
+anything. ADR-0073 states ruling 3 *extends* ADR-0059; depth 1 would overturn it.
+Raising precision by deleting the distractors is a number improving because the
+measurement got easier.
+
+**So every graph case declares 2 — the value it already had.** Both tracked
+baselines reproduce **byte-for-byte**, which is the evidence this changed no
+answer. Depth is now explicit, so retuning it is an arguable change with its own
+measurement rather than an invisible default.
+
+**The first derivation was wrong and is recorded.** Using "all `expected_symbols`
+returned" marked **15 of 31** unsatisfiable at any depth — until reading them
+showed most expect *their own subject* (q052 wants `renderList` among the callers
+of `renderList`), which is the class ADR-0073 ruling 1 made permanently
+unsatisfiable **on purpose**. A criterion that disagrees with a standing ruling
+is the criterion's bug.
+
+**The wiring needed a test the corpus cannot provide.** With every case at 2 and
+the dataclass default also 2, deleting `max_depth=` left **26 corpus-driven tests
+green** — verified by mutation. A stub reading the constructed request pins it,
+parametrised over 1, 2 and 3, because asserting only 2 passes against a
+hard-coded default.
+
+#### DR-07: the ruling's premise was already false
+
+ADR-0073 ruling 2 ruled "exclude cases declaring no relations" and predicted a
+smaller denominator and a moved number. **`runner.py` has filtered
+`if case.expected_relations` since before that ruling** — exclusion was the
+status quo, so the reading was a no-op.
+
+And the options carried each other's consequences. `_precision(predicted, ∅)`
+returns **0.0**, so *keeping* a vacuous case is what would make broadening
+visible; **excluding is what keeps it invisible**, which is the complaint
+ADR-0057 opened the row on. Rather than pick a reading, the question was put
+again with that evidence, and the user chose the third option: **a case whose
+answer carries relations declares them.**
+
+Exactly three did not — **q003, q006, q031** — now declaring seven edges.
+
+**The gold was read off the fixture source, not transcribed from the engine**
+(ADR-0003; ADR-0036 records two expectations that named things the engine could
+not produce because nobody checked the source):
+
+- q003 — `service.py:10` calls `self.store.claim(key)`, `store` annotated
+  `IdempotencyStore` on `__init__`, so it resolves.
+- q006 — the class body defines exactly `__init__` and `claim`. **Both** edges
+  declared: declaring only the answer-bearing one would penalise the engine for
+  citing every supporting edge, the defect ADR-0038 corrected.
+- q031 — `flow.md:3` describes the frontend requesting the route `loadOrder`
+  calls, `:5` what `get_order` returns. The derivation discriminates: it emits
+  **no** edge to `health`, which the document never mentions.
+
+**`relation_path_correctness` 0.8932 → 0.9024**, entirely because the denominator
+grew **24 → 27** with three cases at 1.0. **No engine change and no answer
+change** — this must never be cited as uplift (ADR-0053). Exactly one line
+differs in each of the two baselines; Phase 3's four pre-existing unmet targets
+are untouched.
+
+**Recall holds at 1.0**, so ADR-0058's absolute gate stands — and that is the
+strongest check on the gold: seven edges declared from source, seven emitted.
+
+#### Files
+
+- `src/codeatlas/evaluation/dataset.py` — `traversal_depth`, `GRAPH_INTENTS`,
+  the two-way validator.
+- `src/codeatlas/evaluation/engine_adapter.py` — passes the case's depth.
+- `tests/evaluation/cases/queries.json` — 31 depths, 7 relation edges, **edited
+  in place**: a `json.dumps` round-trip rewrites all ~2600 lines and buries the
+  real insertions, the reflow ADR-0069's handoff stripped from four files. A test
+  pins the file's own spacing.
+- `docs/evaluation/baseline-phase-{3,4}.{json,md}` — one line each, own commit.
+- `tests/evaluation/test_traversal_depth.py` — new, 11 tests.
+- `tests/evaluation/test_engine_adapter.py` — the corpus-derived DR-07 guard.
+- `docs/adr/0075-*.md`, `docs/adr/0076-*.md` — new.
+- `docs/adr/README.md` — **four missing rows added.** The index stopped at
+  ADR-0071 while the directory held 0074; the README's count guard counts files,
+  not rows, so nothing had noticed.
+
+#### Verification
+
+```text
+uv run pytest tests/evaluation -q                     140 passed
+uv run ruff check src tests scripts apps              All checks passed
+run_phase3_baseline.py --check                        exit 0 (after regeneration)
+run_phase4_baseline.py --check                        exit 0 (after regeneration)
+```
+
+Mutation-checked three ways: removing the depth wiring fails the parametrised
+adapter test at depths 1 and 3 (and passes at 2, which is why it is
+parametrised); stripping q031's declarations fails the DR-07 guard naming q031.
+
+#### Limitations
+
+- **DR-07 measures only what the fixtures emit.** A case emitting nothing still
+  contributes no denominator, correctly — there is nothing to be right about.
+- **ADR-0056's finding is untouched**: the corpus fusion runs on is still 14
+  cases over one fixture.
+
+#### Next
+
+**DR-06 is the only remaining task.** Two register rows still wait on a user
+ruling and block nothing: the `TRACE_FLOW` convention and the `-Semantic` opt-in.
 
 ### 2026-09-02T11:00:00Z — DR-01b: the sweep finished, and the register's own notation hid more than the staleness did
 
