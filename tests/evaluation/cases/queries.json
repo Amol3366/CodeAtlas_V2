@@ -79,7 +79,7 @@
                                                "PaymentService.capture"
                                            ],
                       "expected_relations":  [
-
+                                                 "PaymentService.capture CALLS IdempotencyStore.claim"
                                              ],
                       "expected_evidence":  [
                                                 {
@@ -181,7 +181,8 @@
                                                "IdempotencyStore.claim"
                                            ],
                       "expected_relations":  [
-
+                                                 "IdempotencyStore CONTAINS IdempotencyStore.__init__",
+                                                 "IdempotencyStore CONTAINS IdempotencyStore.claim"
                                              ],
                       "expected_evidence":  [
                                                 {
@@ -1040,7 +1041,8 @@
                                                "Order flow"
                                            ],
                       "expected_relations":  [
-
+                                                 "Order flow DOCUMENTS get_order",
+                                                 "Order flow DOCUMENTS loadOrder"
                                              ],
                       "expected_evidence":  [
                                                 {

@@ -266,3 +266,40 @@ def test_every_intent_on_a_measurable_fixture_is_itself_measurable() -> None:
         "these intents appear on measurable fixtures but are gated out, so"
         f" their cases are dropped from every metric: {gated}"
     )
+
+
+def test_no_measured_case_emits_relations_it_does_not_declare(
+    predictions: PredictionFile,
+) -> None:
+    """ADR-0073 ruling 2, as re-ruled: nothing contributes a vacuous denominator.
+
+    `relation_path_correctness` is averaged only over cases whose
+    `expected_relations` is non-empty (`runner.py`). A case that *emits*
+    relations while declaring none is therefore unmeasurable on relation
+    accuracy: ADR-0057 found q006 and q031 broadening from precision 1.00 to
+    0.00 per case with **no aggregate moving anywhere**, and a future change
+    broadening them further would be equally invisible.
+
+    Ruled: such a case declares its relations. This guard is derived from the
+    corpus rather than listing the three that were fixed, so a new lexical or
+    conceptual case cannot reintroduce the hole.
+
+    **The declared relations were read off the fixture source, not transcribed
+    from this output** -- ADR-0003, and the correction ADR-0036 had to make by
+    hand twice. That they then match is a result, not the method.
+    """
+    dataset = load_dataset(DATASET_ROOT)
+    by_id = {item.case_id: item for item in predictions.query_predictions}
+
+    silent = sorted(
+        case.id
+        for case in dataset.query_cases
+        if not case.expected_relations
+        and by_id[case.id].measured
+        and by_id[case.id].relation_paths
+    )
+    assert not silent, (
+        "these cases emit relation paths while declaring none, so their "
+        f"relation accuracy is unmeasurable: {', '.join(silent)}. Declare the "
+        "true relations by reading the fixture source (ADR-0073 ruling 2)."
+    )
