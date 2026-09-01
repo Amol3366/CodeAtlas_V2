@@ -838,13 +838,30 @@ def _unmet_targets(
         # be reasoned about". ADR-0057 settled the last one, so the number is
         # now chosen against a known denominator rather than a moving one.
         #
-        # **The denominator is 24** -- measured cases whose `expected_relations`
-        # is non-empty -- and it is not uniform: 21 declare one edge, and one
-        # each declare two, three and five. So the reachable values just below
-        # 1.0 are 0.9917, 0.9861, 0.9792 and then 0.9583. A 0.95 target would
-        # tolerate exactly one whole-case miss and a 0.99 target would tolerate
-        # only q060 losing one of its five -- privileging one case by accident
-        # of how many edges it happens to declare.
+        # **The denominator is 35** -- measured cases whose `expected_relations`
+        # is non-empty. Every case that declares a relation is measured; none
+        # is excluded by intent or fixture. It is not uniform: 30 declare one
+        # edge, three declare two, and one each declares three and five, for 44
+        # edges. So the reachable values just below 1.0 are 0.9943, 0.9905,
+        # 0.9857 and then 0.9714. A 0.95 target would tolerate exactly one
+        # whole-case miss and a 0.99 target would tolerate only q060 losing one
+        # of its five -- privileging one case by accident of how many edges it
+        # happens to declare.
+        #
+        # **This figure was wrong here for sixteen days, and wrong twice.** It
+        # read 24 -- true when ADR-0058 was written on 2026-08-17 and outgrown
+        # by ordinary corpus additions afterwards -- and DR-07's handoff then
+        # recorded 24 -> 27, correctly adding its own three cases (q003, q006,
+        # q031) to a base that had already moved. Re-derived 2026-09-02 by
+        # running the corpus rather than by adding to the last number written
+        # down: the live report reproduces the tracked Phase 4 baseline
+        # (`relation_path_correctness` 0.9024) with 35 cases in this
+        # denominator.
+        #
+        # None of that changed the gate, and the arithmetic above is recorded
+        # rather than relied on: the gate is **absolute**, so no reachable
+        # value selects it. That argument is below and is untouched by the
+        # denominator.
         #
         # Neither tolerance has a named cause. Nothing is known that can drop a
         # declared, stored, resolved edge for a legitimate reason: a bounded
