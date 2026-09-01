@@ -47,11 +47,31 @@
           ]
         }
       ]
+    },
+    {
+      "id": "delivery_scheduler",
+      "root": "delivery_scheduler",
+      "kind": "python",
+      "snapshots": [
+        {
+          "id": "scheduler-v1",
+          "members": [
+            "README.md",
+            "docs/retries.md",
+            "src/scheduler/__init__.py",
+            "src/scheduler/backoff.py",
+            "src/scheduler/deadlines.py",
+            "src/scheduler/queue.py",
+            "src/scheduler/worker.py",
+            "tests/test_backoff.py"
+          ]
+        }
+      ]
     }
   ],
   "query_cases_file": "queries.json",
   "change_cases_file": "changes.json",
-  "expected_query_count": 14,
+  "expected_query_count": 18,
   "expected_change_count": 1,
     "target_profile":  "conceptual"
 }
