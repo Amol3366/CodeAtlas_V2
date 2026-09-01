@@ -361,6 +361,109 @@
       "forbidden_claims": [
         "Duplicate lines are merged automatically."
       ]
+    },
+    {
+      "id": "s015",
+      "repository_fixture": "delivery_scheduler",
+      "snapshot_id": "scheduler-v1",
+      "question": "Why do retries get further apart each time?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["next_delay"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/scheduler/backoff.py",
+          "symbol": "next_delay",
+          "start_line": 9,
+          "end_line": 20,
+          "evidence_id": "s015-e1",
+          "snapshot_id": "scheduler-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Retries are attempted at a fixed interval.",
+        "The delay grows without limit."
+      ]
+    },
+    {
+      "id": "s016",
+      "repository_fixture": "delivery_scheduler",
+      "snapshot_id": "scheduler-v1",
+      "question": "What stops every worker retrying at the same moment?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["spread"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/scheduler/backoff.py",
+          "symbol": "spread",
+          "start_line": 23,
+          "end_line": 33,
+          "evidence_id": "s016-e1",
+          "snapshot_id": "scheduler-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "Workers coordinate their retries through a shared lock."
+      ]
+    },
+    {
+      "id": "s017",
+      "repository_fixture": "delivery_scheduler",
+      "snapshot_id": "scheduler-v1",
+      "question": "How is the same request submitted twice kept from sending two parcels?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["WorkQueue.submit"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/scheduler/queue.py",
+          "symbol": "WorkQueue.submit",
+          "start_line": 22,
+          "end_line": 34,
+          "evidence_id": "s017-e1",
+          "snapshot_id": "scheduler-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "A duplicate submission raises an error.",
+        "Duplicates are detected by comparing parcel contents."
+      ]
+    },
+    {
+      "id": "s018",
+      "repository_fixture": "delivery_scheduler",
+      "snapshot_id": "scheduler-v1",
+      "question": "What happens to a delivery that has run out of time?",
+      "intent": "CONCEPTUAL",
+      "expected_abstention": false,
+      "expected_symbols": ["park"],
+      "expected_relations": [],
+      "expected_evidence": [
+        {
+          "file_path": "src/scheduler/deadlines.py",
+          "symbol": "park",
+          "start_line": 18,
+          "end_line": 28,
+          "evidence_id": "s018-e1",
+          "snapshot_id": "scheduler-v1"
+        }
+      ],
+      "warnings": [],
+      "limitations": [],
+      "forbidden_claims": [
+        "An expired job is deleted.",
+        "An expired job is retried indefinitely."
+      ]
     }
   ]
 }

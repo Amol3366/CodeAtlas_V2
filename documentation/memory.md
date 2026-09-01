@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01 (end of session)
 
 ## Current Phase
 
@@ -17,6 +17,157 @@ an explicit user decision.
 `docs/plans/PLAN.md`.** Do not restate it here or in `phases.md` — two copies
 of a status list is how they drift, which is the `--format pr` and
 `_SEVERITY_ORDER` lesson applied to documentation.
+
+**2026-09-01: a program over that open tail is planned but NOT approved.** Six
+tasks, DR-01 to DR-06, boarded in `docs/plans/PLAN.md` with every task `ready`;
+Rule 11 keeps them there until the user approves the plan. Design and plan are
+in `docs/superpowers/`. Read the board, not this line, for status.
+
+The one thing worth carrying here rather than looking up: **planning found two
+register rows already stale**, both superseded by ADR-0064 hours after they were
+written, and one of them asks for a ruling that should be withdrawn rather than
+answered. That is the third such find in two weeks. **Audit a row's date against
+the ADRs that landed after it before building anything on what it says.**
+
+**DR-01 complete 2026-09-01 (ADR-0072), with a stated remainder.** The census is
+committed at `scripts/report_symbol_collisions.py` — **any claim about collision
+counts is made with it, not by probe.** It reproduced ADR-0071's 1202/221/981
+exactly and disproved the explanation: a Scala `trait`/`object` pair never
+collided, their members do, and gson's 47 "no remedy" groups are separated by
+the enclosing scope. DR-01b carries the ~18 register rows the sweep did not
+reach; DR-05 is retired.
+
+Two habits this task earned the hard way: **`pathlib.write_text` on Windows
+converts LF to CRLF** and the working tree forbids it — use the editing tools,
+not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
+README guard** until the counts are updated; that is the guard working.
+
+## Resume point — 2026-09-02 (the Deferred Register Program is finished)
+
+**All nine program tasks complete** (DR-01, DR-01b, DR-02, DR-03, DR-04, DR-06,
+DR-07, DR-08, DR-09; DR-05 retired). Branch `plan/deferred-register-program`,
+pushed, gate green, **not merged** — it carries `PARSER_BUNDLE_VERSION` 1.9.0
+and merging is a decision. Board and "Where to resume" live in
+`docs/plans/PLAN.md`.
+
+**The pattern of this program, and the thing worth carrying: six task premises
+were wrong, and every one was cheap to disprove by running something.**
+
+- The `TRACE_FLOW` row's control had never been run — `EXACT_SYMBOL` agrees with
+  the classifier on **0 of 36**, worse than the row's own target.
+- ADR-0073 ruling 2 told DR-07 to exclude vacuous cases; `runner.py` already did.
+- ADR-0073 ruling 3 implied depth should be derived; derived, it says **1**
+  everywhere, which would delete the corpus's only distractors.
+- DR-06's route-literal row asked for a fixture whose shape **deletes the edge**
+  it was meant to exercise.
+- DR-06's same-named-symbol row needed same-named symbols *in one snapshot*; the
+  corpus has none, and the validator already prevents it.
+- DR-06's withheld-step row asked for fixture content; the branch is only
+  reachable through **evidence validation**, not content.
+
+**Run the check before writing the plan step.** Most were one command.
+
+Two smaller habits earned the hard way: **never edit the tree while a gate runs**
+(one run was voided and discarded rather than cited), and **a criterion that
+disagrees with a standing ruling is the criterion's bug** — DR-08's first
+derivation called 15 of 31 cases unsatisfiable by ignoring ADR-0073 ruling 1.
+
+And one authoring trap, twice: **never round-trip a corpus file through
+`json.dumps`.** It reflows all ~2600 lines and buries the real change — the
+reflow ADR-0069's handoff had to strip from four files. Edit the text in place.
+
+## Superseded resume note — 2026-09-02 (mid-session)
+
+**Branch `plan/deferred-register-program`, pushed, tree clean, gate green**
+(`check_phase4.ps1 -SkipSync` exit 0). **DR-09, DR-01b, DR-08, DR-07 complete;
+DR-06 is 2 of 5 done.** Board and "Where to resume" live in `docs/plans/PLAN.md`.
+
+**The pattern of this whole session, and the thing worth carrying:** *four*
+separate task premises were wrong, and each was cheap to disprove by running
+something.
+
+- The `TRACE_FLOW` row said the label was systemically wrong. Its control had
+  never been run: `EXACT_SYMBOL` agrees with the classifier on **0 of 36**,
+  against `TRACE_FLOW`'s 1 of 5.
+- ADR-0073 ruling 2 told DR-07 to exclude vacuous cases. `runner.py` had excluded
+  them all along, and the options carried each other's consequences.
+- ADR-0073 ruling 3 implied depth should be derived. Derived, it says **1**
+  everywhere — which would delete the corpus's only distractors. Depth **2** was
+  kept, so no number moves.
+- DR-06's two closed rows each asked for a fixture. Neither needed one: one
+  trigger is unsatisfiable, the other's model was too broad.
+
+**So: run the check before writing the plan step.** Three of the four were
+disproved by a single command.
+
+Two smaller habits: **a background gate must not run while the tree is edited**
+(one run was voided and discarded rather than cited), and **a criterion that
+disagrees with a standing ruling is the criterion's bug** — DR-08's first
+derivation called 15 of 31 cases unsatisfiable because it ignored ADR-0073
+ruling 1.
+
+## Superseded resume note — 2026-09-02 (mid-session)
+
+**Branch `plan/deferred-register-program` at `574569d`, pushed, tree clean,
+gate green** (`check_phase4.ps1 -SkipSync` exit 0, **2420 passed, 3 skipped**,
+8m32s). Not merged to `main` — the branch still carries the reindex-forcing
+`PARSER_BUNDLE_VERSION` 1.9.0.
+
+**DR-09 and DR-01b are complete.** DR-06 is untouched. **DR-07 and DR-08 are
+both blocked on a decision, and neither blocker is about the code.**
+
+**DR-07's ruling contradicts itself, and the code already does what it says.**
+ADR-0073 ruling 2 says "exclude cases declaring no relations from relation
+precision" and predicts the denominator shrinks and the number moves.
+`runner.py:662` has filtered `if case.expected_relations` all along, so
+excluding is the *status quo* and nothing moves. Worse, the options are
+inverted: **keeping** a vacuous case would make broadening visible, because
+`_precision(predicted, ∅)` returns **0.0** — excluding is what keeps it
+invisible, which is the very complaint the row was opened on. Do not implement
+either reading without asking; they are opposites.
+
+**DR-08's measurement came out unanimous and that is the problem.** All **31**
+graph cases have every declared relation satisfied at **depth 1** — none needs
+depth 2. So "declare each case's depth" means declaring 1 everywhere, which
+would raise relation precision *and* **delete the ranking sensitivity ADR-0059
+deliberately preserved**: depth-2 distractors are what make
+`exact_symbol_resolution` a ranking gate rather than a resolution gate, and
+q003, q005, q015 and q053 are sensitive only because of them. ADR-0073 says
+ruling 3 "extends ADR-0059 rather than overturning it" — depth 1 everywhere
+overturns it. That fork was not anticipated and needs a ruling.
+
+**Two habits this session earned.** A background gate was started and then
+tracked files were edited while it ran, including one a test reads — **that run
+was void and was discarded rather than cited**; never edit the tree a gate is
+measuring. And the first DR-08 derivation used "all expected symbols returned",
+which marked 15 of 31 cases unsatisfiable — until reading them showed most
+expect *their own subject*, the class ADR-0073 ruling 1 made permanently
+unsatisfiable on purpose. **A criterion that disagrees with a standing ruling is
+the criterion's bug.**
+
+## Resume point — 2026-09-01, end of session
+
+**Branch `plan/deferred-register-program` at `56e3b30`, pushed, tree clean, gate
+green. Not merged to `main`** — the program has five tasks left and the branch
+carries a reindex-forcing bundle bump (`PARSER_BUNDLE_VERSION` 1.9.0).
+
+Status lives in the Deferred Register Program board in `docs/plans/PLAN.md`,
+which has a **"Where to resume"** block. Do not restate the board here.
+
+Four tasks done tonight: DR-01 (audit + committed census), DR-02 (first real
+preflight measurement), DR-03 and DR-04 (symbol identity, bundled into one
+reindex by user ruling). Four rulings given, recorded as ADR-0073.
+
+**Read ADR-0072 and then ADR-0074 before touching identity work.** The second
+corrects the first by a factor of five, and a reader who stops at ADR-0072 will
+re-inherit the wrong number — which is precisely how this lineage has gone wrong
+three times now.
+
+The lesson that generalises past this program: **an estimate taken by sampling
+is not a measurement.** ADR-0072 classified 981 collision groups from samples
+and predicted 980 would be fixed; 198 were. The census exists so the next
+estimate can be run instead of reasoned — **run it before writing the number,
+not after.**
 
 ## Completed
 

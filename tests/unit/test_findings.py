@@ -311,6 +311,18 @@ ROWS: tuple[Row, ...] = (
             file_path="src/payments/mod.rs",
         ),
     ),
+    # c033: Python, so the statement classifier runs and reports the specific
+    # class rather than the PUBLIC_BEHAVIOR_CHANGED fallback the four
+    # query-backed rows above carry (ADR-0077).
+    Row(
+        "c033",
+        _change(
+            "capture",
+            FUNCTION,
+            body=BodyChangeClass.RETURN_VALUE_CHANGED,
+            file_path="src/service.py",
+        ),
+    ),
 )
 
 

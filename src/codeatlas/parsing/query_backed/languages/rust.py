@@ -133,6 +133,25 @@ class RustAdapter:
         return None
 
 
+    def discriminator(self, node: Any, source: bytes) -> str | None:
+        """The trait of the enclosing `impl`, or None outside a trait impl.
+
+        Replaces the `None` ADR-0071 recorded here. `Display::fmt` and
+        `Debug::fmt` declare **byte-identical** parameters, so a signature can
+        never separate them; the trait is on the enclosing `impl` and is not a
+        parameter. 21 of the 981 groups (ripgrep).
+
+        An inherent `impl` has no trait and returns None rather than the type,
+        which is already in the qualified name.
+        """
+        current = node.parent
+        while current is not None:
+            if current.type == "impl_item":
+                declared = current.child_by_field_name("trait")
+                return None if declared is None else _text(declared, source)
+            current = current.parent
+        return None
+
     def visibility(self, node: Any, name: str, source: bytes) -> Visibility:
         for child in node.children:
             if child.type == "visibility_modifier":

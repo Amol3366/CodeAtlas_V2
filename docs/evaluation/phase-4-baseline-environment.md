@@ -150,3 +150,85 @@ Change-side metrics are again unchanged, so the Phase 4 gate approval remains
 unaffected. ADR-0018 also records the two findings this exposed and deliberately
 did not fix: module-scoped graph queries ranking the module's own symbol first,
 and `related_tests` not resolving a method subject to its class-level edge.
+
+## Measurement, 2026-09-01 (DR-02) — the first numbers taken on a real repository
+
+The declared targets are scoped **"on the declared fixture and named hardware"**
+(Phase 4 condition 7), and on that fixture they are met: preflight p95 5.151 s
+against ≤ 10 s, refresh p95 1.426 s against ≤ 2 s. Nobody had ever measured a
+real codebase, which is what the register row asked for. **Nothing below is a
+gate result** — the gate is the fixture — and none of it changes the Phase 4
+approval.
+
+### Preflight on this repository, through the CLI
+
+769 files, 727 parsed. Three runs each, an isolated database via `--db`.
+
+| Operation | Median | p95 | Less CLI startup |
+| --- | ---: | ---: | ---: |
+| Commit-range preflight (`--commits HEAD~5..HEAD`) | 29.52 s | 29.70 s | **27.90 s** |
+| Working-tree preflight | 34.29 s | 34.37 s | **32.67 s** |
+| `codeatlas --help` (startup floor) | 1.62 s | 1.65 s | — |
+
+Spreads were 29.39–29.70 s and 34.16–34.37 s, so these are not load artefacts.
+
+**A real repository costs ~6.7x the fixture it was gated on.** Working-tree
+runs cost 4.8 s more than commit-range because `analyze_working_tree` refreshes
+the index before comparing (ADR-0063).
+
+**The register's 10–12 minute `impact` observation is stale.** It was recorded
+2026-08-13, five days before ADR-0064's 29x improvement, and is now ~20x wrong.
+
+### The realistic corpus profile, and what the synthetic one hides
+
+`measure_phase4_perf.py --profile realistic` emits Markdown that mentions the
+symbols the modules define, so the reference class ADR-0064 found to dominate
+real cost is present. The synthetic profile is unchanged and still produces the
+tracked baseline. Both swept on one machine, `machine_settled: True` on all six
+points, `--runs 3`.
+
+| Modules | Synthetic preflight p95 | Realistic preflight p95 | Synthetic refresh p95 | Realistic refresh p95 |
+| ---: | ---: | ---: | ---: | ---: |
+| 40 | 0.911 s | 2.203 s | 0.417 s | 1.146 s |
+| 80 | 1.362 s | 3.942 s | 0.599 s | **2.153 s** |
+| 160 | 2.113 s | 7.452 s | 1.006 s | **4.587 s** |
+
+**At 160 modules the realistic corpus costs 3.60x the synthetic one**, and the
+log-log slope of preflight p50 against module count is **0.898 realistic against
+0.602 synthetic** — half again as steep.
+
+**Two cautions, stated rather than left for a reader to trip over.** These
+exponents are **not comparable to ADR-0062's 1.14**: that sweep ran to 800
+modules and this one stops at 160, where fixed costs still dominate and depress
+every slope below 1. And the ≤ 2 s refresh target — fixture-scoped, met on the
+fixture — is **missed on the realistic corpus from 80 modules upward**. That is
+a statement about what the fixture cannot see, not a regression.
+
+### Resolution's residual, profiled
+
+ADR-0064 left it explicitly open: 3.55 s across 161,343 references "is not
+obviously optimal". One working-tree preflight under `cProfile`, this repository.
+
+**cProfile inflates the run to 90.5 s against 32.7 s unprofiled, so only the
+proportions below are evidence.**
+
+| Stage | Cumulative | Share |
+| --- | ---: | ---: |
+| `resolution.resolve` (3 calls) | 34.5 s | **38%** |
+| — of which `_derive_config_edges` | 17.8 s (9.68 s self) | 20% |
+| — of which `_resolve_mention` | 7.7 s | 9% |
+| `sqlite3.executemany` | 18.6 s | **21%** |
+| `ignore_rules.is_ignored` (`fnmatch` 5.7 s, `re.match` 6.4 s) | 8.6 s | 9% |
+| `scanner.scan` | 7.2 s | 8% |
+| `stable_hash` (488,397 calls, via `relation_id`) | 6.5 s | 7% |
+
+**Resolution is still the largest stage, and `_derive_config_edges` is over half
+of it** — the same site ADR-0064 de-quadraticised, still dominant afterwards.
+
+**No optimisation is proposed here, and none is scheduled.** Committing to a fix
+off one profile is what ADR-0060 through ADR-0062 did three times before
+ADR-0064 measured properly. What the profile establishes is where a future task
+should look, and that **two non-resolution costs are now comparable in size** to
+the one everybody has been attacking: SQLite `executemany` at 21% and ignore-rule
+matching at 9%. A task that optimises resolution alone would be attacking 38% of
+the cost while ignoring 30% sitting beside it.

@@ -187,7 +187,7 @@ def test_null_baseline_is_honest_and_deterministic() -> None:
 
     assert first == second
     assert first.implementation_status == "not_implemented"
-    assert first.case_counts == {"queries": 80, "changes": 32}
+    assert first.case_counts == {"queries": 80, "changes": 33}
     assert first.metrics.exact_symbol_resolution == 0.0
     assert first.metrics.symbol_recall_at_10 == 0.0
     assert first.metrics.mean_reciprocal_rank == 0.0
@@ -764,7 +764,7 @@ def test_markdown_reports_the_exact_case_count_beside_the_precision_aggregate() 
         evaluate_predictions(dataset, _one_exact_change_prediction())
     )
 
-    assert "| Changed-symbol precision | 0.0625 (2/32 cases exact) |" in rendered
+    assert "| Changed-symbol precision | 0.0606 (2/33 cases exact) |" in rendered
 
 
 def test_markdown_omits_the_count_for_an_artifact_that_predates_it() -> None:

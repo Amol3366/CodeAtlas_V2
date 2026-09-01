@@ -14,8 +14,8 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Platform** | Windows 11 primary (loopback only, single user) |
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
-| **Component versions** | Parser bundle `1.8.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2398 passed, 3 skipped** — one *complete* `check_phase4.ps1 -SkipSync` run, exit 0, 2026-08-31, 8m06s. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the seven Chromium Playwright skips, which live in the browser suites and are not part of this gate |
+| **Component versions** | Parser bundle `1.9.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
+| **Tests** | **2450 passed, 3 skipped** — one *complete* `check_phase4.ps1 -SkipSync` run, exit 0, 2026-09-02. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the seven Chromium Playwright skips, which live in the browser suites and are not part of this gate |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -690,15 +690,16 @@ caveats live in `docs/evaluation/*-baseline-environment.md`.
 | Active-snapshot leakage | 0 | snapshot-isolation suite |
 | Exact symbol resolution | **1.0000** | `baseline-phase-4.json` |
 | Changed-symbol recall · direct-impact recall | 1.0000 · 1.0000 | `baseline-phase-4.json` |
-| Changed-symbol precision | 0.9531 — but **29 of 32 cases** score exactly 1.0; read the limitation below | `baseline-phase-4.json` |
+| Changed-symbol precision | 0.9545 — but **30 of 33 cases** score exactly 1.0; read the limitation below | `baseline-phase-4.json` |
 | Unsupported factual claim rate | 0.0000 | `baseline-phase-4.json` |
 | Containing-evidence Recall@10 | **1.0000** | `baseline-phase-4.json` |
 | Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) | `baseline-phase-4.json` |
 | Packaged refresh p95 · preflight p95 | **1.759 s · 2.981 s** (semantic-local, on the artifact; cold start 1.805 s, coverage 1.0). Both targets met; **read the load-sensitivity note below before comparing this to an older figure** | `baseline-phase-7-perf.json`, 2026-08-21 |
 
-Corpus: **80 query cases, 32 change cases, 11 fixtures** — plus a separate
+Corpus: **80 query cases, 33 change cases, 12 fixtures** — plus a separate
 invariant corpus (`tests/evaluation/invariant_cases/`) that asserts a boolean
-rather than an accuracy, and a 14-case conceptual corpus for the semantic layer.
+rather than an accuracy, and an **18-case conceptual corpus over two fixtures**
+for the semantic layer.
 
 > **Do not read `valid_evidence_rate` (0.6544) as "35% of evidence is invalid".**
 > It equals `exact_evidence_rate` by definition (ADR-0003) and measures *exact
@@ -848,14 +849,17 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   2026-08-18, reproduces on `main`, and is under investigation.
 - **The semantic-local packaged tree is 1.05 GB** (torch), accepted at the
   Phase 7 activation gate.
-- **Changed-symbol precision now reads 0.9531 and `unmet_targets` is empty —
+- **Changed-symbol precision now reads 0.9545 and `unmet_targets` is empty —
   and that is dilution, not a fix.** The structural cause is untouched: three
   corpus cases (c020–c022) split one physical diff into three single-symbol
   cases, so the engine — correctly reporting both affected symbols every run —
   has each case count the other's against it. **All three still score exactly
   0.50.** The aggregate crossed 0.95 only because the change corpus grew 29 → 32
-  while those three stayed imperfect: `(29×1.0 + 3×0.5)/32 = 0.9531`, where the
-  same three gave `0.9483` at 29 and `0.9375` at the Phase 4 gate.
+  while those three stayed imperfect: `(30×1.0 + 3×0.5)/33 = 0.9545`, where the
+  same three gave `0.9531` at 32, `0.9483` at 29 and `0.9375` at the Phase 4
+  gate. **c033 moved it again on 2026-09-02** — a case that earns its place,
+  since it fails without ADR-0044's fix — which is the point: the mean keeps
+  drifting up on denominator growth alone.
 
   So the Phase 4 baseline now reports **`targets_met: true` with no unmet
   targets** — for the first time — while the engine is exactly as accurate as it
@@ -874,7 +878,7 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
   The defect was therefore never a lost regression guard; it was a
   *reporting* one, and the report is what changed.
   `changed_symbol_exact_cases` is now emitted beside the mean, so the Phase 4
-  row reads **`0.9531 (29/32 cases exact)`** and the aggregate can no longer
+  row reads **`0.9545 (30/33 cases exact)`** and the aggregate can no longer
   be read as "every case is exact". The 0.95 threshold is deliberately
   unchanged: a count cannot be diluted by adding cases that already pass, so
   the pair says what neither number says alone.
@@ -1027,7 +1031,7 @@ blunt version. The ones that bite most often:
 
 **Decisions and measurement**
 
-`docs/adr/README.md` — 71 accepted records and their rationale ·
+`docs/adr/README.md` — 77 accepted records and their rationale ·
 `docs/evaluation/` — baselines and the environment documents that say how to read
 them · `docs/security/threat-model.md`
 

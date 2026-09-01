@@ -50,7 +50,7 @@ needed. Exactly one task may be `in_progress` or `verifying`.
 | Field           | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Active phase    | **none - closed.** Phases 0-7 are all `complete`. Phase 7's gate was approved 2026-07-31 with condition 7 recorded as missed; that condition has since been met under a corrected metric (ADR-0027), and the correction must be cited with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Active task     | **none - closed.** Phases 0-7 remain complete. The post-ADR-0065 program (`docs/superpowers/plans/2026-08-20-remaining-work.md`) has delivered its P0 and P1: merged, both limits ruled, all four languages measured on query *and* change sides, the package rebuilt, and the README guarded. **No decision now waits on the user**: the `AGENTS.md` §12 divergence was ruled and implemented 2026-08-21 (ADR-0068) — retry and feedback moved to `/v1/messages/{message_id}/...`, and `POST /v1/query/stream` left the contract rather than being built. The `changed_symbol_precision` dilution is **closed**: it was a reporting defect, not a lost guard, and the report now carries `changed_symbol_exact_cases` beside the mean |
+| Active task     | **none.** The **Deferred Register Program is complete** as of 2026-09-02 -- all nine tasks, ADR-0072 to ADR-0077. Previously: **none - closed.** Phases 0-7 remain complete. The post-ADR-0065 program (`docs/superpowers/plans/2026-08-20-remaining-work.md`) has delivered its P0 and P1: merged, both limits ruled, all four languages measured on query *and* change sides, the package rebuilt, and the README guarded. **No decision now waits on the user**: the `AGENTS.md` §12 divergence was ruled and implemented 2026-08-21 (ADR-0068) — retry and feedback moved to `/v1/messages/{message_id}/...`, and `POST /v1/query/stream` left the contract rather than being built. The `changed_symbol_precision` dilution is **closed**: it was a reporting defect, not a lost guard, and the report now carries `changed_symbol_exact_cases` beside the mean |
 | Task status     | `complete` - Phase 7 stays approved; everything since is post-gate work. `SCHEMA_VERSION` **14**, `contract_version` **1.1**, parser bundle **1.8.0**, chunker **1.1.0**, resolver **1.5.0**. Corpus **80 query / 32 change over 11 fixtures**. Last gate: `check_phase4.ps1 -SkipSync` exit 0, **2397 passed, 3 skipped, no xfails** (2026-08-31, one complete run of 8m06s, taken after ADR-0071). **ADR-0069, ADR-0070 and ADR-0071 are all committed and merged.** `PARSER_BUNDLE_VERSION` 1.6.0 -> **1.8.0** across ADR-0070 and ADR-0071, so **users must reindex**. The post-ADR-0069 program is **closed, all six tasks complete**, and nothing waits on the user |
 | Agent           | Claude Code`claude-opus-5`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Started UTC     | 2026-08-10T08:00:00Z (project closeout). **Post-gate work resumed 2026-08-16**; see the handoff log |
@@ -71,6 +71,23 @@ trigger that reopens it. **Nothing here is silently dropped.** An item leaving
 this register requires the same evidence as any other task: a handoff entry
 with verification.
 
+**How to read a struck-through item (added 2026-09-01, DR-01).** A struck title
+meant two different things and only the previous row's wording distinguished
+them, so a reader going top-down could mistake a closed defect for an open one.
+From now on:
+
+- `~~archived original — closed by the row above~~` is **history**. Its prose is
+  the original diagnosis, kept verbatim; the row above it carries the current
+  disposition. Never act on one of these.
+- `~~<title>~~` with a `CLOSED` disposition is a **closed item**.
+- `~~original entry~~` with an `OPEN` disposition is **live** — the title was
+  reworded, the disposition is current.
+
+The rows retrofitted to the first form so far are the two preflight rows and the
+nested-config-keys row closed by ADR-0041. **The rest of the register has not
+been swept for this**; a row whose disposition and neighbour disagree should be
+read as unaudited, not as settled.
+
 | Item                                                                                                             | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Reopens when                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ~~**Two symbols in one file that share a qualified name and a kind collapse onto one `symbol_id`, and indexing FAILS**~~ | **CLOSED 2026-08-22 — ADR-0069, fixed the same day it was found, and it took three fixes because two more defects were hiding behind it.** `ensure_unique_symbol_ids` and `ensure_unique_chunk_ids` disambiguate identity per file; **`qualified_name` is deliberately left alone**, unlike the TS/JS prior art (`_disambiguate_repeated_symbols`, which appends `#L103` to the *name*) — right for an anonymous union member, wrong for `Gson.fromJson`, which would stop being findable by the name a caller types. **No reindex:** the first member of a colliding group keeps its id, so nothing storable today moved; `PARSER_BUNDLE_VERSION` stays **1.6.0**, `CHUNKER_VERSION` **1.1.0**, `SCHEMA_VERSION` **14**, `contract_version` **1.1**. **Fixing the symbols moved the failure rather than curing it** — first to `chunks` (`logical_chunk_id` has the identical shape), then to snapshot validation, which refused a relation whose source was the **invented** id `module_{file_id}` that `query_relations` minted for a file defining nothing (§4.1 forbids exactly that; `package-info.java` is the common shape), then to `relations.relation_id`, where `crypto/rand` and `math/rand` in `gin` both bound `rand` and both reported the `import (` line because Go and Rust attributed every path in a grouped import to the **declaration**. Each path now cites its own line, which is an evidence correction as much as a collision fix. Scala was checked and does **not** have it; Java has one import per statement. **All five real repositories now index:** gson 312 files/4135 symbols, scalaz 590/17226, ripgrep 229/4210, gin 130/1946, cobra 65/818, and `Gson.fromJson` resolves to every overload with its own line range | Nothing reopens it. **The follow-up is separate and open:** the query-backed engine emits no `signature`, so its disambiguator is an ordinal and an inserted same-named sibling shifts later ids — teaching it signatures converts that to stable identity for four languages |
@@ -86,39 +103,41 @@ with verification.
 | Unsigned packaged executable                                                                                     | **DEFERRED — not an engineering task.** SmartScreen warns on first run. Needs a purchased code-signing certificate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | A certificate is purchased                                                                                                                                                  |
 | **Seven** Playwright tests skipped on Chromium, across **five** spec files                           | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all seven, so coverage is not lost. **Counted from the gate run on 2026-08-11, not copied forward:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings`, and `stream-reconnection` ×2. The seventh is ADR-0042's navigation test, which is skipped for the same reason as the reload test beside it. The figure understated itself twice before (corrected 2026-08-07 and 2026-08-10); it is re-counted here rather than incremented                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The upstream bug is fixed                                                                                                                                                   |
 | Packaged semantic tree 1.05 GB                                                                                   | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | A deterministic-only second artifact is wanted                                                                                                                              |
-| **The change corpus cannot express an ADR-0044-shaped defect**                                             | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Someone gives the corpus a Git-backed change case, which is a new fixture shape rather than a new case                                                                      |
+| **The change corpus cannot express an ADR-0044-shaped defect**                                             | **OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | **CLOSED 2026-09-02 (DR-06) — ADR-0077.** `ChangeCase` gains `base_view`, and **c033** reads its base through `GitBlobStateView` against the target on disk — one working tree, two states, the shape `analyze_working_tree` uses. The row's warning was right and is why no case existed before: two directory sides apply the same ignore rules, so a case would pass **with ADR-0044's fix and without it**. **c033 does not**: remove the ignore filter from `GitBlobStateView.list_files` and it reports `bundled_total` **deleted** beside the real change. `coverage/` is the ignore default used, not `dist/`, which this repository's own `.gitignore` excludes — ADR-0049's collision met a second time. Cost: change corpus 32 → 33, `changed_symbol_precision` 0.9531 → 0.9545 **by dilution**, `changed_symbol_exact_cases` 29 → **30**, which is the number that cannot be lifted by adding passing cases |
 | ~~Grow the symbol corpus toward 50 cases~~                                                                      | **CLOSED 2026-08-15.** Scored symbol-intent cases 27 -> **50**, so `exact_symbol_resolution`'s 0.98 finally tolerates one miss (0.9800) rather than silently requiring 27/27 - the condition ADR-0033 left open. **Both assumptions in the estimate were wrong.** It needed **23** cases, not "13+": 27 + 13 = 40, where one miss still scores 0.9750 and the target is as inexpressible as before. And it needed a **new fixture**, because the five existing ones hold only ~20 distinct symbol-shaped targets between them, already queried by the existing 27 - more cases against those would have padded a denominator to loosen a release target, the mirror image of ADR-0032/0033. `symbol_breadth` adds 25 symbols and 69 relations; the other five fixtures stay byte-identical. **`exact_symbol_resolution` held at 1.0000 across all 50**                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | -                                                                                                                                                                           |
 | **A claim beyond the first hop asserted a direct relationship**                                            | **CLOSED 2026-08-17 — ADR-0052. An ENGINE defect**, found while investigating Task 6 and not while looking for it. `max_depth` is 2, so a graph answer routinely holds edges touching **neither end of the root**, and `_claims` rendered them against the root's name: *"test_capture_uses_idempotency_store calls IdempotencyStore.claim at tests/test_service.py:5"* — where line 5 is `assert service.capture(...)`. The test calls `capture`, not `claim`. A §4.1 violation: the citation shows a different call from the one asserted. `relation_paths` was **correct throughout**, carrying the real two-step path, so this is prose only. Now reads *"reaches Y indirectly, through Z"*, mirroring ADR-0016. **Not the first engine defect** — ADR-0019 was one, and its shape is nearly identical (*evidence named one symbol and showed another*); here the *claim* does. Every baseline reproduces byte-for-byte, which also means the corpus cannot see it                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                                                          |
 | ~~**q032: a two-hop trace carries no evidence for its far end**~~ | **CLOSED 2026-08-17 — ADR-0055.** Ruled by the user: a resolved `ROUTES_TO` edge additionally cites the **handler's definition**, an explicit exception to ADR-0047 on ADR-0019's `EXPORTS` precedent — a route *names* its target, and its literal and target sit in different files and usually different languages, so the near side alone cannot show what the flow reaches. q032 **0.50 → 1.00**, and `containing_evidence_recall_at_10` reaches **1.0000** — every case in the corpus now scores. `containing_evidence_rate` 0.7576 → 0.7537, ungated. **This settles the last of ADR-0034's four causes for `trace`**; the lexical half is Task 4 | — |
 | **A route's claim was dropped when it shared a line** | **CLOSED 2026-08-17 — ADR-0055, found while reproducing q032.** Evidence is deduplicated by region — correctly, since one region is one citation — but `_claims` was built from the *surviving pairs*, so the second edge at a shared line lost its claim entirely. `loadOrder ROUTES_TO get_order` and `loadOrder CALLS fetch` both sit on `frontend.ts:2`, so **the engine dropped its only resolved, cross-language edge and kept two unresolved browser globals, decided purely by iteration order.** `relation_paths` carried it and the prose did not — ADR-0020's gap inverted. Fixed as a consequence of the citation ruling: a route that cites its own destination no longer shares a region. `_verb` also had no `ROUTES_TO` entry, so the claim would have read *"relates to"* — unseen because the claim never rendered | — |
-| **The per-edge claim merge is not exercised by any fixture** | **OPEN — a stated limit of what the suite measures, not a defect.** ADR-0055 merges a route's two citations into one claim. Deleting that merge leaves every test green, because a route literal and the call carrying it are the same expression and therefore share a line: the near-side candidate is deduplicated away and only one citation survives, so the merge never fires here. **It is not dead code** — it fires whenever the near side survives. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it, and two of ADR-0055's four mutations looked green for exactly that reason | Someone adds a fixture whose route literal sits alone on its line |
+| **The per-edge claim merge is not exercised by any fixture** | **OPEN — a stated limit of what the suite measures, not a defect.** ADR-0055 merges a route's two citations into one claim. Deleting that merge leaves every test green, because a route literal and the call carrying it are the same expression and therefore share a line: the near-side candidate is deduplicated away and only one citation survives, so the merge never fires here. **It is not dead code** — it fires whenever the near side survives. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it, and two of ADR-0055's four mutations looked green for exactly that reason | **CLOSED 2026-09-02 (DR-06) — the trigger is unsatisfiable, and the merge is unreachable by construction rather than for want of a fixture.** Both shapes were built and indexed (`tests/integration/test_route_claim_merge.py`). **Inline** yields `loadOrder ROUTES_TO get_order` at frontend.ts:2 — but the `CALLS fetch` edge cites the *same line*, comes first, and wins region deduplication, so the route's near side is dropped and the edge survives with **one** citation, the handler definition. **Separated** — the literal bound to its own line — yields **no route edge at all**, because the derivation attributes a route to the call the literal sits *in*. So a route's near side is always the line of a call that also emits `CALLS`, and moving it off that line destroys the edge. Three tests pin this; if deduplication order ever changes and the near side survives, the first fails and the merge becomes reachable, at which point the pin is **inverted rather than deleted** (ADR-0045) |
 | ~~**A `Finding` carries no subject or file path** (ADR-0042 follow-up 1)~~                              | **CLOSED 2026-08-17 — ADR-0054, and the rendering problem was the symptom.** `_finding_citations` keyed changed symbols on `qualified_name` **alone**, so two modules each defining `total` collapsed to whichever the dict comprehension saw last: **the finding about `billing.py` cited lines in `orders.py`**. A §4.1 violation — the citation does not support the claim — and **ADR-0042's own rule ("pair within the file first") reaching a surface that ruling did not touch**. `FindingDraft` now carries `subject_file`, and a symbol draft resolves **only** by location, with no name fallback, because a wrong citation still renders as a valid finding. `Finding` gains optional `subject`/`file_path` **derived from the citation, never stored** — `change_findings` has no such columns, storing them would be a second copy that can disagree, and deriving means no migration and no drift. Surfaced in JSON, Markdown, PR, the CLI verdict and the web list; SARIF needed nothing, already carrying the location in `artifactLocation`. `contract_version` stays `1.1`, `SCHEMA_VERSION` stays 14                                                                                                                                                                                | —                                                                                                                                                                          |
 | **A gated intent left the denominator, flattering six metrics**                                            | **CLOSED 2026-08-17 — ADR-0053.** `CONCEPTUAL` was absent from `SUPPORTED_INTENTS`, so `predict_exact_symbols` emitted `_abstention(measured=False)` and the case **never reached the engine**. **q024 had never been measured**; ADR-0051 put q006 in the same state hours earlier. This is ADR-0017 on the neighbouring constant, failing the **opposite** way — a gated *fixture* scores `False` and stays in the denominator as a miss, a gated *intent* **leaves** it, so the omission removed a failing case from the average instead of reporting capability as failure. Under-reporting is loud and gets found; flattering is silent. Corrected: `relation_path_recall` 0.9130 → **0.8750**, `relation_path_correctness` 0.8261 → 0.7917, `primary_evidence_recall_at_10` 0.9471 → 0.9310, `exact_evidence_rate` 0.6880 → 0.6591, `ndcg_at_10` and `symbol_recall_at_10` down; `exact_symbol_resolution` **1.0000 unchanged** and `unmet_targets` unchanged. **ADR-0051's conclusion survives** — q006 measured through lexical gives 0.9943, confirming it does pass containment — **but its evidence did not establish it**, and that is recorded as the correction                                                                                                     | —                                                                                                                                                                          |
 | ~~**Ranking sensitivity needs distractors, not larger answer sets**~~                                          | **CLOSED 2026-08-17 — ADR-0059. Ruled: a graph expectation declares direct results only**, which is what makes `exact_symbol_resolution` a ranking gate rather than only a resolution gate — a true indirect result left undeclared means the metric asks whether the *direct* answer ranks first. **The row's own model was wrong twice over.** Sensitivity is **not** structurally unavailable for a correctly-specified direct case: it needs a **two-hop chain**, and `symbol_breadth` had none — nothing called `run_pipeline` or `test_pipeline_advances`. A fixture-shape limit, not a structural one. And the counts had drifted from the recorded "9 sensitive, 9 distractors, the same 9" to **11, 12, and not the same set**, partly through ADR-0051, ADR-0053 and ADR-0057. Fixed: q015 corrected on ADR-0036 grounds, `start_pipeline` added for a two-hop chain, q065 added to query it. **q053 is now the first post-2026-08-15 case to be reversal-sensitive**; the symbol-intent sensitive set is q003, q005, q015, q053 | —                                                                                                                                                    |
-| **`restart-persistence` on Firefox can see another suite's conversation** | **OPEN — an intermittent cross-suite state leak, observed once with its mechanism visible, and NOT reproduced in three attempts.** Seen 2026-08-19 in the post-merge gate on `main`: `restart-persistence.spec.ts:15` expected its own question `IdempotencyStore.claim` in `message-user` and the locator resolved five times to **`PaymentService.capture`** — another suite's question. So it is **not a timeout or a timing flake**; the page showed a conversation the test did not create. The suites share one `.e2e-tmp` database and run `workers: 1, fullyParallel: false`, and `restart-persistence` is skipped on Chromium — so on Firefox it always runs after Chromium has already created state. **Not caused by the merge or by the skip that preceded it**: the merged tree is byte-identical to a tip that passed `check_phase7` with 14 e2e passes, and a skip only removes work from Chromium. **Three full clean runs of both projects afterwards were 8 skipped / 14 passed / exit 0.** **More was captured than last time.** The register's earlier flake row recorded that *which* tests failed was lost to a truncating pipe; here the assertion text names the mechanism. **Not chased further** — it did not reproduce, and hunting an intermittent through a 6-minute gate is a poor loop | It recurs — capture the full log and the `.e2e-tmp` database, since the conversation rows are the evidence |
+| **`restart-persistence` on Firefox can see another suite's conversation** | **OPEN — an intermittent cross-suite state leak, observed once with its mechanism visible, and NOT reproduced in three attempts.** Seen 2026-08-19 in the post-merge gate on `main`: `restart-persistence.spec.ts:15` expected its own question `IdempotencyStore.claim` in `message-user` and the locator resolved five times to **`PaymentService.capture`** — another suite's question. So it is **not a timeout or a timing flake**; the page showed a conversation the test did not create. The suites share one `.e2e-tmp` database and run `workers: 1, fullyParallel: false`, and `restart-persistence` is skipped on Chromium — so on Firefox it always runs after Chromium has already created state. **Not caused by the merge or by the skip that preceded it**: the merged tree is byte-identical to a tip that passed `check_phase7` with 14 e2e passes, and a skip only removes work from Chromium. **Three full clean runs of both projects afterwards were 8 skipped / 14 passed / exit 0.** **More was captured than last time.** The register's earlier flake row recorded that *which* tests failed was lost to a truncating pipe; here the assertion text names the mechanism. **Not chased further** — it did not reproduce, and hunting an intermittent through a 6-minute gate is a poor loop | **Capture recipe (DR-01):** keep the Playwright trace, the full worker log, and a copy of `.e2e-tmp` taken BEFORE the run is torn down -- the conversation rows are the evidence and teardown deletes them. Record the worker index and whether the suites ran in parallel |
 | ~~**Chromium Playwright tests now FAIL, not just skip**~~ | **CLOSED 2026-08-19 — reproduced, mechanism named, then ruled by the user.** **The mechanism:** Chromium's renderer *crashes* (`Protocol error (Runtime.callFunctionOn): Page crashed`) while rendering the Settings **Embedding provider** fieldset for a repository whose policy transmits; the trace shows `goto /settings` completing and the `settings-repository` assertion *passing* first, so the page mounts before the renderer dies. It is a crash, not a failed expectation. **The row's own prime suspect was wrong.** Residue is ruled out — it reproduces with `.e2e-tmp` deleted; so is a stale bundle (freshly built `dist`), a flake (**five runs, five failures**), and the headless shell (`--headed` crashes identically). Firefox renders the identical tree correctly. **Third recorded instance of a written-down diagnosis being wrong: a remedy in this register is still a hypothesis.** **It falsified the claim that shaped the test** — `end-to-end-tests.md` and the spec's own docstring both said a full page load renders the branch correctly on both engines, which is why this test used `page.goto` and stayed unskipped. Corrected in both, with the probes that produced the original claim kept rather than deleted. **Ruled by the user: skip it like the other seven.** Applied through a *separate* helper, `skipChromiumSettingsCrash`, because the existing reason string says "conversation-route navigation" and would have mislabelled this crash in the report. `rules.md` forbids skipping a test to make a build pass, so this was applied only on the ruling and is recorded as one. **After: chromium 8 skipped / 3 passed / 0 failed (exit 0); firefox 11 passed / 0 skipped / 0 failed (exit 0)** — so no assertion was lost, only the engine it is proven on | Chromium ships a build that renders the branch — delete the helper call and run `playwright test settings.spec.ts --project=chromium` |
-| **A `CALLERS` expectation may name its own subject**                                                        | **OPEN — narrower than what ADR-0059 ruled, and deliberately left.** q005 expects `IdempotencyStore.claim` among the callers of `IdempotencyStore.claim`, and q053 expects `OrderPipeline.advance` among its own; nothing calls itself here, so both lose recall for declaring it. **This is not the ADR-0018 violation it first appears to be** — that record explicitly allows a self-referential case ("absent means `expected_symbols[0]`, which is correct for every exact, lexical, and self-referential case") and separately records that module-scoped queries *do* return the subject first. **A first reading that nine cases contradicted ADR-0018 was wrong and is corrected here rather than acted on** | Someone rules whether a caller/dependency expectation may name its own subject                                                                       |
-| ~~original entry~~                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | The convention for declaring transitive results is ruled                                                                                                                    |
-| **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone adds cases whose answer sets are large enough for order to matter                                                                                                   |
+| **A `CALLERS` expectation may name its own subject**                                                        | **OPEN — narrower than what ADR-0059 ruled, and deliberately left.** q005 expects `IdempotencyStore.claim` among the callers of `IdempotencyStore.claim`, and q053 expects `OrderPipeline.advance` among its own; nothing calls itself here, so both lose recall for declaring it. **This is not the ADR-0018 violation it first appears to be** — that record explicitly allows a self-referential case ("absent means `expected_symbols[0]`, which is correct for every exact, lexical, and self-referential case") and separately records that module-scoped queries *do* return the subject first. **A first reading that nine cases contradicted ADR-0018 was wrong and is corrected here rather than acted on** | **CLOSED 2026-09-01 -- ADR-0073, ruling 1. Ruled by the user: leave both as declared.** The recall cost is accepted as a stated limit, not fixed: q005 and q053 permanently score below what the engine achieves, and `relation_path_recall` understates it by that margin. Correcting the cases and changing the engine were both on the table and neither was chosen                                                                       |
+| ~~original entry~~                                          | **OPEN — the Task 6 row's stated model is wrong, corrected 2026-08-17.** The row asks for "cases whose answer sets are large enough for order to matter". Size is not the mechanism: **q060 returns 5 symbols and is not ranking-sensitive**, because all 5 are expected. Sensitivity requires a **distractor** — a returned symbol outside `expected_symbols` — and measurement shows distractor presence and reversal sensitivity are *the same 9 cases*, exactly. The only source of distractors in symbol intents is **second-hop traversal**, so for a correctly-specified *direct* graph case ranking sensitivity is **structurally unavailable**, and `exact_symbol_resolution` is a resolution gate rather than a ranking gate. Adding cases under the stated model would raise the count without adding coverage — the very complaint that opened the row. **The three symbol-intent sensitive cases (q003, q005, q015) are sensitive because their expectations omit depth-2 results**, which is an unruled convention, not a design                                                                                                                                                                                                                                                                                | **CLOSED 2026-09-02 -- ADR-0075, and the measurement pointed the other way.** `QueryCase` gains `traversal_depth`, required for the five graph intents and **forbidden** elsewhere, and the adapter passes it instead of taking the default. **Every graph case declares 2 -- the value it already had.** Measured: all **31** satisfy their declared relations at depth **1**, and depth 1 was **rejected** because it removes every depth-2 result, and those are the corpus's only distractors: `exact_symbol_resolution` would stop being a ranking gate, the four reversal-sensitive cases would stop being sensitive, and ADR-0052's indirect-claim rendering would stop being exercised. ADR-0073 says ruling 3 *extends* ADR-0059; depth 1 would have overturned it. **Both baselines reproduce byte-for-byte**, which is the evidence no answer changed. A first derivation using "all expected symbols returned" called 15 of 31 unsatisfiable -- wrong, because most expect **their own subject**, the class ADR-0073 ruling 1 made permanently unsatisfiable on purpose                                                                                                                    |
+| **The new symbol cases are not ranking-sensitive**                                                         | **OPEN - a stated limit of what they measure, recorded because it was found rather than assumed.** Mutation-checking the 23 cases added 2026-08-15 gave two different answers: **dropping the top hit fails 18 of 23**, so they do measure resolution; **reversing the ranking fails 0 of 23**, because most return a single symbol and a reversal is a no-op for them. The nine cases that *do* catch a reversal are all older ones. So corpus growth raised the count without adding ranking coverage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | **CORRECTED 2026-09-02 (DR-01b), not closed -- the count is stale by one and the citation is ADR-0059.** "Reversing the ranking fails **0 of 23**" was true when written on 2026-08-15 and stopped being true two days later: `git log -S` confirms **q053 was added in `9f919f0`**, the very commit that added those 23, and **ADR-0059 states "q053 becomes the first post-2026-08-15 case to be reversal-sensitive"**. So it is **1 of 23**, not 0. **The row's substance survives** -- 22 of 23 still are not ranking-sensitive, and corpus growth still raised the count more than the coverage. **DR-08 changes what this row measures**: ADR-0073 ruling 3 makes traversal depth part of each case, and depth is exactly what decides whether a returned symbol is a distractor. Re-measure after DR-08, not before                                                                                                   |
 | ~~`relation_path_recall` has no gate target~~                                                                      | **CLOSED 2026-08-17 — ADR-0058. Gated at 1.0, absolutely.** Absolute for ADR-0032's reason: a deterministic emission question, not a ranking one, and **no tolerance has a named cause** — a bounded traversal or `MAX_RELATION_PATHS` truncation that lost a declared edge would be a defect to fail on, not luck to absorb. The denominator is **24 and not uniform** (21 declare one edge; one each two, three, five), so reachable values below 1.0 are 0.9917 / 0.9861 / 0.9792 / 0.9583 — 0.99 would privilege q060 by accident of its edge count and 0.95 would buy a tolerance nobody can justify. **Registered on the `retrieval` profile only, and that is load-bearing:** the semantic corpus declares zero relations, so its aggregate is `None` and `_unmet_targets` counts `None` as a miss — a shared entry would have failed the Phase 7 gate on a metric that corpus cannot express (ADR-0023's mistake). **Mutation-checked:** regressing ADR-0057 drove recall 1.0 → 0.875 and the gate caught it. `baseline-phase-0` gains the entry, correctly — a gate the null baseline does not miss asks nothing | —                                                                                             |
 | ~~original entry~~                                                                      | **STILL OPEN, but its blocker is discharged (ADR-0057, 2026-08-17).** ADR-0038 deferred the threshold because one of ADR-0034's four causes was unsettled; that cause is now ruled and implemented, and **`relation_path_recall` reads 1.0000** over a denominator of **24** measured cases that declare a relation. The user deliberately deferred choosing the threshold until the number was known, so this is now a live decision rather than a blocked one. **Compute what one miss is worth before picking it:** at 24 cases a single miss scores 0.9583, so a 0.98 target would be as inexpressible as the ones ADR-0032 and ADR-0033 had to correct | Someone chooses the threshold against the 24-case denominator                                                                                                             |
-| **A lexical answer can broaden with no metric moving**                                                          | **OPEN — a stated limit of the instrument, found 2026-08-17 by ADR-0057.** q006 and q031 now emit **true** edges the corpus does not declare, so their per-case precision falls 1.00 → 0.00 — and **the aggregate cannot see it**, because `relation_scores` is built only from cases where `case.expected_relations` is non-empty. A case declaring nothing cannot measure relation accuracy, which is defensible, but it means this change made two answers broader with **no number moving anywhere**, and a future change making them broader still would be equally invisible. **Deliberately not fixed:** declaring relations on q006/q031 to make them visible would be editing the corpus in response to an engine change (ADR-0003) | Someone rules whether a case declaring no relations should score relation precision at all                                                                                 |
-| **ADR-0057's withheld-step branch is unreachable from the fixtures**                                            | **OPEN — a stated limit of what the suite exercises, not a defect.** A step whose edge falls outside every returned chunk is withheld rather than shown with a gap. Mutating that branch to cite a fabricated id leaves the suite green, because in every corpus fixture each edge lands inside a returned chunk. **It is not dead code** — a bounded result set or a chunk dropped by evidence validation reaches it. `_containing` is pinned by a direct unit test instead, including both rejection cases the fixtures cannot produce. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it (ADR-0055) | Someone adds a fixture where a matched symbol's edge sits outside every returned chunk                                                                                     |
+| **A lexical answer can broaden with no metric moving**                                                          | **OPEN — a stated limit of the instrument, found 2026-08-17 by ADR-0057.** q006 and q031 now emit **true** edges the corpus does not declare, so their per-case precision falls 1.00 → 0.00 — and **the aggregate cannot see it**, because `relation_scores` is built only from cases where `case.expected_relations` is non-empty. A case declaring nothing cannot measure relation accuracy, which is defensible, but it means this change made two answers broader with **no number moving anywhere**, and a future change making them broader still would be equally invisible. **Deliberately not fixed:** declaring relations on q006/q031 to make them visible would be editing the corpus in response to an engine change (ADR-0003) | **CLOSED 2026-09-02 -- ADR-0076, and the ruling's premise was already false.** `runner.py` has excluded cases declaring no relations since before ADR-0073, so "exclude them" was the **status quo** and could move nothing; and the options carried each other's consequences, since `_precision(predicted, empty)` returns **0.0**, making *keeping* such a case the thing that would expose broadening. Re-put to the user with that evidence; they chose the third option -- **a case whose answer carries relations declares them.** Exactly three did not: q003, q006, q031, now declaring seven edges **read off the fixture source rather than transcribed from the engine** (ADR-0003). `relation_path_correctness` **0.8932 -> 0.9024**, entirely because the denominator grew **24 -> 27** with three cases at 1.0 -- **no engine change, no answer change**, and recorded so it is never cited as uplift (ADR-0053). Recall holds **1.0**, so ADR-0058's absolute gate stands, which is also the check on the gold: seven edges declared from source, seven emitted. Guarded corpus-derived, mutation-checked                                                                                 |
+| **ADR-0057's withheld-step branch is unreachable from the fixtures**                                            | **OPEN — a stated limit of what the suite exercises, not a defect.** A step whose edge falls outside every returned chunk is withheld rather than shown with a gap. Mutating that branch to cite a fabricated id leaves the suite green, because in every corpus fixture each edge lands inside a returned chunk. **It is not dead code** — a bounded result set or a chunk dropped by evidence validation reaches it. `_containing` is pinned by a direct unit test instead, including both rejection cases the fixtures cannot produce. Recorded because a mutation that cannot apply is indistinguishable from a test that cannot catch it (ADR-0055) | **CLOSED 2026-09-02 (DR-06) — reached, and not by the route the row imagined.** An outgoing edge's reference site is inside its own source symbol, and a module chunk spans the whole file, so whenever the module is a hit every edge in that file is contained — the branch is unreachable through fixture *content*. The row's other clause is the way in: *"a chunk dropped by evidence validation"*. `symbol_ids` comes from the search hits while `cited` comes from the evidence actually emitted, and those separate when a file is **modified after indexing**: its chunks fail content-hash validation, its symbols stay hits, and their edges have nothing left to cite. `tests/integration/test_withheld_relation_step.py` mutates the tree between indexing and querying — which no corpus fixture can do — and the steps are withheld with `EVIDENCE_STALE_FILE_CONTENT`. **Mutation-checked, and it found a second defence:** fabricating an evidence id is also refused by `QueryResponse` validation ("relation step references unknown evidence"), so §4.1 holds at two layers — but the validator turns a bad citation into a 500 while the branch withholds one step and returns the rest |
 | ~~RRF coarse-chunk bias~~                                                                                            | **CLOSED 2026-08-17 — ADR-0056, measured corpus-wide at three penalty strengths. The answer is that the lever is a pure loss.** ADR-0030 predicted a *trade* — an evidence hit for a symbol hit. **It is not a trade:** `symbol_recall_at_10` falls **0.9286 → 0.8571** alongside `containing_evidence_recall_at_10` **1.0000 → 0.8667**, and **every metric that moves, moves down, at every strength**. The cause is a case ADR-0030 did not anticipate — **s013's expected answer `OrderStatus` is itself a class chunk**, so the penalty demotes the answer it exists to promote (7 → 28), while s001 loses its only containment hit (1 → 11) exactly as predicted. The single gain in the corpus is s007, 8 → 7 — already inside the top 10, so it cannot improve any Recall@10, and its ~0.001 of MRR is swamped by the losses. Incidence today: a coarse chunk outranks the declared evidence in **2 of 14 cases**, both still inside the top 10, so the bias costs **zero** recall. Result is monotone against the lever — both losses occur because the *expected* chunk is coarse, so widening the definition can only demote them further. Instrument validated against three figures recorded before it existed (s013 rank 7, s001 symbol rank 12, `symbol_recall_at_10` 0.9286) and agrees with all three                                                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                             |
-| **The corpus that fusion runs on never grew, and the task premise said it had**                                  | **OPEN — a stated limit of what any fusion measurement can show, found 2026-08-17 by ADR-0056.** Task 7 was scoped as measuring the bias "now the corpus is larger". It is not larger. `_fuse` is gated on `SEMANTIC_INTENTS` (`{PROJECT_OVERVIEW, TEXT}`) and the Phase 4 path `predict_exact_symbols` attaches no fusion at all, so **WS-1's growth of `tests/evaluation/cases` 27 → 50 reached a corpus fusion never touches.** The only corpus that reaches it is `tests/evaluation/semantic_cases` — **14 cases over one fixture**, `queries.json` and `changes.json` byte-identical since `38cc393` (2026-07-31), the sole change anywhere in that tree being ADR-0023's two-line `target_profile`. **Another stale premise** — recorded under Tasks 1, 2, 3, 6 and both WS-1 sub-tasks, with **Task 4 still the only one that checked out**. ADR-0056's conclusion is unaffected but rests on 14 cases, not 50, and must not be quoted as though the corpus had grown | Someone gives the semantic corpus a second fixture — a fixture shape, not a case |
+| **The corpus that fusion runs on never grew, and the task premise said it had**                                  | **OPEN — a stated limit of what any fusion measurement can show, found 2026-08-17 by ADR-0056.** Task 7 was scoped as measuring the bias "now the corpus is larger". It is not larger. `_fuse` is gated on `SEMANTIC_INTENTS` (`{PROJECT_OVERVIEW, TEXT}`) and the Phase 4 path `predict_exact_symbols` attaches no fusion at all, so **WS-1's growth of `tests/evaluation/cases` 27 → 50 reached a corpus fusion never touches.** The only corpus that reaches it is `tests/evaluation/semantic_cases` — **14 cases over one fixture**, `queries.json` and `changes.json` byte-identical since `38cc393` (2026-07-31), the sole change anywhere in that tree being ADR-0023's two-line `target_profile`. **Another stale premise** — recorded under Tasks 1, 2, 3, 6 and both WS-1 sub-tasks, with **Task 4 still the only one that checked out**. ADR-0056's conclusion is unaffected but rests on 14 cases, not 50, and must not be quoted as though the corpus had grown | **CLOSED 2026-09-02 (DR-06) — ADR-0077.** `delivery_scheduler` added: retry backoff, duplicate suppression and deadline parking, a deliberately different domain from orders, with four conceptual cases (s015–s018). The semantic corpus is now **18 cases over two fixtures**. Semantic `containing_evidence_recall_at_10` **holds at 1.0** and `symbol_recall_at_10` rises 0.9286 → **0.9444**; the deterministic side improves 0.8667 → 0.8947 and keeps its two pre-existing unmet targets. **ADR-0056's conclusion is not widened by this** — that record was measured on 14 cases over one fixture and must still be cited that way; the corpus grew, the measurement was not re-run |
 | ~~Phase 4 `containing_evidence_rate` and `containing_evidence_recall_at_10`~~                               | **INVESTIGATED 2026-08-15, RULED 2026-08-16 — superseded by the four rows below.** The per-case run found the recall shortfall is **exactly 10 of 85 cases scoring 0.00** while the other 75 score 1.00, from **two unrelated causes** — and that the rate metric's 1.00 target is unreachable while the engine obeys ADR-0020. Each cause is now its own row with its own ruling                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | ~~**q035: an under-specified expectation, now consuming the entire `exact_symbol_resolution` margin**~~ | **CLOSED 2026-08-16 — ADR-0050.** Ruled by the user. Two corrections on different authorities: q035 declares `query_subject: "target.processor.process"` (additive, the field's own comment sanctions it), and its `expected_evidence` becomes the reference site `4-4` — a **ninth instance of ADR-0047**, which q035 could not be part of on 2026-08-16 because it was abstaining and emitted nothing to compare. `exact_symbol_resolution` **0.9800 → 1.0000 (50/50)**, so the gate tolerates one future miss again; `containing_evidence_recall_at_10` 0.9706 → **0.9824**; `abstention_correctness` and `mean_reciprocal_rank` → 1.0000; `containing_evidence_rate` 0.7561 → 0.7520, ungated (ADR-0048). No engine, `_contains`, or metric-definition change. **The subject fix alone passed its own wrong-side mutation** — see the row below                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | —                                                                                                                                                                          |
 | ~~**The stated blocker for q035 was wrong, and the ambiguity message is why**~~ | **CLOSED 2026-08-20 by `4926e71`, recorded 2026-08-21.** The trigger was "someone fixes the message", and someone did: `_candidate_labels` (`application/graph_queries.py`) now prints the module-qualified form when bare `qualified_name` does not distinguish the candidates, so a caller told to "ask again with a qualified name" is no longer shown `process, process`. The row outlived its own fix by a day. **The finding it carried stands and is worth keeping**: the belief that q035 was inexpressible had never been tested against the store, and `find_exact` tier 2 accepted `module_path.qualified_name` all along | — |
-| **A corpus fix can restore a number without restoring the measurement**                                    | **OPEN — a stated limit found by mutation, generalising the row above about the 2026-08-15 cases.** Declaring q035's `query_subject` restored `exact_symbol_resolution` to 1.0000, and then **the wrong-side mutation was not detected**: pointing the subject at `base.service.process` scored *identically*, because `expected_symbols` is `["process"]` and both fixture sides define a symbol of that name. Only correcting the evidence to the reference site made the case discriminate, because the two sides' reference sites are in different files while their symbol names are not. **The general shape: `exact_symbol_resolution`, `mean_reciprocal_rank` and `abstention_correctness` all read the symbol's *name*, so no name-based metric can separate two same-named symbols.** Any fixture holding same-named symbols has this blind spot                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Someone audits the corpus for other same-named-symbol cases resting on name-based metrics alone                                                                             |
-| **Concurrent full-suite runs fail; the same tree passes solo**                                             | **OPEN — an observation with an unconfirmed mechanism, recorded because it contradicts a standing rule.** Running `check_phase4` and `check_phase7` **at the same time** on 2026-08-16 gave **3 failed / 2237 passed**. The identical tree, run once and alone, gave **2240 passed, exit 0**, and both gates then passed sequentially. **Which three failed was not captured** — the gate output was piped through `Select-Object -Last N`, which truncated the `FAILED` lines — so the mechanism is a hypothesis, not a finding: the packaged end-to-end tests start the packaged server on a **loopback port** and read one **shared `dist/codeatlas-win64`**, neither of which the 2026-08-15 `.test-tmp` fix made concurrency-safe. **That fix made temp *directories* safe and the register then retired the one-at-a-time rule generally, which looks too broad.** Do not pipe a gate through `Select-Object` when the result matters                                                                                                                                                                                                                                                                                                                                                                | Someone reproduces it with full output captured and names the three tests                                                                                                   |
+| **A corpus fix can restore a number without restoring the measurement**                                    | **OPEN — a stated limit found by mutation, generalising the row above about the 2026-08-15 cases.** Declaring q035's `query_subject` restored `exact_symbol_resolution` to 1.0000, and then **the wrong-side mutation was not detected**: pointing the subject at `base.service.process` scored *identically*, because `expected_symbols` is `["process"]` and both fixture sides define a symbol of that name. Only correcting the evidence to the reference site made the case discriminate, because the two sides' reference sites are in different files while their symbol names are not. **The general shape: `exact_symbol_resolution`, `mean_reciprocal_rank` and `abstention_correctness` all read the symbol's *name*, so no name-based metric can separate two same-named symbols.** Any fixture holding same-named symbols has this blind spot                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | **CLOSED 2026-09-02 (DR-06) — audited, no exposure, and the row's model was too broad.** The corpus defines exactly **one** qualified name in more than one file: `process`, in `git_changes`. All three cases naming it (q033, q034, q035) pin their evidence to a single file. **They cannot do otherwise:** `git-base` declares only `base/service.py` and `git-target` only `target/processor.py`, so the two `process` symbols are in *different snapshots* and the dataset validator (ADR-0047 ruling 4) already refuses evidence outside a case's declared members. The row says "any fixture holding same-named symbols has this blind spot"; it actually needs same-named symbols **within one snapshot**, and none exists. The corpus-wide guard therefore **cannot fail today** and a mutation against the real corpus is refused by the loader before reaching it — the ADR-0055 shape — so the predicate is exercised against synthetic input as well, which is where its teeth are proven |
+| **Concurrent full-suite runs fail; the same tree passes solo**                                             | **OPEN — an observation with an unconfirmed mechanism, recorded because it contradicts a standing rule.** Running `check_phase4` and `check_phase7` **at the same time** on 2026-08-16 gave **3 failed / 2237 passed**. The identical tree, run once and alone, gave **2240 passed, exit 0**, and both gates then passed sequentially. **Which three failed was not captured** — the gate output was piped through `Select-Object -Last N`, which truncated the `FAILED` lines — so the mechanism is a hypothesis, not a finding: the packaged end-to-end tests start the packaged server on a **loopback port** and read one **shared `dist/codeatlas-win64`**, neither of which the 2026-08-15 `.test-tmp` fix made concurrency-safe. **That fix made temp *directories* safe and the register then retired the one-at-a-time rule generally, which looks too broad.** Do not pipe a gate through `Select-Object` when the result matters                                                                                                                                                                                                                                                                                                                                                                | **Capture recipe (DR-01):** run `uv run pytest -q -p no:randomly` twice concurrently from two shells, redirect each to its own file, and keep BOTH files plus the two exit codes. The three failing node ids are the deliverable -- an exit code alone cannot distinguish a shared-tempdir collision from a shared-database one. Also record whether `--basetemp` was passed, since the 2026-08-15 diagnosis turned on it                                                                                                   |
 | ~~**`baseline-phase-7.json` has not reproduced since 2026-08-14**~~                                           | **CLOSED 2026-08-16.** Regenerated as its own reviewed commit; **`rerank-phase-7.json` had the identical staleness**, from the same commit `7b2f8ab` and the same cause, and was found only because fixing the first let `check_phase7 -Semantic` reach the next step. Both diffs are two added `finding_count_correctness` lines with no value change. An audit of every tracked artifact carrying a metrics block found only three lacking the key; the other two are **`baseline-phase-1` and `-2`, deliberately left frozen** (ADR-0017 — their gate scripts are SUPERSEDED and exit 5 by design, so regenerating would overwrite the record those gates were approved on). Original entry follows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
-| ~~original entry~~                                                                                              | **OPEN — found 2026-08-16 while verifying ADR-0050, pre-existing and unrelated to it.** `run_phase7_baseline.py --check` exits **5**. The whole difference is one **added metric key**: `finding_count_correctness` entered the report model in `fc7af34` (2026-08-14, "a repeated finding is visible to the score"), and the artifact was last regenerated in `7b2f8ab`, which `git merge-base --is-ancestor` confirms is an **ancestor** of it. Phases 0, 3 and 4 all carry the field; Phase 7 alone does not. **No metric value differs** — regenerating adds two lines, both `"finding_count_correctness": 1.0`. **Why nobody saw it: the semantic block is `-Semantic`-gated and opt-in**, so `check_phase7 -SkipSync` never reaches that step, which is precisely the ADR-0022 process note ("it happened to pass, because the corpora are disjoint — luck, not diligence"). Deliberately **not** regenerated here: ADR-0022's rule is that a gated artifact which stops reproducing is reviewed, not absorbed, and this is outside the ADR-0050 change                                                                                                                                                                                                                                                    | Someone regenerates it as its own reviewed commit, or makes the semantic step non-optional                                                                                  |
+| ~~original entry~~                                                                                              | **OPEN — found 2026-08-16 while verifying ADR-0050, pre-existing and unrelated to it.** `run_phase7_baseline.py --check` exits **5**. The whole difference is one **added metric key**: `finding_count_correctness` entered the report model in `fc7af34` (2026-08-14, "a repeated finding is visible to the score"), and the artifact was last regenerated in `7b2f8ab`, which `git merge-base --is-ancestor` confirms is an **ancestor** of it. Phases 0, 3 and 4 all carry the field; Phase 7 alone does not. **No metric value differs** — regenerating adds two lines, both `"finding_count_correctness": 1.0`. **Why nobody saw it: the semantic block is `-Semantic`-gated and opt-in**, so `check_phase7 -SkipSync` never reaches that step, which is precisely the ADR-0022 process note ("it happened to pass, because the corpora are disjoint — luck, not diligence"). Deliberately **not** regenerated here: ADR-0022's rule is that a gated artifact which stops reproducing is reviewed, not absorbed, and this is outside the ADR-0050 change                                                                                                                                                                                                                                                    | **CLOSED 2026-09-02 (DR-01b) -- regenerated as its own reviewed commit, AND IT HAD GONE STALE A SECOND TIME.** `--check` exited **5** again on audit, 17 days on. The 2026-08-16 closure above fixed that instance; **the mechanism was never touched and has now bitten twice with the identical signature** -- two added metric keys, no value change. This time the key is `changed_symbol_exact_cases`, which entered the report model on 2026-08-20 (the dilution fix), and **`rerank-phase-7.json` had the same gap again**, found the same way as last time: only by fixing the first artifact could the check reach the second. An audit of every tracked artifact carrying a metrics block found no others -- `baseline-phase-1` and `-2` stay deliberately frozen (ADR-0017). Both artifacts now `--check` exit **0**. **The recurrence is its own row below**                                                                                  |
 | ~~**The packaged web bundle is five days behind `apps/web/dist`**~~                                           | **CLOSED 2026-08-16.** Rebuilt with `scripts/build_package.ps1 -SemanticLocal`. **The flag mattered:** the existing package carried `torch` and `lancedb`, so building without it would have silently turned a semantic artifact into a deterministic-only one — a change nobody asked for. The zip was rebuilt too (335 MB → 370 MB) rather than left inconsistent with the folder beside it. `tests/end_to_end/test_packaged_build.py` **6 passed**, and the build script's own verification step reports "web assets match apps/web/dist". Original entry follows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                                                                                          |
-| ~~original entry~~                                                                                              | **OPEN — environmental, found 2026-08-16, not a repository regression.** `test_the_packaged_web_assets_match_the_source_build` fails, which aborts `check_phase4` and `check_phase7` at their *first* step. Both directories are **gitignored build output** — `git ls-files` returns 0 tracked files for each — so this is local state, and a fresh clone skips the test because `apps/web/dist` would be absent. Source built **2026-08-16 02:02**, package built **2026-08-11 19:14**; they differ by one hashed JS asset and the `index.html` naming it. The count corroborates: 2240 passed at `e07c5ff`, now 2239 passed / 1 failed of the same 2240. **The guard is correct and is reporting real staleness** — the packaged executable would serve a five-day-old UI, the 2026-08-05 Settings incident's exact shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `scripts/build_package.ps1` is run                                                                                                                                        |
+| ~~original entry~~                                                                                              | **OPEN — environmental, found 2026-08-16, not a repository regression.** `test_the_packaged_web_assets_match_the_source_build` fails, which aborts `check_phase4` and `check_phase7` at their *first* step. Both directories are **gitignored build output** — `git ls-files` returns 0 tracked files for each — so this is local state, and a fresh clone skips the test because `apps/web/dist` would be absent. Source built **2026-08-16 02:02**, package built **2026-08-11 19:14**; they differ by one hashed JS asset and the `index.html` naming it. The count corroborates: 2240 passed at `e07c5ff`, now 2239 passed / 1 failed of the same 2240. **The guard is correct and is reporting real staleness** — the packaged executable would serve a five-day-old UI, the 2026-08-05 Settings incident's exact shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | **CLOSED 2026-09-02 (DR-01b) -- an archived original that was never marked as one.** Its closure is the row directly above it (rebuilt 2026-08-16 with `-SemanticLocal`), and the trigger it names had already fired then. Verified today rather than assumed: `tests/end_to_end/test_packaged_build.py` **7 passed**, including `test_the_packaged_web_assets_match_the_source_build`. **Retrofitted to the `archived original` form** DR-01 defined, which is the sweep DR-01 did not finish                                                                                                                                        |
 | ~~**ADR-0047 forward-references an ADR-0049 that was never written**~~ | **CLOSED 2026-08-21 — ADR-0049 written.** The record ADR-0047 line 39 cites now exists: the `git_changes` fixture's `target/` side collides with a build-output ignore default, so a *query* case indexing the fixture root could not see half the fixture and **q034's recall was structurally 0 and always had been**. Re-included by a fixture-local `.codeatlasignore` with `overrides=True`, leaving the builtin default untouched for every real repository. Written five days after the decision and **says so in its own header**, because a record dated later than the ruling it describes invites exactly the wrong reading. **ADR-0050's deliberate skip of the number turned out to be right** — taking it would have made ADR-0047's sentence point at an unrelated record. The README's ADR count 67 -> 68 was caught by the guard added earlier the same day rather than by remembering | — |
 | ~~**q006: the engine cites a line that does not prove the claim**~~                                       | **CLOSED 2026-08-16 — ADR-0051. Not an engine defect; the case is mis-typed.** Both halves of the recorded hypothesis are false. `claim` **does** have an outgoing edge (`CALLS add`, line 8), and evidence is built one-per-edge from `edge.start_line` (`graph_queries.py:305-318`) — no chunk or lexical fallback. And the engine's claim is *"IdempotencyStore.claim calls add at idempotency.py:8"*, which line 8 proves exactly; it simply does not answer the *question*. Line 7 holds no relation, so no correct `TRACE_FLOW` can ever cite it. **The product's own classifier routes the question to `text`**, whose result (`5-9`) contains line 7. Re-typed to `CONCEPTUAL` and **q064 added in the same change**, because `TRACE_FLOW` is a symbol intent and removing q006 alone drops the denominator 50 → 49, where one miss scores 0.9796 and fails the gate. `containing_evidence_recall_at_10` 0.9824 → **0.9941**; margin held. **Ninth consecutive instrument finding**, reached by reading the claim against its cited lines and running the classifier, not by reflex                                                                                                                                                                                                                   | —                                                                                                                                                                          |
-| **The `TRACE_FLOW` label may be systemically wrong**                                                     | **OPEN — raised by ADR-0051, deliberately not settled with it.** All three `TRACE_FLOW` cases examined so far — q003, q006, q035 — classify as **`text`** in the product's own `classify()`, so the corpus's declared intent disagrees with the classifier for every one checked. Six carry the label. q006 was re-typed; **q003 and q035 were left alone on purpose** — q035 was settled by ADR-0050 hours earlier and reopening it the same day on a different axis would discard that evidence, and q003 currently passes. The harness bypasses the classifier by design (`_query_term`: "not question understanding"), which is legitimate, but it means **a declared intent no classifier would produce is never cross-checked**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Someone audits all six`TRACE_FLOW` cases together                                                                                                                         |
-| ~~original entry~~                                                                                              | **OPEN — a candidate ENGINE finding, the first in this investigation that is not the instrument.** Surfaced 2026-08-16 by applying ADR-0047. The claim is "duplicate keys are handled"; the line that proves it is `return "duplicate"` (`idempotency.py:7`). The engine cites line 8, `self._keys.add(key)`. **Not proven to be a defect** — the trace answer may be selecting a chunk line rather than the claim-bearing one. Recorded because the reflex the rulings warned about would have declared line 8 "because the engine says so", matched the predicted number, and buried it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Someone investigates why trace evidence selects that line                                                                                                                   |
+| **The `TRACE_FLOW` label may be systemically wrong**                                                     | **OPEN — raised by ADR-0051, deliberately not settled with it.** All three `TRACE_FLOW` cases examined so far — q003, q006, q035 — classify as **`text`** in the product's own `classify()`, so the corpus's declared intent disagrees with the classifier for every one checked. Six carry the label. q006 was re-typed; **q003 and q035 were left alone on purpose** — q035 was settled by ADR-0050 hours earlier and reopening it the same day on a different axis would discard that evidence, and q003 currently passes. The harness bypasses the classifier by design (`_query_term`: "not question understanding"), which is legitimate, but it means **a declared intent no classifier would produce is never cross-checked**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **AUDIT RUN 2026-09-02 (DR-09). The label is not systemically wrong, and this row's own framing was the defect.** Instrument committed at `scripts/report_intent_agreement.py`; any claim about agreement is made by running it. **Three corrections to this row.** (1) It says "Six carry the label" -- there are **five**, because ADR-0051 re-typed q006 to `CONCEPTUAL` the same day this row was written. (2) It says the classifier disagrees "for every one checked" -- measured over all five, **q063 classifies as `trace`**, so it is 4 of 5. (3) The generalisation does not survive its control: **`EXACT_SYMBOL` agrees on 0 of 36**, `DOCUMENT_LOOKUP` 0 of 4, `DEPENDENCIES` 5 of 10, `CALLERS` 6 of 10, and the corpus-wide figure is **15 of 68** scored cases. `TRACE_FLOW`'s 1 of 5 is **better than average**, so singling it out was an artifact of its being the intent under investigation. **The disagreement is by design and the design is recorded**: `engine_adapter._query_term` feeds the declared symbol, not the question, because the harness measures resolution and not question understanding -- a declared intent names the channel under measurement, not a prediction of `classify()`. **Both channels were run for all five cases and the declared one is better or equal every time**: `TRACE` scores top-1 on 5 of 5 and every expected evidence range is CONTAINED, while `TEXT` loses top-1 on q026 and q032 and drops q063's symbol recall 2/3 -> 1/3. Re-typing them would make four of five answers worse and cut the symbol-intent denominator by five (ADR-0051's arithmetic). **A ruling is still the user's**; the audit's recommendation is to close this as a corpus convention that is working. **One genuine product finding came out of it and is its own row below** -- it is not folded in here, because a classifier gap and a corpus convention have different remedies |
+| **A `-Semantic`-gated artifact goes stale unnoticed, and this is the second occurrence** | **OPEN — a process defect, not a data defect, promoted to its own row 2026-09-02 (DR-01b) because closing the instance twice has not stopped it.** `baseline-phase-7.json` and `rerank-phase-7.json` are `--check`ed **only** under `check_phase7.ps1 -Semantic`, which needs the optional extras installed and is opt-in. Every routine `-SkipSync` run stays green while they rot. **Signature both times: two added metric keys, no value change** — `finding_count_correctness` on 2026-08-16, `changed_symbol_exact_cases` on 2026-09-02 — because adding a field to the shared report model updates every artifact a gate regenerates and silently orphans the ones it does not reach. **Both times `rerank-phase-7.json` was found only after fixing `baseline-phase-7.json` let the gate advance one step**, so the second artifact is invisible until the first is repaired: a queue of hidden staleness, not one item. ADR-0022 already ruled such an artifact is *reviewed, not absorbed*, and that ruling has been honoured twice — what is missing is anything that makes the review **happen**. Deliberately **not** fixed here: making the semantic step non-optional would put torch and LanceDB on the critical path of every gate run, which is a real cost and a scope decision, and the cheaper options (a key-set guard over tracked artifacts that needs no extras; or a CI-less reminder) have not been weighed against each other | **PARTLY CLOSED 2026-09-02 (DR-01b) — the cheap half is built.** `tests/evaluation/test_tracked_artifact_metric_keys.py` asserts every regenerable tracked artifact carries the full `AggregateMetrics` key set. It needs no extras, so it runs in **every** gate, it walks **nested** blocks (both stale artifacts nest two reports each, and a top-level check would have missed exactly them), and it reports **all** offenders at once rather than stopping at the first — which is what made the second artifact invisible both times. Mutation-checked by restoring the stale committed copy: it fails naming `baseline-phase-7.json::deterministic` and `::semantic` and the missing key. `baseline-phase-1`/`-2` are exempt by **name**, citing ADR-0017, and a third test pins that the exemption is a literal set rather than a pattern that could grow by accident. **What stays open is the ruling**: whether the `-Semantic` `--check` steps should stop being opt-in. This guard catches a missing *key*; it cannot catch a changed *value*, which is what `--check` is for |
+| **A question beginning with the word "Trace" is not routed to the trace channel** | **OPEN — a user-visible product gap, found 2026-09-02 by DR-09's audit and deliberately kept separate from the row above.** The classifier's only `TRACE` rule is `^trace\s+(?:the\s+)?(?:flow\s+(?:from\|through)\s+)?(?P<subject>\S+)\s*$` (`conversations/intent.py`), which is anchored at both ends and admits **one** trailing token. So `Trace the flow from mount.` classifies as `trace`, and **`Trace order data from frontend to backend.` classifies as `text`** — a question that literally begins with the verb. **It is not cosmetic:** measured on q032's own fixture, the trace channel returns top-1 `loadOrder` with both expected ranges contained, while the text channel the user actually reaches ranks `Order flow` first and gets top-1 **wrong**. The corpus never sees this, because the harness bypasses the classifier by design — so the product measures a channel a real user cannot reach for this phrasing. **No fix proposed here.** Widening the rule changes routing for questions no case covers, and the corpus cannot measure classification at all, so a change would be unmeasured by construction — which is the shape ADR-0056 and ADR-0062 both record as the reason to decline | A ruling on whether the classifier should be widened, **and** a decision about what would measure it — the corpus scores channels, not routing, so this needs an instrument before it needs a fix |
+| ~~original entry~~                                                                                              | **OPEN — a candidate ENGINE finding, the first in this investigation that is not the instrument.** Surfaced 2026-08-16 by applying ADR-0047. The claim is "duplicate keys are handled"; the line that proves it is `return "duplicate"` (`idempotency.py:7`). The engine cites line 8, `self._keys.add(key)`. **Not proven to be a defect** — the trace answer may be selecting a chunk line rather than the claim-bearing one. Recorded because the reflex the rulings warned about would have declared line 8 "because the engine says so", matched the predicted number, and buried it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | **CLOSED 2026-09-02 (DR-01b) -- ADR-0051 answered it, on the same day this row was written, and the row outlived its own answer.** The trigger was "someone investigates why trace evidence selects that line"; ADR-0051 did: evidence is built one `EvidenceCandidate` per edge from `edge.start_line` (`application/graph_queries.py:305-318`), with no chunk and no lexical fallback, so **"line 8 is cited because the edge is at line 8"** and **"there is no edge at line 7"** -- both quoted from that record. The row's own framing ("a candidate ENGINE finding, the first that is not the instrument") is what ADR-0051 disproved. **Archived original**, superseded by the q006 row above it                                                                                                                   |
 | ~~**Ruling 1 — graph evidence is the reference site**~~                                                  | **CLOSED 2026-08-16 — ADR-0047.** Eight expectations corrected; `_contains`, the engine and the metric definitions untouched. **Six were pure convention mismatches; two were not** — q006 and q032 became their own rows below, which is why the predicted 0.9765 came out at 0.9588                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | ~~**Ruling 2 — re-include `target/` in the fixture**~~                                                 | **CLOSED 2026-08-16.** A fixture-local `.codeatlasignore` holding `!target/`. Change cases confirmed unaffected by capturing c020–c023 before and after: byte-identical. **q034 now passes; q035 does not** — the fix put a second `process` in the index, so its trace subject is ambiguous and the answer abstains. That regressed four metrics, all from that one case; see the q035 row                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                                                                          |
 | ~~**Ruling 3 — `containing_evidence_rate` is ungated**~~                                               | **CLOSED 2026-08-16 — ADR-0048.** Reported, not gated; recall keeps its 0.90 gate and meets it at 0.9706. The ceiling was recomputed for today and is **lower** than the figure first quoted: **95/123 = 0.7724** with 28 items still uncredited, against a 1.00 target                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | —                                                                                                                                                                          |
@@ -126,7 +145,7 @@ with verification.
 | **A tracked file that matches an ignore default is reported deleted**                                      | **CLOSED 2026-08-13 — ADR-0044.** Ruled by the user: **preflight never considers a file it would not index**, so the blob side applies the same ignore rules and the same content-based binary sniff as a scan. 12 base-only files → **0**, 26 findings → **0**; the views now list byte-identical path sets on a clean tree. The rejected alternative — letting tracked files bypass ignore rules — would have pulled built output and minified bundles into the index through a comparison. Consequence accepted with the ruling: a tracked-and-ignored file can be added or deleted without preflight saying so, which is what "outside the index" means                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | —                                                                                                                                                                          |
 | ~~Editing a large Markdown file reports hundreds of its sections as deleted~~                                   | **CLOSED 2026-08-13 — not a defect. The engine was right and the measurement was wrong**, which is the **sixth** consecutive investigation of this shape to end that way (ADR-0017, 0018, 0024, 0027, 0038). The 12-minute analysis ran over a **live working tree while the same session rewrote `PLAN.md`** with `Path.write_text`, which truncates before it writes; the read landed in that window and saw an empty file. Proven by exact reproduction: an empty target yields **496 `SYMBOL_DELETED`** against the artifact's **496** for that file, a truncated one yields 491+1, and the real edited bytes yield **2 findings and zero deletions**. Eliminated on the way, and they should stay eliminated: text decoding (the mojibake was the terminal — the JSON holds `—` intact), symbol pairing with matching *and* mismatched `file_id`s, parse divergence (both views: 497 symbols, same ids, zero diagnostics), scale (50/200/497 sections all correct), and the real `GitBlobStateView`-vs-`DirectoryStateView` pairing. Three regression tests kept in `tests/unit/test_document_section_diff.py`, one of which pins the truncation shape so the next wall of deletions is diagnosable in a single run. Full account: `docs/superpowers/plans/2026-08-13-document-sections-report-as-deleted.md` | —                                                                                                                                                                          |
 | ~~**`check_phase7.ps1` can exit non-zero while reporting success**~~                                          | **CLOSED 2026-08-15, with the diagnosis corrected.** The recorded mechanism — "the process exit code is whatever the last native command left" — **does not reproduce.** Under `powershell -File` a trailing `cmd /c "exit 3"` still exits **0**, so the success path was never leaking; and a failing step already exited non-zero, because `Invoke-Checked` throws under `$ErrorActionPreference = "Stop"`. The real exposure is one invocation-form narrower: a **caller** that reads `$LASTEXITCODE` after invoking a gate sees the stale code, measured at **3** through a wrapper `.ps1`. Worth fixing anyway — a release gate should state its verdict rather than leave it to how it was called. **All eight** gate scripts lacked the line, not just Phase 7; all eight now end `exit 0`, guarded with no exemption list. The risk that this masks a red gate is covered twice: a dynamic test asserting a throwing step still exits 1 with `exit 0` below it, and a deliberate breakage of the real Phase 4 gate, which exited **1** naming `Dataset validation failed with exit code 2`                                                                                                                                                                                                             | —                                                                                                                                                                          |
-| **One `check_phase7` run exited 1 while printing every step as passing**                                 | **OPEN — still unattributed, and explicitly *not* closed by the `exit 0` work above.** Exit 1 is the **uncaught-throw** signature, so something threw; the trailing `exit 0` cannot produce or prevent it. Observed once on 2026-08-14, did not reproduce on a clean `main` or on a re-run with the same changes. Split out from the exit-code row on 2026-08-15 so that closing the fixable half did not carry this away with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | It recurs — chase it before trusting a green                                                                                                                               |
+| **One `check_phase7` run exited 1 while printing every step as passing**                                 | **OPEN — still unattributed, and explicitly *not* closed by the `exit 0` work above.** Exit 1 is the **uncaught-throw** signature, so something threw; the trailing `exit 0` cannot produce or prevent it. Observed once on 2026-08-14, did not reproduce on a clean `main` or on a re-run with the same changes. Split out from the exit-code row on 2026-08-15 so that closing the fixable half did not carry this away with it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | **Capture recipe (DR-01):** keep the FULL stdout of the run and the value of `$LASTEXITCODE` after each `Invoke-Checked`, not just the final one. The signature to look for is a step printing `==>` and no failure while the exit code is already non-zero -- so the per-step exit codes are the evidence, and a transcript showing only 'all passed' proves nothing                                                                                                                               |
 | ~~**`.test-tmp` residue and concurrency void gate runs**~~                                                    | **CLOSED 2026-08-15. The cause was not residue and the fix was not a lockfile.** `--basetemp=.test-tmp` named a *shared* directory, and pytest **deletes the directory it is given** the moment the first `tmp_path` is requested — the directory itself, not a numbered subdirectory of it. A second run therefore **destroyed a running session's live files** rather than merely colliding with it, which is why the symptoms looked like both `FileExistsError` and "leftover state". Each session now gets `.test-tmp/s-<pid>-<uuid>`, pruned by age at start; the root stays repository-local because `development-windows.md` records that a locked-down Windows account may be unable to write system temp. **A lockfile was rejected**: it serializes runs instead of making them safe, and would need stale-lock detection — the pid-ownership problem ADR-0037 had to solve. Proven by running `tests/integration` and `tests/unit` concurrently: both passed (706 and 815) into two distinct session directories. **The "never run two gates at once" rule is retired**                                                                                                                                                                                                                                           | —                                                                                                                                                                          |
 | ~~**Preflight takes >15 minutes on a 664-file repository**~~                                                   | **MEASURED 2026-08-18 — ADR-0060. The observation is confirmed: 635.59 s (10.6 min)** on CodeAtlas itself over a commit range, stable across three runs. **99.5% of it is parsing** — `parse_base` 316.2 s + `parse_target` 316.0 s — against `file_diff` 2.4 s and `symbol_diff` 246 ms. `docs/operations/change-analysis.md` was right all along: "the engine parses both full states on every analysis; the cost is O(repository), not O(change)". A genuine quadratic was found and fixed on the way (`symbol_diff`, exponent 2.02 → 0.78, 39× at 800 modules) but it is worth **~2.7%** of the real number, and is recorded as not being the remedy. **This row closes as measured; the remedy is the row below**. **CORRECTED 2026-08-18 by ADR-0064: "99.5% of it is parsing" is wrong.** Those timers wrap `_analyze_state`, which resolves too; parsing the whole repository takes **8.14 s** and resolution took **310.24 s** of the 319.69 s side. The confirmed *observation* stands; the attribution does not - and the **observation itself is now obsolete: same script, same commit range, clean tree, 635.59 s -> 21.56 s median** (21.56 / 21.56 / 21.30), with cold index ~343 s -> 32.64 s. ">15 minutes" is now **~22 seconds** | —                                                                                                          |
 | ~~**Preflight parses every unchanged file, twice, on every analysis**~~                                             | **CLOSED 2026-08-18 — ADR-0061.** Parses are cached for the duration of one `analyze()` call, keyed on `(relative_path, language, content digest)`: **606 → 305 parser calls** on a 303-file preflight, against a theoretical minimum of ~304. **Scoped to the call, so the invalidation ruling this row asked for is not needed** — same process, same bytes, correct by construction. **No end-to-end speedup is claimed**: the machine moved 343 s → 549 s on an untouched path mid-session, so wall-clock comparison was worthless and the mechanism was confirmed by counting instead. **The remaining step — not parsing unchanged files at all, from the stored index — is the row below and still needs its ruling** | — |
@@ -134,17 +153,18 @@ with verification.
 | ~~original entry~~                                                                  | **CLOSED 2026-08-18 - ADR-0064, measured and FIXED.** The split the row asked for, timed on a real `GitBlobStateView`: `list_files` **1.25 s**, `read_file` **0.07 s**, `parse` **8.14 s (2.5%)**, `resolve` **310.24 s (97.0%)**. **Parsing the whole repository takes 8 seconds** - so ADR-0060's "99.5% is parsing" was never close, and the remedies three records spent themselves on targeted 2.5% of the cost. Cause: `resolution.py` claimed O(references) in its own docstring while three call sites scanned `symbols_by_id.values()` **per reference** - `_resolve_mention` (112,265 mentions x 11,502 symbols = **1.29 billion**, `str.lower` called **880 million** times), `_RouteIndex.handlers` (`name_tokens`, a regex split, **10.5 million** calls) and `_derive_config_edges`. Fixed by indexing every symbol-only predicate: **313.97 s -> 3.55 s, 88x**, verified **identical across all 168,605 relations** on this repository | - |
 | ~~**Reuse stored symbols so unchanged files are not parsed at all**~~                                               | **CLOSED 2026-08-18 — ADR-0063, declined on arithmetic, not on the trust ruling.** Only the **target** is in the index — `analyze_working_tree` refreshes first — and the base is a Git commit that is not. Since ADR-0061 each unique file is parsed **exactly once** (305 for 303 files), and that parse serves both sides, so rehydrating the target removes its *use* of the parse, not the parse: **saving ~2**. Commit-range analysis gets exactly **zero**, since neither side is the active snapshot. The ruling three rows deferred to was never reached because the change it authorises saves nothing. **Good news buried in it:** there is no references table, but `GraphSide`'s four fields are all stored, so this needed **no migration** — and the risk avoided was re-keying IDs into the analysis space, where a synthetic-ID base against a real-ID target would pair nothing and report every symbol deleted-and-re-added | — |
 | ~~**Persist the parse cache across runs**~~                                                     | **CLOSED 2026-08-18 - ADR-0064 removed its reason to exist, before it was built.** The row assumed parsing was worth attacking. Measured: **the whole repository parses in 8.14 s**, so a perfect always-hot cache saves ~1.3% of a 635 s preflight - and content-keying misses the most expensive file **every run**, since `docs/plans/PLAN.md` alone is **26.4%** of parse cost and was touched by **50 of the last 50 commits** (`documentation/memory.md`, 50 of 50, is next). Markdown is 60.7% of parse cost and Markdown is what churns here. The trust ruling this row was waiting for is not needed, because the change it would authorise is not worth making | Someone measures parsing above ~20% of preflight on a repository that is not Markdown-heavy |
-| ~~original entry~~                                               | **OPEN — the remaining design question, unchanged by ADR-0061.** Caching within one call removes the duplicate pass, not the pass: preflight is still O(repository). Going below that means taking symbols from the stored index, which needs a ruling on when they may be trusted — parser version, normalisation version and content identity all become inputs. **`SnapshotStateView` is not the vehicle**: it is unused *and* still reads and hashes every file (ADR-0060) | Someone rules what invalidates a stored parse |
-| ~~original entry~~                                             | **OPEN — the real cost, now quantified (ADR-0060).** 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060 | Someone designs the parse-reuse path, with a ruling on what invalidates a cached parse                     |
+| **The parse-reuse remedy, and the ruling it asked for** | **CLOSED and WITHDRAWN 2026-09-01 (DR-01), citing ADR-0064.** Both rows below are dated 2026-08-18 and were written against ADR-0060's attribution; **ADR-0064 was accepted later the same day and explicitly corrects ADR-0060, ADR-0061 and ADR-0062.** A timer named `parse_base` wrapped `_analyze_state`, which lists, reads, parses *and* resolves. Measured separately: `parse` **8.14 s (2.5%)**, `resolve` **310.24 s (97.0%)**. After the fix, preflight is **21.56 s** against 635.59 s. So "632 s is `parse_base` + `parse_target`" is superseded, and the ruling — *what invalidates a stored parse* — is **withdrawn rather than answered**: ADR-0063 killed the change it authorises on arithmetic (only the target is indexed; the base is an unindexed commit) and ADR-0064 killed it on proportion (content-keying the parse stage has a best case of **~1.3% of preflight**). **Not withdrawn:** preflight is still O(repository), which ADR-0064 restates itself — that observation moves to the row below it, whose trigger is a measurement, not a ruling. Original diagnoses follow | **Dead.** No ruling is sought. Reopening needs a measurement showing parsing is material again |
+| ~~archived original — closed by the row above~~ | **Superseded 2026-09-01.** Retained as history: "OPEN — the remaining design question, unchanged by ADR-0061. Caching within one call removes the duplicate pass, not the pass: preflight is still O(repository). Going below that means taking symbols from the stored index, which needs a ruling on when they may be trusted — parser version, normalisation version and content identity all become inputs. **`SnapshotStateView` is not the vehicle**: it is unused *and* still reads and hashes every file (ADR-0060)" | — archived |
+| ~~archived original — closed by the row above~~ | **Superseded 2026-09-01.** Retained as history: "OPEN — the real cost, now quantified (ADR-0060). 632 s of a 635 s preflight is `parse_base` + `parse_target` on a 715-file repository. The fix is not to re-parse unchanged files, keyed by content hash — the index already stores one. **`SnapshotStateView` is not that fix**: it is unused (four tests, zero production callers) *and* its `read_file` still reads and hashes every file, so it avoids only the directory scan. A parse cache is a design question with real invalidation and correctness concerns, deliberately not folded into ADR-0060" | — archived |
 | ~~**Cold-indexing this repository takes 343 s**~~ | **CLOSED — stale since 2026-08-18, found by audit 2026-08-21.** ADR-0064 took a cold index of this repository from **~343 s to 32.64 s**, and the register's *own* ADR-0064 row records that number two screens away. The row survived the fix that obsoleted it. Its trigger — "someone measures where index time goes" — had fired: the measurement is in ADR-0064, and the answer was resolution scanning every symbol per reference, not indexing being inherently slow | — |
-| **A synthetic corpus measures dishonestly whenever the dominant term is carried by a file type it does not emit**                                    | **OPEN - a stated limit of `measure_phase4_perf.py`'s generated profile, found 2026-08-18 and WIDENED the same day by ADR-0064.** Its modules are ~15 lines each, so at 800 modules `file_diff` looked like the largest stage (1339 ms of 3367 ms) and parsing looked secondary; **an earlier draft of ADR-0060 repeated those proportions as fact.** The original row then said the *exponents* held up and that proportions were the only casualty. **That was too generous, and ADR-0064 disproved it:** ADR-0062 fitted a resolution exponent of **1.14** here and concluded resolution was linear, when it was **quadratic in mentions x symbols** - the corpus emits no Markdown, so it has no document sections, no mentions and no routes, and the entire quadratic term was **structurally absent from the sweep**. A clean exponent from a corpus missing the dominant reference class is not weak evidence, it is no evidence. (The real proportions are in ADR-0064, not the "99.5% parsing" this row used to quote from ADR-0060: parsing is **2.5%**) | Someone gives the perf harness a profile with realistic file sizes and a Markdown-heavy tree |
-| **Resolution's remaining 3.55 s is unprofiled**                                                 | **OPEN - stated by ADR-0064 rather than claimed away.** 3.55 s across 161,343 references on 706 files is a 88x improvement and is *not* known to be optimal. The profile after the fix still shows `_derive_config_edges` and `_RouteIndex.handlers` as the two largest items, and neither has been examined since. **No claim is made that resolution is now cheap** - only that it is no longer the bottleneck | Someone profiles resolution again, or preflight regresses above ~60 s |
-| ~~original entry~~                                                   | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Someone measures it properly, or a user reports it                                                                                                                          |
+| **A synthetic corpus measures dishonestly whenever the dominant term is carried by a file type it does not emit**                                    | **OPEN - a stated limit of `measure_phase4_perf.py`'s generated profile, found 2026-08-18 and WIDENED the same day by ADR-0064.** Its modules are ~15 lines each, so at 800 modules `file_diff` looked like the largest stage (1339 ms of 3367 ms) and parsing looked secondary; **an earlier draft of ADR-0060 repeated those proportions as fact.** The original row then said the *exponents* held up and that proportions were the only casualty. **That was too generous, and ADR-0064 disproved it:** ADR-0062 fitted a resolution exponent of **1.14** here and concluded resolution was linear, when it was **quadratic in mentions x symbols** - the corpus emits no Markdown, so it has no document sections, no mentions and no routes, and the entire quadratic term was **structurally absent from the sweep**. A clean exponent from a corpus missing the dominant reference class is not weak evidence, it is no evidence. (The real proportions are in ADR-0064, not the "99.5% parsing" this row used to quote from ADR-0060: parsing is **2.5%**) | **CLOSED 2026-09-01 (DR-02).** `measure_phase4_perf.py --profile realistic` emits Markdown mentioning the symbols the modules define; the synthetic profile is byte-identical and guarded, since the tracked baseline rests on it. Measured: at 160 modules the realistic corpus costs **3.60x** the synthetic one, log-log slope **0.898 against 0.602**. **Not comparable to ADR-0062's 1.14** -- that swept to 800 modules, this to 160, where fixed costs depress every slope. New finding: the <= 2 s refresh target is **missed on the realistic corpus from 80 modules up** |
+| **Resolution's remaining 3.55 s is unprofiled**                                                 | **OPEN - stated by ADR-0064 rather than claimed away.** 3.55 s across 161,343 references on 706 files is a 88x improvement and is *not* known to be optimal. The profile after the fix still shows `_derive_config_edges` and `_RouteIndex.handlers` as the two largest items, and neither has been examined since. **No claim is made that resolution is now cheap** - only that it is no longer the bottleneck | **CLOSED 2026-09-01 (DR-02) -- profiled, no fix proposed.** Proportions of one cProfile'd preflight (inflated 90.5 s vs 32.7 s, so shares only): `resolve` **38%**, of which `_derive_config_edges` is **20%** -- the site ADR-0064 de-quadraticised, still over half of resolution. **The surprise is beside it:** `sqlite3.executemany` **21%** and ignore-rule `fnmatch`/`re.match` **9%**. A task optimising resolution alone would attack 38% while ignoring 30% next to it. Committing to a fix off one profile is exactly what ADR-0060 to ADR-0062 did three times |
+| ~~original entry~~                                                   | **OPEN — an observation, not yet a measured defect.** The declared target is warm p95 ≤ 10 s, but that is on the declared *fixture* profile; nobody has measured a real codebase. `docs/operations/change-analysis.md` already explains the cost — the engine parses **both full states** on every analysis, O(repository) not O(change), and the snapshot-reuse path ADR-0005 decision 2 describes was never implemented. Observed 2026-08-13 during ADR-0044 verification: one `impact` run exceeded a 10-minute budget and a second took ~12 minutes. **Recorded because it was noticed twice and written down neither time**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | **CLOSED 2026-09-01 (DR-02) -- measured.** Working-tree preflight p95 **34.37 s** on this 769-file repository, commit-range **29.70 s**, 1.62 s of which is CLI startup. **Not a target miss:** condition 7 scopes the <= 10 s target to the declared fixture, where p95 is 5.151 s and met. A real repository costs **6.7x the fixture it was gated on**, which is the number nobody had. The 10-12 minute `impact` runs this row recorded are **~20x stale** -- observed 2026-08-13, five days before ADR-0064                                                                                                                          |
 | ~~**An oversized tracked file fails the whole comparison**~~                                              | **CLOSED 2026-08-15 — ADR-0045.** Ruled by the user: **skip it like the scanner does, and declare the omission**. One committed 3 MB CSV used to make a repository impossible to preflight while the directory scan merely skipped the same file. `archive` now skips and names oversized entries; `read_blob` still raises, because it is asked for one specific blob and answering "here is nothing" would be worse; `StateView.excluded_files()` carries the names and the engine emits a `FILE_TOO_LARGE` warning plus a limitation naming the files. **The directory side was silently omitting them too** — the scanner had recorded `TOO_LARGE` since Phase 1 and nothing ever surfaced it. Only oversize is declared; an *ignored* file stays unreported, because ADR-0044 already ruled it outside the index                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                          |
 | ~~ADR-0030 module-granularity ruling~~                                                                          | **CLOSED 2026-08-15 — ADR-0046.** Ruled by the user: **a module-level answer satisfies a conceptual question**, and **no ranking change is made**. ADR-0030 had already found no defect; ruling the other way would have declared one, spent real risk on a metric ungated on the retrieval profile (ADR-0023), and traded an evidence hit for a symbol hit. A conceptual expectation naming only the implementing symbol may be *widened*, never replaced, and only on the ADR-0031/0036 justification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —                                                                                                                                                                          |
 | **Duplicate findings, and false findings on a clean tree**                                                 | **CLOSED 2026-08-11 — ADR-0042.** The register's own guess ("may be a UI issue") was wrong: `symbol_diff` matched on `(kind, qualified_name)` with no file, so a config key name in *N* files was an *N*-versus-*N* ambiguous match reporting `2N` changes — **4 findings on a clean working tree, byte-identical content**. Occurrences now pair within their file first; config ancestors fold into the descendant that changed, on the dotted path; a derived `DOCUMENTS` edge targets the key it names. `RESOLVER_VERSION` 1.3.0 → **1.4.0**, so **every snapshot must be re-indexed**. Two corpus expectations gave a leaf its parent's range and were corrected — which exposed that **c012 has emitted this duplicate since Phase 4**, unseen because `expected_findings` is a set of codes. Follow-up left open there: a `Finding` carries no subject or file path, so a *legitimate* same-named pair still renders identically                                                                                                                                                                                                                                                                                                                                                                               | —                                                                                                                                                                          |
 | **Nested config keys report false changes (ADR-0025 regression)**                                          | **CLOSED 2026-08-11 — ADR-0041.** A key now hashes its own value rather than the line range it cites; the reproduction went from 8 findings (7 false) to 2. `PARSER_BUNDLE_VERSION` 1.3.0 → 1.4.0, so **every snapshot must be re-indexed**. Two residues recorded there: YAML compares subtree *text*, so re-indenting a block reports a change; and every tracked baseline reproduced byte-for-byte, which means **the corpus cannot see this defect** — the unit tests are the only coverage. Original diagnosis follows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | —                                                                                                                                                                          |
-| ~~Nested config keys, original entry~~                                                                          | **OPEN — a real defect in the core wedge, reported by the user 2026-08-11 and reproduced.** Changing **one line** of `pyproject.toml` (`version`) yields **8 `CONFIG_VALUE_CHANGED` findings, 7 false**: `project`, `project.optional-dependencies`, `…semantic-local`, `…semantic-openai`, `project.scripts`, `…codeatlas`, `…codeatlas-mcp`, plus the one true `project.version`. **Cause:** ADR-0025 made nested keys addressable symbols, and a leaf whose own line cannot be located keeps its **parent's range** — so its content hash is the whole parent block, and any change inside that block marks every nested key modified. They also render with identical spans, which is what reads on screen as duplicated findings. **The engine does not emit literal duplicates** — the JSON findings are distinct — so a separately-reported duplicate *rendering* in the web Preflight screen is unreproduced and may be a UI issue                                                                                                                                                                                                                                                                                                                                                                | Next session. Fixing it means giving a leaf a real hash of its own value rather than inheriting the parent block's, which is a`PARSER_BUNDLE_VERSION` bump and a re-index |
+| ~~archived original — closed by the row above~~                                                                          | **Superseded; closed by ADR-0041 in the row above.** Retained as history: "OPEN — a real defect in the core wedge, reported by the user 2026-08-11 and reproduced.** Changing **one line** of `pyproject.toml` (`version`) yields **8 `CONFIG_VALUE_CHANGED` findings, 7 false**: `project`, `project.optional-dependencies`, `…semantic-local`, `…semantic-openai`, `project.scripts`, `…codeatlas`, `…codeatlas-mcp`, plus the one true `project.version`. **Cause:** ADR-0025 made nested keys addressable symbols, and a leaf whose own line cannot be located keeps its **parent's range** — so its content hash is the whole parent block, and any change inside that block marks every nested key modified. They also render with identical spans, which is what reads on screen as duplicated findings. **The engine does not emit literal duplicates** — the JSON findings are distinct — so a separately-reported duplicate *rendering* in the web Preflight screen is unreproduced and may be a UI issue                                                                                                                                                                                                                                                                                                                                                                | Next session. Fixing it means giving a leaf a real hash of its own value rather than inheriting the parent block's, which is a`PARSER_BUNDLE_VERSION` bump and a re-index |
 
 ### Phase 7 Task Board
 
@@ -280,6 +300,208 @@ Every Phase 2 task is `complete`; details live in the
 Every Phase 1 task is `complete`; details live in the
 [Phase 1 plan](phases/phase-01-repository-truth-vertical-slice.md).
 
+### Deferred Register Program Task Board
+
+- Design: `docs/superpowers/specs/2026-09-01-deferred-register-program-design.md`
+- Plan: `docs/superpowers/plans/2026-09-01-deferred-register-program.md`
+
+**Approved by the user 2026-09-01**, who also chose inline execution over
+subagent-driven. DR-01 is active; the rest stay `ready` behind it.
+
+| Task  | Deliverable                                                                                  | Dependencies | Status  |
+| ----- | -------------------------------------------------------------------------------------------- | ------------ | ------- |
+| DR-01 | Register staleness audit; committed collision census; flake capture recipes; decision brief   | —            | `complete` **with a stated remainder** |
+| DR-01b | **The register sweep DR-01 did not finish** — the dated cross-check over the ~18 open rows it did not reach | DR-01 | `complete` — 25 rows read `OPEN`; **7 were already closed in column 3 and 3 were archived originals**, so 13 were live. **Three closed with citations, one corrected, two opened.** A `-Semantic`-gated artifact had gone stale a **second** time and a guard for it is built |
+| DR-02 | Preflight re-measured post-ADR-0064; realistic perf profile; resolution residual profiled or declined | DR-01 | `complete` |
+| DR-03 | **Enclosing-declaration discriminator** — predicted 845, **measured 65**; ADR-0074 | DR-01 | `complete` |
+| DR-04 | **Own declaration form** — predicted 135, **measured 133**; bundled with DR-03 into **one** reindex by user ruling; ADR-0074; `PARSER_BUNDLE_VERSION` **1.9.0** | DR-03 | `complete` |
+| ~~DR-05~~ | ~~Go enclosing scope as a separate task~~ — **retired 2026-09-01 by ADR-0072.** Go's 5 groups are one language of DR-03's mechanism, not a mechanism of their own | — | `n/a` |
+| DR-06 | Fixture shapes the evaluation corpus cannot currently express | DR-01 | `complete` — **all 5 rows closed.** Two were findings, not fixtures (the route-literal trigger is unsatisfiable; the same-named-symbol model was too broad). Three needed real work: the withheld-step branch reached through stale-evidence dropping, a **Git-backed change case** (ADR-0077), and a **second semantic fixture** (ADR-0077) |
+| DR-07 | **Ruling 2 (ADR-0073), re-ruled 2026-09-02 — ADR-0076.** The ruling's premise was false (exclusion was already the behaviour); re-put to the user, who chose *cases declare their relations*. q003, q006, q031 declare seven source-derived edges | DR-01 | `complete` — `relation_path_correctness` **0.8932 → 0.9024** by denominator growth **24 → 27**, not by any engine change |
+| DR-08 | **Ruling 3 (ADR-0073) — ADR-0075.** `traversal_depth` added to the dataset contract, required for graph intents and forbidden elsewhere; all 31 graph cases declare **2** | DR-01 | `complete` — **no number moves and both baselines reproduce byte-for-byte.** Depth 1, which the measurement supports, was rejected: it deletes the corpus's only distractors |
+| DR-09 | **Ruling 4 (ADR-0073):** audit the `TRACE_FLOW` cases together; the outcome is evidence, and the ruling follows it. **There are five, not six** — ADR-0051 re-typed q006 | DR-01 | `complete` — **the label is not systemically wrong**; `TRACE_FLOW` agrees 1/5 against `EXACT_SYMBOL`'s 0/36. Instrument committed. One separate product finding opened as its own row; **the closing ruling is the user's** |
+
+#### Where to resume (updated 2026-09-02 — the program is finished)
+
+**All nine tasks are `complete`: DR-01, DR-01b, DR-02, DR-03, DR-04, DR-06,
+DR-07, DR-08, DR-09.** DR-05 stays retired. **Nothing is in progress.**
+
+The branch is still **not merged to `main`** and carries the reindex-forcing
+`PARSER_BUNDLE_VERSION` **1.9.0**. Merging is a decision, not a leftover task.
+
+**Read ADR-0075, ADR-0076 and ADR-0077 before touching the evaluation corpus.**
+All three were implemented against premises that turned out to be wrong, and
+each records the correction rather than working around it.
+
+**Two rulings wait on the user and block nothing:**
+
+1. Close the `TRACE_FLOW` row as a working corpus convention (DR-09's audit
+   recommends yes: it agrees with the classifier more often than
+   `EXACT_SYMBOL` does).
+2. Whether the `-Semantic` `--check` steps should stop being opt-in. This now
+   matters more: those artifacts went stale twice, and DR-06 moved them again.
+
+**Two open questions own no task**, both raised by evidence: the **783 ordinal
+collision groups** (~718 sharing a name, a kind *and* one enclosing scope — no
+mechanism proposed on purpose), and whether to **re-gate Phase 4 on the
+realistic performance profile**, where the ≤ 2 s refresh target is missed from
+80 modules up.
+
+#### Superseded resume note (2026-09-02, mid-session)
+
+**Gate green** — `check_phase4.ps1 -SkipSync` exit 0. **DR-09, DR-01b, DR-08 and
+DR-07 are `complete`; DR-06 is `in_progress` with 2 of 5 items done.** Still not
+merged to `main`; the reindex-forcing bundle bump stands.
+
+**Read ADR-0075 and ADR-0076 before touching the evaluation corpus.** Both were
+implemented against rulings whose premises turned out to be wrong, and each
+records the correction rather than quietly working around it.
+
+**Three DR-06 items remain**, and the lesson from the two that closed is to
+**measure before building**: both turned out to be findings, not fixtures.
+
+1. **A Git-backed change case** — a *harness* change (nothing in the evaluation
+   path builds a Git repository), and it moves the change corpus.
+2. **A second semantic fixture** — moves the semantic baselines, which are
+   exactly the `-Semantic`-gated artifacts DR-01b found stale twice. Land it
+   after the ruling on how those get checked.
+3. **ADR-0057's withheld-step branch** — needs a fixture where a matched
+   symbol's edge falls outside every returned chunk. Measure first.
+
+**Two rulings wait on the user and block nothing:** whether to close the
+`TRACE_FLOW` row as a working corpus convention (DR-09 recommends yes), and
+whether the `-Semantic` `--check` steps should stop being opt-in.
+
+#### Superseded resume note (2026-09-02, mid-session)
+
+**Branch `plan/deferred-register-program` at `574569d`, pushed, tree clean, gate
+green** — `check_phase4.ps1 -SkipSync` exit 0, **2420 passed, 3 skipped**, 8m32s.
+Still not merged to `main`; the reindex-forcing bundle bump stands.
+
+**DR-09 and DR-01b are `complete`. DR-06 is untouched. DR-07 and DR-08 are both
+blocked on a user decision**, and neither blocker is in the code:
+
+- **DR-07 — ADR-0073 ruling 2 contradicts itself.** It rules "exclude cases
+  declaring no relations" and predicts a smaller denominator and a moved number.
+  `runner.py:662` has filtered `if case.expected_relations` since before the
+  ruling, so **exclusion is the status quo and nothing moves**. The options are
+  also inverted: `_precision(predicted, ∅)` returns **0.0**, so *keeping* such a
+  case is what would make a broadened answer visible, and excluding is what keeps
+  it invisible — the complaint the row was opened on. **Implementing either
+  reading without a ruling produces the opposite of the other.**
+- **DR-08 — the measurement is unanimous and that is the finding.** All **31**
+  graph cases have every declared relation satisfied at **depth 1**; none needs
+  depth 2. Declaring 1 everywhere raises relation precision and **removes the
+  ranking sensitivity ADR-0059 preserved on purpose** — depth-2 distractors are
+  what make `exact_symbol_resolution` a ranking gate, and q003, q005, q015 and
+  q053 are sensitive only through them. ADR-0073 says ruling 3 *extends*
+  ADR-0059; depth 1 everywhere **overturns** it. Unanticipated fork, needs a
+  ruling.
+
+**Do DR-06 next if you want unblocked work.** It depends on neither decision,
+though it adds cases and therefore moves denominators, so it is cheaper *after*
+DR-07 and DR-08 settle than before.
+
+#### Where to resume (written 2026-09-01, end of session)
+
+**Branch `plan/deferred-register-program`, pushed, working tree clean, gate
+green at `56e3b30`.** Not merged to `main`, deliberately: the program is five
+tasks from done and the branch carries a reindex-forcing bundle bump.
+
+**Read first:** ADR-0072 then ADR-0074. The second corrects the first, and the
+correction is the thing a fresh reader will otherwise re-inherit.
+
+**Start with DR-09** unless directed otherwise. It is the cheapest of the five,
+it is pure evidence-gathering, and its outcome may be an engine defect rather
+than a corpus limit — so it is the one most likely to change what the rest of
+the program should be.
+
+**Nothing waits on the user.** All four rulings were given and are recorded in
+ADR-0073; the decision brief above them is now history, not a queue.
+
+**Two open questions no task owns**, both raised by evidence rather than
+speculation:
+
+1. **783 collision groups remain on the ordinal, ~718 of them two declarations
+   sharing a name, a kind and one enclosing scope.** No mechanism is proposed
+   *on purpose*: it may not be an identity defect at all, and guessing at the
+   mechanism is what produced ADR-0072's five-fold error.
+2. **Two Phase 4 release targets are green on a fixture that provably cannot
+   contain the dominant cost** (DR-02, ADR-0064). Whether to re-gate on the
+   realistic profile is a scope decision about the gate itself.
+
+**Practical notes for the next session.** The five pinned repositories must be
+re-fetched — they lived in a scratch directory, not the repo; the SHAs are in
+`scripts/check_real_repos.py`. Use `scripts/report_symbol_collisions.py` for any
+claim about collision counts rather than a fresh probe. And **edit tracked text
+with the editing tools, not `pathlib.write_text`**: it converts LF to CRLF on
+Windows and `test_no_tracked_file_carries_crlf_into_the_working_tree` will fail
+the gate ten minutes later.
+
+**DR-03 and DR-04 each force a reindex.** Bundling them would remove one, and
+ADR-0071's reason for keeping mechanisms apart — bundling hides which one moved
+which ids — still applies. ADR-0072 leaves that choice to the implementing task,
+because the committed census now makes per-language attribution measurable
+either way; changing the number of reindexes needs a user ruling.
+
+**Deliberately not tasks**, with the reason recorded in the design: the three
+test-infrastructure flakes (two have no reproduction; DR-01 gives each a capture
+recipe instead), the unsigned executable (a certificate purchase), the Chromium
+Playwright skips (an unresolved upstream renderer crash), the 1.05 GB semantic
+tree (accepted at the Phase 7 activation gate), and the two gate targets already
+approved as missed — Phase 7 recall@10 0.6667 and Phase 4
+`changed_symbol_precision` 0.9375.
+
+**Re-scoped 2026-09-01 by ADR-0072**, which is DR-01's central finding. The
+census reproduces ADR-0071's counts exactly but disproves its account of them: a
+Scala `trait`/`object` pair never collided (different kinds), their *members*
+do; and gson's 47 — which ADR-0071 says have no remedy — are enum-constant
+bodies, anonymous classes and method-local classes, all separated by the
+enclosing scope. Three mechanisms covering 934 become **two covering 980 of
+981**. The one remaining group is a single scalaz `INTERFACE` collision, still
+uncharacterised and recorded rather than guessed at.
+
+### Decision Brief — four rulings awaiting the user (DR-01, 2026-09-01)
+
+Each is a convention question the engine cannot settle for itself. **A fifth —
+*what invalidates a stored parse* — was withdrawn rather than put here**, because
+ADR-0063 and ADR-0064 between them leave the change it authorises paying nothing.
+
+**1. May a `CALLERS` or dependency expectation name its own subject?**
+q005 expects `IdempotencyStore.claim` among the callers of `IdempotencyStore.claim`,
+and q053 expects `OrderPipeline.advance` among its own. Nothing calls itself in
+either fixture, so both cases lose recall for declaring it. **This is narrower
+than it first looks:** ADR-0018 explicitly permits a self-referential case, and
+separately records that module-scoped queries do return the subject first — an
+earlier reading that nine cases contradicted ADR-0018 was wrong and was corrected
+rather than acted on. *Options:* (a) a caller expectation never names its
+subject, and the two cases are corrected; (b) it may, and the engine returns the
+subject for symbol-scoped queries as it does for module-scoped ones; (c) leave
+both, and accept the recall cost as declared.
+
+**2. Should a case declaring no relations score relation precision at all?**
+Raised by ADR-0057: a lexical answer can broaden with no metric moving, because a
+case with an empty relation expectation contributes a vacuous denominator.
+*Options:* (a) exclude such cases from relation precision, so the metric measures
+only cases that assert something; (b) keep them, and accept that breadth is
+invisible to the metric; (c) require every lexical case to declare its relations,
+which is corpus work rather than a ruling.
+
+**3. What is the convention for declaring transitive results in a graph
+expectation?** ADR-0059 ruled that a graph expectation declares direct results;
+what an expectation should say about depth-2 results was left open. It is the
+reason q003, q005 and q015 are ranking-sensitive — their expectations omit
+depth-2 results that the engine returns as distractors. *Options:* (a) an
+expectation declares direct results only, and depth-2 returns are not
+distractors; (b) it declares every returned result to the traversal's depth;
+(c) the traversal depth becomes part of the case.
+
+**4. `TRACE_FLOW`: is the label systemically wrong?** ADR-0051 raised it and
+deliberately declined to settle it. All six `TRACE_FLOW` cases must be audited
+together, and the outcome may be an engine defect rather than a corpus limit.
+This one is **not** a pure convention call — it needs the audit run first, and
+the ruling after. *Recommended:* authorise the audit, defer the ruling.
+
 ## Handoff Schema
 
 Every handoff entry contains:
@@ -294,6 +516,959 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-02T21:00:00Z — DR-06 finished: three rows closed, and two of the three needed a shape rather than a case
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-06 `complete`. All five rows closed.** With DR-09, DR-01b,
+  DR-08 and DR-07 already done, **the Deferred Register Program is finished.**
+- ADR-0077 accepted. `SCHEMA_VERSION` **14**, `contract_version` **1.1**,
+  `PARSER_BUNDLE_VERSION` **1.9.0**, chunker **1.1.0**, resolver **1.5.0** — all
+  unchanged. No migration.
+
+#### The withheld-step branch, reached by the clause the row buried
+
+The row asked for "a fixture where a matched symbol's edge sits outside every
+returned chunk". **That is unreachable through fixture content**: an outgoing
+edge's reference site is inside its own source symbol, and a module chunk spans
+the whole file, so whenever the module is a hit every edge in that file is
+contained.
+
+The way in is the row's other clause — *"a chunk dropped by evidence
+validation"*. `symbol_ids` comes from the search **hits**; `cited` comes from
+the evidence the builder actually **emitted**. Those separate when a file is
+modified after indexing: its chunks fail the content-hash check, its symbols
+stay hits, and their edges have nothing left to cite. Measured: 2 steps before
+the edit, **0 after**, with `EVIDENCE_STALE_FILE_CONTENT` — while the untouched
+file still answers.
+
+No corpus fixture can do this, because nothing in the harness edits a tree
+between indexing and querying.
+
+**Mutation-checked, and it found a second defence.** Fabricating an evidence id
+fails these tests *inside* `QueryResponse` validation — "relation step
+references unknown evidence" — so §4.1 holds at two layers. The branch is not
+redundant: the validator turns a bad citation into a 500, while the branch
+withholds one step and returns the rest of a correct answer.
+
+#### The Git-backed change case, and why one could not exist before
+
+`ChangeCase` gains `base_view`. A `git_blob` case commits its base and reads it
+back through `GitBlobStateView` against the target on disk — one working tree,
+two states, the shape `analyze_working_tree` uses.
+
+**The row's warning was right, and is the reason no case existed.** Two
+directory sides apply the same ignore rules, so a tracked-but-ignored file is
+absent from both and a case asserting "no `SYMBOL_DELETED`" passes with
+ADR-0044's fix *and* without it. **c033 does not:**
+
+| | changed symbols | findings |
+| --- | --- | --- |
+| with the fix | `['capture']` | `['RETURN_VALUE_CHANGED']` |
+| without it | `['bundled_total', 'capture']` | `['SYMBOL_DELETED', 'RETURN_VALUE_CHANGED']` |
+
+`coverage/` is the ignore default used rather than the obvious `dist/`, because
+**this repository's own `.gitignore` excludes `dist/`** and the fixture file
+could not have been committed. That is ADR-0049's collision between a fixture's
+needs and an ignore rule, met a second time.
+
+**Two expectations were declared wrongly and corrected before landing.** The
+first declared `PUBLIC_BEHAVIOR_CHANGED` by analogy with the Rust case c032 —
+but Rust only falls through to that code because ADR-0065's tier has no
+statement-level classifier. Python has one and correctly says
+`RETURN_VALUE_CHANGED`. **Generalising from a language that lacks a classifier
+produced a wrong expectation about one that has it.** The second declared the
+symbol's whole range as evidence; c002 and c009 already declare the *body span*
+for this finding class, so the corpus convention was against the declaration,
+not the engine. The fixture also needed a module docstring — without one its
+only function shared the module symbol's exact range, a collision no other
+fixture has because every other changed symbol is nested in a class.
+
+#### The second semantic fixture
+
+`delivery_scheduler` — retry backoff, duplicate suppression, deadline parking —
+a deliberately different domain from orders, with four conceptual cases. The
+semantic corpus is **18 cases over two fixtures**, having been 14 over one and
+byte-identical since 2026-07-31.
+
+Semantic `containing_evidence_recall_at_10` **holds at 1.0**,
+`symbol_recall_at_10` rises 0.9286 → **0.9444**, `targets_met` stays true. The
+deterministic side improves 0.8667 → **0.8947** and keeps its two pre-existing
+unmet targets.
+
+**ADR-0056 is not widened by this.** Its conclusion was measured on 14 cases
+over one fixture and must still be cited that way; the corpus grew, the
+measurement was not re-run.
+
+#### The number that moved, and what it means
+
+`changed_symbol_precision` **0.9531 → 0.9545**, from the denominator growing
+32 → 33. **No engine change.** It is the third time that mean has drifted up on
+denominator growth alone, and it must never be cited as improvement (ADR-0053).
+`changed_symbol_exact_cases` **29 → 30** is the honest counterpart: it rises
+because a genuinely exact case was added, and cannot be lifted by adding cases
+that already pass.
+
+#### Files
+
+- `src/codeatlas/evaluation/dataset.py` — `base_view`.
+- `src/codeatlas/evaluation/engine_adapter.py` — `_state_views`, `_commit_all`,
+  `_apply_overlay`.
+- `tests/evaluation/cases/fixtures/tracked_ignored/`, its variant, `c033`.
+- `tests/evaluation/semantic_cases/fixtures/delivery_scheduler/`, s015–s018.
+- `tests/integration/test_withheld_relation_step.py`,
+  `tests/evaluation/test_git_backed_change_case.py` — new.
+- Four tracked baselines regenerated; `docs/adr/0077-*.md`; README counts.
+
+#### Verification
+
+```text
+uv run pytest tests/evaluation tests/contract -q       493 passed
+run_phase3_baseline.py --check                         exit 0
+run_phase4_baseline.py --check                         exit 0
+run_phase7_baseline.py --check                         exit 0
+run_phase7_rerank_ab.py --check                        exit 0
+```
+
+#### Limitations
+
+- **The `-Semantic` artifacts moved again**, and they are the ones DR-01b found
+  stale twice. The key-set guard added there still passes, but the ruling on
+  whether those `--check` steps should stop being opt-in is still open and now
+  matters more.
+- **c033 is the only Git-backed case**, pinned by a test so a second is a
+  deliberate decision rather than a default — each costs a subprocess.
+
+#### Next
+
+**Nothing is in progress.** Two register rows wait on a user ruling and block
+nothing: the `TRACE_FLOW` convention and the `-Semantic` opt-in. Two open
+questions still own no task: the 783 ordinal collision groups, and whether to
+re-gate Phase 4 on the realistic performance profile.
+
+### 2026-09-02T18:00:00Z — DR-06 part 1: two rows closed, and neither needed the fixture it asked for
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-06 `in_progress` — 2 of 5 items done.** Two register rows
+  closed with citations. No version moves, no migration, no baseline change.
+
+#### Both items closed as findings, not as fixtures
+
+The plan's Task 6 assumed five rows each needed a fixture built. Two did not,
+and measuring them first is what showed it.
+
+**The route-literal row: its trigger is unsatisfiable.** The row asks for "a
+fixture whose route literal sits alone on its line" so ADR-0055's per-edge claim
+merge can fire. Both shapes were built and indexed:
+
+- **Inline** — ``fetch(`/orders/${id}`)`` — yields `loadOrder ROUTES_TO
+  get_order` at frontend.ts:2. But the `CALLS fetch` edge cites **the same
+  line**, comes first, and wins region deduplication, so the route's near-side
+  citation is dropped and the edge survives with **one** citation: the handler
+  definition. One citation, so the merge has nothing to merge.
+- **Separated** — the literal bound to its own line, then passed to `fetch` —
+  yields **no route edge at all.** The derivation attributes a route to the call
+  the literal sits *in*.
+
+So a route's near side is always the line of a call that also emits a `CALLS`
+edge, and moving it off that line destroys the edge. **The merge is unreachable
+by construction, not for want of a fixture.** Three tests pin it; if
+deduplication order ever changes, the first fails and the pin is *inverted*
+rather than deleted (ADR-0045).
+
+**The same-named-symbol row: audited, no exposure, model too broad.** The corpus
+defines exactly **one** qualified name in more than one file — `process`, in
+`git_changes` — and all three cases naming it pin their evidence to one file.
+**They cannot do otherwise:** the two `process` symbols live in *different
+snapshots*, and the dataset validator already refuses evidence outside a case's
+declared members (ADR-0047 ruling 4). The row says "any fixture holding
+same-named symbols has this blind spot"; what it needs is same-named symbols
+**within one snapshot**, and none exists.
+
+That makes the corpus-wide guard unable to fail today, and a mutation against
+the real corpus is refused by the loader before reaching the assertion — the
+ADR-0055 shape again. The predicate is therefore split out and exercised against
+synthetic input, which is where its teeth are proven: four cases covering two
+files, no evidence at all, a correct pin, and an unrelated name.
+
+#### Files
+
+- `tests/integration/test_route_claim_merge.py` — new, 3 tests.
+- `tests/evaluation/test_same_named_symbol_cases.py` — new, 6 tests.
+- `docs/plans/PLAN.md`, `README.md` — two rows closed, board, counts, this entry.
+
+#### Verification
+
+```text
+uv run pytest tests/integration/test_route_claim_merge.py -q        3 passed
+uv run pytest tests/evaluation/test_same_named_symbol_cases.py -q   6 passed
+uv run ruff check src tests scripts apps                            All checks passed
+uv run mypy --no-incremental src tests scripts apps                 no issues, 398 files
+```
+
+#### Limitations
+
+**Three DR-06 items remain, and each is larger than the two closed here.**
+
+- **A Git-backed change case.** `predict_changes` compares two
+  `DirectoryStateView`s and no evaluation path builds a Git repository, so
+  `GitBlobStateView` — where ADR-0044's fix lives — never runs under the corpus.
+  This needs a **harness** change, not a case, and it will move the change
+  corpus.
+- **A second semantic fixture.** The semantic corpus is 14 cases over one
+  fixture, byte-identical since 2026-07-31. Adding one moves the semantic
+  baselines, which are the `-Semantic`-gated artifacts DR-01b just found stale
+  twice — so it should land *after* the ruling on how those get checked.
+- **ADR-0057's withheld-step branch.** Needs a fixture where a matched symbol's
+  edge falls outside every returned chunk. Not attempted; the two closed above
+  both turned out to be findings rather than fixtures, and this one deserves the
+  same measure-first treatment rather than a guessed shape.
+
+#### Next
+
+DR-06's remaining three. Two register rows still wait on a user ruling and block
+nothing: the `TRACE_FLOW` convention and the `-Semantic` opt-in.
+
+### 2026-09-02T15:00:00Z — DR-08 and DR-07: one ruling's premise was false, and the other's measurement argued against itself
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-08 and DR-07 both `complete`** (ADR-0075, ADR-0076). Two
+  register rows closed. **DR-06 is the only task left.**
+- `SCHEMA_VERSION` **14**, `contract_version` **1.1**, `PARSER_BUNDLE_VERSION`
+  **1.9.0**, chunker **1.1.0**, resolver **1.5.0** — all unchanged. No
+  migration. The evaluation dataset contract stays at **1.0**.
+
+#### DR-08: the measurement said depth 1, and depth 1 was refused
+
+ADR-0073 ruling 3 made traversal depth part of each case but did not say what
+depth. Measured across depths 1–3, checking the smallest that returns every
+relation a case declares: **31 of 31 satisfied at depth 1. None needs 2.**
+
+Read literally that means declaring 1 everywhere. **It was rejected**, because
+depth 1 also removes every depth-2 result and those are the corpus's only
+distractors. Without them `exact_symbol_resolution` stops being a *ranking* gate
+and becomes a resolution gate, the four reversal-sensitive cases stop being
+sensitive, and ADR-0052's indirect-claim rendering stops being exercised by
+anything. ADR-0073 states ruling 3 *extends* ADR-0059; depth 1 would overturn it.
+Raising precision by deleting the distractors is a number improving because the
+measurement got easier.
+
+**So every graph case declares 2 — the value it already had.** Both tracked
+baselines reproduce **byte-for-byte**, which is the evidence this changed no
+answer. Depth is now explicit, so retuning it is an arguable change with its own
+measurement rather than an invisible default.
+
+**The first derivation was wrong and is recorded.** Using "all `expected_symbols`
+returned" marked **15 of 31** unsatisfiable at any depth — until reading them
+showed most expect *their own subject* (q052 wants `renderList` among the callers
+of `renderList`), which is the class ADR-0073 ruling 1 made permanently
+unsatisfiable **on purpose**. A criterion that disagrees with a standing ruling
+is the criterion's bug.
+
+**The wiring needed a test the corpus cannot provide.** With every case at 2 and
+the dataclass default also 2, deleting `max_depth=` left **26 corpus-driven tests
+green** — verified by mutation. A stub reading the constructed request pins it,
+parametrised over 1, 2 and 3, because asserting only 2 passes against a
+hard-coded default.
+
+#### DR-07: the ruling's premise was already false
+
+ADR-0073 ruling 2 ruled "exclude cases declaring no relations" and predicted a
+smaller denominator and a moved number. **`runner.py` has filtered
+`if case.expected_relations` since before that ruling** — exclusion was the
+status quo, so the reading was a no-op.
+
+And the options carried each other's consequences. `_precision(predicted, ∅)`
+returns **0.0**, so *keeping* a vacuous case is what would make broadening
+visible; **excluding is what keeps it invisible**, which is the complaint
+ADR-0057 opened the row on. Rather than pick a reading, the question was put
+again with that evidence, and the user chose the third option: **a case whose
+answer carries relations declares them.**
+
+Exactly three did not — **q003, q006, q031** — now declaring seven edges.
+
+**The gold was read off the fixture source, not transcribed from the engine**
+(ADR-0003; ADR-0036 records two expectations that named things the engine could
+not produce because nobody checked the source):
+
+- q003 — `service.py:10` calls `self.store.claim(key)`, `store` annotated
+  `IdempotencyStore` on `__init__`, so it resolves.
+- q006 — the class body defines exactly `__init__` and `claim`. **Both** edges
+  declared: declaring only the answer-bearing one would penalise the engine for
+  citing every supporting edge, the defect ADR-0038 corrected.
+- q031 — `flow.md:3` describes the frontend requesting the route `loadOrder`
+  calls, `:5` what `get_order` returns. The derivation discriminates: it emits
+  **no** edge to `health`, which the document never mentions.
+
+**`relation_path_correctness` 0.8932 → 0.9024**, entirely because the denominator
+grew **24 → 27** with three cases at 1.0. **No engine change and no answer
+change** — this must never be cited as uplift (ADR-0053). Exactly one line
+differs in each of the two baselines; Phase 3's four pre-existing unmet targets
+are untouched.
+
+**Recall holds at 1.0**, so ADR-0058's absolute gate stands — and that is the
+strongest check on the gold: seven edges declared from source, seven emitted.
+
+#### Files
+
+- `src/codeatlas/evaluation/dataset.py` — `traversal_depth`, `GRAPH_INTENTS`,
+  the two-way validator.
+- `src/codeatlas/evaluation/engine_adapter.py` — passes the case's depth.
+- `tests/evaluation/cases/queries.json` — 31 depths, 7 relation edges, **edited
+  in place**: a `json.dumps` round-trip rewrites all ~2600 lines and buries the
+  real insertions, the reflow ADR-0069's handoff stripped from four files. A test
+  pins the file's own spacing.
+- `docs/evaluation/baseline-phase-{3,4}.{json,md}` — one line each, own commit.
+- `tests/evaluation/test_traversal_depth.py` — new, 11 tests.
+- `tests/evaluation/test_engine_adapter.py` — the corpus-derived DR-07 guard.
+- `docs/adr/0075-*.md`, `docs/adr/0076-*.md` — new.
+- `docs/adr/README.md` — **four missing rows added.** The index stopped at
+  ADR-0071 while the directory held 0074; the README's count guard counts files,
+  not rows, so nothing had noticed.
+
+#### Verification
+
+```text
+uv run pytest tests/evaluation -q                     140 passed
+uv run ruff check src tests scripts apps              All checks passed
+run_phase3_baseline.py --check                        exit 0 (after regeneration)
+run_phase4_baseline.py --check                        exit 0 (after regeneration)
+```
+
+Mutation-checked three ways: removing the depth wiring fails the parametrised
+adapter test at depths 1 and 3 (and passes at 2, which is why it is
+parametrised); stripping q031's declarations fails the DR-07 guard naming q031.
+
+#### Limitations
+
+- **DR-07 measures only what the fixtures emit.** A case emitting nothing still
+  contributes no denominator, correctly — there is nothing to be right about.
+- **ADR-0056's finding is untouched**: the corpus fusion runs on is still 14
+  cases over one fixture.
+
+#### Next
+
+**DR-06 is the only remaining task.** Two register rows still wait on a user
+ruling and block nothing: the `TRACE_FLOW` convention and the `-Semantic` opt-in.
+
+### 2026-09-02T11:00:00Z — DR-01b: the sweep finished, and the register's own notation hid more than the staleness did
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-01b `complete`.** Three rows closed with citations, one
+  corrected, two opened. Two tracked artifacts regenerated.
+- No product code changed. `PARSER_BUNDLE_VERSION` **1.9.0**, `SCHEMA_VERSION`
+  **14**, `contract_version` **1.1** — all unchanged. No migration.
+
+#### What the sweep actually had to sweep
+
+25 register rows read `OPEN` in the disposition column. **Only 13 were live.**
+Seven carried a closure in the *third* column (DR-01, DR-02 and ADR-0073 each
+closed rows there without restating the disposition), and three were archived
+originals. **The notation, not the prose, is what makes this register hard to
+audit** — exactly the finding DR-01 recorded and did not finish acting on.
+
+#### The one that matters: a gated artifact went stale a second time
+
+`run_phase7_baseline.py --check` exits **5** today, 17 days after the row saying
+so was written and **four days after that row's own closure**. The 2026-08-16
+entry closed the *instance*; the mechanism was untouched.
+
+**Identical signature both times.** Two added metric keys, no value change:
+`finding_count_correctness` (2026-08-14, found 2026-08-16), then
+`changed_symbol_exact_cases` (2026-08-20, found today). And both times
+**`rerank-phase-7.json` had the same gap and was found only after the first
+artifact was fixed**, because the gate stops at the first failure — a queue of
+hidden staleness, not one item.
+
+**The cause is a backward-compatibility default doing its job.** Every new
+`AggregateMetrics` field is declared `= None` so older artifacts still load and
+score unchanged (ADR-0027's and ADR-0038's pattern, and the right call). The
+price is that a *missing* key and an *unknown* value are indistinguishable, so
+nothing objects until a byte comparison runs — and that comparison lives behind
+`-Semantic`, which the register itself calls "the flag that goes unrun".
+
+Both artifacts regenerated and now `--check` exit **0**. An audit of every
+tracked metrics block found no others; `baseline-phase-1` and `-2` stay frozen
+(ADR-0017).
+
+#### The guard, and why it is shaped the way it is
+
+`tests/evaluation/test_tracked_artifact_metric_keys.py` — every regenerable
+tracked artifact carries the full `AggregateMetrics` key set. **No extras, so it
+runs in every gate**, not only under `-Semantic`.
+
+Three properties were chosen against the two observed failures rather than in
+the abstract: it walks **nested** blocks, because both stale artifacts nest two
+reports each and a top-level check would have missed precisely them; it reports
+**every** offender at once, because stopping at the first is what hid the second
+artifact twice; and the frozen pair is exempt **by name citing ADR-0017**, with
+a third test pinning that the exemption is a literal set — a "skip phases 0–2"
+pattern is how `SUPPORTED_FIXTURES` understated two metrics for four phases.
+
+**Mutation-checked**, and it needed to be: it passed on first run only because
+the artifacts had just been regenerated. Restoring the stale committed copy
+fails it, naming `baseline-phase-7.json::deterministic`, `::semantic`, and the
+missing key.
+
+**It does not replace `--check`.** A missing key is not a changed value; the
+ruling on whether the semantic steps should stop being opt-in stays open.
+
+#### The other three rows
+
+- **`test_the_packaged_web_assets_match_the_source_build` fails** —
+  **CLOSED**, an archived original never marked as one. Its closure is the row
+  directly above it (rebuilt 2026-08-16). Verified rather than assumed:
+  `tests/end_to_end/test_packaged_build.py` **7 passed**.
+- **"Reversing the ranking fails 0 of 23"** — **CORRECTED, not closed.** True
+  when written 2026-08-15, false two days later: `git log -S` confirms **q053
+  was added in `9f919f0`**, the commit that added those 23, and ADR-0059 states
+  it "becomes the first post-2026-08-15 case to be reversal-sensitive". It is
+  **1 of 23**. The substance survives — 22 still are not — and **DR-08 changes
+  what the row measures**, since traversal depth is what decides whether a
+  returned symbol is a distractor. Re-measure after DR-08.
+- **"Trace evidence selects line 8, a candidate ENGINE finding"** — **CLOSED,
+  and ADR-0051 answered it on the day it was written.** That record says
+  evidence is one candidate per edge from `edge.start_line`, so "line 8 is cited
+  because the edge is at line 8" and "there is no edge at line 7". The row's own
+  framing is what ADR-0051 disproved; it outlived its own answer by 17 days.
+
+#### Rows confirmed live, by measurement rather than by reading
+
+- The semantic corpus is **14 cases over one fixture**, `queries.json`
+  byte-identical since `38cc393` (2026-07-31). The row says exactly this and is
+  correct. DR-06 owns it.
+- The ADR-0044-shaped change case, the lone-line route literal, the
+  withheld-step branch and the same-named-symbol audit are all still
+  unexpressible by the corpus. DR-06 owns all four.
+
+#### Files
+
+- `docs/evaluation/baseline-phase-7.{json,md}`,
+  `docs/evaluation/rerank-phase-7.{json,md}` — regenerated, two added lines
+  each, **no value change**.
+- `tests/evaluation/test_tracked_artifact_metric_keys.py` — new, 3 tests.
+- `docs/plans/PLAN.md` — four rows corrected, one row added, the board, this
+  entry.
+
+#### Verification
+
+```text
+uv run python scripts/run_phase7_baseline.py ... --check      exit 0 (was 5)
+uv run python scripts/run_phase7_rerank_ab.py ... --check     exit 0 (was stale)
+uv run pytest tests/evaluation/test_tracked_artifact_metric_keys.py   3 passed
+uv run pytest tests/unit/test_deferred_register.py                    3 passed
+uv run pytest tests/end_to_end/test_packaged_build.py                 7 passed
+```
+
+#### A process error, recorded rather than quietly fixed
+
+A `check_phase4.ps1` run was started and **then** tracked files were edited
+while it was in flight — including `docs/plans/PLAN.md`, which
+`tests/unit/test_deferred_register.py` reads. **That run is void and is not
+cited anywhere.** The gate is re-run on the settled tree and only that result is
+quoted. This is the repository's own "never edit the tree you are measuring"
+rule, applied to a gate instead of a preflight.
+
+#### Next
+
+DR-07, DR-08, DR-06 remain. Two rows wait on a user ruling and block nothing:
+the `TRACE_FLOW` convention and the `-Semantic` opt-in.
+
+### 2026-09-02T09:00:00Z — DR-09: the label is fine, the row's control was missing, and the audit found a different defect
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-09 `complete`.** One register row corrected on three counts;
+  one new row opened. **The closing ruling is the user's** — ADR-0073 ruling 4
+  authorised the audit and deferred the ruling, and this entry does not take it.
+- No product code changed. `PARSER_BUNDLE_VERSION` **1.9.0**, `SCHEMA_VERSION`
+  **14**, `contract_version` **1.1**, chunker **1.1.0**, resolver **1.5.0** — all
+  unchanged. No migration.
+
+#### What the row claimed, and what measuring it found
+
+The row said the `TRACE_FLOW` label "may be systemically wrong", on the evidence
+of three cases all classifying as `text`. **Three separate corrections:**
+
+1. **There are five cases, not six.** ADR-0051 re-typed q006 to `CONCEPTUAL`
+   hours before this row was written, and the count was never updated.
+2. **The classifier does not disagree with all of them.** q063 ("Trace the flow
+   from mount.") classifies as `trace`. It is 4 of 5, not 5 of 5.
+3. **The generalisation dies on its control, which was never run.** Agreement
+   per declared intent across the whole corpus:
+
+| Declared intent | Cases | Classifier agrees |
+| --- | ---: | ---: |
+| `EXACT_SYMBOL` | 36 | **0** |
+| `DOCUMENT_LOOKUP` | 4 | **0** |
+| `DEPENDENCIES` | 10 | 5 |
+| `CALLERS` | 10 | 6 |
+| `RELATED_TESTS` | 3 | 3 |
+| **`TRACE_FLOW`** | **5** | **1** |
+| **Total (scored)** | **68** | **15** |
+
+`TRACE_FLOW` is **better than the corpus average**. Singling it out was an
+artifact of it being the intent ADR-0051 happened to be investigating.
+
+**The disagreement is by design, and the design is written down.**
+`engine_adapter._query_term` feeds the declared symbol rather than the question,
+because the harness measures resolution accuracy and not question understanding.
+A declared intent names *the channel under measurement*; it was never a
+prediction of `classify()`. Corpus questions are natural language while the
+classifier's rules are command-shaped, so disagreement is the normal case.
+
+#### Both channels were run, and the declared one wins every time
+
+| Case | Classifier | `trace` top-1 | `trace` recall | `text` top-1 | `text` recall |
+| --- | --- | --- | ---: | --- | ---: |
+| q003 | text | yes | 1/1 | yes | 1/1 |
+| q026 | text | yes | 1/1 | **no** | 1/1 |
+| q032 | text | yes | 2/2 | **no** | 2/2 |
+| q035 | text | yes | 1/1 | yes | 1/1 |
+| q063 | trace | yes | 2/3 | yes | **1/3** |
+
+Every expected evidence range is CONTAINED by **both** channels in all five
+cases, so the label costs nothing on evidence. It costs on ranking, and it costs
+in the direction that favours keeping it. Re-typing the five would make four of
+five answers worse and drop the symbol-intent denominator by five — ADR-0051's
+arithmetic, which is why that record added q064 rather than just removing q006.
+
+The probe agrees with the tracked instrument: `exact_symbol_resolution` is
+**1.0000** and `mean_reciprocal_rank` **1.0000** in `baseline-phase-4.json`,
+which is only possible if all five score top-1 under the declared channel.
+
+#### The defect the audit actually found
+
+**A question beginning with the word "Trace" is not routed to the trace
+channel.** The classifier's only `TRACE` rule is anchored at both ends and
+admits one trailing token, so `Trace the flow from mount.` matches and
+**`Trace order data from frontend to backend.` does not** — it falls through to
+`text`, which ranks `Order flow` first and gets top-1 wrong on that fixture.
+
+This is user-visible and the corpus is structurally blind to it, because the
+harness bypasses the classifier by design. **No fix is proposed**: the corpus
+scores channels, not routing, so any widening of the rule would be unmeasured by
+construction. It needs an instrument before it needs a change — the shape
+ADR-0056 and ADR-0062 both record as a reason to decline. Opened as its own row
+rather than folded into the row above, because a classifier gap and a corpus
+convention have opposite remedies.
+
+#### Files
+
+- `scripts/report_intent_agreement.py` — new, the committed instrument. DR-01's
+  precedent: this row has carried a wrong count twice, so the claim is made by
+  running a tool, not by reading the corpus and reasoning about it.
+- `tests/unit/test_report_intent_agreement.py` — new, 4 tests.
+- `docs/plans/PLAN.md` — the row corrected, one row added, the board, this entry.
+
+#### Verification
+
+```text
+uv run pytest tests/unit/test_report_intent_agreement.py -q    4 passed
+uv run ruff check src tests scripts apps                       All checks passed
+uv run mypy --no-incremental src tests scripts apps            no issues, 395 files
+uv run python scripts/report_intent_agreement.py               15/68 scored
+```
+
+**Mutation-checked, both ways that matter.** Scoring a channel-less intent as
+`0` instead of `n/a` — the ADR-0053 shape, and `CONFIG_LOOKUP` alone is six
+cases — fails `test_an_intent_with_no_classifier_channel_is_not_scored_at_all`.
+Collapsing the per-intent tallies into one bucket fails three of the four,
+including the one that carries the control this whole finding rests on.
+
+#### Limitations
+
+- **The audit cannot say what the classifier *should* return.** It measures
+  agreement with today's rules; whether those rules are right is the open row.
+- **`_CHANNEL_BY_INTENT` is hand-written.** Four corpus intents have no
+  classifier channel and are reported `n/a`; if a future intent gains one, this
+  mapping is a second place that has to learn about it. Derived mapping was
+  rejected because the two vocabularies genuinely differ — `CONFIG_LOOKUP` is
+  answered lexically and has no `Intent` member to derive from.
+
+#### Next
+
+DR-01b, DR-07, DR-08, DR-06 remain. The `TRACE_FLOW` row and the new classifier
+row both wait on a user ruling and block nothing.
+
+### 2026-09-01T23:00:00Z — DR-03 and DR-04: the mechanisms work, and my own estimate of them was wrong by 5x
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-03 and DR-04 both `complete`**, bundled into one reindex by
+  user ruling. DR-05 stays retired.
+- **`PARSER_BUNDLE_VERSION` 1.8.0 -> 1.9.0 (ADR-0074). Users must reindex.**
+  `SCHEMA_VERSION` 14, `contract_version` 1.1, `CHUNKER_VERSION` 1.1.0,
+  `RESOLVER_VERSION` 1.5.0 all unchanged. **No migration** — a discriminator is
+  an id-construction input like the ordinal, not stored evidence.
+
+#### What was built
+
+`LanguageAdapter.discriminator`: the declaration a symbol sits inside, or its
+own form where it has one. Java, Scala, Go and Rust supply one.
+
+Two details carry it. **The discriminator is appended to the id hash only when
+non-empty**, so a group whose members return `None` keeps byte-identical ids and
+each language moves for its own reason. And **ADR-0069's "the first member of a
+group keeps its id" shortcut no longer applies where a discriminator exists** —
+that shortcut is itself ordinal-dependent, so inserting a member above the first
+displaces it, which is the instability the whole mechanism exists to remove.
+
+#### The measurement, and the correction to ADR-0072
+
+| Repository | Separated before | After | Still ordinal |
+| --- | ---: | ---: | ---: |
+| gson (Java) | 52 | **76** | 23 |
+| cobra (Go) | 0 | **1** | **0** |
+| gin (Go) | 0 | **4** | **0** |
+| ripgrep (Rust) | 0 | **4** | 17 |
+| scalaz (Scala) | 169 | **334** | 743 |
+| **Total** | **221** | **419** | **783** |
+
+**198 groups gained position-independent identity. ADR-0072 predicted 980.**
+
+**I wrote ADR-0072, and it was wrong for a nameable reason:** it classified the
+981 groups by *sampling* them and inferring a mechanism, never checking whether
+the enclosing declaration **differs between the colliding members**. Usually it
+does not. About **718 of scalaz's remaining 743 are two declarations sharing a
+name, a kind, and one enclosing scope** — `TimeInstances.max` twice inside one
+trait. One scope, so no enclosing-based mechanism can reach them. Rust's
+remaining 17 are methods sharing one `impl`, not two-trait pairs.
+
+**Third time in this lineage** that an inherited count was the defect: ADR-0071
+disproved ADR-0069's follow-up, ADR-0072 disproved ADR-0071's, this disproves
+ADR-0072's. The instrument now exists; what was missing was running it *before*
+writing the estimate.
+
+#### A test that passed before the fix existed
+
+The first draft of `test_symbol_identity_stability.py` asserted that the set of
+ids seen before an insertion was a **subset** of the set seen after. That passes
+on the broken code, because the ordinal scheme *reuses* the id values and hands
+them to different symbols — **all five assertions passed before a line of the
+fix was written.** Members are now followed by `content_hash`, and each fixture
+body is deliberately distinct so the hash can do that.
+
+#### Files
+
+- `src/codeatlas/domain/symbols.py`, `parsing/query_backed/{profile,engine}.py`,
+  and the four language adapters.
+- `src/codeatlas/parsing/registry.py` — bundle 1.9.0.
+- `scripts/report_symbol_collisions.py` — now measures
+  `(signature, discriminator)`; before this it could not have seen the mechanism
+  work.
+- `tests/unit/test_symbol_identity_stability.py` — new, 9 tests.
+- `docs/adr/0074-a-symbol-is-identified-by-the-declaration-it-sits-in.md`.
+
+#### Verification
+
+```text
+scripts/check_phase4.ps1 -SkipSync        GATE_EXIT_CODE=0
+2413 passed, 3 skipped, 1 warning in 671.38s (0:11:11)
+Lint clean · Types clean over 393 files · all baselines --check clean
+```
+
+Every tracked baseline still reproduces byte-for-byte despite the bundle bump,
+which is the expected result: the baselines measure evaluation metrics, not
+symbol ids.
+
+#### Next
+
+**783 groups remain on the ordinal**, and the largest class — ~718 — is two
+declarations sharing one scope. **No mechanism proposed, and it may not be an
+identity defect at all**: if `Align.F` renders one qualified name for two
+members a reader would call distinct, the qualified name is what is wrong. Not
+started. DR-01b, DR-06, DR-07, DR-08 and DR-09 remain.
+
+### 2026-09-01T20:00:00Z — Four rulings given (ADR-0073); three of them authorise work, one closes its row
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **DR-07, DR-08 and DR-09 opened `ready`.** One register row closed
+  by ruling; one stays open with a changed trigger. The mechanism ADRs move to
+  **0074 and 0075** because ADR-0073 took the number.
+- No product code changed and no version moves. Every version bump belongs to
+  the task a ruling authorises.
+
+#### What the user ruled
+
+1. **A caller expectation may name its own subject — leave q005 and q053 as
+   declared.** The recall cost is *accepted*, not fixed: both cases permanently
+   score below what the engine achieves. Closes its row and authorises nothing.
+2. **A case declaring no relations leaves the relation-precision denominator.**
+   Authorises **DR-07**.
+3. **Traversal depth becomes part of each case.** Extends ADR-0059 rather than
+   overturning it. Authorises **DR-08**.
+4. **`TRACE_FLOW` is audited before it is ruled.** ADR-0051's reasoning upheld —
+   the outcome may be a corpus limit or an engine defect, and those have
+   opposite remedies. Authorises **DR-09**; the row stays open with its trigger
+   changed from "someone rules" to "the audit runs".
+
+#### The thing to watch in DR-07 and DR-08
+
+**Both change a reported number without the engine getting better.** Ruling 2
+shrinks a denominator; ruling 3 rewrites what every graph case declares. Each
+task must show the figure before and after and name the mechanism that moved it,
+and DR-07 must regenerate its baseline **as its own reviewed commit** — the
+precedent is `baseline-phase-7.json` on 2026-08-16. This is the exact failure
+ADR-0053 recorded, where a gated intent left the denominator and flattered six
+metrics at once.
+
+#### Files
+
+- `docs/adr/0073-four-evaluation-conventions-ruled.md` — new.
+- `docs/plans/PLAN.md` — three tasks, four rows, this entry.
+- `README.md` — 73 accepted records.
+
+#### Next
+
+Nothing waits on the user. **DR-03** remains the largest engineering item;
+**DR-09** is the cheapest of the three new tasks and is pure evidence-gathering.
+
+### 2026-09-01T18:00:00Z — DR-02: the real repository costs 6.7x the fixture it was gated on, and resolution is no longer the only problem
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: DR-02 `in_progress -> complete`. Three register rows closed.
+- No product code changed; `measure_phase4_perf.py` gains a second corpus
+  profile and the synthetic one is byte-identical. No version moves.
+
+#### Preflight, measured on a real repository for the first time
+
+769 files, 727 parsed, isolated database, three runs each:
+
+```text
+commit-range (HEAD~5..HEAD)   median 29.52 s   p95 29.70 s   (27.90 s less startup)
+working tree                  median 34.29 s   p95 34.37 s   (32.67 s less startup)
+codeatlas --help                                  1.62 s     startup floor
+```
+
+Spreads of 0.31 s and 0.21 s, so this is not machine load.
+
+**This is not a missed target, and saying so was the first thing worth
+checking.** Phase 4 condition 7 scopes warm preflight p95 <= 10 s **"on the
+declared fixture and named hardware"**, and the fixture reads 5.151 s, met. What
+is true is that **a real repository costs 6.7x the fixture the gate was taken
+on** — the number the register row asked for and nobody had.
+
+**The 10-12 minute `impact` runs the register recorded are ~20x stale**, exactly
+as predicted: observed 2026-08-13, five days before ADR-0064's 29x.
+
+#### The synthetic corpus, and what it was hiding
+
+`--profile realistic` emits Markdown that mentions the symbols the modules
+define. A document with no symbol names would produce sections and no
+`<mention>` references — the same blindness in a new costume. The synthetic
+profile is untouched and regression-guarded, because the tracked baseline rests
+on it.
+
+At 160 modules the realistic corpus costs **3.60x** the synthetic one, and the
+log-log slope is **0.898 against 0.602**. **These are not comparable to
+ADR-0062's 1.14** — that sweep ran to 800 modules, this one stops at 160 where
+fixed costs still depress every slope below 1. Stated because quoting 0.898
+against 1.14 is precisely the kind of comparison this lineage keeps getting
+wrong.
+
+**New finding:** the <= 2 s changed-file refresh target is **missed on the
+realistic corpus from 80 modules upward** (2.153 s, 4.587 s at 160). Fixture-
+scoped and met on the fixture, so not a gate failure — a statement about what
+the fixture cannot see.
+
+#### Resolution's residual, profiled — and the finding is what sits beside it
+
+ADR-0064 invited this and it is now done. cProfile inflates the run to 90.5 s
+against 32.7 s, so **only proportions are evidence**:
+
+| Stage | Share |
+| --- | ---: |
+| `resolution.resolve` | **38%** |
+| — `_derive_config_edges` | 20% |
+| `sqlite3.executemany` | **21%** |
+| `ignore_rules.is_ignored` | 9% |
+| `scanner.scan` | 8% |
+
+`_derive_config_edges` is over half of resolution — the same site ADR-0064
+de-quadraticised, still dominant. **But a task optimising resolution alone would
+attack 38% of the cost while ignoring 30% sitting next to it** in persistence
+and ignore matching, neither of which anyone has looked at.
+
+**No optimisation is proposed and none is scheduled.** Committing to a fix off a
+single profile is what ADR-0060 through ADR-0062 did three times before ADR-0064
+measured properly.
+
+#### Files
+
+- `scripts/measure_phase4_perf.py` — `--profile`, recorded in the JSON output.
+- `tests/unit/test_perf_corpus_profile.py` — new, three tests, written first.
+- `docs/evaluation/phase-4-baseline-environment.md` — the measurements.
+- `docs/plans/PLAN.md` — three rows closed, this entry.
+
+#### Next
+
+**DR-03** (enclosing-declaration discriminator, 845 groups) or **DR-01b** (the
+register sweep). Four rulings still await the user and block neither.
+
+### 2026-09-01T12:00:00Z — DR-01: ADR-0071 measured right and explained wrong, and the gate caught three of my own defects
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: DR-01 `in_progress -> complete` **with a stated remainder**;
+  **DR-01b opened** for the sweep this task did not finish. DR-05 **retired**.
+- No product behaviour changed. `PARSER_BUNDLE_VERSION` stays 1.8.0,
+  `SCHEMA_VERSION` 14, `contract_version` 1.1 — **no reindex is caused by this
+  task.**
+
+#### The census reproduces ADR-0071 exactly, and disproves its explanation
+
+`scripts/report_symbol_collisions.py` is now committed, which ADR-0071's probe
+never was. Measured: gson 99/52/47, cobra 1/0/1, gin 4/0/4, ripgrep 21/0/21,
+scalaz 1077/169/908 — **1202/221/981, to the digit.**
+
+**A Scala `trait`/`object` companion pair never collided.** `trait` captures as
+`INTERFACE`, `object` as `CLASS`; different kinds are different `symbol_id`s.
+What collides is their **members**, which render the same qualified-name prefix
+under either parent. scalaz's 908 are FUNCTION 432, FIELD 272, CLASS 135,
+TYPE_ALIAS 68, INTERFACE 1 — so the declaration form ADR-0071 proposed reaches
+**135**, not 908.
+
+**And gson's 47 do have a remedy**, where ADR-0071 says none is named: 43
+methods in enum-constant bodies and anonymous classes, 4 classes declared inside
+methods. All 47 need the enclosing scope — the mechanism ADR-0071 named for Go.
+
+Recorded as **ADR-0072**. Three mechanisms covering 934 become **two covering
+980 of 981**; the last is one uncharacterised scalaz `INTERFACE` group, recorded
+rather than guessed at. DR-05 is retired because Go's 5 were never a mechanism
+of their own.
+
+#### The gate caught three defects, all of them mine
+
+The first run exited 1. Every failure was introduced by this task and every
+guard was right:
+
+1. `test_the_readme_test_count_matches_what_the_suite_collects` — three new
+   census tests, README not updated. Now **2401 passed, 3 skipped**.
+2. `test_the_readme_adr_count_matches_the_directory` — ADR-0072 made 72.
+3. `test_no_tracked_file_carries_crlf_into_the_working_tree` — I edited
+   `PLAN.md` with `pathlib.write_text`, which translates `\n` to `os.linesep` on
+   Windows. **Git printed "CRLF will be replaced by LF" and I read past it.**
+   Normalised back to LF.
+
+Worth keeping: the guard that caught the third exists because ADR-0043 found
+preflight walking every line of every file while `git status` was empty. It
+earned its place again here.
+
+#### What DR-01 did not do
+
+**Step 7 asked for a dated cross-check of every open row; two were audited, not
+~20.** The two known-stale preflight rows are closed citing ADR-0064, the
+parse-invalidation ruling is **withdrawn rather than answered** (ADR-0063 on
+arithmetic, ADR-0064 on proportion), the notation is disambiguated, the three
+flakes have capture recipes and the four rulings have a decision brief. The
+remaining rows are unswept and the register says so in its own header. **DR-01b
+carries that**, rather than the task claiming a sweep it did not run.
+
+#### Files
+
+- `scripts/report_symbol_collisions.py`, `tests/unit/test_report_symbol_collisions.py` — new.
+- `docs/adr/0072-what-adr-0071s-remaining-collisions-actually-are.md` — new.
+- `src/codeatlas/domain/symbols.py` — a docstring that still claimed every
+  query-backed language reports `signature is None`, untrue since ADR-0071.
+- `README.md`, `docs/plans/PLAN.md`.
+
+#### Verification
+
+```text
+scripts/check_phase4.ps1 -SkipSync        GATE_EXIT_CODE=0
+2401 passed, 3 skipped, 1 warning in 652.55s (0:10:52)
+Lint clean · Types clean over 391 files · all baselines --check clean
+```
+
+The five repositories were fetched at the SHAs pinned in
+`scripts/check_real_repos.py`, so the census numbers above are reproducible.
+
+#### Next
+
+**DR-02** (preflight re-measure) is next and is blocked by nothing. **DR-03 and
+DR-04 are re-scoped by ADR-0072 and each still force a reindex.** Four rulings
+await the user in the decision brief above; none of them blocks DR-02.
+
+### 2026-09-01T00:00:00Z — The gate re-run green, and the open tail planned; two register rows found stale before any of it
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/deferred-register-program`.
+- Transition: **no task moved.** The Deferred Register Program board is added
+  with every task `ready`; under Rule 11 none may start until the user approves
+  the plan.
+- No product code changed. `SCHEMA_VERSION` 14, `contract_version` 1.1,
+  `PARSER_BUNDLE_VERSION` 1.8.0, `CHUNKER_VERSION` 1.1.0, `RESOLVER_VERSION`
+  1.5.0 all unchanged.
+
+## The gate was re-run on an unchanged tree
+
+`scripts/check_phase4.ps1 -SkipSync` against a clean tree at `7c8250f`:
+
+```text
+GATE_EXIT_CODE=0
+Tests   2398 passed, 3 skipped, 1 warning in 1402.84s
+Lint    clean · Types clean over 389 files
+Contract freshness, dataset validation, Phase 0/3/4 baselines, ADR-0016 invariants — all clean
+```
+
+**2398, not the 2397 of the previous entry**, is the expected +1 from `6cc97e9`;
+its passing is what proves the README figure and the collected count agree.
+
+**1402.84 s against 486.78 s — 2.9x — is recorded, not explained away.** Reads
+ran against the repository throughout, so this is *read* as machine load rather
+than measured as one. The register already carries a 2026-08-21 retraction where
+exactly this was written up as a perf regression before being withdrawn, so the
+solo re-run belongs in DR-02 rather than in an assumption made here.
+
+## Two register rows were stale before the planning started
+
+Both preflight rows are dated 2026-08-18 and were written against ADR-0060's
+attribution. **ADR-0064 was accepted later the same day and explicitly corrects
+ADR-0060, ADR-0061 and ADR-0062**: a timer named `parse_base` wrapped
+`_analyze_state`, which lists, reads, parses *and* resolves. Parsing is **2.5%**
+of preflight (8.14 s), resolution was **97%** (310.24 s), and after the fix
+preflight is **21.56 s** against 635.59 s.
+
+So the row claiming "632 s of a 635 s preflight is `parse_base` +
+`parse_target`" is superseded, and the ruling the neighbouring row asks for —
+*what invalidates a stored parse* — **should be withdrawn rather than answered**,
+because ADR-0063 killed the change it authorises on arithmetic and ADR-0064
+killed it on proportion. Neither correction is applied here; both are DR-01's
+work, so they land with the audit's evidence rather than ahead of it.
+
+**This is the third time.** The 2026-08-21 audit found five stale rows in a day,
+and the last two handoffs each recorded a task whose premise was the defect. Two
+more were found in one cluster in about ten minutes, which is why the audit is
+DR-01 and not a later step.
+
+## A second finding: ADR-0071's three mechanisms do not cover its own 981
+
+They cover **934**. Scala companions 908, Rust traits 21, Go local types 5. The
+remaining **47 are Java groups in gson** that a signature did not separate — gson
+had 99 and signature separated 52 — and **ADR-0071 names no remedy for them.**
+No task invents one; DR-01 characterises what they are.
+
+## A third, smaller finding: the register's notation is ambiguous
+
+An item titled `~~original entry~~` means either "reworded, still open" (the
+preflight rows) or "archived original, closed by the row above" (the
+nested-config row closed by ADR-0041). Only a pointer in the preceding row
+distinguishes them, and reading top-down mistakes a closed defect for an open
+one. DR-01 makes the distinction explicit.
+
+## Files
+
+- `docs/superpowers/specs/2026-09-01-deferred-register-program-design.md` — new.
+- `docs/superpowers/plans/2026-09-01-deferred-register-program.md` — new.
+- `docs/plans/PLAN.md` — this entry and the task board, both appended.
+
+## Verification
+
+The gate above. No test was added or changed, and no claim of new behaviour is
+made in this entry.
+
+## Next
+
+**The plan needs the user's approval before DR-01 may start.** Nothing is in
+progress.
+
 
 ### 2026-08-31T22:00:00Z — Task 6: the follow-up's own claim was the thing that needed measuring
 

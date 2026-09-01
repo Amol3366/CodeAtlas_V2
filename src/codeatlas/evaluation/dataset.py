@@ -74,12 +74,55 @@ class QueryCase(ContractModel):
     # valid unchanged; declaring it is additive, never a re-labelling of an
     # expectation (ADR-0003).
     query_subject: NonEmptyText | None = None
+    # How far the traversal runs for this case (ADR-0073 ruling 3).
+    #
+    # Depth used to be implied: `GraphQueryRequest.max_depth` defaults to 2 and
+    # every graph case silently took it, while ADR-0059 ruled that an
+    # expectation declares *direct* results. A case therefore declared depth-1
+    # answers and was scored against a depth-2 traversal, and the undeclared
+    # second-hop results read as distractors -- which is the whole reason q003,
+    # q005, q015 and q053 are reversal-sensitive.
+    #
+    # Making it explicit does not change any answer: every graph case declares
+    # **2**, the value it was already getting. That is deliberate. The
+    # measurement says all 31 satisfy their declared relations at depth 1, but
+    # dropping to 1 would remove the depth-2 distractors and with them the
+    # ranking sensitivity ADR-0059 kept on purpose, turning
+    # `exact_symbol_resolution` from a ranking gate back into a resolution one.
+    # ADR-0073 says ruling 3 *extends* ADR-0059; that would overturn it. So the
+    # field is introduced with today's value, and any retuning is a separate
+    # decision with its own measurement.
+    #
+    # Required for graph intents and forbidden elsewhere -- see the validator.
+    traversal_depth: int | None = Field(default=None, ge=1, le=5)
     expected_symbols: list[NonEmptyText]
     expected_relations: list[NonEmptyText]
     expected_evidence: list[EvidenceExpectation]
     warnings: list[str]
     limitations: list[str]
     forbidden_claims: list[NonEmptyText]
+
+    @model_validator(mode="after")
+    def _depth_belongs_to_graph_cases(self) -> QueryCase:
+        """A graph case declares its depth; a non-graph case has none to declare.
+
+        Both directions are enforced, because a silently-ignored field is worse
+        than a missing one: a `traversal_depth` on an `EXACT_SYMBOL` case would
+        read as though it controlled something, and nothing would contradict it.
+        That is the shape ADR-0053 recorded, where a constant nobody checked
+        removed a case from a denominator without saying so.
+        """
+        if self.intent in GRAPH_INTENTS and self.traversal_depth is None:
+            raise ValueError(
+                f"case {self.id}: intent {self.intent} traverses relations and "
+                "must declare traversal_depth (ADR-0073 ruling 3)"
+            )
+        if self.intent not in GRAPH_INTENTS and self.traversal_depth is not None:
+            raise ValueError(
+                f"case {self.id}: intent {self.intent} does not traverse "
+                "relations, so traversal_depth would have no effect"
+            )
+        return self
 
 
 class StateSpec(ContractModel):
@@ -110,6 +153,22 @@ class ChangeCase(ContractModel):
     expected_changed_symbols: list[NonEmptyText]
     expected_impact_paths: list[list[NonEmptyText]]
     expected_findings: list[NonEmptyText]
+    # Which `StateView` reads the base side.
+    #
+    # `directory` compares two materialized directories, which is what every
+    # case did until now and what keeps a case independent of Git being
+    # installed. `git_blob` commits the base and reads it back through
+    # `GitBlobStateView`, the view a real working-tree preflight uses.
+    #
+    # The distinction is not cosmetic: **the corpus could not express an
+    # ADR-0044-shaped defect at all** while both sides were directories. That
+    # record fixed the blob view to apply the same ignore rules as a scan, and a
+    # directory-versus-directory case cannot see it -- both sides apply those
+    # rules already, so a tracked-but-ignored file is absent from *both* and a
+    # case asserting "no deletion" passes with the fix and without it. Permanent
+    # green reads as coverage, which is why no such case was committed before
+    # the harness could run this side through Git.
+    base_view: Literal["directory", "git_blob"] = "directory"
     warnings: list[str]
     limitations: list[str]
     forbidden_claims: list[NonEmptyText]
@@ -144,6 +203,14 @@ SYMBOL_INTENTS: Final[frozenset[str]] = frozenset(
 LEXICAL_INTENTS: Final[frozenset[str]] = frozenset(
     {"CONFIG_LOOKUP", "DOCUMENT_LOOKUP"}
 )
+# The intents answered by traversing stored relations, and therefore the ones
+# whose answer depends on how far the traversal runs. `EXACT_SYMBOL` is a
+# symbol intent but not a graph one: it resolves a name and never walks an edge.
+#
+# Defined here beside the other corpus vocabulary for ADR-0023's reason -- the
+# adapter maps these to service methods and would otherwise hold a second
+# definition that could drift. `test_engine_adapter.py` pins the two together.
+GRAPH_INTENTS: Final[frozenset[str]] = SYMBOL_INTENTS - {"EXACT_SYMBOL"}
 
 # Which gate table a corpus is measured by. `retrieval` is the default so every
 # existing manifest stays valid unchanged; the conceptual corpus declares its

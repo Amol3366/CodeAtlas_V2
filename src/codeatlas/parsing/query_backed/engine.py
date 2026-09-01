@@ -68,12 +68,16 @@ class TagsBackedParser:
         #
         # Before references, deliberately: reference extraction binds to
         # `symbols[0].symbol_id`, so the ids must be final by the time it runs.
+        definitions = self._definitions(tree.root_node, request, module_path)
         symbols = ensure_unique_symbol_ids(
             (
                 self._compilation_unit(tree.root_node, request, module_path),
-                *self._definitions(tree.root_node, request, module_path),
+                *(record for record, _ in definitions),
             ),
             PARSER_BUNDLE_VERSION,
+            # Positionally parallel, and the compilation unit leads with None:
+            # it is one per file and cannot collide with itself (ADR-0074).
+            (None, *(discriminator for _, discriminator in definitions)),
         )
         references = extract_query_references(
             tree.root_node, request.content, request, self._adapter, symbols
@@ -136,10 +140,32 @@ class TagsBackedParser:
             visibility="public",
         )
 
+    def definitions_with_discriminators(
+        self, request: ParseRequest
+    ) -> list[tuple[SymbolRecord, str | None]]:
+        """Each definition with the discriminator that separates it.
+
+        Exists for `scripts/report_symbol_collisions.py`, which has to answer
+        "is this group separated by something position-independent?" and cannot,
+        from `parse` alone: `ensure_unique_symbol_ids` has already made every id
+        distinct by the time a `ParseResult` is returned, so a census built on
+        that output agrees with any fix, including a broken one.
+
+        Ids are deliberately **pre-disambiguation** here. The census groups on
+        qualified name and kind, and needs the discriminator beside them.
+        """
+        if not request.content or len(request.content) > MAX_PARSE_BYTES:
+            return []
+        tree = self._parser.parse(request.content)
+        module_path = self._adapter.module_path(
+            tree.root_node, request.content, request.relative_path
+        )
+        return self._definitions(tree.root_node, request, module_path)
+
     def _definitions(
         self, root: Any, request: ParseRequest, module_path: str
-    ) -> list[SymbolRecord]:
-        """One SymbolRecord per definition the tags query matched.
+    ) -> list[tuple[SymbolRecord, str | None]]:
+        """One SymbolRecord, and its discriminator, per matched definition.
 
         ``matches`` rather than ``captures``: a capture mapping is flat and
         carries no association between a definition and its name, which is
@@ -155,7 +181,7 @@ class TagsBackedParser:
         rank_of = {
             name: rank for rank, name in enumerate(self._profile.kind_by_capture)
         }
-        best: dict[tuple[int, int], tuple[int, SymbolRecord]] = {}
+        best: dict[tuple[int, int], tuple[int, SymbolRecord, str | None]] = {}
         for _pattern, captures in QueryCursor(self._profile.tags_query).matches(root):
             kind: SymbolKind | None = None
             definition_node: Any = None
@@ -189,8 +215,12 @@ class TagsBackedParser:
                 self._record(
                     definition_node, request, kind, name, qualified_name, module_path
                 ),
+                self._adapter.discriminator(definition_node, request.content),
             )
-        return [record for _rank, record in best.values()]
+        return [
+            (record, discriminator)
+            for _rank, record, discriminator in best.values()
+        ]
 
     def _scopes(self, node: Any, source: bytes) -> list[str]:
         """Enclosing scope names, outermost first."""

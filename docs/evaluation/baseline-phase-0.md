@@ -8,14 +8,14 @@
 | Metric | Value |
 | --- | ---: |
 | Query cases | 80 |
-| Change cases | 32 |
+| Change cases | 33 |
 | Exact symbol resolution | 0.0000 |
 | Primary evidence Recall@10 | 0.0000 |
 | Containing evidence Recall@10 | 0.0000 |
 | Valid evidence rate | not applicable |
 | Exact evidence rate | not applicable |
 | Containing evidence rate | not applicable |
-| Changed-symbol precision | 0.0000 (0/32 cases exact) |
+| Changed-symbol precision | 0.0000 (0/33 cases exact) |
 | Changed-symbol recall | 0.0000 |
 | Direct-impact recall | 0.0000 |
 | Unsupported-claim rate | not applicable |

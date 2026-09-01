@@ -15,6 +15,7 @@ emitted that the engine did not itself verify.
 from __future__ import annotations
 
 import shutil
+import subprocess
 import tempfile
 import time
 from collections.abc import Callable, Sequence
@@ -22,7 +23,11 @@ from pathlib import Path
 from typing import Final
 
 from codeatlas.analysis.engine import ChangeAnalysisEngine, ChangeReport
-from codeatlas.analysis.states import DirectoryStateView
+from codeatlas.analysis.states import (
+    DirectoryStateView,
+    GitBlobStateView,
+    StateView,
+)
 from codeatlas.application.container import build_services
 from codeatlas.application.graph_queries import GraphQueryRequest
 from codeatlas.application.lookup import SymbolLookupRequest
@@ -249,11 +254,22 @@ def _answer(
                 services.graph,  # type: ignore[attr-defined]
                 GRAPH_INTENTS[case.intent],
             )
+            # The case's own depth, never the request default (ADR-0073
+            # ruling 3). `traversal_depth` is required for exactly these
+            # intents, so `or` never falls through for a validated corpus; it
+            # is there so a hand-built `QueryCase` in a test still traverses to
+            # the depth the dataclass documents rather than to `None`.
+            # The case's own depth, never the request default (ADR-0073
+            # ruling 3). `traversal_depth` is required for exactly these
+            # intents, so `or` never falls through for a validated corpus; it
+            # is there so a hand-built `QueryCase` in a test still traverses to
+            # the depth the dataclass documents rather than to `None`.
             response = method(
                 GraphQueryRequest(
                     repository_id=repository_id,
                     symbol=_query_term(case),
                     request_id=f"eval_{case.id}",
+                    max_depth=case.traversal_depth or 2,
                 )
             )
         else:
@@ -629,16 +645,12 @@ def predict_changes(
     with tempfile.TemporaryDirectory(prefix="codeatlas-change-") as workspace:
         staging = Path(workspace)
         for index, case in enumerate(dataset.change_cases):
-            base = _materialize(staging / f"{index}-base", case.base_state)
-            target = _materialize(
-                staging / f"{index}-target", case.target_state
-            )
-
             started = time.perf_counter()
             try:
-                report = engine.analyze(
-                    DirectoryStateView(base), DirectoryStateView(target)
+                base_view, target_view = _state_views(
+                    staging, index, case
                 )
+                report = engine.analyze(base_view, target_view)
             except CodeAtlasError:
                 predictions.append(_empty_change(case.id))
                 continue
@@ -844,6 +856,81 @@ def _empty_change(case_id: str) -> ChangePrediction:
         claims=[],
         duration_ms=0.0,
     )
+
+
+
+def _state_views(
+    staging: Path, index: int, case: ChangeCase
+) -> tuple[StateView, StateView]:
+    """The two views a change case is analysed through.
+
+    `directory` materializes both sides side by side, which is what every case
+    did before ADR-0077 and needs no Git.
+
+    `git_blob` builds **one** working tree: the base is committed and read back
+    through `GitBlobStateView`, then the target overlay is written over the same
+    directory and read through `DirectoryStateView`. That is deliberately the
+    shape of a real working-tree preflight -- `analyze_working_tree` compares a
+    committed ref against the tree on disk -- and it is the only shape in which
+    the blob view's ignore-rule handling participates at all (ADR-0044).
+
+    Two directories would not do: the ADR-0044 defect is a *disagreement between
+    the two view implementations* about which files exist, so a comparison that
+    uses one implementation twice cannot produce it.
+    """
+    if case.base_view == "directory":
+        base = _materialize(staging / f"{index}-base", case.base_state)
+        target = _materialize(staging / f"{index}-target", case.target_state)
+        return DirectoryStateView(base), DirectoryStateView(target)
+
+    worktree = _materialize(staging / f"{index}-git", case.base_state)
+    _commit_all(worktree)
+    # The target overlay lands on top of the committed base, so HEAD holds the
+    # base and the working tree holds the target -- one directory, two states.
+    _apply_overlay(worktree, case.target_state)
+    return GitBlobStateView(worktree, "HEAD"), DirectoryStateView(worktree)
+
+
+def _commit_all(root: Path) -> None:
+    """Initialise a repository and commit everything in it.
+
+    Identity and signing are set locally rather than inherited: a contributor
+    whose global config signs commits would otherwise fail the whole gate on a
+    fixture, and `core.autocrlf` is pinned off so the committed bytes are the
+    bytes written -- ADR-0043 is about the two sides disagreeing over line
+    endings, and the harness must not introduce that disagreement itself.
+    """
+    for arguments in (
+        ("init", "-q"),
+        ("config", "user.email", "evaluation@codeatlas.invalid"),
+        ("config", "user.name", "CodeAtlas Evaluation"),
+        ("config", "commit.gpgsign", "false"),
+        ("config", "core.autocrlf", "false"),
+        ("add", "-A"),
+        ("commit", "-qm", "base state"),
+    ):
+        subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            shell=False,
+        )
+
+
+def _apply_overlay(destination: Path, spec: StateSpec) -> None:
+    """Write one state's overlay over an existing tree, deletions included."""
+    if spec.overlay is None:
+        return
+    for source in sorted(spec.overlay.rglob("*")):
+        if not source.is_file():
+            continue
+        landing = destination / source.relative_to(spec.overlay)
+        landing.parent.mkdir(parents=True, exist_ok=True)
+        if source.stat().st_size == 0:
+            landing.unlink(missing_ok=True)
+        else:
+            shutil.copy2(source, landing)
 
 
 def _materialize(destination: Path, spec: StateSpec) -> Path:

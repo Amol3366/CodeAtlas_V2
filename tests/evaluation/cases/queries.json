@@ -74,11 +74,12 @@
                       "question":  "What validates the capture key?",
                       "intent":  "TRACE_FLOW",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "expected_symbols":  [
                                                "PaymentService.capture"
                                            ],
                       "expected_relations":  [
-
+                                                 "PaymentService.capture CALLS IdempotencyStore.claim"
                                              ],
                       "expected_evidence":  [
                                                 {
@@ -140,6 +141,7 @@
                       "question":  "What calls IdempotencyStore.claim?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "IdempotencyStore.claim",
                       "expected_symbols":  [
                                                "PaymentService.capture",
@@ -179,7 +181,8 @@
                                                "IdempotencyStore.claim"
                                            ],
                       "expected_relations":  [
-
+                                                 "IdempotencyStore CONTAINS IdempotencyStore.__init__",
+                                                 "IdempotencyStore CONTAINS IdempotencyStore.claim"
                                              ],
                       "expected_evidence":  [
                                                 {
@@ -208,6 +211,7 @@
                       "question":  "Which test covers capture?",
                       "intent":  "RELATED_TESTS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "PaymentService.capture",
                       "expected_symbols":  [
                                                "test_capture_uses_idempotency_store"
@@ -308,6 +312,7 @@
                       "question":  "What dependency does service import?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "service",
                       "expected_symbols":  [
                                                "PaymentService",
@@ -409,6 +414,7 @@
                       "question":  "What does total depend on?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "expected_symbols":  [
                                                "total",
                                                "Order"
@@ -476,6 +482,7 @@
                       "question":  "What does client import?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "client",
                       "expected_symbols":  [
                                                "total"
@@ -510,6 +517,7 @@
                       "question":  "Who calls total?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "total",
                       "expected_symbols":  [
                                                "render",
@@ -545,6 +553,7 @@
                       "question":  "What is exported from orders?",
                       "intent":  "EXPORTS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "orders",
                       "expected_symbols":  [
                                                "Order",
@@ -862,6 +871,7 @@
                       "question":  "Where does the frontend load orders?",
                       "intent":  "TRACE_FLOW",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "expected_symbols":  [
                                                "loadOrder"
                                            ],
@@ -1031,7 +1041,8 @@
                                                "Order flow"
                                            ],
                       "expected_relations":  [
-
+                                                 "Order flow DOCUMENTS get_order",
+                                                 "Order flow DOCUMENTS loadOrder"
                                              ],
                       "expected_evidence":  [
                                                 {
@@ -1060,6 +1071,7 @@
                       "question":  "Trace order data from frontend to backend.",
                       "intent":  "TRACE_FLOW",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "expected_symbols":  [
                                                "loadOrder",
                                                "get_order"
@@ -1168,6 +1180,7 @@
                       "question":  "What does strict mode do?",
                       "intent":  "TRACE_FLOW",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "target.processor.process",
                       "expected_symbols":  [
                                                "process"
@@ -1724,6 +1737,7 @@
                       "question":  "Who calls renderList?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "renderList",
                       "expected_symbols":  [
                                                "mount",
@@ -1759,6 +1773,7 @@
                       "question":  "Who calls advance?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "OrderPipeline.advance",
                       "expected_symbols":  [
                                                "run_pipeline",
@@ -1795,6 +1810,7 @@
                       "question":  "Who constructs OrderRepository?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "OrderRepository",
                       "expected_symbols":  [
                                                "build_repository",
@@ -1831,6 +1847,7 @@
                       "question":  "What does advance depend on?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "OrderPipeline.advance",
                       "expected_symbols":  [
                                                "OrderPipeline.advance",
@@ -1866,6 +1883,7 @@
                       "question":  "What does build_repository depend on?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "build_repository",
                       "expected_symbols":  [
                                                "build_repository",
@@ -1901,6 +1919,7 @@
                       "question":  "What does formatTotal depend on?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "formatTotal",
                       "expected_symbols":  [
                                                "formatTotal",
@@ -1936,6 +1955,7 @@
                       "question":  "What does the pipeline module import?",
                       "intent":  "DEPENDENCIES",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "src.orders.pipeline",
                       "expected_symbols":  [
                                                "src.orders.pipeline",
@@ -1971,6 +1991,7 @@
                       "question":  "What does the widgets module export?",
                       "intent":  "EXPORTS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "src.web.widgets",
                       "expected_symbols":  [
                                                "renderOrder",
@@ -2009,6 +2030,7 @@
                       "question":  "What does the handlers module export?",
                       "intent":  "EXPORTS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "src.web.handlers",
                       "expected_symbols":  [
                                                "OrderView",
@@ -2051,6 +2073,7 @@
                       "question":  "Which tests cover advance?",
                       "intent":  "RELATED_TESTS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "OrderPipeline.advance",
                       "expected_symbols":  [
                                                "test_pipeline_advances"
@@ -2085,6 +2108,7 @@
                       "question":  "Which tests cover OrderRepository?",
                       "intent":  "RELATED_TESTS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "OrderRepository",
                       "expected_symbols":  [
                                                "test_pipeline_advances"
@@ -2119,6 +2143,7 @@
                       "question":  "Trace the flow from mount.",
                       "intent":  "TRACE_FLOW",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "expected_symbols":  [
                                                "mount",
                                                "renderList",
@@ -2187,6 +2212,7 @@
                       "question":  "What calls run_pipeline?",
                       "intent":  "CALLERS",
                       "expected_abstention":  false,
+                      "traversal_depth":  2,
                       "query_subject":  "run_pipeline",
                       "expected_symbols":  [
                                                "start_pipeline"
@@ -2275,6 +2301,7 @@
                       "question": "What calls PaymentService.charge?",
                       "intent": "CALLERS",
                       "expected_abstention": false,
+                      "traversal_depth":  2,
                       "query_subject": "PaymentService.charge",
                       "expected_symbols": [
                           "OrderService.capture"
@@ -2307,6 +2334,7 @@
                       "question": "What does OrderService depend on?",
                       "intent": "DEPENDENCIES",
                       "expected_abstention": false,
+                      "traversal_depth":  2,
                       "query_subject": "OrderService",
                       "expected_symbols": [
                           "OrderService",
@@ -2394,6 +2422,7 @@
                       "question": "What calls PaymentService.charge in the Scala service?",
                       "intent": "CALLERS",
                       "expected_abstention": false,
+                      "traversal_depth":  2,
                       "query_subject": "PaymentService.charge",
                       "expected_symbols": [
                           "OrderService.capture"
@@ -2426,6 +2455,7 @@
                       "question": "What does the Scala OrderService depend on?",
                       "intent": "DEPENDENCIES",
                       "expected_abstention": false,
+                      "traversal_depth":  2,
                       "query_subject": "OrderService",
                       "expected_symbols": [
                           "OrderService",
@@ -2513,6 +2543,7 @@
                       "question": "What calls Service.Charge in the Go service?",
                       "intent": "CALLERS",
                       "expected_abstention": false,
+                      "traversal_depth":  2,
                       "query_subject": "Service.Charge",
                       "expected_symbols": [
                           "OrderService.Capture"
@@ -2600,6 +2631,7 @@
                       "question": "What calls PaymentService.charge in the Rust service?",
                       "intent": "CALLERS",
                       "expected_abstention": false,
+                      "traversal_depth":  2,
                       "query_subject": "PaymentService.charge",
                       "expected_symbols": [
                           "OrderService.capture"
@@ -2632,6 +2664,7 @@
                       "question": "What does the Rust OrderService depend on?",
                       "intent": "DEPENDENCIES",
                       "expected_abstention": false,
+                      "traversal_depth":  2,
                       "query_subject": "OrderService",
                       "expected_symbols": [
                           "OrderService",
