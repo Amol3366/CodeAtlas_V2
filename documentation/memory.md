@@ -42,7 +42,41 @@ converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
 
-## Resume point — 2026-09-02 (end of session)
+## Resume point — 2026-09-02 (the Deferred Register Program is finished)
+
+**All nine program tasks complete** (DR-01, DR-01b, DR-02, DR-03, DR-04, DR-06,
+DR-07, DR-08, DR-09; DR-05 retired). Branch `plan/deferred-register-program`,
+pushed, gate green, **not merged** — it carries `PARSER_BUNDLE_VERSION` 1.9.0
+and merging is a decision. Board and "Where to resume" live in
+`docs/plans/PLAN.md`.
+
+**The pattern of this program, and the thing worth carrying: six task premises
+were wrong, and every one was cheap to disprove by running something.**
+
+- The `TRACE_FLOW` row's control had never been run — `EXACT_SYMBOL` agrees with
+  the classifier on **0 of 36**, worse than the row's own target.
+- ADR-0073 ruling 2 told DR-07 to exclude vacuous cases; `runner.py` already did.
+- ADR-0073 ruling 3 implied depth should be derived; derived, it says **1**
+  everywhere, which would delete the corpus's only distractors.
+- DR-06's route-literal row asked for a fixture whose shape **deletes the edge**
+  it was meant to exercise.
+- DR-06's same-named-symbol row needed same-named symbols *in one snapshot*; the
+  corpus has none, and the validator already prevents it.
+- DR-06's withheld-step row asked for fixture content; the branch is only
+  reachable through **evidence validation**, not content.
+
+**Run the check before writing the plan step.** Most were one command.
+
+Two smaller habits earned the hard way: **never edit the tree while a gate runs**
+(one run was voided and discarded rather than cited), and **a criterion that
+disagrees with a standing ruling is the criterion's bug** — DR-08's first
+derivation called 15 of 31 cases unsatisfiable by ignoring ADR-0073 ruling 1.
+
+And one authoring trap, twice: **never round-trip a corpus file through
+`json.dumps`.** It reflows all ~2600 lines and buries the real change — the
+reflow ADR-0069's handoff had to strip from four files. Edit the text in place.
+
+## Superseded resume note — 2026-09-02 (mid-session)
 
 **Branch `plan/deferred-register-program`, pushed, tree clean, gate green**
 (`check_phase4.ps1 -SkipSync` exit 0). **DR-09, DR-01b, DR-08, DR-07 complete;
