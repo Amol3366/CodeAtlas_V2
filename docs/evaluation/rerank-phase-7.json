@@ -50,6 +50,7 @@
     "implementation_status": "implemented",
     "metrics": {
       "abstention_correctness": 1.0,
+      "changed_symbol_exact_cases": 1,
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
       "containing_evidence_rate": 0.11162790697674418,
@@ -87,6 +88,7 @@
     "implementation_status": "implemented",
     "metrics": {
       "abstention_correctness": 1.0,
+      "changed_symbol_exact_cases": 1,
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
       "containing_evidence_rate": 0.11162790697674418,
