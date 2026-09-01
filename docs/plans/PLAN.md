@@ -365,11 +365,23 @@ posed** there, with a narrower fix that does not trade against gate condition 2.
    torch, which gate condition 2 exists to catch.
 
 **Two open questions own no task**, both raised by evidence: the **783 ordinal
-collision groups** (~718 sharing a name, a kind *and* one enclosing scope — no
-mechanism proposed on purpose), and whether to **re-gate Phase 4 on the
-realistic performance profile**, where the ≤ 2 s refresh target is missed from
-80 modules up. **Both now own a task** -- RW-05 and RW-06 -- and RW-05 still
-proposes no mechanism.
+collision groups** and whether to **re-gate Phase 4 on the realistic
+performance profile**, where the ≤ 2 s refresh target is missed from 80 modules
+up. **Both now own a task** -- RW-05 and RW-06.
+
+**RW-05 answered the first, and still proposes no mechanism** (2026-09-02,
+`docs/evaluation/collision-residual.md`). The census reconciles with ADR-0074
+**to the digit** -- 1202 groups, 419 separated, 783 on the ordinal -- on a tool
+that did not exist when those numbers were taken. The "~718" above is corrected
+to **700 of scalaz's 743**, and **730 of 783** corpus-wide. What they *are*:
+not pairs, but **one qualified name standing for many declarations** --
+`TypeAdapters.read` x28 (gson's anonymous adapters), `TupleInstances3._1` x31
+(scalaz), `imp` x8 (ripgrep's `cfg`-gated alternatives, which are not
+simultaneously live and should never have been counted as colliding identities).
+**This supports the row's own hypothesis that the qualified name is the defect,
+not identity** -- and weakens the case for acting: 730 of 783 share a
+discriminator, so nothing short of a new identity input reaches them, which is a
+bundle bump and a forced reindex.
 
 #### Superseded resume note (2026-09-02, mid-session)
 
