@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Annotated, Final, Literal
@@ -555,3 +556,37 @@ def _resolve_side(
         return StateSpec(root=fixture_root, overlay=resolved_overlay)
 
     raise DatasetError(f"unrecognized state ref: {ref}")
+
+
+# Separates path from content and one file from the next, so that a rename
+# moving bytes across the boundary cannot leave the digest unchanged.
+_FIELD_SEPARATOR: Final[bytes] = b"\x00"
+
+
+def dataset_inputs_digest(dataset_root: Path) -> str:
+    """Every byte a measurement over this corpus depends on, as one digest.
+
+    Manifest, case files and fixture content, in sorted repository-relative
+    path order so the value never depends on filesystem enumeration order.
+    Paths are hashed as POSIX text and content as raw bytes, so a run on
+    Windows and a run on Linux agree.
+
+    This exists because a *count* does not move when a fixture's content does,
+    and content is what decides the right answer. ADR-0078: an artifact
+    regenerated only under an opt-in gate can be stale for weeks while every
+    routine run stays green, and both recorded instances were caught by their
+    key set rather than by their values. DR-06 added a whole semantic fixture,
+    which changes what those artifacts should say and moves no key at all.
+
+    Strength is not the point and this is not a security boundary -- the corpus
+    is trusted local test data. Coverage is the point: hash what the answer
+    depends on, so a regeneration that did not happen is named.
+    """
+    root = dataset_root.resolve(strict=True)
+    digest = hashlib.sha256()
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(_FIELD_SEPARATOR)
+        digest.update(path.read_bytes())
+        digest.update(_FIELD_SEPARATOR)
+    return digest.hexdigest()

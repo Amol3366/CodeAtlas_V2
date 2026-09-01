@@ -1031,7 +1031,7 @@ blunt version. The ones that bite most often:
 
 **Decisions and measurement**
 
-`docs/adr/README.md` — 77 accepted records and their rationale ·
+`docs/adr/README.md` — 78 accepted records and their rationale ·
 `docs/evaluation/` — baselines and the environment documents that say how to read
 them · `docs/security/threat-model.md`
 
