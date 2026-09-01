@@ -1387,6 +1387,51 @@
                       "forbidden_claims": [
                           "charge panics on every empty identifier at runtime."
                       ]
+                  },
+                  {
+                      "id":  "c033",
+                      "repository_fixture":  "tracked_ignored",
+                      "snapshot_id":  "tracked-base",
+                      "base_ref":  "HEAD",
+                      "target_ref":  "working-tree:return-value",
+                      "base_view":  "git_blob",
+                      "expected_symbols":  [
+                                               "capture"
+                                           ],
+                      "expected_relations":  [
+
+                                             ],
+                      "expected_evidence":  [
+                                                {
+                                                    "file_path":  "src/service.py",
+                                                    "symbol":  "capture",
+                                                    "start_line":  4,
+                                                    "end_line":  6,
+                                                    "evidence_id":  "c033-e1",
+                                                    "snapshot_id":  "tracked-base"
+                                                }
+                                            ],
+                      "expected_changed_symbols":  [
+                                                       "capture"
+                                                   ],
+                      "expected_impact_paths":  [
+
+                                                ],
+                      "expected_findings":  [
+                                                "RETURN_VALUE_CHANGED"
+                                            ],
+                      "warnings":  [
+
+                                   ],
+                      "limitations":  [
+                                          "A RETURN_VALUE_CHANGED case cites the body span rather than the symbol range, which is the convention c002 and c009 already follow: the finding is about what the function returns, and the signature line does not prove it.",
+                                          "The base side is read through GitBlobStateView rather than a second directory, which is the only shape in which the blob view's ignore-rule handling participates (ADR-0044).",
+                                          "coverage/report.py is tracked at HEAD and matched by an ignore default, so it is outside the index on both sides and no change to it is reportable."
+                                      ],
+                      "forbidden_claims":  [
+                                               "bundled_total was deleted.",
+                                               "The coverage report changed."
+                                           ]
                   }
               ]
 }

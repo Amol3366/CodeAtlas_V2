@@ -86,6 +86,10 @@ DOCUMENTS = RelationKind.DOCUMENTS
 CONTAINS = RelationKind.CONTAINS
 TESTS = RelationKind.TESTS
 
+# ADR-0077. One module-level function; `coverage/report.py` is tracked but
+# outside the index, so it contributes no symbol here either.
+_TRACKED_IGNORED = {"capture": PY}
+
 _PYTHON_APP = {
     "PaymentService": CLASS,
     "PaymentService.capture": METHOD,
@@ -283,6 +287,11 @@ CASES: tuple[Case, ...] = (
         _RUST_EDGES,
         (("PaymentService.charge", ChangeKind.MODIFIED),),
     ),
+    # c033: the Git-backed case (ADR-0077). `capture` is a module-level
+    # function that nothing calls, so its expansion is empty -- the case exists
+    # to prove the two *state views* agree about which files exist, not to
+    # exercise orientation. An empty path set is the assertion.
+    Case("c033", _TRACKED_IGNORED, (), (("capture", ChangeKind.MODIFIED),)),
     Case(
         "c015", _MIXED, _MIXED_EDGES, (("get_order", ChangeKind.MODIFIED),), _ROUTE
     ),

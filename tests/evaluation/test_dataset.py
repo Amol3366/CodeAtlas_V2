@@ -21,11 +21,11 @@ DATASET_ROOT = Path("tests/evaluation/cases")
 def test_shipped_dataset_has_declared_phase_zero_cardinality() -> None:
     dataset = load_dataset(DATASET_ROOT)
 
-    assert len(dataset.fixtures) == 11
+    assert len(dataset.fixtures) == 12
     assert len(dataset.query_cases) == 80
-    assert len(dataset.change_cases) == 32
+    assert len(dataset.change_cases) == 33
     assert len({case.id for case in dataset.query_cases}) == 80
-    assert len({case.id for case in dataset.change_cases}) == 32
+    assert len({case.id for case in dataset.change_cases}) == 33
 
 
 def test_shipped_dataset_evidence_resolves_inside_fixture_roots() -> None:

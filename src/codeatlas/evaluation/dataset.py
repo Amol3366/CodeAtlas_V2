@@ -153,6 +153,22 @@ class ChangeCase(ContractModel):
     expected_changed_symbols: list[NonEmptyText]
     expected_impact_paths: list[list[NonEmptyText]]
     expected_findings: list[NonEmptyText]
+    # Which `StateView` reads the base side.
+    #
+    # `directory` compares two materialized directories, which is what every
+    # case did until now and what keeps a case independent of Git being
+    # installed. `git_blob` commits the base and reads it back through
+    # `GitBlobStateView`, the view a real working-tree preflight uses.
+    #
+    # The distinction is not cosmetic: **the corpus could not express an
+    # ADR-0044-shaped defect at all** while both sides were directories. That
+    # record fixed the blob view to apply the same ignore rules as a scan, and a
+    # directory-versus-directory case cannot see it -- both sides apply those
+    # rules already, so a tracked-but-ignored file is absent from *both* and a
+    # case asserting "no deletion" passes with the fix and without it. Permanent
+    # green reads as coverage, which is why no such case was committed before
+    # the harness could run this side through Git.
+    base_view: Literal["directory", "git_blob"] = "directory"
     warnings: list[str]
     limitations: list[str]
     forbidden_claims: list[NonEmptyText]
