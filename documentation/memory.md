@@ -42,7 +42,37 @@ converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
 
-## Resume point — 2026-09-02
+## Resume point — 2026-09-02 (end of session)
+
+**Branch `plan/deferred-register-program`, pushed, tree clean, gate green**
+(`check_phase4.ps1 -SkipSync` exit 0). **DR-09, DR-01b, DR-08, DR-07 complete;
+DR-06 is 2 of 5 done.** Board and "Where to resume" live in `docs/plans/PLAN.md`.
+
+**The pattern of this whole session, and the thing worth carrying:** *four*
+separate task premises were wrong, and each was cheap to disprove by running
+something.
+
+- The `TRACE_FLOW` row said the label was systemically wrong. Its control had
+  never been run: `EXACT_SYMBOL` agrees with the classifier on **0 of 36**,
+  against `TRACE_FLOW`'s 1 of 5.
+- ADR-0073 ruling 2 told DR-07 to exclude vacuous cases. `runner.py` had excluded
+  them all along, and the options carried each other's consequences.
+- ADR-0073 ruling 3 implied depth should be derived. Derived, it says **1**
+  everywhere — which would delete the corpus's only distractors. Depth **2** was
+  kept, so no number moves.
+- DR-06's two closed rows each asked for a fixture. Neither needed one: one
+  trigger is unsatisfiable, the other's model was too broad.
+
+**So: run the check before writing the plan step.** Three of the four were
+disproved by a single command.
+
+Two smaller habits: **a background gate must not run while the tree is edited**
+(one run was voided and discarded rather than cited), and **a criterion that
+disagrees with a standing ruling is the criterion's bug** — DR-08's first
+derivation called 15 of 31 cases unsatisfiable because it ignored ADR-0073
+ruling 1.
+
+## Superseded resume note — 2026-09-02 (mid-session)
 
 **Branch `plan/deferred-register-program` at `574569d`, pushed, tree clean,
 gate green** (`check_phase4.ps1 -SkipSync` exit 0, **2420 passed, 3 skipped**,
