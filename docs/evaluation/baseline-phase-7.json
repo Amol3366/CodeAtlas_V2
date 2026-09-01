@@ -1,24 +1,24 @@
 {
   "comparison": {
     "abstention_correctness": {
-      "delta": 0.0714285714285714,
-      "deterministic": 0.9285714285714286,
+      "delta": 0.05555555555555558,
+      "deterministic": 0.9444444444444444,
       "semantic": 1.0
     },
     "containing_evidence_rate": {
-      "delta": -0.014298018949181729,
-      "deterministic": 0.1259259259259259,
-      "semantic": 0.11162790697674418
+      "delta": -0.01876172607879925,
+      "deterministic": 0.13414634146341464,
+      "semantic": 0.11538461538461539
     },
     "containing_evidence_recall_at_10": {
-      "delta": 0.1333333333333333,
-      "deterministic": 0.8666666666666667,
+      "delta": 0.10526315789473684,
+      "deterministic": 0.8947368421052632,
       "semantic": 1.0
     },
     "exact_evidence_rate": {
-      "delta": -0.013608957795004303,
-      "deterministic": 0.07407407407407407,
-      "semantic": 0.06046511627906977
+      "delta": -0.019981238273921204,
+      "deterministic": 0.08536585365853659,
+      "semantic": 0.06538461538461539
     },
     "exact_symbol_resolution": {
       "delta": null,
@@ -26,14 +26,14 @@
       "semantic": null
     },
     "primary_evidence_recall_at_10": {
-      "delta": 0.20000000000000007,
-      "deterministic": 0.6,
-      "semantic": 0.8
+      "delta": 0.1578947368421052,
+      "deterministic": 0.6842105263157895,
+      "semantic": 0.8421052631578947
     },
     "symbol_recall_at_10": {
-      "delta": 0.2142857142857143,
-      "deterministic": 0.7142857142857143,
-      "semantic": 0.9285714285714286
+      "delta": 0.16666666666666663,
+      "deterministic": 0.7777777777777778,
+      "semantic": 0.9444444444444444
     },
     "unsupported_claim_rate": {
       "delta": 0.0,
@@ -44,37 +44,37 @@
   "contract_version": "1.0",
   "corpus": {
     "change_cases": 1,
-    "query_cases": 14
+    "query_cases": 18
   },
   "deterministic": {
     "case_counts": {
       "changes": 1,
-      "queries": 14
+      "queries": 18
     },
     "contract_version": "1.0",
     "implementation_status": "implemented",
     "metrics": {
-      "abstention_correctness": 0.9285714285714286,
+      "abstention_correctness": 0.9444444444444444,
       "changed_symbol_exact_cases": 1,
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
-      "containing_evidence_rate": 0.1259259259259259,
-      "containing_evidence_recall_at_10": 0.8666666666666667,
+      "containing_evidence_rate": 0.13414634146341464,
+      "containing_evidence_recall_at_10": 0.8947368421052632,
       "direct_impact_recall": 1.0,
-      "exact_evidence_rate": 0.07407407407407407,
+      "exact_evidence_rate": 0.08536585365853659,
       "exact_symbol_resolution": null,
       "finding_count_correctness": 1.0,
       "finding_precision": 1.0,
       "lexical_resolution": null,
-      "mean_reciprocal_rank": 0.3619047619047619,
-      "ndcg_at_10": 0.4475706060133805,
-      "primary_evidence_recall_at_10": 0.6,
+      "mean_reciprocal_rank": 0.40987654320987654,
+      "ndcg_at_10": 0.49743729372699164,
+      "primary_evidence_recall_at_10": 0.6842105263157895,
       "relation_path_correctness": null,
       "relation_path_recall": null,
-      "symbol_recall_at_10": 0.7142857142857143,
+      "symbol_recall_at_10": 0.7777777777777778,
       "total_duration_ms": 0.0,
       "unsupported_claim_rate": 0.0,
-      "valid_evidence_rate": 0.07407407407407407
+      "valid_evidence_rate": 0.08536585365853659
     },
     "targets_met": false,
     "unmet_targets": [
@@ -85,7 +85,7 @@
   "semantic": {
     "case_counts": {
       "changes": 1,
-      "queries": 14
+      "queries": 18
     },
     "contract_version": "1.0",
     "implementation_status": "implemented",
@@ -94,23 +94,23 @@
       "changed_symbol_exact_cases": 1,
       "changed_symbol_precision": 1.0,
       "changed_symbol_recall": 1.0,
-      "containing_evidence_rate": 0.11162790697674418,
+      "containing_evidence_rate": 0.11538461538461539,
       "containing_evidence_recall_at_10": 1.0,
       "direct_impact_recall": 1.0,
-      "exact_evidence_rate": 0.06046511627906977,
+      "exact_evidence_rate": 0.06538461538461539,
       "exact_symbol_resolution": null,
       "finding_count_correctness": 1.0,
       "finding_precision": 1.0,
       "lexical_resolution": null,
-      "mean_reciprocal_rank": 0.6977040816326531,
-      "ndcg_at_10": 0.7529705336309596,
-      "primary_evidence_recall_at_10": 0.8,
+      "mean_reciprocal_rank": 0.6741402116402117,
+      "ndcg_at_10": 0.7380359702875555,
+      "primary_evidence_recall_at_10": 0.8421052631578947,
       "relation_path_correctness": null,
       "relation_path_recall": null,
-      "symbol_recall_at_10": 0.9285714285714286,
+      "symbol_recall_at_10": 0.9444444444444444,
       "total_duration_ms": 0.0,
       "unsupported_claim_rate": 0.0,
-      "valid_evidence_rate": 0.06046511627906977
+      "valid_evidence_rate": 0.06538461538461539
     },
     "targets_met": true,
     "unmet_targets": []
