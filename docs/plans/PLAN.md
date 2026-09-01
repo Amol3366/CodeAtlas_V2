@@ -321,7 +321,25 @@ subagent-driven. DR-01 is active; the rest stay `ready` behind it.
 | DR-08 | **Ruling 3 (ADR-0073) — ADR-0075.** `traversal_depth` added to the dataset contract, required for graph intents and forbidden elsewhere; all 31 graph cases declare **2** | DR-01 | `complete` — **no number moves and both baselines reproduce byte-for-byte.** Depth 1, which the measurement supports, was rejected: it deletes the corpus's only distractors |
 | DR-09 | **Ruling 4 (ADR-0073):** audit the `TRACE_FLOW` cases together; the outcome is evidence, and the ruling follows it. **There are five, not six** — ADR-0051 re-typed q006 | DR-01 | `complete` — **the label is not systemically wrong**; `TRACE_FLOW` agrees 1/5 against `EXACT_SYMBOL`'s 0/36. Instrument committed. One separate product finding opened as its own row; **the closing ruling is the user's** |
 
-#### Where to resume (updated 2026-09-02 — the program is finished)
+#### Where to resume (updated 2026-09-03 — the register tail is finished)
+
+**The register-tail program is complete: RW-01 to RW-07**, on branch
+`plan/register-tail`, **not yet merged**. Design and plan are
+`docs/superpowers/specs/2026-09-02-register-tail-design.md` and
+`docs/superpowers/plans/2026-09-02-register-tail.md`; the 02:00Z handoff below
+carries the findings. **No version constant moved, so no reindex.**
+
+**Read that handoff before planning anything from a register row.** Four of the
+plan's own claims were false and each died on one command — including a
+denominator this project has now carried wrong twice, and a lint command that
+would have reflowed 205 files. **Re-derive a number before building on it.**
+
+**Three rulings are the user's**, and every one now has evidence rather than an
+argument: widen the classifier (RW-02: trace alone reaches 4 of 63 misroutes),
+re-gate Phase 4 (RW-06's brief), and close the `TRACE_FLOW` row (DR-09
+recommends yes).
+
+#### Superseded resume note (2026-09-02 — the Deferred Register Program finished)
 
 **All nine tasks are `complete`: DR-01, DR-01b, DR-02, DR-03, DR-04, DR-06,
 DR-07, DR-08, DR-09.** DR-05 stays retired. **Nothing is in progress.**
@@ -552,6 +570,140 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-03T02:00:00Z — The register tail, executed: seven tasks, and four of the plan's own claims were wrong
+
+- Agent: Claude Code `claude-opus-5`, branch `plan/register-tail`.
+- Transition: **RW-01 to RW-07 `complete`.** Four instruments, one guard, one
+  hygiene pass, one brief. **No product behaviour changed and no version
+  constant moved, so no reindex.**
+- Outcome: **ADR-0078** added. Register rows 119 and 121 closed, row 93's
+  follow-up corrected, the 783 residual described, and two decision briefs
+  written.
+
+#### The plan was wrong four times, and executing it is what found that
+
+Every one was caught by running a command, never by re-reading.
+
+1. **The denominator is 35, not 27.** RW-01's first step re-derives it instead
+   of trusting the plan — which is the only reason this surfaced. The comment
+   read **24**, true on 2026-08-17 and outgrown by ordinary corpus additions;
+   **DR-07's handoff then recorded 24 -> 27**, correctly adding its own three
+   cases to a base that had already moved. This plan copied that 27 forward.
+   The live report reproduces the tracked Phase 4 baseline (0.9024) on **35**.
+   Reachable values recomputed: 0.9943, 0.9905, 0.9857, 0.9714.
+2. **`run_phase4_baseline.py` requires `--dataset`.**
+3. **The register guard is `tests/unit/`, not `tests/plans/`.**
+4. **The gate lints with `ruff check` only.** The plan told the executor to run
+   `ruff format --check`, which would have reflowed **205 files** and buried the
+   change. The gate has never run it.
+
+Each was fixed in the plan file as it surfaced, so the document does not stay
+wrong after being executed.
+
+#### One defect introduced and caught
+
+`>` redirection wrote **CRLF** into `docs/evaluation/routing-fidelity.txt`.
+Caught by `test_working_tree_line_endings.py` and rewritten with LF. Every
+later capture was written through Python with an explicit LF newline.
+
+#### What each task found
+
+- **RW-02 — routing.** **63 of 80 query cases change channel, and all 63 land on
+  the same one**: the lexical fall-through. Zero reach a different structured
+  channel; zero are unroutable. This **independently reproduces DR-09's audit**
+  (`EXACT_SYMBOL` 0/36, `TRACE_FLOW` 1/5) with a different tool. The cost DR-09
+  could not show: `relation_path_recall` **1.0 -> 0.8743**, which ADR-0058 gates
+  absolutely at 1.0; `exact_evidence_rate` 0.6404 -> 0.2369; and
+  `lexical_resolution` goes **undefined**, because routed, no case remains on a
+  lexical intent at all. **Recorded with its caveat**: corpus questions were
+  authored as natural-language probes for a harness that bypasses the
+  classifier, so this is not a user-facing failure rate and must not be quoted
+  as one. **Widening the trace rule reaches 4 of the 63.**
+- **RW-03 — ADR-0078.** The ruling is **refused as posed**: gate condition 2
+  forbids making the deterministic gate depend on torch. The real defect is
+  narrower — an artifact stale because its *inputs* moved, which is what
+  ADR-0077 did. `dataset_inputs_digest()` hashes manifest, cases and every
+  fixture byte; both artifacts gained **one line** and **no metric value moved**.
+  Mutation-checked against the real scenario: one appended line to a fixture
+  fails **both** artifacts while the key-set guard stays green.
+- **RW-04 — ranking.** Of the 23 cases added 2026-08-15: **reverse 1** (q053
+  alone), **drop-top 23**. The reverse figure confirms DR-01b's correction *by
+  running it*; the drop-top figure **improved from the recorded 18 and the row
+  never knew**. Corpus-wide reverse 12 of 76, drop-top 71 of 76, and **54 of 76
+  answers carry fewer than two symbols**, which is the mechanism quantified.
+  **New:** q032-q035 are blind to *both*, because each returns a **duplicated
+  symbol name**. That is row 129's mechanism with a second consequence — its
+  DR-06 closure holds for resolution, which evidence pins, but **ranking is
+  separately blind and nothing pins it**.
+- **RW-05 — the 783.** Reconciles with ADR-0074 **to the digit** (1202/419/783)
+  on a tool that did not exist when those numbers were taken. "~718" corrected
+  to **700 of scalaz's 743**, **730 of 783** overall. They are **one qualified
+  name standing for many declarations**: `TypeAdapters.read` x28 (gson's
+  anonymous adapters), `TupleInstances3._1` x31, `imp` x8 (ripgrep `cfg`-gated
+  alternatives that are **never simultaneously live**). **Supports the row's own
+  hypothesis that the qualified name is the defect, not identity**, and weakens
+  the case for acting: 730 of 783 share a discriminator, so nothing short of a
+  new identity input reaches them — a bundle bump and a forced reindex.
+- **RW-06 — Phase 4.** The register's claim confirmed: refresh first misses at
+  **80 modules**. **A second miss the register never recorded:** at 300 modules
+  realistic also misses **preflight**, 13.844 s against 10 s. The gap widens
+  with size (3.4x at 40 modules, 5.2x at 300), so no single target adjustment
+  absorbs it. Option (c) is listed **non-neutrally**, because ADR-0048 already
+  refused it.
+
+#### Files
+
+- Created: `scripts/report_routing_fidelity.py`,
+  `scripts/report_ranking_sensitivity.py`,
+  `tests/unit/test_routing_fidelity.py`,
+  `tests/unit/test_ranking_sensitivity.py`,
+  `tests/unit/test_collision_residual.py`,
+  `tests/evaluation/test_semantic_artifact_inputs.py`, **ADR-0078**,
+  `docs/evaluation/routing-fidelity.md`,
+  `docs/evaluation/collision-residual.md`,
+  `docs/evaluation/phase4-realistic-profile.md`, and two `.txt` captures.
+- Changed: `dataset.py` (`dataset_inputs_digest`), `runner.py` (denominator),
+  `engine_adapter.py` (duplicated comment removed), `run_phase7_baseline.py`
+  (stamp), `report_symbol_collisions.py` (`--residual-detail`), both semantic
+  artifacts, `README.md`, `docs/adr/README.md`, this file.
+- `run_phase7_rerank_ab.py` needed **no** change: its payload already copies
+  `dict(baseline["corpus"])`.
+
+#### Contracts and migrations
+
+None. `SCHEMA_VERSION` 14, `contract_version` 1.1, `PARSER_BUNDLE_VERSION`
+1.9.0, chunker 1.1.0, resolver 1.5.0 — all unchanged. **No reindex.**
+
+#### Verification
+
+`check_phase4.ps1 -SkipSync`. **The first run failed, exit 1**, on the one guard
+deliberately deferred: the README claimed 2450+3 against **2475 collected**.
+That is the guard working as designed. README set to **2472 passed, 3 skipped**,
+and the gate re-run on the committed tree.
+
+Absolute scratch paths were stripped from `collision-residual.txt` before it was
+committed: AGENTS.md forbids logging them, and a committed artifact is the same
+surface.
+
+#### Limitations
+
+- RW-06's figures are **p95 over 10 runs** — adequate to locate a threshold
+  crossing, **not** adequate to publish. They must not reach the README, which
+  quotes 20-run figures from a different script.
+- ADR-0078 does **not** close drift from a model or library upgrade. That needs
+  the model run and stays behind `-Semantic`.
+- RW-02's 63 of 80 is **not** a user-facing failure rate.
+
+#### Next
+
+**Three rulings are the user's, and all three now rest on evidence rather than
+argument.** (1) Widen the classifier — RW-02 says trace alone reaches 4 of 63.
+(2) Re-gate Phase 4 — RW-06's brief, whose option (c) ADR-0048 already refused.
+(3) Close the `TRACE_FLOW` row — DR-09 recommends yes.
+
+**Three flakes stay unworked**, each with a capture recipe and none reproduced.
+
 
 ### 2026-09-02T23:30:00Z — The register tail, planned; and two of its six items were already done
 
