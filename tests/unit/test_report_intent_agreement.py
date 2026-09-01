@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from codeatlas.evaluation.dataset import GRAPH_INTENTS
 from scripts.report_intent_agreement import report_agreement
 
 _MANIFEST = {
@@ -79,7 +80,7 @@ def _corpus(root: Path, cases: list[dict[str, object]]) -> Path:
 
 
 def _case(case_id: str, intent: str, question: str) -> dict[str, object]:
-    return {
+    case: dict[str, object] = {
         "id": case_id,
         "repository_fixture": "f",
         "snapshot_id": "s",
@@ -93,6 +94,12 @@ def _case(case_id: str, intent: str, question: str) -> dict[str, object]:
         "limitations": [],
         "forbidden_claims": [],
     }
+    # A graph case must declare its traversal depth and a non-graph case must
+    # not (ADR-0075). This helper builds both kinds, so it asks the corpus
+    # contract which it is rather than carrying a second list that could drift.
+    if intent in GRAPH_INTENTS:
+        case["traversal_depth"] = 2
+    return case
 
 
 def test_a_command_shaped_question_agrees_with_its_declared_intent(
