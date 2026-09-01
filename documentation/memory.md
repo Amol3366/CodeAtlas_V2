@@ -46,8 +46,10 @@ README guard** until the counts are updated; that is the guard working.
 
 **All nine program tasks complete** (DR-01, DR-01b, DR-02, DR-03, DR-04, DR-06,
 DR-07, DR-08, DR-09; DR-05 retired). Branch `plan/deferred-register-program`,
-pushed, gate green, **not merged** — it carries `PARSER_BUNDLE_VERSION` 1.9.0
-and merging is a decision. Board and "Where to resume" live in
+pushed and **merged to `main` 2026-09-02** as `9a445ba` (`--no-ff`, 23 commits),
+with the gate verified green on the merged result before pushing — exit 0, 2450
+passed. **`PARSER_BUNDLE_VERSION` 1.9.0 is now on `main`: users must reindex.**
+The branch is kept rather than deleted. Board and "Where to resume" live in
 `docs/plans/PLAN.md`.
 
 **The pattern of this program, and the thing worth carrying: six task premises
