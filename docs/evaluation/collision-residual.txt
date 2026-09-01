@@ -1,0 +1,53 @@
+repo: gson
+  total: 99 groups, 76 separated, 23 ordinal
+    java         99     76     23
+  residual: 23 groups, 13 sharing a discriminator
+    java         23 groups,     13 shared
+      TypeAdapters.read                            METHOD     x28
+      TypeAdapters.write                           METHOD     x28
+      ReflectionAccessFilterTest.check             METHOD     x11
+      JavaTimeTypeAdapters.create                  METHOD     x9
+      TypeAdapters.create                          METHOD     x6
+      ReflectionAccessFilter.check                 METHOD     x5
+      UnsafeAllocator.newInstance                  METHOD     x5
+      ReflectionAccessFilter.toString              METHOD     x4
+      TypeAdapters.toString                        METHOD     x4
+      GsonTest.read                                METHOD     x3
+repo: cobra
+  total: 1 groups, 1 separated, 0 ordinal
+    go            1      1      0
+  residual: 0 groups, 0 sharing a discriminator
+repo: gin
+  total: 4 groups, 4 separated, 0 ordinal
+    go            4      4      0
+  residual: 0 groups, 0 sharing a discriminator
+repo: ripgrep
+  total: 21 groups, 4 separated, 17 ordinal
+    rust         21      4     17
+  residual: 17 groups, 17 sharing a discriminator
+    rust         17 groups,     17 shared
+      imp                                          FUNCTION   x8
+      DirEntryRaw.from_entry_os                    METHOD     x3
+      DirEntryRaw.from_path                        METHOD     x3
+      HyperlinkPath.from_path                      METHOD     x3
+      device_num                                   FUNCTION   x3
+      imp                                          FUNCTION   x3
+      Data<'a>.from_path                           METHOD     x2
+      Dir.link_dir                                 METHOD     x2
+      Dir.link_file                                METHOD     x2
+      DirEntryRaw.metadata_internal                METHOD     x2
+repo: scalaz
+  total: 1077 groups, 334 separated, 743 ordinal
+    scala      1077    334    743
+  residual: 743 groups, 700 sharing a discriminator
+    scala       743 groups,    700 shared
+      TupleInstances3._1                           FUNCTION   x31
+      TupleInstances3._2                           FUNCTION   x27
+      MapTest.f                                    FIELD      x26
+      TupleInstances2._1                           FUNCTION   x23
+      TupleInstances3._3                           FUNCTION   x23
+      TupleInstances2._2                           FUNCTION   x20
+      TupleInstances3._4                           FUNCTION   x19
+      EitherTTest.instances.functor                FUNCTION   x17
+      TupleInstances2._3                           FUNCTION   x17
+      Liskov.l                                     TYPE_ALIAS x16

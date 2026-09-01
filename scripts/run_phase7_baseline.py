@@ -33,7 +33,12 @@ from codeatlas.evaluation.cli import (
     EXIT_STALE_ARTIFACT,
     EXIT_SUCCESS,
 )
-from codeatlas.evaluation.dataset import Dataset, DatasetError, load_dataset
+from codeatlas.evaluation.dataset import (
+    Dataset,
+    DatasetError,
+    dataset_inputs_digest,
+    load_dataset,
+)
 from codeatlas.evaluation.engine_adapter import predict_changes, predict_conceptual
 from codeatlas.evaluation.runner import (
     EvaluationError,
@@ -88,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         deterministic = _run(dataset, semantic=False)
         semantic = _run(dataset, semantic=True)
 
-        payload = _payload(dataset, deterministic, semantic)
+        payload = _payload(args.dataset, dataset, deterministic, semantic)
         json_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
         markdown_text = _render(payload)
 
@@ -136,6 +141,7 @@ def _run(dataset: Dataset, *, semantic: bool) -> EvaluationReport:
 
 
 def _payload(
+    dataset_root: Path,
     dataset: Dataset,
     deterministic: EvaluationReport,
     semantic: EvaluationReport,
@@ -154,6 +160,12 @@ def _payload(
         "corpus": {
             "query_cases": len(dataset.query_cases),
             "change_cases": len(dataset.change_cases),
+            # ADR-0078. Counts do not move when a fixture's *content* changes,
+            # and content is what decides the right answer. This artifact is
+            # regenerated only under `-Semantic`, so without a stamp of what it
+            # was measured on it can rot for weeks while every routine gate
+            # stays green -- which it has done twice.
+            "inputs_digest": dataset_inputs_digest(dataset_root),
         },
         "deterministic": deterministic.model_dump(mode="json"),
         "semantic": semantic.model_dump(mode="json"),

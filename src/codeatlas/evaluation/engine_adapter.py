@@ -259,11 +259,6 @@ def _answer(
             # intents, so `or` never falls through for a validated corpus; it
             # is there so a hand-built `QueryCase` in a test still traverses to
             # the depth the dataclass documents rather than to `None`.
-            # The case's own depth, never the request default (ADR-0073
-            # ruling 3). `traversal_depth` is required for exactly these
-            # intents, so `or` never falls through for a validated corpus; it
-            # is there so a hand-built `QueryCase` in a test still traverses to
-            # the depth the dataclass documents rather than to `None`.
             response = method(
                 GraphQueryRequest(
                     repository_id=repository_id,

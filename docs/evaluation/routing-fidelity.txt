@@ -1,0 +1,91 @@
+query cases:                       80
+channel changed by the classifier: 63
+routed to a channel with no intent: 0
+
+rerouted:
+  q001   EXACT_SYMBOL     -> CONCEPTUAL
+  q002   EXACT_SYMBOL     -> CONCEPTUAL
+  q003   TRACE_FLOW       -> CONCEPTUAL
+  q004   EXACT_SYMBOL     -> CONCEPTUAL
+  q008   EXACT_SYMBOL     -> CONCEPTUAL
+  q009   EXACT_SYMBOL     -> CONCEPTUAL
+  q010   DEPENDENCIES     -> CONCEPTUAL
+  q011   EXACT_SYMBOL     -> CONCEPTUAL
+  q012   EXACT_SYMBOL     -> CONCEPTUAL
+  q014   EXACT_SYMBOL     -> CONCEPTUAL
+  q015   DEPENDENCIES     -> CONCEPTUAL
+  q017   EXPORTS          -> CONCEPTUAL
+  q018   EXACT_SYMBOL     -> CONCEPTUAL
+  q019   DOCUMENT_LOOKUP  -> CONCEPTUAL
+  q020   CONFIG_LOOKUP    -> CONCEPTUAL
+  q021   CONFIG_LOOKUP    -> CONCEPTUAL
+  q022   CONFIG_LOOKUP    -> CONCEPTUAL
+  q023   CONFIG_LOOKUP    -> CONCEPTUAL
+  q025   EXACT_SYMBOL     -> CONCEPTUAL
+  q026   TRACE_FLOW       -> CONCEPTUAL
+  q027   DOCUMENT_LOOKUP  -> CONCEPTUAL
+  q028   EXACT_SYMBOL     -> CONCEPTUAL
+  q029   CONFIG_LOOKUP    -> CONCEPTUAL
+  q030   EXACT_SYMBOL     -> CONCEPTUAL
+  q031   DOCUMENT_LOOKUP  -> CONCEPTUAL
+  q032   TRACE_FLOW       -> CONCEPTUAL
+  q033   EXACT_SYMBOL     -> CONCEPTUAL
+  q034   EXACT_SYMBOL     -> CONCEPTUAL
+  q035   TRACE_FLOW       -> CONCEPTUAL
+  q036   EXACT_SYMBOL     -> CONCEPTUAL
+  q037   DOCUMENT_LOOKUP  -> CONCEPTUAL
+  q038   POLICY           -> CONCEPTUAL
+  q039   CONFIG_LOOKUP    -> CONCEPTUAL
+  q040   EXACT_SYMBOL     -> CONCEPTUAL
+  q041   EXACT_SYMBOL     -> CONCEPTUAL
+  q042   EXACT_SYMBOL     -> CONCEPTUAL
+  q043   EXACT_SYMBOL     -> CONCEPTUAL
+  q044   EXACT_SYMBOL     -> CONCEPTUAL
+  q045   EXACT_SYMBOL     -> CONCEPTUAL
+  q046   EXACT_SYMBOL     -> CONCEPTUAL
+  q047   EXACT_SYMBOL     -> CONCEPTUAL
+  q048   EXACT_SYMBOL     -> CONCEPTUAL
+  q049   EXACT_SYMBOL     -> CONCEPTUAL
+  q050   EXACT_SYMBOL     -> CONCEPTUAL
+  q051   EXACT_SYMBOL     -> CONCEPTUAL
+  q054   CALLERS          -> CONCEPTUAL
+  q058   DEPENDENCIES     -> CONCEPTUAL
+  q059   EXPORTS          -> CONCEPTUAL
+  q060   EXPORTS          -> CONCEPTUAL
+  q064   EXACT_SYMBOL     -> CONCEPTUAL
+  q066   EXACT_SYMBOL     -> CONCEPTUAL
+  q067   EXACT_SYMBOL     -> CONCEPTUAL
+  q070   EXACT_SYMBOL     -> CONCEPTUAL
+  q071   EXACT_SYMBOL     -> CONCEPTUAL
+  q072   CALLERS          -> CONCEPTUAL
+  q073   DEPENDENCIES     -> CONCEPTUAL
+  q074   EXACT_SYMBOL     -> CONCEPTUAL
+  q075   EXACT_SYMBOL     -> CONCEPTUAL
+  q076   CALLERS          -> CONCEPTUAL
+  q077   EXACT_SYMBOL     -> CONCEPTUAL
+  q078   EXACT_SYMBOL     -> CONCEPTUAL
+  q079   CALLERS          -> CONCEPTUAL
+  q080   DEPENDENCIES     -> CONCEPTUAL
+
+metrics:
+  abstention_correctness             declared=1.0                  routed=0.9868421052631579     <-- moves
+  changed_symbol_exact_cases         declared=1                    routed=1                   
+  changed_symbol_precision           declared=0.030303030303030304 routed=0.030303030303030304
+  changed_symbol_recall              declared=0.030303030303030304 routed=0.030303030303030304
+  containing_evidence_rate           declared=0.7543859649122807   routed=0.5100401606425703     <-- moves
+  containing_evidence_recall_at_10   declared=0.7037037037037037   routed=0.6620370370370371     <-- moves
+  direct_impact_recall               declared=0.0                  routed=0.0                 
+  exact_evidence_rate                declared=0.6403508771929824   routed=0.23694779116465864    <-- moves
+  exact_symbol_resolution            declared=1.0                  routed=1.0                 
+  finding_count_correctness          declared=0.030303030303030304 routed=0.030303030303030304
+  finding_precision                  declared=0.030303030303030304 routed=0.030303030303030304
+  lexical_resolution                 declared=1.0                  routed=None                   <-- moves
+  mean_reciprocal_rank               declared=1.0                  routed=0.8984649122807017     <-- moves
+  ndcg_at_10                         declared=0.9245657291699583   routed=0.8352529914361364     <-- moves
+  primary_evidence_recall_at_10      declared=0.6527777777777778   routed=0.5324074074074074     <-- moves
+  relation_path_correctness          declared=0.9023809523809524   routed=0.5857142857142857     <-- moves
+  relation_path_recall               declared=1.0                  routed=0.8742857142857143     <-- moves
+  symbol_recall_at_10                declared=0.9013157894736842   routed=0.8333333333333334     <-- moves
+  total_duration_ms                  declared=0.0                  routed=0.0                 
+  unsupported_claim_rate             declared=0.0                  routed=0.0                 
+  valid_evidence_rate                declared=0.6403508771929824   routed=0.23694779116465864    <-- moves

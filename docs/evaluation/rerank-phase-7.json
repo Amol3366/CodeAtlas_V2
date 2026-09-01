@@ -39,6 +39,7 @@
   "contract_version": "1.0",
   "corpus": {
     "change_cases": 1,
+    "inputs_digest": "fd0a81fa4057a0a0d9a685a65f2afae23e9074b210982e5314c7d465764d75e8",
     "query_cases": 18
   },
   "reranked": {

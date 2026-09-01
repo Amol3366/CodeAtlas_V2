@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-01 (end of session)
+Last updated: 2026-09-03 (end of session)
 
 ## Current Phase
 
@@ -42,7 +42,38 @@ converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
 
-## Resume point — 2026-09-02 (the Deferred Register Program is finished)
+## Resume point — 2026-09-03 (the register tail is finished)
+
+**Branch `plan/register-tail`, seven tasks RW-01 to RW-07, not merged.** Design
+and plan are dated 2026-09-02 under `docs/superpowers/`. **No version constant
+moved, so no reindex.** Board and the full findings live in `docs/plans/PLAN.md`
+— do not restate them here.
+
+**The habit this session earned, and it is the same one twice now.** Four of the
+plan's own claims were false, and every one died on a single command:
+
+- **A number this project has carried wrong twice.** The relation denominator
+  read 24 in a code comment (true on 2026-08-17, outgrown after), and DR-07's
+  handoff then recorded 24 -> 27 by adding its own three cases to a base that
+  had already moved. This plan copied the 27 forward. It is **35**. The rule:
+  **re-derive a number by running it; never increment the last one written
+  down.**
+- **A lint command that would have reflowed 205 files.** The plan said
+  `ruff format --check`. The gate has only ever run `ruff check`. Reading the
+  gate script beats assuming the toolchain's defaults are in use.
+
+Two smaller ones: `run_phase4_baseline.py` needs `--dataset`, and the register
+guard is `tests/unit/`, not `tests/plans/`.
+
+**Also: `>` redirection writes CRLF on Windows and a tracked-file guard catches
+it.** Write captured output through Python with an explicit LF newline.
+
+**Three rulings wait on the user and block nothing** — widen the classifier,
+re-gate Phase 4, close the `TRACE_FLOW` row. All three now have measurements
+rather than arguments behind them.
+
+
+## Superseded resume note — 2026-09-02 (the Deferred Register Program finished)
 
 **All nine program tasks complete** (DR-01, DR-01b, DR-02, DR-03, DR-04, DR-06,
 DR-07, DR-08, DR-09; DR-05 retired). Branch `plan/deferred-register-program`,
