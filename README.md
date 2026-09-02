@@ -10,7 +10,7 @@ specific repository. Nothing here treats a language model as repository truth.
 
 | | |
 | --- | --- |
-| **Status** | Phases 0–7 complete, every gate user-approved; project closed out 2026-08-10, post-gate work ongoing |
+| **Status** | **Closed 2026-09-03.** Phases 0–7 complete, every gate user-approved. The Deferred Register is terminal — every item closed, accepted, or deferred with a named trigger; none open. New work needs an explicit decision |
 | **Platform** | Windows 11 primary (loopback only, single user) |
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
