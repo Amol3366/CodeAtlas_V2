@@ -46,19 +46,24 @@ SECTION_END = "### Phase 7 Task Board"
 PLACEHOLDERS = {"original entry"}
 
 
-def _register_rows() -> list[str]:
+def _register_cells() -> list[list[str]]:
+    """Every register row as its (item, disposition, trigger) cells."""
     text = PLAN.read_text(encoding="utf-8")
     start = text.index(SECTION_START)
     end = text.index(SECTION_END)
-    rows: list[str] = []
+    rows: list[list[str]] = []
     for line in text[start:end].split("\n"):
         if not line.startswith("| ") or line.count("|") < 3:
             continue
         cells = [cell.strip() for cell in line.split("|")[1:-1]]
         if len(cells) < 3 or cells[0].startswith("---") or cells[0] == "Item":
             continue
-        rows.append(cells[0])
+        rows.append(cells)
     return rows
+
+
+def _register_rows() -> list[str]:
+    return [cells[0] for cells in _register_cells()]
 
 
 def _identity(item: str) -> str:
@@ -130,4 +135,41 @@ def test_no_item_is_listed_open_twice() -> None:
     assert not repeated, (
         "these items are listed open more than once: "
         + "; ".join(f"{key} ({n}x)" for key, n in sorted(repeated.items()))
+    )
+
+
+def test_no_row_is_open_in_one_column_and_closed_in_another() -> None:
+    """A disposition and its trigger cannot disagree about whether it is done.
+
+    The two guards above read only the Item cell and infer closure from a
+    strikethrough, so they were blind to the shape that actually occurred: a
+    row whose Disposition still reads OPEN while its Trigger cell already
+    records **CLOSED**, with the date and the ADR that closed it.
+
+    **Sixteen** rows were in that state at the 2026-09-03 closeout: fifteen
+    fully closed -- by DR-01b, DR-02, DR-06, RW-04, ADR-0073, ADR-0075,
+    ADR-0076 and ADR-0077 -- and never re-dispositioned, plus one whose trigger
+    read `PARTLY CLOSED` and which became an accepted limit. A reader going
+    top-down sees OPEN and stops;
+    the register's own preamble warns that "a row whose disposition and
+    neighbour disagree should be read as unaudited", which is an instruction
+    to a human that nothing enforced.
+
+    Closing a row means editing the Disposition cell, not only appending the
+    evidence to the Trigger cell.
+    """
+    contradictory = []
+    for cells in _register_cells():
+        disposition, trigger = cells[1], cells[2]
+        if not disposition.lstrip("*").upper().startswith("OPEN"):
+            continue
+        if re.search(r"\bCLOSED\b", trigger):
+            contradictory.append(_identity(cells[0])[:70])
+
+    assert not contradictory, (
+        f"{len(contradictory)} register row(s) say OPEN in the Disposition "
+        "column while the Trigger column records a closure: "
+        + "; ".join(sorted(contradictory))
+        + ". Promote the closure into the Disposition cell -- a reader going "
+        "top-down never reaches the third column."
     )

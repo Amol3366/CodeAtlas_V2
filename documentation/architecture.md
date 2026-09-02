@@ -116,7 +116,7 @@ CodeAtlas_V2/
 │   ├── unit/ integration/ contract/ end_to_end/
 │   ├── security/ retrieval/ evaluation/ fixtures/
 ├── docs/
-│   ├── adr/                                # 0000-template + ADR-0001..0070
+│   ├── adr/                                # 0000-template + ADR-0001..0080
 │   ├── api/ · evaluation/ · operations/ · security/
 │   └── plans/PLAN.md                       # LIVE task status — the coordination file
 ├── documentation/                          # this folder: PRD, architecture, rules, phases, design, memory
@@ -163,7 +163,7 @@ explicit; schema is never mutated at startup.
   in `.env` (ADR-0011), because an unknown OpenAI id also needs a declared width.
 - `Snapshot` — id, repository, Git HEAD, working-tree fingerprint, lifecycle
   state, parser/chunker/index versions. **Exactly one is active per repository.**
-  Current stamps: parser bundle **1.8.0**, chunker **1.1.0**, resolver **1.5.0** —
+  Current stamps: parser bundle **1.9.0**, chunker **1.1.0**, resolver **1.5.0** —
   a change to any one makes every existing snapshot stale and forces a reindex.
 - `FileRecord` — stable logical id, snapshot membership, normalized relative
   path, content hash, language, classification, line map.

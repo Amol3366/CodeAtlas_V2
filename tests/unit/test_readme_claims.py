@@ -75,17 +75,24 @@ def _readme() -> str:
 
 
 # label -> (pattern capturing the stated value, the constant that declares it)
+#
+# Whitespace is `\s+`, never a literal space, and that is not style. Written
+# with a literal space these patterns silently skip any claim the prose happens
+# to wrap across a line: the README carried parser bundle `1.8.0` at line 335
+# for two days, past a bump and past this guard, because "parser bundle" ended
+# one line and `1.8.0` began the next. A guard that reads only the occurrences
+# that fit on one line reports on the README's line breaks, not its claims.
 VERSION_CLAIMS: list[tuple[str, str, str]] = [
-    ("parser bundle", r"[Pp]arser bundle `([0-9.]+)`", PARSER_BUNDLE_VERSION),
-    ("chunker", r"chunker `([0-9.]+)`", CHUNKER_VERSION),
-    ("resolver", r"resolver `([0-9.]+)`", RESOLVER_VERSION),
-    ("schema version", r"Schema version\*\* `([0-9]+)`", str(SCHEMA_VERSION)),
+    ("parser bundle", r"[Pp]arser\s+bundle\s+`([0-9.]+)`", PARSER_BUNDLE_VERSION),
+    ("chunker", r"chunker\s+`([0-9.]+)`", CHUNKER_VERSION),
+    ("resolver", r"resolver\s+`([0-9.]+)`", RESOLVER_VERSION),
+    ("schema version", r"Schema\s+version\*\*\s+`([0-9]+)`", str(SCHEMA_VERSION)),
     (
         "contract version",
-        r"\*\*Contract version\*\* \| `([0-9.]+)`",
+        r"\*\*Contract\s+version\*\*\s+\|\s+`([0-9.]+)`",
         CONTRACT_VERSION,
     ),
-    ("MCP tool schema", r"MCP tool schema\*\* `([0-9.]+)`", TOOL_SCHEMA_VERSION),
+    ("MCP tool schema", r"MCP\s+tool\s+schema\*\*\s+`([0-9.]+)`", TOOL_SCHEMA_VERSION),
 ]
 
 

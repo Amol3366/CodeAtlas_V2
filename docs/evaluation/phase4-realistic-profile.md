@@ -3,6 +3,18 @@
 A decision brief. Measured 2026-09-02 (RW-06). **This proposes no change to any
 gate** — the scope decision is the user's.
 
+> **Decided 2026-09-03 — ADR-0080: option (a).** The gate stays on the
+> synthetic profile, the synthetic tree stays byte-identical so the tracked
+> baseline keeps its meaning, and the realistic figures below are recorded as a
+> declared limit — now named in `AGENTS.md` §19.3 as well, so the gate's scope
+> is stated in the contract and not only in a script. Option (b) was rejected on
+> timing rather than merit: it would open a **red** release gate at 80 modules
+> during a closeout. Option (c) stays refused by ADR-0048.
+>
+> The register row is now an **accepted limit with a trigger**: it reopens when
+> a user reports real-repository latency, or when the realistic tree is made
+> tracked and reproducible. The brief below is unchanged as measured.
+
 ## The two targets
 
 Section 19.3 declares them, and `measure_phase4_perf.py` implements them:

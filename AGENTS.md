@@ -931,6 +931,17 @@ warnings, and forbidden claims.
 Performance claims must name hardware, repository profile, cold/warm state, and
 measurement method.
 
+**The two p95 targets are gated on the `synthetic` profile of
+`scripts/measure_phase4_perf.py`, and that profile is known not to contain the
+dominant cost** (ADR-0064: its generated modules emit no documents mentioning
+the symbols they define). On the `realistic` profile, which does emit that
+shape, refresh first misses at 80 modules and preflight at 300. ADR-0080 ruled
+that the gate stays on synthetic — so the tracked baseline keeps its meaning and
+the gate stays reproducible — and that the shortfall is declared rather than
+absorbed. A build may therefore satisfy this table while being slower than 2 s
+on a real repository of modest size. Read
+`docs/evaluation/phase4-realistic-profile.md` before quoting either target.
+
 ## 20. Development Order
 
 Agents must deliver working vertical slices in this order. Do not scaffold all
@@ -1250,10 +1261,20 @@ the entire semantic layer on top of it is worth **+0.07**.
 
 **Phase 7 was the last phase in this section. Phases 0–7 are all complete with
 user-approved gates, and no Phase 8 exists.** Seven items were carried into the
-approval as open work with no later phase to absorb them; **five remain.** They
-are the three Phase 6 qualifications (Chromium conversation-route skips, no
-pid-reuse detection, unsigned executable), the 1.05 GB packaged semantic tree,
-and the untested `POST /v1/models/test` success branch.
+approval as open work with no later phase to absorb them.
+
+**Updated 2026-09-03 (CO-05): three remain, and all three are terminal.** This
+line read "five remain" and was stale twice over — pid-reuse detection was
+closed by ADR-0037 at the 2026-08-10 closeout, and the `POST /v1/models/test`
+success branch was covered on 2026-08-07 by a stubbed provider, which is what
+the stated blocker ("needs an available provider") had wrongly ruled out. What
+remains is the unsigned executable and the Chromium Playwright skips, both
+**deferred** with named triggers, and the 1.05 GB packaged semantic tree,
+**accepted** at the Phase 7 activation gate.
+
+**The Deferred Register in `docs/plans/PLAN.md` is the authority on all of
+this, and this paragraph is a pointer, not a second copy** — it is a pointer
+precisely because it went stale while the register did not.
 
 Two of the original seven closed on 2026-08-01: the web settings page is routed
 at `/settings` and covered by `apps/web/e2e/settings.spec.ts`, which passes on

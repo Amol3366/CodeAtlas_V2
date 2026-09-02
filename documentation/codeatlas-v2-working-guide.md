@@ -479,8 +479,12 @@ CodeAtlas verifies local changes before they leave the machine.
 
 ## Current Product Status
 
-Phases 0 through 7 are complete with user-approved gates. Current post-gate
-features include:
+**Closed 2026-09-03.** Phases 0 through 7 are complete with user-approved gates,
+and the Deferred Register in `docs/plans/PLAN.md` is **terminal** — every item
+closed, accepted, or deferred with a named trigger, and none left open. New work
+requires an explicit decision.
+
+Current post-gate features include:
 
 - optional semantic retrieval;
 - governed answer providers;
@@ -495,7 +499,7 @@ features include:
   with both of its declared limits since ruled (ADR-0066, ADR-0067) and all
   four languages covered by query *and* change evaluation cases.
 
-Schema version is 14. Contract version is 1.1. Parser bundle 1.8.0, chunker 1.1.0, resolver 1.5.0.
+Schema version is 14. Contract version is 1.1. Parser bundle 1.9.0, chunker 1.1.0, resolver 1.5.0.
 
 ## Known Limits and Open Gaps
 
@@ -516,16 +520,41 @@ These are not hidden:
   quirks: a Go interface reads as `CLASS`, a Scala method as `FUNCTION`, and
   none of the four is classified at statement level, so every body change
   reports `PUBLIC_BEHAVIOR_CHANGED`.
-- The packaged executable is unsigned.
-- Some Chromium conversation-route Playwright tests are skipped because of a
-  browser renderer crash; Firefox proves the workflow.
-- Crash recovery does not detect PID reuse.
-- The semantic-local packaged tree is large because of the torch dependency.
-- Phase 7 Recall@10 improved but missed the declared target.
-- Phase 4 changed-symbol precision missed the target for a structural corpus
-  reason that is documented.
+- The packaged executable is unsigned. Needs a purchased certificate — a
+  purchasing decision, not an engineering task.
+- **Seven** Playwright tests are skipped on Chromium across **five** spec files;
+  the renderer dies on a client-side navigation. Firefox runs all seven, so
+  coverage is not lost. (This previously read "some conversation-route tests".
+  The defect has since been hit on more routes, so the route-specific wording
+  understated it.)
+- The semantic-local packaged tree is 1.05 GB because of torch, accepted at the
+  Phase 7 activation gate.
+- Phase 7's primary evidence Recall@10 missed its ≥0.90 target at the gate
+  (0.6667). It now reads **1.0000** under the containment-based metric ADR-0027
+  introduced — a *corrected definition and no engine change*, so it must never
+  be cited as uplift.
+- Phase 4 changed-symbol precision missed its target for a structural corpus
+  reason (c020–c022 split one physical diff into three cases that count each
+  other's symbols against them). The aggregate has since crossed 0.95 by
+  **dilution** as the corpus grew; the three cases still score exactly 0.50, and
+  `changed_symbol_exact_cases` is reported beside the mean so the pair cannot be
+  read as "every case is exact".
+- The Phase 4 performance gate measures the **synthetic** profile, which
+  ADR-0064 showed cannot contain the dominant cost. On the realistic profile
+  refresh misses at 80 modules and preflight at 300 (ADR-0080, declared not
+  absorbed).
+- Preflight parses **both full states** every run — O(repository), not
+  O(change).
 - There is no GitHub/GitLab/CI integration yet.
 - There is no multi-user tenancy or enterprise control plane.
+
+**Two entries were removed here on 2026-09-03 as stale, not as fixed-by-this-
+edit.** "Crash recovery does not detect PID reuse" was closed by **ADR-0037** at
+the 2026-08-10 closeout — `GetProcessTimes` sits beside the handle the recovery
+path already opens — and the Recall@10 line above now carries ADR-0027's
+correction. Both had outlived their answers in this file while the Deferred
+Register recorded them correctly, which is why that register, and not this list,
+is the authority.
 
 ## Best Next Improvements
 

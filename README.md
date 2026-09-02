@@ -10,12 +10,12 @@ specific repository. Nothing here treats a language model as repository truth.
 
 | | |
 | --- | --- |
-| **Status** | Phases 0–7 complete, every gate user-approved; project closed out 2026-08-10, post-gate work ongoing |
+| **Status** | **Closed 2026-09-03.** Phases 0–7 complete, every gate user-approved. The Deferred Register is terminal — every item closed, accepted, or deferred with a named trigger; none open. New work needs an explicit decision |
 | **Platform** | Windows 11 primary (loopback only, single user) |
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.9.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2472 passed, 3 skipped** — one *complete* `check_phase4.ps1 -SkipSync` run, exit 0, 2026-09-02. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the seven Chromium Playwright skips, which live in the browser suites and are not part of this gate |
+| **Tests** | **2480 passed, 3 skipped** — one *complete* `uv run pytest tests` run, exit 0, 2026-09-03. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the seven Chromium Playwright skips, which live in the browser suites and are not part of this run |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -332,7 +332,7 @@ active → superseded
 
 Vector coverage is tracked separately and can **never** block deterministic
 activation. Component versions are stamped into each snapshot — parser bundle
-`1.8.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
+`1.9.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
 existing snapshots stale and forces a reindex. The parser and resolver bumps
 landed together in ADR-0065 deliberately: both invalidate every snapshot, so
 shipping them in one change costs users one reindex rather than two.
@@ -1031,7 +1031,7 @@ blunt version. The ones that bite most often:
 
 **Decisions and measurement**
 
-`docs/adr/README.md` — 78 accepted records and their rationale ·
+`docs/adr/README.md` — 80 accepted records and their rationale ·
 `docs/evaluation/` — baselines and the environment documents that say how to read
 them · `docs/security/threat-model.md`
 
