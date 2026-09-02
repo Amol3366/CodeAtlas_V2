@@ -24,7 +24,7 @@ from typing import Final
 
 from codeatlas.domain.errors import QueryTooLongError
 
-RETRIEVAL_POLICY_VERSION: Final[str] = "5.3"
+RETRIEVAL_POLICY_VERSION: Final[str] = "5.4"
 
 # Bounded input (`AGENTS.md` Section 10.3). Truncating instead would answer a
 # question the user did not ask.
@@ -181,6 +181,15 @@ def classify(text: str) -> Classification:
             continue
         groups = match.groupdict()
         subject = groups.get("subject")
+        if subject:
+            # Every rule ends `(?P<subject>\S+)\s*$`, and `\S+` takes the
+            # sentence's punctuation with it: `trace the flow from mount.`
+            # yielded `mount.`, which resolves to nothing because no symbol
+            # ends in a full stop. The question reached the right channel and
+            # the channel answered nothing -- an abstention whose cause the
+            # user cannot see. Trailing sentence punctuation only; a dot
+            # *inside* the token is load-bearing (`orders.py`, `A.b`).
+            subject = subject.rstrip(".!,;:") or subject
         return Classification(
             intent=intent,
             target=subject if subject else stripped,

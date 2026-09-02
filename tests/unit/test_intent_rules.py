@@ -25,8 +25,8 @@ from codeatlas.domain.errors import QueryTooLongError
 def test_the_policy_version_is_recorded() -> None:
     """A run stores this; changing the rules without changing the version
     would make old runs claim to have used rules they never saw."""
-    assert RETRIEVAL_POLICY_VERSION == "5.3"
-    assert classify("PaymentService.capture").policy_version == "5.3"
+    assert RETRIEVAL_POLICY_VERSION == "5.4"
+    assert classify("PaymentService.capture").policy_version == "5.4"
 
 
 @pytest.mark.parametrize("text", ["Hi", "hello!", "hey there", "good morning"])
@@ -111,6 +111,38 @@ def test_each_graph_intent_has_its_phrasing(text: str, intent: Intent) -> None:
     result = classify(text)
     assert result.intent is intent
     assert result.target == "capture"
+
+
+@pytest.mark.parametrize(
+    ("text", "intent"),
+    [
+        ("trace the flow from mount.", Intent.TRACE),
+        ("trace mount!", Intent.TRACE),
+        ("who calls mount.", Intent.CALLERS),
+        ("callers of mount.", Intent.CALLERS),
+        ("dependencies of mount.", Intent.DEPENDENCIES),
+        ("tests for mount.", Intent.TESTS),
+        ("docs for mount.", Intent.DOCUMENTS),
+    ],
+)
+def test_sentence_punctuation_does_not_ride_into_the_subject(
+    text: str, intent: Intent
+) -> None:
+    """A question written as a sentence still names a symbol.
+
+    Every rule ends `(?P<subject>\\S+)\\s*$`, and `\\S+` is greedy about
+    punctuation, so `trace the flow from mount.` yielded the subject `mount.`
+    -- which resolves to nothing, because no symbol ends in a full stop. The
+    question routed to the right channel and the channel then answered
+    nothing, which is the worst of both: a user sees an abstention and has no
+    way to know a period caused it.
+
+    Measured on q063's own fixture: subject `mount.` returns no symbols at
+    all, subject `mount` returns `mount` and `renderList`.
+    """
+    result = classify(text)
+    assert result.intent is intent
+    assert result.target == "mount"
 
 
 @pytest.mark.parametrize(
