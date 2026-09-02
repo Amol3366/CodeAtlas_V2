@@ -68,9 +68,21 @@ way to attribute it -- build the old artifact and measure it beside the new one.
 ACROSS runs, so a measurement on a slower machine looks as authoritative as one
 beside the baseline.
 
-**Two follow-ups need nobody:** a second quiet `-Perf` run (the pass rests on
-one measurement; a confirming run was blocked), and
-`playwright test --repeat-each=10` for an e2e failure rate.
+**The perf pass is confirmed** by a second quiet run -- 1.668 s against the
+first's 1.783 s, faster on every metric. Two independent passes.
+
+**And the fix I proposed for it was measured and withdrawn.** I suggested
+comparing `calibration_before_s` across runs to detect a slow machine, calling
+it something that "would have flagged all four loaded runs immediately."
+Measured: a loaded run reads **0.2187** and a quiet run **0.2192** -- five
+ten-thousandths apart, with refresh p95 of 2.296 against 1.668. The calibration
+workload is short and CPU-bound; the loaded runs were losing **I/O** to
+PyInstaller builds and 1 GB zips, which it cannot see. **A plausible fix that
+does not work is worse than none** -- someone would have built it and then
+trusted it.
+
+**One follow-up needs nobody:** `playwright test --repeat-each=10` for an e2e
+failure rate.
 
 **Also from this session:** `-Package` and `-SkipSync` run against different
 environments -- frozen sync drops `semantic-local`, collection goes 2483 -> 2458

@@ -449,3 +449,40 @@ but nothing compares them **across** runs, so a measurement taken on a machine
 A cross-run calibration comparison would have flagged all four loaded runs
 immediately. **Recorded as an observation, not built** — it is a change to a
 gated measurement script and needs its own decision.
+
+### Confirmed 2026-09-03 by a second quiet run — and the proposed instrument fix is disproved
+
+| Run | calibration_before | refresh p50 | refresh p95 | preflight p95 | verdict |
+| --- | ---: | ---: | ---: | ---: | :---: |
+| loaded, run 1 | 0.2187 | 2.137 | 2.296 | 4.245 | ❌ |
+| loaded, run 2 | — | 2.128 | 2.310 | 4.026 | ❌ |
+| loaded, parser 1.6.0 | 0.2355 | 1.750 | 2.240 | 4.194 | ❌ |
+| quiet A (tracked) | 0.2156 | 1.694 | **1.783** | 3.072 | ✅ |
+| **quiet B** | **0.2192** | **1.560** | **1.668** | **2.963** | ✅ |
+
+**Two independent quiet runs pass**, the second faster than the first on every
+metric. The retraction stands and the pass no longer rests on one measurement.
+
+#### The cross-run calibration check proposed above would NOT have worked
+
+The section above recorded, as a promising observation, that nothing compares
+`calibration_before_s` **across** runs and that such a check "would have flagged
+all four loaded runs immediately."
+
+**Measured, it would not have.** A loaded run reads **0.2187** and a quiet run
+reads **0.2192** — five ten-thousandths apart, with refresh p95 of 2.296 and
+1.668 respectively. The spread across all five runs (0.2156-0.2355) does not
+separate the passes from the failures, and the *slowest* calibration (0.2355,
+the 1.6.0 artifact) belongs to a run whose refresh was among the *faster*
+failures.
+
+So the calibration workload does not measure whatever actually slowed those
+runs. The loaded measurements were taken while PyInstaller builds and ~1 GB zip
+operations were running, which is **I/O contention**; a short CPU-bound
+calibration is blind to it.
+
+**The recommendation is withdrawn rather than left standing**, because a
+plausible-sounding fix that does not work is worse than no fix: someone would
+have built it and then trusted it. What would actually discriminate is unknown
+and is not guessed at here -- an I/O-sensitive probe is the obvious direction
+and is not evidence until measured.
