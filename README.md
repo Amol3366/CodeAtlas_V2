@@ -694,7 +694,7 @@ caveats live in `docs/evaluation/*-baseline-environment.md`.
 | Unsupported factual claim rate | 0.0000 | `baseline-phase-4.json` |
 | Containing-evidence Recall@10 | **1.0000** | `baseline-phase-4.json` |
 | Relation-path recall | **1.0000**, gated at 1.0 absolutely (ADR-0058) | `baseline-phase-4.json` |
-| Packaged refresh p95 · preflight p95 | **1.759 s · 2.981 s** (semantic-local, on the artifact; cold start 1.805 s, coverage 1.0). Both targets met; **read the load-sensitivity note below before comparing this to an older figure** | `baseline-phase-7-perf.json`, 2026-08-21 |
+| Packaged refresh p95 · preflight p95 | **1.783 s · 3.072 s** (semantic-local, on the artifact; cold start 3.353 s, coverage 1.0). Both targets met; **read the load-sensitivity note below before comparing this to an older figure** — on 2026-09-03 the same artifact measured **2.30 s** on a loaded machine and **1.783 s** once it was quiet, which is the note's whole point | `baseline-phase-7-perf.json`, 2026-09-03 |
 
 Corpus: **80 query cases, 33 change cases, 12 fixtures** — plus a separate
 invariant corpus (`tests/evaluation/invariant_cases/`) that asserts a boolean

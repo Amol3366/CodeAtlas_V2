@@ -391,3 +391,61 @@ not be defended; now, a claimed *pass* cannot be reproduced.
 - **`check_phase7.ps1 -Perf` exits 1 on this machine**, for both artifacts. Any
   release claim quoting refresh p95 ≤ 2 s must be measured, not inherited.
 - The cause is **unattributed**, and it is not the code.
+
+## RETRACTED 2026-09-03 — the target is MET; the miss above was machine load
+
+The section immediately above is **wrong on its headline** and is kept in full,
+because the reasoning error is the reusable part.
+
+Re-measured on a quiet machine, by the same script and the same artifact:
+
+| Measurement | refresh p95 | ≤ 2.0 s | preflight p95 | exit |
+| --- | ---: | :---: | ---: | :---: |
+| loaded, run 1 | 2.296 | ❌ | 4.245 | 1 |
+| loaded, run 2 | 2.310 | ❌ | 4.026 | 1 |
+| loaded, parser 1.6.0 artifact | 2.240 | ❌ | 4.194 | 1 |
+| **quiet** | **1.783** | ✅ | **3.072** | **0** |
+
+**`check_phase7.ps1 -Perf` passes.** There is no miss, and there was nothing to
+accept.
+
+### The error, which this document had already warned against
+
+This file's own 2026-08-21 section says, verbatim:
+
+> **Within-session agreement is not evidence of validity.** The loaded pair
+> agreed within 26 ms and the quiet pair within 37 ms — tight both times,
+> 0.68 s apart.
+
+The 2026-09-03 investigation quoted that warning and then reproduced it exactly:
+its loaded pair agreed within **14 ms** and sits **0.52 s** from the quiet
+figure. Two runs minutes apart, agreeing tightly, on a machine that was busy
+both times.
+
+### What survives, and what does not
+
+**Does not survive:** the claimed target miss, and the framing of the section
+above.
+
+**Survives, and is the reason that section is kept:** the controlled comparison
+against a parser **1.6.0** artifact was correct and remains useful. It showed
+old and new artifacts perform identically, which is what *exonerated*
+ADR-0070/0071/0074 — and that conclusion is unaffected by the load, because both
+sides were measured under the same conditions. Had the miss been real, that
+comparison would have been the right way to attribute it.
+
+**Also survives:** `machine_settled: True` does **not** mean the machine was
+fast. It compares a calibration workload before and after the run — stability,
+not speed — and it reported `True` for every loaded run above. **That is the
+finding with the longest shelf life here**, because it is the field a future
+investigator will reach for to rule load out, and it cannot do that.
+
+### The instrument gap this exposes
+
+Nothing in the artifact records how fast the machine was in absolute terms. The
+calibration figures are stored (`calibration_before_s`, `calibration_after_s`)
+but nothing compares them **across** runs, so a measurement taken on a machine
+40% slower than the baseline's looks as authoritative as one taken beside it.
+A cross-run calibration comparison would have flagged all four loaded runs
+immediately. **Recorded as an observation, not built** — it is a change to a
+gated measurement script and needs its own decision.

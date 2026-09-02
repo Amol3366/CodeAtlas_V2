@@ -42,7 +42,44 @@ converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
 
-## Resume point — 2026-09-03 (release validation done; one decision open)
+## Resume point — 2026-09-03 (release validation done; ALL FIVE LEGS PASS)
+
+**RV-01, RV-03 to RV-09 complete; RV-02 cancelled on evidence.** All five legs
+exit 0, including `-Perf` after the miss was **retracted**.
+
+**The lesson of this session, and it is a humbling one: I quoted a warning and
+then walked straight into it.** `phase-7-performance-environment.md` says
+"within-session agreement is not evidence of validity -- the loaded pair agreed
+within 26 ms". I cited that sentence to the user while reporting a refresh
+miss, and my own loaded pair agreed within **14 ms**, 0.52 s from the truth.
+The machine was busy; a quiet run reads **1.783 s** and passes.
+
+**Read what an instrument measures before citing it.** I said
+`machine_settled: True` ruled out load. It does not -- it compares calibration
+before and after the run, so it measures **stability, not speed**, and returned
+`True` for all four loaded runs.
+
+**What survived the retraction, and why it was still worth doing:** the
+controlled parser-1.6.0 comparison exonerates ADR-0070/0071/0074, because both
+sides were measured under the same load. If a miss is ever real, that is the
+way to attribute it -- build the old artifact and measure it beside the new one.
+
+**Instrument gap, recorded not built:** nothing compares calibration figures
+ACROSS runs, so a measurement on a slower machine looks as authoritative as one
+beside the baseline.
+
+**Two follow-ups need nobody:** a second quiet `-Perf` run (the pass rests on
+one measurement; a confirming run was blocked), and
+`playwright test --repeat-each=10` for an e2e failure rate.
+
+**Also from this session:** `-Package` and `-SkipSync` run against different
+environments -- frozen sync drops `semantic-local`, collection goes 2483 -> 2458
+-- and a guard justified on "collection is a pure function of the source" broke
+on the first `-Package` run in the project's history. **The leg nobody runs is
+where the defect lives.**
+
+
+## Superseded resume note — 2026-09-03 (release validation; one decision open)
 
 **RV-01, RV-03 to RV-08 complete; RV-02 cancelled on evidence.** Four of five
 legs pass — `-SkipSync`, `-Package`, `-Semantic -Package`, and the by-hand
