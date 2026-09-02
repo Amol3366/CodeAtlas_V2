@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-03 (project closeout)
+Last updated: 2026-09-03 (release validation)
 
 ## Current Phase
 
@@ -42,7 +42,47 @@ converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
 
-## Resume point — 2026-09-03 (the project is CLOSED)
+## Resume point — 2026-09-03 (release validation done; one decision open)
+
+**RV-01, RV-03 to RV-08 complete; RV-02 cancelled on evidence.** Four of five
+legs pass — `-SkipSync`, `-Package`, `-Semantic -Package`, and the by-hand
+install/uninstall all exit 0. **`-Perf` exits 1.** Board and full findings in
+`docs/plans/PLAN.md`; do not restate them here.
+
+**Three of my own claims died on a command this session. That is the habit to
+keep, and it is now six programs old.**
+
+- **"The e2e flake is deterministic now."** Written on a sample of two. Run 3
+  passed and every run since has: **2 failures in 5**. RV-02's fix was
+  cancelled, and the *reason* is the reusable part — its verification was "run
+  the suite and see it go green", which against that rate is the outcome you
+  get anyway. **A fix you cannot distinguish from luck is not a fix.**
+- **"The refresh regression is ADR-0070/0071/0074."** Obvious, plausible, and
+  wrong. A worktree at parser **1.6.0** measured on the same machine minutes
+  apart reads **2.240 — also a miss**. Build the old artifact and measure it;
+  do not reason about it.
+- **"`machine_settled: True` rules out load."** It does not. It compares
+  calibration **before and after** the run — stability, not speed. **Read what
+  an instrument measures before citing it as evidence.**
+
+**The structural find worth carrying: `-Package` and `-SkipSync` run against
+different environments.** `-Package` syncs frozen, extras are not groups, so
+`semantic-local` goes away and collection drops **2483 → 2458**. A guard that
+justified itself on "collection is a pure function of the source" had never run
+outside `-SkipSync` and broke on the first `-Package` run in the project's
+history. **The leg nobody runs is where the defect lives** — same shape as the
+stale packaged artifact found in the closeout.
+
+**Do not regenerate `baseline-phase-7-perf.json`** to make `-Perf` pass. It
+would encode a failing measurement into the gate and move README figures a
+guard checks.
+
+**Recommended, needs nobody:** `playwright test --repeat-each=10` for an e2e
+failure *rate*. That is what would let the deferred flake row be closed or
+fixed defensibly, and it is ~10 minutes.
+
+
+## Superseded resume note — 2026-09-03 (the project is CLOSED)
 
 **CO-01 to CO-08 on `plan/project-closeout`, ten commits, not merged.**
 ADR-0079 and ADR-0080. **The Deferred Register is terminal** — 63 closed, 5
