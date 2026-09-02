@@ -240,9 +240,22 @@ def test_the_readme_test_count_matches_what_the_suite_collects() -> None:
     **Only pass/fail requires running the suite; the total does not.** A
     collected test either passes, fails, or is skipped, so ``passed + skipped``
     is the collected count for any green run -- and the README only ever quotes
-    a green run. Collection is a pure function of the source, which is what
-    makes this derivable at all, and deriving it is what stops the row going
-    stale a fourth time.
+    a green run.
+
+    **Collection is NOT a pure function of the source, and this docstring said
+    it was until 2026-09-03.** It is a function of the source *and the
+    installed optional extras*: modules that import `sentence_transformers` at
+    module scope are not collected at all when `semantic-local` is absent, so
+    the suite collects **2483** with the extra and **2458** without -- a
+    25-test swing. The claim went unchallenged because every run that had ever
+    exercised this guard used `-SkipSync`, which leaves the developer's
+    environment alone. The first `check_phase7.ps1 -Package` run does
+    `uv sync --all-groups --frozen`, extras are not groups, and the guard
+    failed on a README that was correct for the environment it names.
+
+    So this asserts only in the environment the README declares, and abstains
+    -- loudly, with the reason -- in any other. A guard that fails because it
+    was pointed at a different environment is not reporting on the README.
 
     Collected in a **subprocess** rather than from this session, because the
     outer run may have selected a subset while the README quotes the whole
@@ -258,6 +271,27 @@ def test_the_readme_test_count_matches_what_the_suite_collects() -> None:
     stated = re.search(r"\*\*(\d+) passed, (\d+) skipped\*\*", _readme())
     assert stated, "the README no longer states 'N passed, M skipped'"
     claimed = int(stated.group(1)) + int(stated.group(2))
+
+    # The README names its environment in the same row it states the counts.
+    # Both must move together, so read the declaration rather than assume it.
+    declares_semantic_local = "`semantic-local`-installed" in _readme()
+    try:
+        import sentence_transformers  # noqa: F401
+
+        extras_present = True
+    except ImportError:
+        extras_present = False
+
+    if declares_semantic_local != extras_present:
+        pytest.skip(
+            "the README states a "
+            f"{'semantic-local-installed' if declares_semantic_local else 'no-extras'}"
+            " environment; this one has "
+            f"{'the extra installed' if extras_present else 'no extras'}. "
+            "Collection differs by ~25 tests between them, so the count cannot "
+            "be checked here. Run with the declared environment, or run "
+            "`uv sync --extra semantic-local` to restore it."
+        )
 
     with tempfile.TemporaryDirectory(prefix="readme-collect-") as basetemp:
         completed = subprocess.run(
