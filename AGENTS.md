@@ -931,6 +931,17 @@ warnings, and forbidden claims.
 Performance claims must name hardware, repository profile, cold/warm state, and
 measurement method.
 
+**The two p95 targets are gated on the `synthetic` profile of
+`scripts/measure_phase4_perf.py`, and that profile is known not to contain the
+dominant cost** (ADR-0064: its generated modules emit no documents mentioning
+the symbols they define). On the `realistic` profile, which does emit that
+shape, refresh first misses at 80 modules and preflight at 300. ADR-0080 ruled
+that the gate stays on synthetic — so the tracked baseline keeps its meaning and
+the gate stays reproducible — and that the shortfall is declared rather than
+absorbed. A build may therefore satisfy this table while being slower than 2 s
+on a real repository of modest size. Read
+`docs/evaluation/phase4-realistic-profile.md` before quoting either target.
+
 ## 20. Development Order
 
 Agents must deliver working vertical slices in this order. Do not scaffold all

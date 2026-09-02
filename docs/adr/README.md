@@ -143,6 +143,8 @@ ADR timestamps use UTC dates. Rejected and superseded records remain for audit.
 
 | [0079](0079-a-subject-is-a-symbol-not-a-sentence-fragment.md) | Trailing sentence punctuation is stripped from an extracted subject -- `trace the flow from mount.` yielded the subject `mount.`, reached the right channel and answered **nothing**, across all seven subject-bearing rules. The `TRACE` rule is **not** widened: ruled, then declined on measurement, because no subject extractable from q032's question resolves and routing it would move the case from one of two expected symbols to zero. The brief's "reaches 4 of the 63" is corrected to **1** | post-gate |
 
+| [0080](0080-the-release-gate-measures-the-profile-it-can-reproduce.md) | The Phase 4 p95 targets stay gated on the **synthetic** profile, which ADR-0064 showed cannot contain the dominant cost; the realistic figures (refresh first misses at 80 modules, preflight at 300) are declared in `AGENTS.md` §19.3 rather than absorbed. Option (b) rejected on timing — it opens a red gate at 80 modules during a closeout; option (c) stays refused by ADR-0048 | post-gate |
+
 ## Notes
 
 None is superseded. ADR-0008 is the first record to change a published contract
