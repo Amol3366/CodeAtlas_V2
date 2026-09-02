@@ -4,7 +4,7 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-03 (end of session)
+Last updated: 2026-09-03 (project closeout)
 
 ## Current Phase
 
@@ -42,7 +42,62 @@ converts LF to CRLF** and the working tree forbids it — use the editing tools,
 not scripted rewrites, on tracked text. And **adding a test or an ADR breaks a
 README guard** until the counts are updated; that is the guard working.
 
-## Resume point — 2026-09-03 (the register tail is finished)
+## Resume point — 2026-09-03 (the project is CLOSED)
+
+**CO-01 to CO-08 on `plan/project-closeout`, ten commits, not merged.**
+ADR-0079 and ADR-0080. **The Deferred Register is terminal** — 63 closed, 5
+deferred, 2 accepted, **zero rows stating a bare `OPEN`**. Board and full
+findings are in `docs/plans/PLAN.md`; do not restate them here.
+
+**`RETRIEVAL_POLICY_VERSION` 5.3 → 5.4** and nothing else moved, so **no
+reindex**.
+
+**The one thing to carry: the packaged artifact had outlived the engine and
+nothing was watching.** `codeatlas.exe` was built 08-31 18:33; parser 1.9.0
+landed 09-01. The shipped binary was a *different parser* from `main` for two
+days. Rebuilt and verified by indexing **through the binary** and reading the
+stamp out of the rows it wrote — never from source, which is the only way that
+claim means anything. **Add the artifact to whatever you check after a version
+constant moves.**
+
+**Four of my own checks were wrong this session, and every one died on a
+command.** The habit is now five programs old and still earning its keep:
+
+- **A guard can be blind in a shape nobody pictured.** `test_readme_claims`
+  matched version labels with a *literal space*, so a claim the prose wrapped
+  across a line was invisible — the README carried parser `1.8.0` at line 335
+  while its own header said `1.9.0`. Whitespace in a doc-scraping regex is
+  `\s+`, never a space.
+- **`$?` after a pipe is the last stage's exit code.** `eslint ... | tail`
+  reported `EXIT=0` having proven nothing. Never read an exit code through a
+  pipe.
+- **"Widening trace reaches 4 of the 63" was 1.** The 4 counts `TRACE_FLOW`
+  cases that fall through — a neighbouring quantity. Re-derive, never inherit.
+- **Appending a cell silently made a register row 4 columns wide** and the guard
+  passed, because it only requires `>= 3`.
+
+**A ruling reversed under measurement, and that is the shape to expect.** The
+user approved widening the trace classifier; executing it showed the only case
+it reaches would go from 1 of 2 expected symbols to **0**, because no subject
+extractable from q032's question resolves — the brief's supporting number used
+the corpus's *declared* subject, which a classifier cannot produce. Put back,
+declined, recorded in ADR-0079. **The real defect was underneath it:** `\S+`
+carried the sentence's full stop into the subject, so `Trace the flow from
+mount.` reached the right channel and answered nothing, across all seven
+subject-bearing rules.
+
+**Sixteen register rows said `OPEN` while their own trigger cell recorded the
+closure.** The preamble had warned a *reader* about this for three weeks;
+nothing enforced it, because the guard read only the Item cell. Closing a row
+means editing the **Disposition** cell.
+
+**Not run, deliberately:** `check_phase7.ps1 -Package`, `-Semantic -Package`,
+`-SkipSync -Perf`, and release-validation step 5 (it mutates the real user PATH,
+and that reversal is the thing being checked). A full `check_phase7.ps1` has not
+passed on this branch; every component was run individually and recorded.
+
+
+## Superseded resume note — 2026-09-03 (the register tail is finished)
 
 **Seven tasks RW-01 to RW-07, merged to `main` 2026-09-03** as `c208397`
 (`--no-ff`); branch `plan/register-tail` kept. Gate green on the merged content
