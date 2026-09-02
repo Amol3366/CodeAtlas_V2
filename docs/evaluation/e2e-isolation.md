@@ -72,3 +72,56 @@ The Deferred Register row stays **DEFERRED**, and gains run 4 as a third data
 point plus the mechanism hypothesis with its status stated. It is **not**
 closed: closing it would require demonstrating the mechanism, and this
 experiment did not.
+
+## Rate measured 2026-09-03 — 0 failures in 140, and the hypothesis is retired
+
+`pnpm exec playwright test --repeat-each=10`, exit **0**: **140 passed, 80
+skipped**, 10.3 minutes. `restart-persistence` on Firefox ran **10 of 10
+green**, at test positions 114, 125, 136, 147, 158, 169, 180, 191, 202, 213.
+
+### Today's totals
+
+| | |
+| --- | ---: |
+| Firefox executions of this spec | ~16 |
+| Failures | **2** |
+| Consecutive passes since the second failure | **14** |
+
+Both failures were the session's **first two** full runs.
+
+### This argues AGAINST the mechanism this document proposed
+
+The hypothesis was state accumulation: one worker, one `seed()`, conversations
+from earlier specs piling up until `restart-persistence` trips over them.
+
+`--repeat-each=10` is close to a direct test. It reuses **one worker**, so the
+seed still fires once and every repetition runs later than the last. **If
+accumulation were the cause, position 213 should be far more dangerous than
+position 15.** It passed, and so did the nine before it.
+
+The state also did not pile up the way the hypothesis requires. After 140
+executions the database held **7 conversations and 6 user messages** — nothing
+like ten repetitions' worth of residue. Either the harness resets more often
+than one-seed-per-worker implies, or conversations are not retained as assumed.
+Both readings weaken the hypothesis.
+
+**It is retired, not confirmed.** The failure is real — two captures exist, one
+with the conversation rows — but it is rare, not reproducible on demand, and
+its mechanism is unknown.
+
+### What is deliberately not concluded
+
+Both failures cluster in the session's first two runs, which is the same shape
+the performance misses had before they turned out to be machine load. **That is
+recorded as an observation and not as a claim.** Twice in this session a
+pattern was mistaken for a mechanism — the "no longer intermittent"
+reclassification and the parser-bump attribution — and both died on a
+measurement. A third guess is not offered.
+
+### Consequence for any future fix
+
+A fix here cannot be verified by running the suite. At a rate of roughly 2 in
+16 — and 0 in the last 140 — a green run is the overwhelmingly likely outcome
+whether or not anything was fixed. **Any candidate fix needs a reproduction
+first**, or a mechanism demonstrated from the code, and neither exists today.
+That is why the planned RV-02 change was cancelled rather than shipped.

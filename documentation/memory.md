@@ -81,8 +81,26 @@ PyInstaller builds and 1 GB zips, which it cannot see. **A plausible fix that
 does not work is worse than none** -- someone would have built it and then
 trusted it.
 
-**One follow-up needs nobody:** `playwright test --repeat-each=10` for an e2e
-failure rate.
+**The e2e rate is measured: 0 failures in 140 executions** (`--repeat-each=10`,
+exit 0), `restart-persistence` 10 of 10 green on Firefox at positions 114-213.
+Today: ~16 executions of that spec, **2 failures, both in the first two runs,
+then 14 consecutive passes.**
+
+**And it retired my own hypothesis.** The accumulation story said one worker +
+one `seed()` means later repetitions are more dangerous -- position 213 passed
+along with the nine before it, and the database held only **7 conversations**
+after 140 executions. Retired, not confirmed.
+
+**The consequence that outlives it: a fix here cannot be verified by running
+the suite.** At 2 in 16, a green run is the likely outcome whether or not
+anything was fixed. Any candidate fix needs a reproduction or a mechanism read
+out of the code first. That is why RV-02 was cancelled, and the reasoning now
+has a number behind it.
+
+**Three of my guesses died on measurements today** -- "the flake is
+deterministic", "the refresh regression is the parser bumps", and "compare
+calibration across runs to detect load". Each was plausible, each was cheap to
+test, and each was wrong. **Test the guess before recording it as a finding.**
 
 **Also from this session:** `-Package` and `-SkipSync` run against different
 environments -- frozen sync drops `semantic-local`, collection goes 2483 -> 2458
