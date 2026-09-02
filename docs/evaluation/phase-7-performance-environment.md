@@ -315,3 +315,79 @@ the 1.05 GB semantic-local tree exceeded the automation timeout in this
 workspace, so `check_phase7.ps1 -Semantic -Package` passes `-SkipZip` and the
 perf artifact records `archive_size_bytes: null`. A distributable archive can be
 produced as a slower packaging step, but it is not what the perf harness starts.
+
+## Re-measured 2026-09-03 — the target is missed, and it is NOT the code
+
+RV-06 ran the first `-Perf` measurement since 2026-08-21 — four
+`PARSER_BUNDLE_VERSION` bumps later (1.6.0 → 1.9.0, ADR-0070, ADR-0071,
+ADR-0074). Both runs miss:
+
+| Run | refresh p50 | refresh p95 | target ≤ 2.0 s | preflight p95 |
+| --- | ---: | ---: | :---: | ---: |
+| 1 | 2.137 | **2.296** | ❌ | 4.245 |
+| 2 | 2.128 | **2.310** | ❌ | 4.026 |
+
+against a tracked baseline of **1.759** taken 2026-08-21. That is +31%, and
+the obvious hypothesis was the three parser bumps: each adds per-symbol work in
+the indexing path — a `MODULE` symbol per query-backed file and dual import
+attribution (ADR-0070), signatures (ADR-0071), a discriminator on symbol
+identity (ADR-0074).
+
+### The hypothesis was tested and is WRONG
+
+A worktree at `be31777` — the last commit at `PARSER_BUNDLE_VERSION` **1.6.0**,
+immediately before ADR-0070 — was built as a semantic-local artifact and
+measured **by the same current script, on the same machine, minutes apart**:
+
+| Artifact | Parser | refresh p50 | refresh p95 | preflight p95 | cold index |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `be31777` | **1.6.0** | 1.750 | **2.240** ❌ | 4.194 | 27.17 |
+| `main` | **1.9.0** | 2.128 / 2.137 | **2.296 / 2.310** ❌ | 4.245 / 4.026 | 27.24 |
+
+**The pre-bump artifact misses too, by the same margin.** 2.240 against 2.30 is
+2.6% on the gated metric; preflight and cold-index are indistinguishable.
+ADR-0070, ADR-0071 and ADR-0074 are exonerated — the +31% is not attributable
+to any code change between those two commits.
+
+The p50 gap (1.750 vs 2.13) is larger than the p95 gap and is **not** claimed as
+a finding: the gated metric is p95, the two p95 figures agree, and run order
+and thermal state are uncontrolled between the two builds.
+
+### `machine_settled: True` does not mean the machine was fast
+
+This was misread during the investigation and the correction is the reusable
+part. The field is computed from a calibration workload run **before and after**
+the measurement:
+
+```
+calibration_before_s: 0.2187   calibration_after_s: 0.2616   tolerance: 0.2
+```
+
+It asserts the machine **did not change during the run** — stability, not
+absolute speed. **A persistently loaded or persistently slower machine passes
+`machine_settled` comfortably.** Reading it as "load has been ruled out" is
+wrong, and it was read that way here before the controlled comparison corrected
+it.
+
+### Why the 1.759 s figure cannot be reproduced is UNKNOWN
+
+Stated rather than guessed. The tracked baseline records
+`calibration_before_s: None`, `calibration_after_s: None`,
+`machine_settled: None` — it was taken before those fields existed, so **there
+is no machine-speed evidence from 2026-08-21 to compare against.** The platform
+string is identical both times (`Windows-11-10.0.26200-SP0`), so it is not an OS
+upgrade. Beyond that the record cannot say, and this document does not
+speculate.
+
+**This is the cost of a baseline that recorded a result without recording the
+conditions that produced it** — the same lesson the 2026-08-21 retraction
+recorded, now biting from the other direction: then, a claimed regression could
+not be defended; now, a claimed *pass* cannot be reproduced.
+
+### Disposition
+
+- **The tracked baseline is NOT regenerated.** Overwriting it would encode a
+  failing measurement into the gate and move README figures a guard checks.
+- **`check_phase7.ps1 -Perf` exits 1 on this machine**, for both artifacts. Any
+  release claim quoting refresh p95 ≤ 2 s must be measured, not inherited.
+- The cause is **unattributed**, and it is not the code.
