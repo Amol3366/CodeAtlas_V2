@@ -146,9 +146,11 @@ def test_no_row_is_open_in_one_column_and_closed_in_another() -> None:
     row whose Disposition still reads OPEN while its Trigger cell already
     records **CLOSED**, with the date and the ADR that closed it.
 
-    Fifteen rows were in that state at the 2026-09-03 closeout -- closed by
-    DR-01b, DR-02, DR-06, RW-04, ADR-0073, ADR-0075, ADR-0076 and ADR-0077,
-    and never re-dispositioned. A reader going top-down sees OPEN and stops;
+    **Sixteen** rows were in that state at the 2026-09-03 closeout: fifteen
+    fully closed -- by DR-01b, DR-02, DR-06, RW-04, ADR-0073, ADR-0075,
+    ADR-0076 and ADR-0077 -- and never re-dispositioned, plus one whose trigger
+    read `PARTLY CLOSED` and which became an accepted limit. A reader going
+    top-down sees OPEN and stops;
     the register's own preamble warns that "a row whose disposition and
     neighbour disagree should be read as unaudited", which is an instruction
     to a human that nothing enforced.
