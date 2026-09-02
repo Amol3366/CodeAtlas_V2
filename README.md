@@ -332,7 +332,7 @@ active → superseded
 
 Vector coverage is tracked separately and can **never** block deterministic
 activation. Component versions are stamped into each snapshot — parser bundle
-`1.8.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
+`1.9.0`, chunker `1.1.0`, resolver `1.5.0` — and a change to any of them makes
 existing snapshots stale and forces a reindex. The parser and resolver bumps
 landed together in ADR-0065 deliberately: both invalidate every snapshot, so
 shipping them in one change costs users one reindex rather than two.
