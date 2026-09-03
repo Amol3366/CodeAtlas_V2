@@ -281,13 +281,27 @@ def _pair_within_files(
 ]:
     """Match occurrences that share a file, and return what is left over.
 
-    Only a file holding exactly one occurrence on each side pairs here. Two
-    occurrences of one name inside a single file are genuinely ambiguous, and
-    guessing between them would be the ungrounded move this module refuses to
-    emit -- so they fall through to the caller untouched.
+    Occurrences pair by ``symbol_id`` first, then -- on whatever is left -- by
+    being the only candidate on each side.
 
-    Pairing is by file *path*, not file id: an id is not stable across the two
-    state views, and comparing ids would pair nothing.
+    **This used to pair only files holding exactly one occurrence per side**,
+    on the grounds that two occurrences of one name in a file are ambiguous and
+    guessing between them is the ungrounded move this module refuses to make.
+    That reasoning was correct until ADR-0069 and outlived it: those
+    occurrences used to *share* an id, so there was nothing to pair on. They no
+    longer do.
+
+    Leaving it produced a serious defect in the core wedge, found 2026-09-04 by
+    running preflight on five unmodified real repositories. Every ``git
+    status`` was empty; gson, cobra, gin and scalaz **failed outright** (the
+    report contract rejects an empty ``changed_files`` beside a non-empty
+    ``changed_symbols``), and ripgrep reported **102 changed symbols and 51
+    findings at high risk** -- exactly 51 x 2, 51 being the total membership of
+    its 17 ordinal-carried collision groups.
+
+    Pairing by file *path*, not file id: a **file** id is not stable across the
+    two state views. A **symbol** id is, which is the distinction that makes
+    this work -- measured rather than assumed.
     """
     base_by_path: dict[str, list[SymbolRecord]] = defaultdict(list)
     for symbol in base_symbols:
@@ -302,6 +316,36 @@ def _pair_within_files(
     matched: set[int] = set()
     for path in sorted(set(base_by_path) & set(target_by_path)):
         mine, theirs = base_by_path[path], target_by_path[path]
+
+        # Pair by `symbol_id` first, which is what makes more than one
+        # occurrence tractable at all.
+        #
+        # Before ADR-0069 every occurrence of a name in a file collapsed onto
+        # ONE id, so there was nothing to pair on and refusing to guess was
+        # right. ADR-0069 gives each a distinct, deterministic id, and the two
+        # state views compute the same id from the same bytes -- measured on
+        # gson: 4,414 symbols per side, 4,414 ids in common, none on either
+        # side alone, and all 99 of its colliding groups matching across both
+        # views. So this is the identity the parser already assigned, not a
+        # choice between look-alikes.
+        by_id = {symbol.symbol_id: symbol for symbol in theirs}
+        for base_symbol in mine:
+            target_symbol = by_id.get(base_symbol.symbol_id)
+            if target_symbol is None:
+                continue
+            paired.extend(
+                _classify_one_to_one(
+                    key, base_symbol, target_symbol, base, target, context
+                )
+            )
+            matched.add(id(base_symbol))
+            matched.add(id(target_symbol))
+
+        # Then the original rule, on whatever the ids did not claim. Kept
+        # rather than replaced: a lone occurrence whose id moved for some other
+        # reason still pairs by being the only candidate, exactly as before.
+        mine = [symbol for symbol in mine if id(symbol) not in matched]
+        theirs = [symbol for symbol in theirs if id(symbol) not in matched]
         if len(mine) != 1 or len(theirs) != 1:
             continue
         paired.extend(

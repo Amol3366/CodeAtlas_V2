@@ -4,7 +4,51 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-04 (the real-repository check is in the gate)
+Last updated: 2026-09-04 (preflight was broken on real code; found and fixed)
+
+## Resume point — 2026-09-04 (the gate step paid on its first run)
+
+**Change preflight was broken on every real repository, and the gate step added
+hours earlier is what found it.** On five **unmodified** checkouts, every `git
+status` empty: gson, cobra, gin and scalaz **raised** `ValidationError:
+changed_files cannot be empty when changed_symbols is not`, and ripgrep
+reported **102 changed symbols, 51 findings, `overall_risk: high`**. The CLI
+printed a raw pydantic traceback; the MCP tool `analyze_working_tree` escaped
+its own tool boundary.
+
+**Cause:** `_pair_within_files` refused to pair a name occurring more than once
+in one file. **Correct before ADR-0069**, when those occurrences shared one
+`symbol_id`; wrong after it gave each a distinct one, and nothing revisited the
+refusal. ripgrep's 102 is exactly 51 x 2, 51 being the total membership of its
+17 ordinal-carried collision groups.
+
+**Fixed** by pairing on `symbol_id` first, with the original only-candidate
+rule kept for the remainder. **No version constant moved and no reindex** — it
+is diff-time, not index-time. All five now report 0 changed, 0 findings.
+
+**The measurement that made the fix legitimate, and it was taken BEFORE writing
+it:** do the two state views agree on ids? On gson — 4,414 symbols per side,
+**4,414 ids in common, none on either side alone**, all 99 colliding groups
+matching. So pairing by id is the identity the parser already assigned, not a
+guess. Without that number the fix would have been the "ungrounded move" the
+old code refused to make.
+
+**The tracked Phase 4 baseline reproduces byte-for-byte, before and after.**
+That is the diagnosis, not reassurance: the corpus holds no colliding group and
+**cannot express this defect**. Sixth instance of that shape.
+
+**Two related defects are recorded and NOT fixed.** A same-named sibling
+inserted above another still transfers the earlier symbol's id to the new one
+(needs a new identity input, so a bundle bump and forced reindex — a ruling).
+And the MCP tool boundary still lets a non-`CodeAtlasError` escape, so the
+envelope is bypassed by any other exception.
+
+**The standing gap:** `check_real_repos.py` indexes and stops. An indexing gate
+found an indexing defect; it did not find this one. Extending it to a
+clean-tree preflight assertion would have, and costs gate time — a scope
+decision for the user.
+
+## Superseded resume note — 2026-09-04 (real repositories are gated)
 
 ## Resume point — 2026-09-04 (real repositories are gated)
 
@@ -454,6 +498,18 @@ estimate can be run instead of reasoned — **run it before writing the number,
 not after.**
 
 ## Completed
+
+- [x] **Preflight reported changes on unmodified real repositories, and failed
+      outright on four of five — found and fixed 2026-09-04.** `_pair_within_files`
+      refused to pair a name occurring more than once in one file; correct
+      before ADR-0069, wrong after it gave each occurrence a distinct
+      `symbol_id`. Fixed by pairing on that id first, the original
+      only-candidate rule kept for the remainder. **No version constant moved,
+      no reindex** — diff-time, not index-time. All five real repositories now
+      report 0 changed / 0 findings on a clean tree; the Phase 4 baseline
+      reproduces byte-for-byte, because the corpus cannot express the defect.
+      Guard: `test_an_unchanged_file_with_a_repeated_name_reports_nothing`,
+      written first and observed failing.
 
 - [x] **The real-repository check is wired into a gate (2026-09-04).**
       `check_phase7.ps1` now runs `scripts/check_real_repos.py

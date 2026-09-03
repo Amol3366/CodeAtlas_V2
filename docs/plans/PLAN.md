@@ -107,6 +107,7 @@ not only appending the evidence to the Trigger cell.
 
 | Item                                                                                                             | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Reopens when                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~**Preflight reports changes on an UNMODIFIED checkout, and FAILS OUTRIGHT on four of five real repositories**~~ | **CLOSED 2026-09-04 -- found and fixed the same day, by the gate step added hours earlier.** Preflight on five unmodified real repositories, every `git status` empty: gson, cobra, gin and scalaz **raised** `ValidationError: changed_files cannot be empty when changed_symbols is not`, so the flagship workflow returned nothing at all; ripgrep reported **102 changed symbols, 51 findings, overall_risk high**. It reached every surface -- the CLI printed a raw pydantic traceback and exited 1, and the MCP tool `analyze_working_tree` **escaped the tool boundary** rather than returning an envelope, because `ToolRegistry.call` catches `CodeAtlasError` on dispatch and `ValueError` only on input validation. **Cause:** `_pair_within_files` refused to pair a name occurring more than once in one file, correctly before ADR-0069 when those occurrences shared one `symbol_id`, and wrongly after it gave each a distinct one. ripgrep's 102 is exactly 51 x 2, 51 being the total membership of its 17 ordinal-carried collision groups. **Fix:** pair by `symbol_id` first, then the original only-candidate rule on the remainder -- measured first rather than assumed, on gson: 4,414 symbols per side, 4,414 ids in common, none on either side alone, all 99 colliding groups matching across both state views, so this is the identity the parser already assigned and not a guess. All five now report 0 changed, 0 findings, risk none. **No version constant moved and no reindex**: this is diff-time, not index-time. The tracked Phase 4 baseline reproduces byte-for-byte, which is the signature of a defect the corpus cannot express -- it holds no colliding group. Test-first, observed failing before the fix | Never for this cause; the guard is `test_an_unchanged_file_with_a_repeated_name_reports_nothing`. **Related and NOT fixed:** a same-named sibling inserted above another still transfers the earlier symbol's id to the new one, and the MCP tool boundary still lets a non-`CodeAtlasError` escape |
 | ~~**Two symbols in one file that share a qualified name and a kind collapse onto one `symbol_id`, and indexing FAILS**~~ | **CLOSED 2026-08-22 — ADR-0069, fixed the same day it was found, and it took three fixes because two more defects were hiding behind it.** `ensure_unique_symbol_ids` and `ensure_unique_chunk_ids` disambiguate identity per file; **`qualified_name` is deliberately left alone**, unlike the TS/JS prior art (`_disambiguate_repeated_symbols`, which appends `#L103` to the *name*) — right for an anonymous union member, wrong for `Gson.fromJson`, which would stop being findable by the name a caller types. **No reindex:** the first member of a colliding group keeps its id, so nothing storable today moved; `PARSER_BUNDLE_VERSION` stays **1.6.0**, `CHUNKER_VERSION` **1.1.0**, `SCHEMA_VERSION` **14**, `contract_version` **1.1**. **Fixing the symbols moved the failure rather than curing it** — first to `chunks` (`logical_chunk_id` has the identical shape), then to snapshot validation, which refused a relation whose source was the **invented** id `module_{file_id}` that `query_relations` minted for a file defining nothing (§4.1 forbids exactly that; `package-info.java` is the common shape), then to `relations.relation_id`, where `crypto/rand` and `math/rand` in `gin` both bound `rand` and both reported the `import (` line because Go and Rust attributed every path in a grouped import to the **declaration**. Each path now cites its own line, which is an evidence correction as much as a collision fix. Scala was checked and does **not** have it; Java has one import per statement. **All five real repositories now index:** gson 312 files/4135 symbols, scalaz 590/17226, ripgrep 229/4210, gin 130/1946, cobra 65/818, and `Gson.fromJson` resolves to every overload with its own line range | Nothing reopens it. **The follow-up recorded here was stale and is corrected 2026-09-02 (RW-01).** It read "the query-backed engine emits no `signature`, so its disambiguator is an ordinal ... teaching it signatures converts that to stable identity for four languages". `parsing/registry.py` records otherwise: **ADR-0071 (bundle 1.8.0) gave Java and Scala a signature**, and **Go and Rust emit `None` deliberately -- measured, a signature separates none of the collisions they actually produce**. ADR-0074 then added a discriminator for all four, taking separation from 221 to 419 of 1202 groups. The proposed remedy shipped; what remains is the **783-group residual**, which is a measurement question and is RW-05 |
 | ~~**A Java `IMPORTS` edge cites a line outside the symbol it is labelled with**~~ | **CLOSED 2026-08-31 -- ADR-0070, ruled by the user and merged (`65e51e0`, `--no-ff`). Every query-backed file now emits a compilation-unit `MODULE`, and an import is attributed to it *and* to the file's first definition: the module edge cites a line INSIDE its labelled symbol (4 of 4), and the definition edge is the one a caller asks for. Costs nothing measured -- every Phase 4 metric byte-identical, `targets_met` true, 0 of 80 query cases differ, and the corpus was NOT edited. `PARSER_BUNDLE_VERSION` 1.6.0 -> 1.7.0, so USERS MUST REINDEX. All five real repositories still index, each gaining one symbol per query-backed source file. The original text follows.** **OPEN — a modelling consequence of ADR-0065, found 2026-08-19 while authoring the first Java evaluation cases, and stated rather than smoothed over.** Python attaches a file-level import to a **MODULE** symbol whose range covers the whole file, so the import line sits *inside* the source symbol — which is what ADR-0019's "a reference site inside the source" describes. **The query-backed engine emits no module symbol for Java**, so the import attaches to the class: `OrderService` is defined at lines 5-15 and its `IMPORTS PaymentService` evidence cites **line 3**. **This is not a §4.1 violation** — line 3 *is* the import statement, so the evidence genuinely supports the claim "OrderService imports PaymentService", and Java's one-public-class-per-file convention makes the class a truthful importer. What is inconsistent is the *label model*, not the evidence. Two options, both real: accept it as a declared consequence of Java having no compilation-unit symbol, or emit one so imports attach as they do in Python (a `PARSER_BUNDLE_VERSION` bump and a reindex). q069 declares today's behaviour and passes; **it will need updating if the ruling goes the other way**, which is recorded here so the case is not mistaken for an endorsement. | A ruling is given, or a second query-backed language makes the inconsistency user-visible **MEASURED 2026-08-21 — the scope is wider than this row says, and its own reopen trigger has already fired.** It is **not Java-specific**: every one of the four query-backed languages does it. Indexed each fixture and compared each `IMPORTS` edge's cited line against its source symbol's span — **java_app** `CLASS OrderService` 5-15, import cited at **3**; **go_app** 7-9 at **3**; **rust_app** 3-5 at **1**; **scala_app** 5-9 at **3**. **4 of 4 outside.** The contrast is exact and falls on the tier boundary: Python and TS/JS attach an import to a **`MODULE`** symbol spanning the whole file (`src.payments.service` 1-11 cited at 1, `src.client` 1-5 at 1) — **3 of 3 inside**. So the choice is not about Java: accepting it accepts it for the whole query-backed tier, and fixing it is **one engine change rather than four adapters**, since no query-backed adapter emits a compilation-unit symbol (only `rust.py` maps `definition.module`, and that is a Rust `mod` declaration, not a file). This row's trigger reads "or a second query-backed language makes the inconsistency user-visible" — three have.  **COST MEASURED 2026-08-22 by prototype, and it is much higher than this row implied.** A compilation-unit symbol was implemented in the shared engine and measured. **The revert this row claimed did not happen — corrected 2026-08-22, later the same day.** The prototype sat uncommitted in `engine.py` for a day; `git status` showed it modified, `git stash` was empty, and a Phase 4 `--check` on that tree exited **5**, so "both baselines re-`--check`ed" cannot have been run after the claim was written. Actually reverted 2026-08-22T14:00Z, and both baselines re-`--check` exit **0** — see the handoff of that date. **The measurement below is unaffected and was independently reproduced** on the prototype tree before reverting: the same 12 metrics, the same figures. **It works**: imports attach to a `MODULE` and land inside it, **4 of 4**, one engine change covering all four languages. **But it fails the Phase 4 gate.** `targets_met: false`, unmet **`exact_symbol_resolution` 1.0000 -> 0.9545** (§19.3 target 0.98) and **`relation_path_recall` 1.0000 -> 0.9062** (ADR-0058 gates this at **1.0 absolutely**). **Twelve metrics move and every one moves down** — `abstention_correctness` 1.0000 -> 0.9605, `containing_evidence_recall_at_10` 1.0000 -> 0.9720, `ndcg_at_10` 0.9246 -> 0.9004, and the rest — because a per-file `MODULE` is an extra retrieval candidate that dilutes top-1 ranking and enters relation paths. **Two predictions in the plan were wrong**: the corpus cardinality guards do **not** fire (the whole evaluation suite passes, 125 tests — those guards count *cases*, not symbols), and it is not a clean six-line change — a naive whole-file range **fails snapshot validation** ("a staged symbol has a line range outside its file"), because tree-sitter's root node ends one line past a trailing newline, so the range needs clamping. Symbols +1 per file (+47% on the two-file fixtures). Phase 3 baseline moves too; Phase 0 does not. **So the real choice is: accept the tier difference, or pay a corpus-expectation update alongside the engine change** — not a version bump and a reindex. **RE-MEASURED PER-CASE 2026-08-31, AND THAT FRAMING IS WRONG.** Branch `imports-compilation-unit-measurement` (`dbb09fd`, kept, never merged). The 12 movements reproduce **exactly**. What had never been done is asking *which cases* moved: **only 3 of 80 query cases change — q069 (Java), q073 (Scala), q080 (Rust) — and all three go from a correct answer to ABSTENTION.** They account for every movement: `63/66 = 0.9545` and `29/32 = 0.9062` to four places. **The mechanism is that the `IMPORTS` edge moves off the class and onto the compilation unit, so "what does `OrderService` import" stops having an answer** and the engine correctly abstains. **This is an engine regression, not a stale instrument** — the hypothesis that six prior investigations (ADR-0017, 0018, 0024, 0027, 0038, 0051) made worth testing, and it does not hold here. **The corpus was therefore deliberately NOT updated:** re-declaring q069 as `app IMPORTS PaymentService` would restore every number while declaring a *worse* answer, which is laundering a regression into a passing metric and is what ADR-0003 forbids. A third option neither this row nor the plan considered is now the interesting one and is **unmeasured**: emit the compilation-unit symbol *and* keep attributing the import to the class, so the label model gains a module without losing the class relationship |
 | ~~**ADR-0065's two declared limits: Go imports and Scala member calls**~~ | **BOTH CLOSED 2026-08-19 by user ruling, and they were ruled in opposite directions on purpose.** **Go (ADR-0066): declined, permanently.** The module prefix lives in `go.mod`, which a single-file parse cannot read, so closing it needs a *matching policy* rather than more parsing — and the cost is asymmetric: trimming too far makes a third-party `github.com/foo/payments` resolve onto a local `payments`, **inventing** a relationship §4.1 forbids. The `strict` xfail is **inverted rather than deleted** (ADR-0045's precedent) and now pins both halves: the import is recorded, and it is not resolved. **Scala (ADR-0067): closed.** `LanguageProfile` gained an optional `references_query`; Scala authors `scala.references.scm` capturing the `field_expression`'s `field`. **What separates the two rulings is where the missing information lives** — Go's is in a file the parser is not allowed to read, Scala's was in the syntax tree all along and only a query was missing. Declaring a limit that nine lines of query closes would have recorded an absence of work as a property of the language. `PARSER_BUNDLE_VERSION` **1.5.0 -> 1.6.0** (Scala yields references it did not before); `RESOLVER_VERSION` deliberately unchanged, because resolution draws the same conclusions from a reference as it always did. **The corpus carries no xfails at all now.** | Someone wants a Go matching policy (supersede ADR-0066), or a fourth language needs a supplementary query |
@@ -593,6 +594,100 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-04T06:00:00Z — The gate step paid on its first run: preflight was broken on real code
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **no task status moved.** A defect found, recorded and fixed in
+  one pass, on the user's instruction.
+- **No version constant moved. NO REINDEX** — this is a diff-time fix, not an
+  index-time one. `SCHEMA_VERSION` 14, `contract_version` 1.1, parser 1.9.0,
+  chunker 1.1.0, resolver 1.5.0, `RETRIEVAL_POLICY_VERSION` 5.4.
+
+#### What was found
+
+Change preflight — "the core product wedge" — on five **unmodified** real
+repositories, every `git status` empty:
+
+| Repository | Result before |
+| --- | --- |
+| gson, cobra, gin, scalaz | **RAISED** `ValidationError: changed_files cannot be empty when changed_symbols is not` |
+| ripgrep | **102 changed symbols, 51 findings, `overall_risk: high`** |
+
+It reached every surface. The CLI printed a **raw pydantic traceback** and
+exited 1 — not the error envelope, and not one of the documented exit codes.
+The MCP tool `analyze_working_tree` **escaped the tool boundary** entirely,
+because `ToolRegistry.call` catches `CodeAtlasError` on dispatch and `ValueError`
+only on *input* validation, so an agent got a protocol-level crash.
+
+#### The cause, and why it was invisible for so long
+
+`_pair_within_files` refused to pair a name occurring more than once in one
+file, on the grounds that choosing between the occurrences would be a guess.
+**That was correct before ADR-0069**, when those occurrences collapsed onto one
+`symbol_id`. ADR-0069 gave each a distinct id and nothing revisited the refusal,
+so the unpaired occurrences fell through and were reported as deleted **and**
+added.
+
+ripgrep's 102 is exactly **51 x 2**, and 51 is the total membership of its 17
+ordinal-carried collision groups — `imp` 11 members produced 22 entries,
+`DirEntryRaw.from_path` 3 produced 6, and so on. The arithmetic closes exactly.
+
+**The tracked Phase 4 baseline reproduces byte-for-byte**, before and after.
+That is not reassurance, it is the diagnosis: the corpus holds no colliding
+group, so it **cannot express this defect**. Sixth instance of that shape
+(ADR-0016, ADR-0029, ADR-0042, ADR-0043, ADR-0044, ADR-0069).
+
+#### The fix, measured before it was written
+
+Pair by `symbol_id` first; the original only-candidate rule then runs on the
+remainder, so no existing behaviour is replaced.
+
+The question that decides whether that is legitimate is whether the two state
+views agree on ids. **Measured on gson rather than assumed:** 4,414 symbols per
+side, **4,414 ids in common, zero on either side alone**, and all **99** of its
+colliding groups matching across both views. So the pairing uses the identity
+the parser already computed; the ambiguity the old rule protected against does
+not exist any more.
+
+After: all five report **0 changed symbols, 0 findings, risk none**. The MCP
+tool returns a report. Test-first — the guard was observed failing before the
+fix existed.
+
+#### Two related defects, NOT fixed, recorded rather than folded in
+
+1. **A same-named sibling inserted above another transfers the earlier symbol's
+   id to the new one.** Measured on ripgrep: inserting a third `cfg`-gated
+   `from_path` above two existing ones left both original ids in place but
+   attached to *different* methods, because the first member in byte order
+   always takes the undisambiguated base id. `domain/symbols.py` documents the
+   mechanism; the consequence is over-reporting, which that docstring already
+   accepts as recoverable. Closing it needs a new identity input, so a bundle
+   bump and a forced reindex — a ruling, not a patch.
+2. **The MCP tool boundary lets a non-`CodeAtlasError` escape.** The envelope
+   is bypassed by any handler raising something else. Narrow and fixable
+   without a ruling; deliberately left out of this pass so the fix above stays
+   attributable.
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| `pytest tests` | see the commit; run on the committed tree |
+| `ruff check src tests scripts apps` | exit 0 |
+| `mypy --no-incremental src tests scripts apps` | **409 files, no issues** |
+| Phase 4 baseline `--check` | **exit 0**, byte-identical |
+| `tests/evaluation` | 276 passed |
+| Clean-tree sweep, five real repos | 0 changed, 0 findings, risk none, on all five |
+
+#### Next
+
+**The gate still does not run preflight on real code** — `check_real_repos.py`
+indexes and stops, which is why an indexing gate found an indexing defect and
+not this one. Extending it to a clean-tree preflight assertion would have caught
+this directly, and would cost more gate time. That is a scope decision and is
+left for the user.
+
 
 ### 2026-09-04T04:00:00Z — The highest-yield check in the project's history was in no gate; it is now
 

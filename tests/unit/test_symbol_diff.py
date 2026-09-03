@@ -893,3 +893,56 @@ def test_a_sibling_config_key_is_not_folded_by_a_prefix_that_only_looks_alike()\
         "service.api",
         "service.apikey",
     ]
+
+
+_PROPERTY_PAIR = """class Account:
+    @property
+    def balance(self):
+        return self._balance
+
+    @balance.setter
+    def balance(self, value):
+        self._balance = value
+"""
+
+
+def test_an_unchanged_file_with_a_repeated_name_reports_nothing() -> None:
+    """Two same-named symbols in one file are not a change when nothing changed.
+
+    **Found by running preflight on five real repositories, all unmodified.**
+    `git status` was empty on every one, and change analysis reported gson,
+    cobra, gin and scalaz as *failing outright* -- the report contract rejects
+    ``changed_files`` being empty while ``changed_symbols`` is not -- and
+    ripgrep as having **102 changed symbols and 51 findings**, at
+    ``overall_risk: high``.
+
+    The cause is here. `_pair_within_files` refuses to pair a name occurring
+    more than once in one file, on the correct-at-the-time grounds that
+    choosing between the occurrences would be a guess. That was true **before
+    ADR-0069**, when those occurrences collapsed onto one ``symbol_id``. Since
+    ADR-0069 each carries a distinct, deterministic id, and the two state views
+    produce **identical ids for identical bytes** -- measured on gson: 4,414
+    symbols each side, 4,414 ids in common, zero on either side alone, and all
+    99 of its colliding groups matching across both views.
+
+    So the ambiguity this refusal protects against no longer exists, and the
+    unpaired occurrences fell through to be reported as deleted **and** added.
+    ripgrep's 102 is exactly 51 x 2, and 51 is the total membership of its 17
+    ordinal-carried collision groups.
+
+    A Python property and its setter are the smallest reproduction: same kind,
+    same qualified name, different signature, one file.
+    """
+    _, base_symbols = _parse(_PROPERTY_PAIR)
+    _, target_symbols = _parse(_PROPERTY_PAIR)
+    paths = _path_dict("src/payments/service.py")
+
+    changes = compute_symbol_changes(
+        _input(base_symbols, paths),
+        _input(target_symbols, paths),
+    )
+
+    assert changes == (), (
+        "an unmodified file reported changes: "
+        f"{[(c.change_kind.value, c.qualified_name) for c in changes]}"
+    )
