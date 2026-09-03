@@ -4,7 +4,27 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-03 (release validation)
+Last updated: 2026-09-03 (staleness pass over `Decisions Made` and
+`Known Issues`)
+
+**Staleness pass, 2026-09-03.** Five entries were corrected in place — struck
+through with the superseding authority named, never deleted, because the
+reasoning error is the reusable part. The `Known Issues` carry-over list is now
+marked **historical** rather than reading as current status, matching how
+`documentation/phases.md` marks its own. Corrected: ADR-0060's "99.5% is
+parsing" (superseded by ADR-0064, and it sat in `Decisions Made` while its
+correction lived 400 lines below); the Chromium skip count (five/four →
+**eight/five**, re-counted from the specs); pid-reuse detection (closed by
+ADR-0037 three weeks earlier, in this file's own `Completed` section);
+changed-symbol precision (0.9375 → **0.9545**, by dilution, not by a fix); and
+Recall@10, which was missing ADR-0027's containment correction.
+
+**Every replacement figure was re-derived, not incremented** — from
+`baseline-phase-4.json`, `baseline-phase-7.json`, and the e2e specs themselves.
+That is what caught the Chromium count being wrong in the **register** as well,
+by one: the register enumerates helper call sites and `settings.spec.ts` also
+skips inline at line 143. **The register is not amended here** — it is the
+authority, and amending it is a separate act with its own evidence.
 
 ## Current Phase
 
@@ -3294,12 +3314,25 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
   change to `EmbeddingMigrationService`. Two resolution sites could disagree
   about which model is current, and a namespace whose label disagrees with its
   contents fails silently.
-- **Preflight on a real repository is 635 s, and 99.5% of it is parsing**
-  (ADR-0060). The register's ">15 minutes on a 664-file repository" is
-  confirmed, not anecdotal. `parse_base` 316 s + `parse_target` 316 s against
-  `file_diff` 2.4 s and `symbol_diff` 0.2 s. The remedy is not re-parsing
-  unchanged files; **`SnapshotStateView` is not that remedy** — it is unused
-  *and* still reads and hashes every file.
+- ~~**Preflight on a real repository is 635 s, and 99.5% of it is parsing**
+  (ADR-0060).~~ **SUPERSEDED by ADR-0064 (2026-08-18); corrected here
+  2026-09-03, because this bullet sat in `Decisions Made` stating the
+  overturned attribution as a standing decision while its correction lived
+  ~400 lines below under `Known Issues`.** A reader going top-down met the
+  wrong number first. **Parsing is 2.5%, not 99.5%**: `parse` 8.14 s against
+  `resolve` 310.24 s (97.0%), with `list_files` 1.25 s and `read_file` 0.07 s.
+  The timer named `parse_base` wrapped `_analyze_state`, which lists, reads,
+  parses **and resolves**. Preflight is **21.56 s** after ADR-0064's fix,
+  against 635.59 s. Read the `Known Issues` entry "A timer is named by its
+  author, not by what it wraps" for the full account.
+
+  **What survives the correction**, and is why the bullet is kept rather than
+  deleted: the register's ">15 minutes on a 664-file repository" *was*
+  confirmed rather than anecdotal, and **`SnapshotStateView` is still not the
+  remedy** — it is unused *and* still reads and hashes every file. The
+  reasoning error is the reusable part: three records' worth of remedies
+  (ADR-0061, ADR-0062, ADR-0063) were aimed at a stage that was 2.5% of the
+  cost, because a timer's *name* was read as its scope.
 - **A synthetic profile measures scaling honestly and proportions
   dishonestly** (ADR-0060). `measure_phase4_perf.py` generates ~15-line
   modules, so `file_diff` looked like the biggest stage and parsing looked
@@ -3844,19 +3877,84 @@ Full rationale lives in `docs/adr/`. The ones that shape day-to-day work:
 
 Carried into gate approvals as declared work rather than dropped:
 
-- Unsigned packaged executable → SmartScreen warns on first run. Needs a
-  purchased certificate.
-- **Five Playwright tests skipped on Chromium, across four spec files** —
-  `onboarding-to-citation`, `restart-persistence`, `settings`, and
-  `stream-reconnection` all use the skip helper. Upstream renderer defect, not
-  application code; Firefox runs every one of them.
+> **This list is the HISTORICAL record of what was carried into an approval,
+> and it is not a current status list** (marked as such 2026-09-03, matching
+> the same treatment `documentation/phases.md` gives its own "Still Open"
+> list). **The authority is the Deferred Register in `docs/plans/PLAN.md`**,
+> which is terminal — every row closed, accepted, or deferred with a named
+> trigger. Where this list and the register disagree, the register wins and
+> this list is the bug.
+>
+> Four rows below had gone stale *against the register and against this file's
+> own `Completed` section*, and are corrected in place rather than deleted.
+> Two were closed by ADRs recorded ~2,500 lines above them here; one is an
+> arithmetic figure that has moved four times. That is the same shape the
+> 2026-09-03 closeout found in the register itself — sixteen rows saying
+> `OPEN` while their own trigger cell recorded the closure — recurring in the
+> summary that points at it.
 
-  **Correction (2026-08-07):** this used to read "four conversation-route tests
-  … on `/conversations/{id}`". The defect has since been hit on more routes, so
-  the route-specific wording understated it. `AGENTS.md` Section 20 still
-  describes the Phase 6 gate state and is deliberately not edited.
-- No pid-reuse detection in crash recovery — a reassigned pid keeps a repository
-  blocked from reindexing. `codeatlas doctor` makes it visible, not automatic.
+- Unsigned packaged executable → SmartScreen warns on first run. Needs a
+  purchased certificate. **Still open** (verified against the register
+  2026-09-03: `DEFERRED`, trigger "a certificate is purchased").
+- ~~**Five Playwright tests skipped on Chromium, across four spec files**~~
+  → **EIGHT tests across FIVE spec files**, re-counted from the specs
+  2026-09-03. Upstream renderer defect, not application code; Firefox runs
+  every one of them, so no assertion is lost — only the engine it is proven on.
+
+  **Counted, not incremented**, because this figure has now understated itself
+  three times (corrected 2026-08-07, 2026-08-10, and here). The eight call
+  sites, one test each:
+
+  | Spec | Line | Mechanism |
+  | --- | ---: | --- |
+  | `onboarding-to-citation` | 20 | `skipChromiumRendererCrash` |
+  | `preflight` | 63 | inline `test.skip` |
+  | `preflight` | 99 | inline `test.skip` |
+  | `restart-persistence` | 20 | `skipChromiumRendererCrash` |
+  | `settings` | 143 | inline `test.skip` |
+  | `settings` | 269 | `skipChromiumSettingsCrash` |
+  | `stream-reconnection` | 248 | `skipChromiumRendererCrash` |
+  | `stream-reconnection` | 272 | `skipChromiumRendererCrash` |
+
+  **Corroborated by run totals rather than by the count alone:** a full run
+  reports **8 skipped** (22 tests over two projects — 13 passed, 8 skipped, 1
+  failed on 2026-09-03), and `--repeat-each=10` reported **80 skipped**, which
+  is 8 per repetition. The count and the observed totals agree.
+
+  > **The Deferred Register says "seven … across five spec files" and is
+  > understated by one.** Its enumeration lists `settings` once; the spec has
+  > **two** Chromium skips — line 143 (inline) and line 269 (via
+  > `skipChromiumSettingsCrash`) — and the register's own list was built from
+  > the helper call sites, so the inline one was invisible to it. **This is a
+  > note, not a correction to the register**: the register is the authority and
+  > amending it is a separate act with its own evidence. `README.md` carries
+  > the same "seven" and would move with it. Flagged 2026-09-03.
+
+  **Why the earlier wording understated it, kept because the reasoning
+  recurs.** The 2026-08-07 correction records that it used to read "four
+  conversation-route tests … on `/conversations/{id}`" — route-specific
+  wording that could not survive the defect being hit on more routes. The
+  entry above then counted *helper* call sites, which could not survive a skip
+  written inline. **Each phrasing was accurate about the mechanism it knew and
+  silently excluded the one it did not.** `AGENTS.md` Section 20 still
+  describes the Phase 6 gate state and is deliberately not edited — it records
+  what a completed phase delivered.
+- ~~No pid-reuse detection in crash recovery — a reassigned pid keeps a
+  repository blocked from reindexing. `codeatlas doctor` makes it visible, not
+  automatic.~~ **CLOSED 2026-08-10 — ADR-0037** (status `accepted`), recorded
+  in this file's own `Completed` section under the project-closeout entry.
+  **Struck here 2026-09-03; it had outlived its answer by three weeks in the
+  one list a reader checks for open work.** An owner stamp now records a
+  process *instance* rather than a pid, so a reassigned pid no longer looks
+  alive.
+
+  **The reason it stayed open is the reusable part, and it is recorded at
+  ADR-0037:** the stated blocker was "no portable source without a new
+  dependency", which was *half* right — there is no portable source, and
+  `GetProcessTimes` sits in `kernel32` beside the `OpenProcess` the module
+  already called through `ctypes`. **Scoping a requirement to "portable" when
+  the product is Windows-first** is what kept a user-visible defect open across
+  two phase gates.
 - Packaged semantic tree is 1.05 GB (torch), accepted at the Phase 7 activation
   gate.
 - ~~**`POST /v1/models/test` success branch is untested.**~~ **Closed
@@ -3874,13 +3972,51 @@ Carried into gate approvals as declared work rather than dropped:
   returns a vector. Waiting for a real provider is what kept it open for a
   week, and once one *was* installed, the naive version of the test would have
   issued a real billable request on every run.
-- Primary evidence Recall@10 = 0.6667 vs a ≥0.90 target. Missed with *and*
-  without the semantic layer, so not a regression. Never cite the uplift without
-  `docs/evaluation/phase-7-baseline-environment.md`: the lexical stopword fix
-  was worth +0.53, the semantic layer +0.07.
-- Changed-symbol precision = 0.9375 vs ≥0.95. Structural — c020–c022 split one
-  physical diff into three single-symbol cases that count each other's symbols
-  against them. The other 21 cases score 1.0.
+- Primary evidence Recall@10 = 0.6667 vs a ≥0.90 target **at the Phase 7
+  gate**. Missed with *and* without the semantic layer, so not a regression.
+  Never cite the uplift without `docs/evaluation/phase-7-baseline-environment.md`:
+  the lexical stopword fix was worth +0.53, the semantic layer +0.07.
+
+  **Updated 2026-09-03 with the metric correction this entry was missing.**
+  Read from `docs/evaluation/baseline-phase-7.json` rather than from prose:
+  today the semantic column is **0.8421** primary and **1.0000** containing,
+  against deterministic **0.6842** / **0.8947**. The gate condition passes
+  under `containing_evidence_recall_at_10`, the containment metric **ADR-0027**
+  introduced.
+
+  **ADR-0027 was a corrected definition and NO engine change, so this must
+  never be cited as uplift.** `primary_evidence_recall_at_10` compared line
+  ranges for exact equality, so a citation one line longer than the gold range
+  scored as never found — four of Phase 7's five misses were returning the
+  right evidence at ranks 1, 1, 2 and 4. The gate figure of 0.6667 and the
+  1.0000 today are the same engine measured two ways.
+- ~~Changed-symbol precision = 0.9375 vs ≥0.95.~~ **Reads 0.9545 (30 of 33
+  cases exact) and `unmet_targets` is EMPTY** — read from
+  `docs/evaluation/baseline-phase-4.json` 2026-09-03, which reports
+  `targets_met: true` over a corpus of 33 change / 80 query cases.
+
+  **Nothing was fixed, and the figure moving is not progress.** The structural
+  cause is untouched: c020, c021 and c022 split one physical `git_changes` diff
+  into three single-symbol cases, so the engine — correctly reporting both
+  affected symbols every run — has each case count the other's against it.
+  **All three still score exactly 0.50.** The aggregate crossed 0.95 purely by
+  **dilution** as the corpus grew: `0.9375` at the Phase 4 gate, then `0.9464`,
+  `0.9483`, `0.9531` at 32 cases, and `(30x1.0 + 3x0.5)/33 = 0.9545` today.
+
+  **Never cite "all Section 19.3 targets met" without this paragraph.** The
+  corpus was not edited to move a number (ADR-0003) — the cases were added to
+  give Scala, Go and Rust the change coverage they had none of — but the effect
+  still has to be declared, and it is the mirror of the threshold-granularity
+  problem ADR-0032 and ADR-0033 record.
+
+  **No regression guard was ever lost, and the first write-up of this said
+  otherwise.** `tests/evaluation/test_change_adapter.py` has pinned those three
+  cases two-sided since Phase 4 — failing if a fourth drops below 1.0, and
+  equally if one of the three is quietly "fixed". What went blind was the
+  *aggregate*, so the fix was reporting: `changed_symbol_exact_cases` is
+  emitted beside the mean, and the Phase 4 row reads
+  **`0.9545 (30/33 cases exact)`**. A count cannot be diluted by adding cases
+  that already pass, so the pair says what neither number says alone.
 - ~~User still observed the older Settings view until a manual reload.~~
   **Root-caused 2026-08-05, and it was never a caching problem.** There are two
   built web bundles, and `web_assets_path()` (`src/codeatlas/api/web.py`) picks
