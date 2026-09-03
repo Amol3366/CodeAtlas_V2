@@ -522,11 +522,13 @@ These are not hidden:
   reports `PUBLIC_BEHAVIOR_CHANGED`.
 - The packaged executable is unsigned. Needs a purchased certificate — a
   purchasing decision, not an engineering task.
-- **Seven** Playwright tests are skipped on Chromium across **five** spec files;
-  the renderer dies on a client-side navigation. Firefox runs all seven, so
-  coverage is not lost. (This previously read "some conversation-route tests".
-  The defect has since been hit on more routes, so the route-specific wording
-  understated it.)
+- **Eight** Playwright tests are skipped on Chromium across **five** spec files;
+  the renderer dies on a client-side navigation. Firefox runs all eight, so
+  coverage is not lost. (This has understated itself three times. It read "some
+  conversation-route tests" until the defect was hit on other routes; it then
+  read "seven", counted from the `skipChromium*` helper call sites, which could
+  not see `settings.spec.ts`'s second, inline skip. Re-counted from the specs
+  2026-09-03 and corroborated by full runs reporting 8 skipped.)
 - The semantic-local packaged tree is 1.05 GB because of torch, accepted at the
   Phase 7 activation gate.
 - Phase 7's primary evidence Recall@10 missed its ≥0.90 target at the gate

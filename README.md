@@ -843,10 +843,18 @@ call sites scanned every symbol per reference. Indexing them gave **313.97 s →
 - **The packaged executable is unsigned**, so SmartScreen warns on first run.
   This needs a purchased certificate — a purchasing decision, not an engineering
   task.
-- **Seven Playwright tests are skipped on Chromium** across five spec files; the
-  renderer dies on a client-side navigation. Firefox runs all seven, so coverage
-  is not lost. A separate, *failing* Chromium settings test was found
-  2026-08-18, reproduces on `main`, and is under investigation.
+- **Eight Playwright tests are skipped on Chromium** across five spec files; the
+  renderer dies on a client-side navigation. Firefox runs all eight, so coverage
+  is not lost. Corrected from "seven" 2026-09-03 by re-counting the specs: the
+  figure was built from the `skipChromium*` helper call sites and
+  `settings.spec.ts` also skips inline, so one was invisible to the count. Full
+  runs report 8 skipped, which is the corroboration.
+
+  The *failing* Chromium settings test found 2026-08-18 is **no longer under
+  investigation** — it was reproduced, its mechanism named (the renderer
+  crashes rendering the Embedding provider fieldset for a transmitting
+  repository), and it was skipped by explicit user ruling on 2026-08-19 on the
+  same terms as its neighbours. It is one of the eight.
 - **The semantic-local packaged tree is 1.05 GB** (torch), accepted at the
   Phase 7 activation gate.
 - **Changed-symbol precision now reads 0.9545 and `unmet_targets` is empty —

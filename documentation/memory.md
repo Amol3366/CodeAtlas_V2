@@ -22,9 +22,16 @@ Recall@10, which was missing ADR-0027's containment correction.
 **Every replacement figure was re-derived, not incremented** — from
 `baseline-phase-4.json`, `baseline-phase-7.json`, and the e2e specs themselves.
 That is what caught the Chromium count being wrong in the **register** as well,
-by one: the register enumerates helper call sites and `settings.spec.ts` also
-skips inline at line 143. **The register is not amended here** — it is the
-authority, and amending it is a separate act with its own evidence.
+by one: the register enumerated helper call sites and `settings.spec.ts` also
+skips inline at line 143.
+
+**Follow-up 2026-09-04, on the user's instruction:** the register row,
+`README.md` and `codeatlas-v2-working-guide.md` are corrected to **eight**, and
+a handoff is appended at 2026-09-04T02:00:00Z. `AGENTS.md` is deliberately
+untouched — its "all seven" sits in the Phase 6 gate record, which is
+past-tense and cannot go stale. `README.md`'s claim that the 2026-08-18 failing
+Chromium settings test "is under investigation" was corrected in the same pass:
+it was ruled and skipped on 2026-08-19 and is one of the eight.
 
 ## Current Phase
 
@@ -3921,14 +3928,25 @@ Carried into gate approvals as declared work rather than dropped:
   failed on 2026-09-03), and `--repeat-each=10` reported **80 skipped**, which
   is 8 per repetition. The count and the observed totals agree.
 
-  > **The Deferred Register says "seven … across five spec files" and is
-  > understated by one.** Its enumeration lists `settings` once; the spec has
-  > **two** Chromium skips — line 143 (inline) and line 269 (via
-  > `skipChromiumSettingsCrash`) — and the register's own list was built from
-  > the helper call sites, so the inline one was invisible to it. **This is a
-  > note, not a correction to the register**: the register is the authority and
-  > amending it is a separate act with its own evidence. `README.md` carries
-  > the same "seven" and would move with it. Flagged 2026-09-03.
+  > ~~**The Deferred Register says "seven … across five spec files" and is
+  > understated by one.**~~ **CORRECTED in the register 2026-09-04**, on the
+  > user's instruction, together with `README.md` and
+  > `codeatlas-v2-working-guide.md`; see the 2026-09-04T02:00:00Z handoff.
+  > Kept as written because the finding is the reusable part: the register's
+  > enumeration listed `settings` once while the spec has **two** Chromium
+  > skips — line 143 (inline `test.skip`) and line 269 (via
+  > `skipChromiumSettingsCrash`) — because the row was built from the helper
+  > call sites, so the inline one was structurally invisible to it. Flagged
+  > 2026-09-03, corrected 2026-09-04.
+  >
+  > **`settings.spec.ts` had the right total in prose the whole time**, and no
+  > count derived from call sites could reach it: its header records the
+  > transmitting test as skipped "on the same terms as its **seven
+  > neighbours**".
+  >
+  > **`AGENTS.md` was deliberately NOT corrected.** §20 line 1204 says "Firefox
+  > proves all seven" inside the Phase 6 gate record — a past-tense account of
+  > what that gate observed, which cannot go stale and must not be edited.
 
   **Why the earlier wording understated it, kept because the reasoning
   recurs.** The 2026-08-07 correction records that it used to read "four

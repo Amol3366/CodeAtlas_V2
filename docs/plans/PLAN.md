@@ -120,7 +120,7 @@ not only appending the evidence to the Trigger cell.
 | Unsigned packaged executable                                                                                     | **DEFERRED — not an engineering task.** SmartScreen warns on first run. Needs a purchased code-signing certificate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | A certificate is purchased                                                                                                                                                  |
 | ~~**Refresh p95 misses its 2 s target on the packaged artifact, cause unattributed**~~ | **CLOSED 2026-09-03 (RV-09) -- RETRACTED. There is no miss.** Re-measured on a quiet machine by the same script and the same artifact: refresh p95 **1.783 s**, preflight **3.072 s**, `measure_phase7_perf.py` **exit 0**, both targets met. The four failing runs (2.296, 2.310, and 2.240 on the parser-1.6.0 artifact) were **machine load**, exactly as the 2026-08-21 claim was. **The error is the reusable part, and this file had already warned against it**: `phase-7-performance-environment.md` says "within-session agreement is not evidence of validity -- the loaded pair agreed within 26 ms", and this investigation quoted that warning and then agreed within **14 ms**, 0.52 s from the truth. **What survives:** the controlled parser-1.6.0 comparison still exonerates ADR-0070/0071/0074, because both sides were measured under the same conditions; and **`machine_settled: True` does NOT mean the machine was fast** -- it compares calibration before and after the run, so it reported `True` for every loaded run. That is the finding with the longest shelf life, because it is the field a future investigator reaches for to rule load out. The tracked baseline is regenerated at 1.783/3.072 by the gate's own `--json-output` command **CONFIRMED 2026-09-03 by a second quiet run: refresh p95 **1.668 s**, preflight **2.963 s**, faster than the first on every metric. Two independent passes; the retraction no longer rests on one measurement.** | Closed. **The cross-run calibration check proposed here is WITHDRAWN -- measured, it would not have worked.** A loaded run reads `calibration_before_s` **0.2187** and a quiet run **0.2192**, five ten-thousandths apart, with refresh p95 2.296 against 1.668. The calibration workload is CPU-bound and short; the loaded runs were competing for **I/O** with PyInstaller builds and ~1 GB zip operations, which it cannot see. A plausible fix that does not work is worse than none -- someone would build it and then trust it |
 | **`-Package` and `-SkipSync` run against materially different environments** | **CLOSED 2026-09-03 (RV-04) -- found by running the leg nobody had run.** `-Package` omits `-SkipSync`, so it does `uv sync --all-groups --frozen`; **extras are not groups**, so that uninstalls `semantic-local` and modules importing `sentence_transformers` at module scope stop being **collected**: **2483 with the extra, 2458 without**. `test_the_readme_test_count_matches_what_the_suite_collects` asserted a static number against whichever environment was present, and justified itself on the claim that **"collection is a pure function of the source"** -- false, and now corrected in place. The README was never wrong; the guard was pointed at an environment the README does not describe and blamed the README. The guard now reads the environment the README declares, asserts only there, and **abstains loudly** otherwise. Mutation-checked in all three states. | Closed; reopens if a second environment-dependent claim is found |
-| **Seven** Playwright tests skipped on Chromium, across **five** spec files                           | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all seven, so coverage is not lost. **Counted from the gate run on 2026-08-11, not copied forward:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings`, and `stream-reconnection` ×2. The seventh is ADR-0042's navigation test, which is skipped for the same reason as the reload test beside it. The figure understated itself twice before (corrected 2026-08-07 and 2026-08-10); it is re-counted here rather than incremented                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The upstream bug is fixed                                                                                                                                                   |
+| **Eight** Playwright tests skipped on Chromium, across **five** spec files                          | **DEFERRED — upstream defect.** The renderer dies on a client-side navigation. Firefox runs all eight, so coverage is not lost. **Re-counted from the specs 2026-09-03 and corrected SEVEN → EIGHT:** `onboarding-to-citation`, `preflight` ×2, `restart-persistence`, `settings` **×2**, and `stream-reconnection` ×2. ADR-0042's navigation test is skipped for the same reason as the reload test beside it. **The miscount's mechanism, which is the reusable part: this row was built from the `skipChromium*` helper call sites, and `settings.spec.ts` skips Chromium twice** — line 269 through `skipChromiumSettingsCrash`, and line 143 through an inline `test.skip` — so the inline one was structurally invisible to the way the row was counted, exactly as the pre-2026-08-07 route-specific wording was blind to skips on other routes. Corroborated three ways rather than by re-counting alone: full-run totals report **8 skipped** (13 passed / 8 skipped / 1 failed, 2026-09-03), `--repeat-each=10` reported **80 skipped** = 8 per repetition, and `settings.spec.ts`'s own header records the transmitting test as skipped "on the same terms as its **seven neighbours**". **The figure has now understated itself three times** (corrected 2026-08-07, 2026-08-10, and here); each phrasing was accurate about the mechanism it knew and silently excluded the one it did not. Found 2026-09-03 while re-deriving the same figure for `documentation/memory.md`, which had it as five across four                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | The upstream bug is fixed                                                                                                                                                   |
 | Packaged semantic tree 1.05 GB                                                                                   | **ACCEPTED at the Phase 7 activation gate.** The torch cost was known and approved when the semantic layer was admitted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | A deterministic-only second artifact is wanted                                                                                                                              |
 | ~~**The change corpus cannot express an ADR-0044-shaped defect**~~ | **CLOSED 2026-09-02 (DR-06), ADR-0077 -- disposition promoted 2026-09-03 (CO-05); the closure was recorded only in the Trigger cell. Original diagnosis retained verbatim: OPEN — a stated limit of the instrument, not a defect.** Found 2026-08-14 writing WS-1 Task 3c. `predict_changes` compares two `DirectoryStateView`s (`engine_adapter.py:581`) and no evaluation path builds a Git repository, so `GitBlobStateView` — where ADR-0044's ignore-rule fix lives — never runs under the corpus. Both directory sides have applied identical ignore rules since Phase 4, so a tracked-but-ignored file is absent from *both* states: a case asserting "no `SYMBOL_DELETED`" would pass with the fix **and** with it reverted. **Deliberately not committed as a case**, because permanent green reads as coverage. ADR-0044's integration tests remain its only coverage, and any future blob-vs-directory defect is invisible here for the same reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | **CLOSED 2026-09-02 (DR-06) — ADR-0077.** `ChangeCase` gains `base_view`, and **c033** reads its base through `GitBlobStateView` against the target on disk — one working tree, two states, the shape `analyze_working_tree` uses. The row's warning was right and is why no case existed before: two directory sides apply the same ignore rules, so a case would pass **with ADR-0044's fix and without it**. **c033 does not**: remove the ignore filter from `GitBlobStateView.list_files` and it reports `bundled_total` **deleted** beside the real change. `coverage/` is the ignore default used, not `dist/`, which this repository's own `.gitignore` excludes — ADR-0049's collision met a second time. Cost: change corpus 32 → 33, `changed_symbol_precision` 0.9531 → 0.9545 **by dilution**, `changed_symbol_exact_cases` 29 → **30**, which is the number that cannot be lifted by adding passing cases |
 | ~~Grow the symbol corpus toward 50 cases~~                                                                      | **CLOSED 2026-08-15.** Scored symbol-intent cases 27 -> **50**, so `exact_symbol_resolution`'s 0.98 finally tolerates one miss (0.9800) rather than silently requiring 27/27 - the condition ADR-0033 left open. **Both assumptions in the estimate were wrong.** It needed **23** cases, not "13+": 27 + 13 = 40, where one miss still scores 0.9750 and the target is as inexpressible as before. And it needed a **new fixture**, because the five existing ones hold only ~20 distinct symbol-shaped targets between them, already queried by the existing 27 - more cases against those would have padded a denominator to loosen a release target, the mirror image of ADR-0032/0033. `symbol_breadth` adds 25 symbols and 69 relations; the other five fixtures stay byte-identical. **`exact_symbol_resolution` held at 1.0000 across all 50**                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | -                                                                                                                                                                           |
@@ -593,6 +593,111 @@ Every handoff entry contains:
 - exact next task or required decision.
 
 ## Handoff Log
+
+### 2026-09-04T02:00:00Z — A documentation staleness pass, and the register was wrong about the same number
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **no task status moved.** No task was open; this was a
+  documentation correction pass requested directly by the user after a full
+  read of `documentation/memory.md`.
+- **No source, contract, corpus, or version change. No version constant moved.
+  No reindex.** `SCHEMA_VERSION` 14, `contract_version` 1.1, parser 1.9.0,
+  chunker 1.1.0, resolver 1.5.0, `RETRIEVAL_POLICY_VERSION` 5.4.
+
+#### What was asked, and what it found
+
+The user asked for the stale entries in `documentation/memory.md` to be fixed.
+Five were, in place — struck through with the superseding authority named,
+never deleted. **Re-deriving one of the replacement figures instead of copying
+it is what found that this register was wrong about the same figure.**
+
+| Entry | Was | Now | Authority |
+| --- | --- | --- | --- |
+| ADR-0060 attribution, in `Decisions Made` | "99.5% of preflight is parsing" | parse **2.5%** (8.14 s), resolve **97.0%** (310.24 s) | ADR-0064 |
+| Chromium Playwright skips | 5 tests / 4 specs | **8 tests / 5 specs** | the specs themselves |
+| pid-reuse detection | open | **closed 2026-08-10** | ADR-0037 |
+| `changed_symbol_precision` | 0.9375 | **0.9545 (30/33 exact)**, by dilution | `baseline-phase-4.json` |
+| Recall@10 | gate figure alone | + the containment correction | ADR-0027 |
+
+#### The register was understated by one, and the mechanism is the reusable part
+
+This row read **seven** Playwright skips across five spec files. There are
+**eight**. The row was counted from the `skipChromium*` **helper call sites**,
+and `settings.spec.ts` skips Chromium **twice** — line 269 through
+`skipChromiumSettingsCrash` and line 143 through an inline `test.skip` — so the
+inline one was structurally invisible to the way the row was counted.
+
+**That is the same shape as the wording it replaced.** The pre-2026-08-07 entry
+said "conversation-route tests", which was blind to skips on other routes; its
+replacement counted one mechanism and was blind to the other. **Each phrasing
+was accurate about the mechanism it knew and silently excluded the one it did
+not**, which is why the figure has now understated itself three times.
+
+**Corroborated three ways rather than by re-counting alone**, because a
+re-count is one more instance of the thing that was wrong:
+
+| Source | Says |
+| --- | ---: |
+| Full run, 2026-09-03 | 13 passed / **8 skipped** / 1 failed |
+| `--repeat-each=10` | **80 skipped** = 8 per repetition |
+| `settings.spec.ts` header | the transmitting test is skipped "on the same terms as its **seven neighbours**" |
+
+The third is the one worth keeping: **the spec file had recorded the correct
+total in prose all along**, and no count derived from call sites could reach it.
+
+#### A second stale claim, found on the way
+
+`README.md` said the failing Chromium settings test found 2026-08-18 "is under
+investigation". **It was reproduced, its mechanism named, and it was skipped by
+explicit user ruling on 2026-08-19** — recorded in the P1-4 entry in
+`documentation/memory.md`. It is one of the eight. Corrected.
+
+#### What was NOT done, deliberately
+
+**`AGENTS.md` is untouched.** Its §20 Phase 6 text describes what that gate
+recorded, and §22's checklists record what a completed phase delivered. Editing
+a past-tense record to match a present count would falsify history rather than
+correct a claim — the distinction §5/§6/§19 were corrected under on 2026-08-20
+while §22 was deliberately left.
+
+**No guard was written for the skip count.** It is a *measurement* over the
+specs, not a figure derivable from a constant, and this project already records
+the cost of a guard whose scope is unstated being mistaken for a guarantee. A
+guard deriving it from the `test.skip` call sites would have to parse two
+mechanisms, which is the thing that just went wrong; it is worth doing and it is
+its own task.
+
+#### Files
+
+- `documentation/memory.md` — five entries corrected; the `Known Issues`
+  carry-over list marked **historical**, matching how `documentation/phases.md`
+  marks its own, because it was reading as current status.
+- `docs/plans/PLAN.md` — this entry, and the Chromium row amended **in place**
+  (a live status table is not handoff evidence; the precedent is the 2026-08-22
+  amendment). Edited **within existing cells**: the CO-05 lesson is that
+  appending a cell silently made a row four columns wide and the guard passed.
+- `README.md` — seven → eight, and the stale "under investigation" sentence.
+- `documentation/codeatlas-v2-working-guide.md` — seven → eight.
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| `test_deferred_register.py` | **9 passed** — row still 3 columns, one item one disposition |
+| `test_readme_claims.py` | **passed** |
+| `test_working_tree_line_endings.py` | **2 passed** |
+| `test_contract_language_profile.py` | **passed** |
+| `git ls-files --eol` on all four files | `i/lf w/lf` |
+
+Exit codes read directly, never through a pipe.
+
+#### Next
+
+Nothing waits on an agent, and the register stays terminal — this row was
+already `DEFERRED` and remains so; only its count changed. A guard deriving the
+Chromium skip count from the specs is unwritten and is the same class as the
+still-unwritten `SECURITY.md` guard.
+
 
 ### 2026-09-04T00:30:00Z — The e2e failure rate: 0 in 140, and my own hypothesis is retired by it
 
