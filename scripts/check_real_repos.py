@@ -1,9 +1,44 @@
 """Index five real repositories and assert each produces an active snapshot.
 
-**Deliberately not part of any gate.** It needs the network and takes minutes;
-a gate that requires the internet is not trustworthy offline, and this product
-is local-first. Run it before a release, and after any change to parsing,
-symbol identity, or chunk identity.
+**In the gate since 2026-09-04, and the objection that kept it out was half
+right.** This docstring used to read "deliberately not part of any gate -- it
+needs the network and takes minutes". The network half stands and is now
+designed around; the *minutes* half was never measured and is wrong. Timed
+2026-09-04: **46.6 s wall for all five** in `--require-cached` mode, which is
+what a gate runs, against a suite that takes twenty minutes. The cache is
+**16 MB**.
+
+Two numbers, because they are not the same measurement and quoting the larger
+one as the gate's cost would overstate it: the first run, which fetched,
+reported per-repository index times summing to ~75 s (gson 17.8, cobra 7.3,
+gin 9.4, ripgrep 11.9, scalaz 28.0); the cached re-run finished in 46.6 s wall.
+
+So `check_phase7.ps1` runs this with ``--require-cached``, which **never
+fetches**: it checks the pins already materialised in the workspace and reports
+the rest as NOT CHECKED without failing. A gate that needs the internet would
+not be trustworthy offline for a local-first product; a gate that reads an
+already-materialised checkout is just reading the disk.
+
+**Why not an opt-in ``-RealRepos`` flag**, which is the obvious alternative:
+this project has already paid for that shape. ``-Package`` was opt-in, four
+ADR-0065 slices shipped without it, and `main` got an artifact that could not
+start at all. `-Semantic` was opt-in and two tracked baselines sat stale for
+two days behind it. **The leg nobody runs is where the defect lives**, so this
+one runs by default and degrades to a loud notice instead of hiding behind a
+flag.
+
+Populate the cache once, with a network::
+
+    $ws = "$env:LOCALAPPDATA\\CodeAtlas\\real-repos"
+    uv run python scripts/check_real_repos.py --workspace $ws
+
+Run it directly too, before a release and after any change to parsing, symbol
+identity, or chunk identity.
+
+**This check is the highest-yield thing in the repository's history and it is
+worth saying so here.** ADR-0041 to ADR-0045, ADR-0064 and ADR-0069 were all
+found by running the product on real code, including one -- indexing failing
+outright, latent since Phase 1 -- that 2,400 passing tests could not see.
 
 The five are not an arbitrary sample. **Every one of them failed to index
 before ADR-0069**, each for a different language reason -- Java and Scala
@@ -106,6 +141,30 @@ TARGETS: tuple[Target, ...] = (
 )
 
 
+def cached_root(target: Target, into: Path) -> Path | None:
+    """The materialised checkout for this pin, or ``None`` if it is not there.
+
+    Checked against the **SHA**, never against the directory merely existing:
+    a half-fetched or stale-pin directory must not read as a hit. Pure -- it
+    creates nothing, because `--require-cached` calls it on a workspace that
+    may legitimately be absent and a probe that mkdirs would leave a trail of
+    empty directories that later look like partial checkouts.
+    """
+    root = into / target.name
+    if not (root / ".git").exists():
+        return None
+    head = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        shell=False,
+        check=False,
+    )
+    if head.returncode == 0 and head.stdout.strip() == target.sha:
+        return root
+    return None
+
+
 def fetch(target: Target, into: Path) -> Path:
     """Materialise the pinned commit, shallowly.
 
@@ -117,23 +176,18 @@ def fetch(target: Target, into: Path) -> Path:
     Git is invoked as an argument array with ``shell=False``, the same rule the
     product's own Git adapter follows. An import path or a URL is untrusted
     text.
+
+    **Never called under ``--require-cached``** -- that mode reads
+    `cached_root` and nothing else, which is what lets a gate run this check
+    without a network.
     """
     root = into / target.name
     root.mkdir(parents=True, exist_ok=True)
 
     # Already materialised at the pin: nothing to do. This is what makes
-    # `--workspace` worth having, and it is checked against the SHA rather
-    # than against the directory merely existing -- a half-fetched directory
-    # must not read as a hit.
+    # `--workspace` worth having.
     if (root / ".git").exists():
-        head = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            shell=False,
-            check=False,
-        )
-        if head.returncode == 0 and head.stdout.strip() == target.sha:
+        if cached_root(target, into) is not None:
             return root
     else:
         subprocess.run(
@@ -213,7 +267,24 @@ def main() -> int:
         help="reuse this directory instead of a temporary one, so a rerun "
         "does not refetch",
     )
+    parser.add_argument(
+        "--require-cached",
+        action="store_true",
+        help="never fetch: check only the pins already materialised in "
+        "--workspace, and report the rest as not checked. This is the mode a "
+        "gate uses, so the gate never needs a network.",
+    )
     args = parser.parse_args()
+
+    if args.require_cached and not args.workspace:
+        print(
+            "--require-cached needs --workspace: without one the clones go to "
+            "a fresh temporary directory, which is empty by construction, so "
+            "every target would report as not cached and the check would "
+            "always pass having measured nothing.",
+            file=sys.stderr,
+        )
+        return 2
 
     targets = TARGETS
     if args.only:
@@ -245,19 +316,29 @@ def main() -> int:
     )
 
     failures: list[str] = []
+    uncached: list[str] = []
     with clone_context as scratch, database_context as database_root:
         workspace = Path(scratch)
         workspace.mkdir(parents=True, exist_ok=True)
         databases = Path(database_root)
         for target in targets:
             started = time.monotonic()
-            print(f"[{target.name}] fetching {target.sha[:8]}...", flush=True)
-            try:
-                root = fetch(target, workspace)
-            except subprocess.CalledProcessError as error:
-                print(f"[{target.name}] FETCH FAILED: {error}", flush=True)
-                failures.append(f"{target.name}: fetch failed ({error})")
-                continue
+            if args.require_cached:
+                cached = cached_root(target, workspace)
+                if cached is None:
+                    print(f"[{target.name}] NOT CACHED, not checked", flush=True)
+                    uncached.append(target.name)
+                    continue
+                root = cached
+                print(f"[{target.name}] cached at {target.sha[:8]}", flush=True)
+            else:
+                print(f"[{target.name}] fetching {target.sha[:8]}...", flush=True)
+                try:
+                    root = fetch(target, workspace)
+                except subprocess.CalledProcessError as error:
+                    print(f"[{target.name}] FETCH FAILED: {error}", flush=True)
+                    failures.append(f"{target.name}: fetch failed ({error})")
+                    continue
             print(f"[{target.name}] indexing...", flush=True)
             reason = check(target, root, databases / f"{target.name}.sqlite")
             elapsed = time.monotonic() - started
@@ -272,7 +353,34 @@ def main() -> int:
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print(f"\nAll {len(targets)} repositories indexed.")
+
+    checked = len(targets) - len(uncached)
+
+    # A gate must stay trustworthy offline, so an absent cache is NOT a
+    # failure. It is announced loudly instead, with the exact command that
+    # fixes it -- because the alternative this project has already paid for is
+    # an opt-in leg nobody runs, which is how `-Package` shipped an artifact
+    # that could not start.
+    if uncached:
+        print(
+            f"\nNOT CHECKED: {', '.join(uncached)} "
+            f"({len(uncached)} of {len(targets)}) are not cached in "
+            f"{workspace}.",
+            file=sys.stderr,
+        )
+        print(
+            "  Populate it once, with a network, and every later run checks "
+            "them offline:\n"
+            f"    uv run python scripts/check_real_repos.py "
+            f'--workspace "{workspace}"',
+            file=sys.stderr,
+        )
+
+    if checked == 0:
+        print("\nNo repository was checked.", file=sys.stderr)
+        return 0
+
+    print(f"\n{checked} of {len(targets)} repositories indexed.")
     return 0
 
 

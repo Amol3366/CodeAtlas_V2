@@ -4,8 +4,66 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-03 (staleness pass over `Decisions Made` and
-`Known Issues`)
+Last updated: 2026-09-04 (the real-repository check is in the gate)
+
+## Resume point — 2026-09-04 (real repositories are gated)
+
+**`scripts/check_real_repos.py` runs in `check_phase7.ps1`.** It was in no gate
+at all until now, and it is the highest-yield check this project has: ADR-0041
+to ADR-0045, ADR-0064 and ADR-0069 were **all** found by running the product on
+real code, including one where indexing failed outright and had been latent
+since Phase 1 while every gate passed.
+
+**The thing worth carrying is the number, not the change.** Asked what was
+being missed, I measured instead of guessing: **84,553 lines of Markdown
+against 39,921 lines of `src/`**, and since 2026-08-23 only **11 of 72 commits
+touched `src/`** — four of those evaluation-harness only, and five of the
+remaining seven are one thread (symbol identity, ADR-0069 → 0074) that was
+itself triggered by running on real repositories.
+
+**This file had already written the diagnosis on 2026-08-22 and nothing acted
+on it:** *"the corpus and register work produces better rulers, not better
+products."* Every commit between that sentence and 2026-09-04 is ruler work.
+
+**The docstring's objection was half right and the wrong half had never been
+measured.** It said "needs the network and takes minutes". The network half
+stands and is designed around; `--require-cached` **never fetches**, indexing
+pins already on disk and reporting the rest as `NOT CHECKED` without failing,
+so the gate stays trustworthy offline. The *minutes* half is false: **46.6 s**
+for all five from a 16 MB cache, against a twenty-minute suite.
+
+**Not an opt-in flag, deliberately.** `-Package` was opt-in and `main` got an
+artifact that could not start; `-Semantic` was opt-in and two baselines sat
+stale for two days. **The leg nobody runs is where the defect lives.**
+
+**Populate the cache once, or the step is decoration:**
+
+```powershell
+$ws = "$env:LOCALAPPDATA\CodeAtlas\real-repos"
+uv run python scripts/check_real_repos.py --workspace $ws
+```
+
+A fresh clone has no cache, so the step prints `NOT CHECKED` and passes. That
+is deliberate — a gate must pass offline — but it means **the check is only as
+real as someone having run that once**, and no guard can enforce it without
+requiring a network.
+
+**Three of my own things were wrong this session, each caught by running
+something.** My guard matched the gate's *comment* rather than its invocation
+(**defining or mentioning a path is not invoking it** — the packaging guard's
+defect, and the third instance of that class in one session);
+`mypy_path = "scripts"` collided with `files` and stopped mypy entirely, so the
+test was rewritten to drive the CLI instead; and I quoted 75 s as the gate's
+cost when that was the *fetching* run's index times.
+
+**An unasked question, recorded rather than answered:** ADR-0069 kept the first
+colliding member's id so no reindex was needed, and RW-05 measured **783 groups
+still identified by ordinal** on these five repositories. Nobody has asked
+whether editing a file above a colliding symbol changes its `symbol_id` on the
+next index, and whether stored evidence then points at the wrong symbol. Not
+asserted as a defect, because it has not been run.
+
+## Superseded resume note — 2026-09-03 (staleness pass)
 
 **Staleness pass, 2026-09-03.** Five entries were corrected in place — struck
 through with the superseding authority named, never deleted, because the
@@ -396,6 +454,28 @@ estimate can be run instead of reasoned — **run it before writing the number,
 not after.**
 
 ## Completed
+
+- [x] **The real-repository check is wired into a gate (2026-09-04).**
+      `check_phase7.ps1` now runs `scripts/check_real_repos.py
+      --require-cached`, which indexes five pinned real repositories from a
+      local cache and **never fetches**. All five pass: gson 312 files / 4,414
+      symbols, cobra 65 / 854, gin 130 / 2,045, ripgrep 229 / 4,320, scalaz
+      590 / 17,795. 46.6 s cached; the cache is 16 MB.
+
+      **It had been in no gate at all**, while being the source of ADR-0041 to
+      ADR-0045, ADR-0064 and ADR-0069 — the last of which was indexing failing
+      outright on real code, latent since Phase 1, invisible to 2,400 passing
+      tests because every fixture is a two-file toy.
+
+      New guard `tests/unit/test_real_repo_gate.py` (7 tests) asserts two
+      properties that pull against each other: **the gate runs it** (not behind
+      an opt-in flag) and **it cannot need a network**. Five mutations, all
+      caught. `--require-cached` without `--workspace` is refused with exit 2,
+      because it would otherwise pass having measured nothing.
+
+      Verified: `pytest tests` **2493 passed, 3 skipped, exit 0**; ruff exit 0;
+      mypy **409 files, no issues**. No product behaviour changed, no version
+      constant moved, no reindex.
 
 - [x] Phase 0 — contracts, fixtures, evaluation runner, ADR process
 - [x] Phase 1 — registration, scanning, Python symbols, exact lookup (2026-07-25)

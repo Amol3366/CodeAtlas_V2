@@ -594,6 +594,139 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-09-04T04:00:00Z — The highest-yield check in the project's history was in no gate; it is now
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **no task status moved.** No task was open. Requested by the user
+  after a measured review of where this project's recent effort has gone.
+- **No product behaviour changed and no version constant moved. No reindex.**
+  `SCHEMA_VERSION` 14, `contract_version` 1.1, parser 1.9.0, chunker 1.1.0,
+  resolver 1.5.0, `RETRIEVAL_POLICY_VERSION` 5.4.
+
+#### Why this was done, measured rather than asserted
+
+The user asked what they were missing. Measured, not guessed:
+
+| | |
+| --- | ---: |
+| Markdown in the repository | **84,553 lines** |
+| `src/` | 39,921 lines |
+| Commits since 2026-08-23 touching `src/` | **11 of 72** |
+| …of those, evaluation-harness only | 4 |
+| Commits since 2026-09-01 touching `src/` | **5 of 47** |
+
+Of the seven real product commits since 2026-08-23, **five are one thread** —
+ADR-0069 → 0070 → 0071 → 0074, all symbol identity, all triggered by running
+the product on real repositories.
+
+**This file had already written the diagnosis and it was not acted on.**
+`documentation/memory.md` records, in the ADR-0069 entry of 2026-08-22:
+
+> Run the product on real repositories. ADR-0041 to ADR-0045 and ADR-0064 all
+> came that way; **the corpus and register work produces better rulers, not
+> better products.**
+
+Every commit between that sentence and this one is ruler work. And
+`scripts/check_real_repos.py` — the script that embodies the advice — **was
+invoked by no gate at all.**
+
+#### Run, and all five pass
+
+`uv run python scripts/check_real_repos.py`, exit **0**:
+
+| Repository | Language | Files | Symbols | Index time |
+| --- | --- | ---: | ---: | ---: |
+| gson | java | 312 | 4,414 | 17.8 s |
+| cobra | go | 65 | 854 | 7.3 s |
+| gin | go | 130 | 2,045 | 9.4 s |
+| ripgrep | rust | 229 | 4,320 | 11.9 s |
+| scalaz | scala | 590 | 17,795 | 28.0 s |
+
+#### The docstring's objection was half right, and the half that was wrong had never been measured
+
+It read *"deliberately not part of any gate — it needs the network and takes
+minutes"*. The **network** half stands. The **minutes** half is false:
+`--require-cached` over a warm cache is **46.6 s wall** for all five, against a
+suite that takes twenty minutes, and the cache is **16 MB**.
+
+So the check is in `check_phase7.ps1` with a new `--require-cached` mode that
+**never fetches**: it indexes the pins already materialised and reports the
+rest as `NOT CHECKED` without failing. The gate stays trustworthy offline for a
+local-first product — the same principle ADR-0078 used to refuse making the
+deterministic gate depend on torch.
+
+**Deliberately NOT an opt-in `-RealRepos` flag.** This project has paid for
+that shape twice: `-Package` was opt-in and `main` received an artifact that
+could not start at all; `-Semantic` was opt-in and two tracked baselines sat
+stale for two days. **The leg nobody runs is where the defect lives.**
+
+`--require-cached` without `--workspace` is **refused with exit 2**. Otherwise
+it would point at a fresh temporary directory, find nothing cached, and exit 0
+having measured nothing — this project's single most-recorded failure shape.
+
+#### Three of my own things were wrong, each caught by running something
+
+1. **My guard matched a comment, not the invocation.** It searched the bare
+   string `check_real_repos.py`; the gate's own explanatory comment names the
+   script, so the search hit the prose. **Defining or mentioning a path is not
+   invoking it** — the identical defect the packaging guard hit, where a test
+   passed with the `--add-data` line deleted because a `Join-Path` assignment
+   held the same substring. Now matches the quoted argument-array form, bounded
+   to that array. **Third instance of this class in one session.**
+2. **`mypy_path = "scripts"` broke type checking.** Added so a test could
+   import `cached_root`; it collided with `files` (same module reachable two
+   ways) and stopped mypy entirely. Reverted, and the test was rewritten to
+   drive the **CLI** — no config change, and it asserts the surface the gate
+   actually invokes rather than an internal it happens to use.
+3. **I quoted 75 s as the gate's cost.** That was the sum of the *first* run's
+   index times, which included fetching. The cached mode a gate runs is
+   **46.6 s**. Both figures are now in the docstring, because quoting the
+   larger one would overstate what the gate pays.
+
+#### Files
+
+- `scripts/check_real_repos.py` — `--require-cached`, `cached_root` extracted
+  and made pure, the refusal, the `NOT CHECKED` report, and a docstring that no
+  longer says the opposite of what is true.
+- `scripts/check_phase7.ps1` — the gate step, with its reasoning at the call
+  site.
+- `tests/unit/test_real_repo_gate.py` — **new**, 7 tests.
+- `docs/operations/release-validation.md` — a **step 0**: populate the cache
+  once. It is the only step here whose omission is silent.
+- `README.md` — the quality-gates section, and the Tests row.
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| `check_real_repos.py` (fetching) | **exit 0**, 5 of 5 |
+| `check_real_repos.py --require-cached` | **exit 0**, 5 of 5, 46.6 s |
+| `pytest tests` | **2493 passed, 3 skipped**, exit 0, 11m15s |
+| `ruff check src tests scripts apps` | exit 0 |
+| `mypy --no-incremental src tests scripts apps` | **409 files, no issues** |
+| Mutations on the new guard | **5 of 5 caught** |
+
+Mutations: gate step deleted; wired without `--require-cached`; the SHA check
+removed from `cached_root`; the missing-workspace refusal removed; an absent
+cache made fatal. Restored from scratchpad copies, never `git checkout --`.
+
+#### Next
+
+**The cache is the one thing a second machine does not inherit.** A fresh
+clone has no `%LOCALAPPDATA%\CodeAtlas\real-repos`, so the step prints
+`NOT CHECKED` and passes. That is deliberate — a gate must pass offline — but
+it means the check is only as real as someone having run step 0 once. There is
+no guard for that and there cannot be one that does not require a network.
+
+**An unasked question, recorded rather than answered:** ADR-0069 kept the first
+member of a colliding group's id so no reindex was needed, and RW-05 measured
+**783 groups still identified by ordinal** on these five repositories. Nobody
+has asked whether editing a file above a colliding symbol changes its
+`symbol_id` on the next index, and whether stored evidence then points at the
+wrong symbol. It is a product-correctness question about real code. It is not
+asserted here as a defect, because it has not been run.
+
+
 ### 2026-09-04T02:00:00Z — A documentation staleness pass, and the register was wrong about the same number
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

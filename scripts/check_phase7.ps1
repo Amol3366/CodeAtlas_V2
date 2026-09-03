@@ -122,6 +122,32 @@ Invoke-Checked "Phase 4 engine baseline (Phase 7 comparison point)" @(
     "--markdown-output", "docs/evaluation/baseline-phase-4.md",
     "--check"
 )
+# Real repositories, and this one earns its 75 seconds more than anything else
+# in this script.
+#
+# ADR-0041 to ADR-0045, ADR-0064 and ADR-0069 were ALL found by running the
+# product on real code. ADR-0069 is the argument on its own: indexing a real
+# repository failed outright -- `UNIQUE constraint failed`, no snapshot at all,
+# six of seven languages -- and it had been latent since Phase 1 while every
+# gate passed, because every fixture is a two-file toy and a corpus that cannot
+# express a defect reads as coverage.
+#
+# `--require-cached` NEVER fetches. It indexes the pins already materialised in
+# the workspace and reports the rest as NOT CHECKED without failing, so this
+# gate stays trustworthy offline for a local-first product. Populate the cache
+# once with a network and every run afterwards checks it from disk:
+#
+#     uv run python scripts/check_real_repos.py --workspace $ws
+#
+# Deliberately NOT behind an opt-in flag. `-Package` was opt-in and `main` got
+# an artifact that could not start; `-Semantic` was opt-in and two tracked
+# baselines sat stale for two days. The leg nobody runs is where the defect
+# lives. Wiring guarded by tests/unit/test_real_repo_gate.py.
+$realRepoWorkspace = Join-Path $env:LOCALAPPDATA "CodeAtlas\real-repos"
+Invoke-Checked "Real repositories (cached pins only, never fetches)" @(
+    "run", "python", "scripts/check_real_repos.py",
+    "--require-cached", "--workspace", $realRepoWorkspace
+)
 Invoke-Checked "Phase 7 rerank A/B artifact" @(
     "run", "python", "scripts/run_phase7_rerank_ab.py",
     "--semantic-baseline", "docs/evaluation/baseline-phase-7.json",

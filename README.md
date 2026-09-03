@@ -15,7 +15,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.9.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2486 passed, 3 skipped** — one *complete* `uv run pytest tests` run, exit 0, 2026-09-04. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the eight Chromium Playwright skips, which live in the browser suites and are not part of this run |
+| **Tests** | **2493 passed, 3 skipped** — one *complete* `uv run pytest tests` run, exit 0, 2026-09-04. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the eight Chromium Playwright skips, which live in the browser suites and are not part of this run |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -955,6 +955,24 @@ the web app's lint, types, component tests, and build. Unlike earlier phase
 scripts it runs the Playwright suites **inside** the gate; `-SkipE2E` opts out
 for a fast inner loop. `scripts/check_phase0.ps1` … `check_phase7.ps1` each still
 prove their own phase.
+
+**It also indexes five real repositories** — gson, cobra, gin, ripgrep, scalaz —
+in ~47 s. Every evaluation fixture is a two-file toy, and *a corpus that cannot
+express a defect reads as coverage*: ADR-0041 to ADR-0045, ADR-0064 and ADR-0069
+were all found by running the product on real code, including one where indexing
+failed outright and had been latent since Phase 1 while every gate passed.
+
+The step **never fetches**, so the gate stays trustworthy offline. Populate the
+cache once and it is read from disk forever after:
+
+```powershell
+$ws = "$env:LOCALAPPDATA\CodeAtlas\real-repos"
+uv run python scripts/check_real_repos.py --workspace $ws
+```
+
+Without the cache the step prints `NOT CHECKED` and passes — it is deliberately
+not an opt-in flag, because `-Package` and `-Semantic` both proved that the leg
+nobody runs is where the defect lives.
 
 Three things that have each cost a session:
 

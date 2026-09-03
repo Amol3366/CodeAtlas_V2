@@ -11,8 +11,17 @@ to ship.
 ## The sequence
 
 ```powershell
+# 0. Populate the real-repository cache, ONCE, on a machine with a network.
+#    Every gate run afterwards indexes these five from disk and never fetches.
+#    Skipping this does not fail a gate -- it prints NOT CHECKED and moves on,
+#    which is the one step here whose omission is silent, so do it first.
+$ws = "$env:LOCALAPPDATA\CodeAtlas\real-repos"
+uv run python scripts/check_real_repos.py --workspace $ws
+
 # 1. Deterministic gate, including the browser suites, packaged build, and
-#    packaged smoke/security tests.
+#    packaged smoke/security tests. Since 2026-09-04 this also indexes the five
+#    cached real repositories (~47 s), which is where ADR-0041 to ADR-0045,
+#    ADR-0064 and ADR-0069 all came from.
 powershell -ExecutionPolicy Bypass -File scripts/check_phase7.ps1 -Package
 
 # 2. Semantic-local gate and semantic package build. This produces the measured
