@@ -100,6 +100,7 @@ def test_no_powershell_script_is_called_with_array_splatting(
 
 _LANGUAGES = Path("src/codeatlas/parsing/query_backed/languages")
 _BUILD_SCRIPT = SCRIPTS / "build_package.ps1"
+_SPEC = Path("packaging/codeatlas.spec")
 
 # `load_tags_source("tree_sitter_java")` -- the grammar package whose shipped
 # data the adapter reads.
@@ -127,9 +128,23 @@ def test_every_grammar_whose_data_is_read_is_collected_by_the_build() -> None:
     added without a matching `--collect-data` fails here in milliseconds instead
     of in a user's first command.
     """
+    # Read from the SPEC since 2026-09-04, when the build became spec-driven so
+    # it could produce two executables. The requirement is unchanged and the
+    # derivation below is unchanged; only the file carrying the collection
+    # moved. **Both files are searched**, so this keeps passing whichever one
+    # holds it -- a guard that breaks on a refactor it should not care about is
+    # a guard people delete.
     script = _BUILD_SCRIPT.read_text(encoding="utf-8")
+    if _SPEC.exists():
+        script += "\n" + _SPEC.read_text(encoding="utf-8")
+
     collected = set(re.findall(r'"--collect-data",\s*"?(?P<m>[\w.]+)"?', script))
     collected |= set(re.findall(r'"(tree_sitter_\w+)"', script))
+
+    assert "collect_data_files" in script or "--collect-data" in script, (
+        "neither the build script nor the spec collects any package data. "
+        "Naming a grammar is not bundling its tags.scm."
+    )
 
     required = {
         match.group("module")
@@ -155,6 +170,8 @@ def test_the_authored_import_queries_are_added_to_the_build() -> None:
     in the same constructor.
     """
     script = _BUILD_SCRIPT.read_text(encoding="utf-8")
+    if _SPEC.exists():
+        script += "\n" + _SPEC.read_text(encoding="utf-8")
     authored = {
         match.group("name")
         for path in _adapter_sources()
@@ -162,20 +179,34 @@ def test_the_authored_import_queries_are_added_to_the_build() -> None:
     }
     assert authored, "no adapter reads an authored query; the regex is stale"
 
-    # The whole directory is carried in one `--add-data`, so the check is that
-    # the directory is bundled -- not that each file is named.
+    # The whole directory is carried in one entry, so the check is that the
+    # directory is bundled -- not that each file is named.
     #
-    # **Matched against the `--add-data` argument, not against the path string.**
-    # A first version of this asserted only that "query_backed/queries" appeared
-    # somewhere in the script, and it passed with the `--add-data` line deleted:
-    # the `$importQueries = Join-Path ...` definition contains the same substring.
-    # Mutation is what caught that; the assertion now names the flag it depends on.
+    # **Matched against the bundling, never against the path string.** A first
+    # version asserted only that "query_backed/queries" appeared somewhere in
+    # the script, and it passed with the `--add-data` line deleted: the
+    # `$importQueries = Join-Path ...` definition contains the same substring.
+    # Mutation caught that, and the distinction survives the 2026-09-04 move to
+    # a spec -- where the path is now handed over as an environment variable,
+    # so the chain has two links and both are checked.
+    flattened = script.replace("\\", "/")
     bundled = re.search(
-        r'"--add-data"\s*,\s*"[^"]*query_backed[/\\]queries"',
-        script.replace("\\", "/"),
+        r'"--add-data"\s*,\s*"[^"]*query_backed/queries"', flattened
+    ) or re.search(
+        r'CODEATLAS_BUILD_QUERIES"\]\s*,\s*"codeatlas/parsing/query_backed/queries"',
+        flattened,
     )
     assert bundled, (
-        f"{_BUILD_SCRIPT.name} does not --add-data the authored query directory, "
-        f"but the adapters load {sorted(authored)} from it relative to __file__. "
+        "the build does not bundle the authored query directory, but the "
+        f"adapters load {sorted(authored)} from it relative to __file__. "
         "Defining the path is not bundling it."
     )
+
+    if _SPEC.exists():
+        assert "$env:CODEATLAS_BUILD_QUERIES" in _BUILD_SCRIPT.read_text(
+            encoding="utf-8"
+        ), (
+            "the spec bundles CODEATLAS_BUILD_QUERIES but "
+            f"{_BUILD_SCRIPT.name} never sets it, so the build would carry an "
+            "empty source path -- the second link in the chain."
+        )

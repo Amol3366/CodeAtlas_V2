@@ -15,7 +15,7 @@ specific repository. Nothing here treats a language model as repository truth.
 | **Languages indexed** | **Full engine:** Python, TypeScript, JavaScript. **Symbols, imports, and calls only** (ADR-0065): Java, Go, Rust, Scala. Markdown and common config/schema formats throughout. [What the second tier does not do →](#measured-results-and-known-limits) |
 | **Contract version** | `1.1` · **Schema version** `14` (migrations `0001`–`0014`) · **MCP tool schema** `1.0` |
 | **Component versions** | Parser bundle `1.9.0` · chunker `1.1.0` · resolver `1.5.0` — a change to any one makes every snapshot stale |
-| **Tests** | **2494 passed, 3 skipped** — one *complete* `uv run pytest tests` run, exit 0, 2026-09-04. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the eight Chromium Playwright skips, which live in the browser suites and are not part of this run |
+| **Tests** | **2499 passed, 3 skipped** — one *complete* `uv run pytest tests` run, exit 0, 2026-09-04. **No xfails.** The 3 skips are `semantic-local`-installed environment skips, not the eight Chromium Playwright skips, which live in the browser suites and are not part of this run |
 | **Authority** | `AGENTS.md` is the release-blocking contract · `docs/plans/PLAN.md` is live status |
 
 ---
@@ -524,6 +524,38 @@ Tool schema version `1.0`. Registered tools: `register_repository`,
 
 Inputs and outputs are bounded and versioned. A tool returns warnings and
 unsupported states rather than silently omitting them.
+
+**Transport is stdio only** — no socket, no port. The client launches the
+server, so the client configuration *is* the integration:
+
+```jsonc
+{
+  "mcpServers": {
+    "codeatlas": {
+      // packaged release — ADR-0081; or "uv" with args ["run","codeatlas-mcp"]
+      "command": "C:\\path\\to\\codeatlas-win64\\codeatlas-mcp.exe",
+      "args": [],
+      "env": { "CODEATLAS_DB_PATH": "C:\\path\\to\\codeatlas.db" }
+    }
+  }
+}
+```
+
+`CODEATLAS_DB_PATH` is optional and points the server at a database other than
+the default; omit it and the server uses the same one the CLI does.
+
+> **Until 2026-09-04 the packaged release contained no MCP entry point at all**
+> and this list was true only for a source checkout. The build now produces
+> `codeatlas-mcp.exe` beside `codeatlas.exe` (ADR-0081), verified by speaking
+> the protocol to it rather than by checking the file exists — a stdio server
+> cannot answer `--help`, and `--help` is what still worked when a packaging
+> defect had otherwise destroyed the artifact.
+
+**What an agent should know before acting on a result.** `get_related_tests`
+returning nothing for a Java, Go, Rust or Scala symbol means *not analysed*, not
+*not tested* — the query-backed tier has no test edges (ADR-0065). C#, Kotlin,
+Ruby, PHP, Swift and C/C++ yield zero symbols. A `semantic_candidate` is never a
+fact, and an abstention is a successful outcome.
 
 ### Web app
 
@@ -1057,7 +1089,7 @@ blunt version. The ones that bite most often:
 
 **Decisions and measurement**
 
-`docs/adr/README.md` — 80 accepted records and their rationale ·
+`docs/adr/README.md` — 81 accepted records and their rationale ·
 `docs/evaluation/` — baselines and the environment documents that say how to read
 them · `docs/security/threat-model.md`
 

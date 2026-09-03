@@ -13,6 +13,24 @@ powershell -ExecutionPolicy Bypass -File scripts/build_package.ps1
 
 Produces `dist/codeatlas-win64/` and `dist/codeatlas-win64.zip` (~44 MB).
 
+**Two executables since 2026-09-04 (ADR-0081):** `codeatlas.exe` and
+`codeatlas-mcp.exe`, in one shared bundle. Until then the artifact carried only
+the CLI, so an agent using the release could not use MCP at all -- it was
+source-checkout-only, and nothing said so.
+
+The build is driven by `packaging/codeatlas.spec` rather than command-line
+arguments, because `pyinstaller a.py b.py` builds *one* program over two
+scripts; only a spec can hand two `EXE`s to a single `COLLECT`. The script still
+owns what is built and passes the data paths in as environment variables.
+
+**`codeatlas-mcp.exe` is verified by speaking the protocol to it**, not by
+checking it exists. It is a stdio server, so `--help` would block -- and
+`--help` is exactly what still worked on 2026-08-19 while two missing data sets
+had otherwise destroyed the artifact. `scripts/verify_mcp_server.py` runs
+`initialize`, `tools/list`, one call and one deliberate failure, and the
+packaged end-to-end suite reuses it so the build and the gate cannot check
+different things.
+
 The semantic-local package is deliberately explicit:
 
 ```powershell

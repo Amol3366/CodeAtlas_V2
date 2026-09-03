@@ -595,6 +595,102 @@ Every handoff entry contains:
 
 ## Handoff Log
 
+### 2026-09-04T08:00:00Z — The packaged release had no MCP in it, and now ships it as its own executable
+
+- Agent: Claude Code `claude-opus-5`, branch `main`.
+- Transition: **no task status moved.** Requested by the user, who chose "ship
+  it as its own executable" from four options after being shown the gap.
+- **ADR-0081.** No version constant moved. `contract_version` 1.1,
+  `TOOL_SCHEMA_VERSION` 1.0, `SCHEMA_VERSION` 14. **No reindex.**
+
+#### What was missing
+
+`packaging/entry.py` froze exactly one entry point, so the artifact shipped
+`codeatlas.exe` and nothing else, and there is no `mcp` subcommand on the CLI.
+**An agent using the packaged release could not use MCP at all** — it was
+source-checkout-only. The README listed the 22 tools without saying so, which
+is worse than the gap: a reader was told about a capability the artifact
+lacked.
+
+`AGENTS.md` §2 names a coding agent as one of three users and §13 requires MCP
+to wrap the same use cases as the CLI. The CLI shipped; the MCP server did not.
+
+#### What was done
+
+Two executables in one shared bundle. `packaging/mcp_entry.py` calls the same
+`main()` the console script calls, so source and packaged installs cannot
+drift. The build moved from a command line to `packaging/codeatlas.spec` —
+**forced, not preferred**: `pyinstaller a.py b.py` builds one program over two
+scripts, and only a spec can hand two `EXE`s to one `COLLECT`. The script still
+owns *what* is built; the spec owns *how* it is assembled.
+
+#### The verification, which is the part worth keeping
+
+`--help` cannot check a stdio server: it would block. More to the point,
+**`--help` is what still worked on 2026-08-19** while two missing data sets had
+destroyed the artifact and `repo add` and `doctor` both died.
+
+So `scripts/verify_mcp_server.py` speaks the protocol — `initialize`,
+`tools/list`, one call, and one deliberate failure — and the build runs it. It
+also fails on **non-JSON output on stdout**, because stdout is now a protocol
+channel in a shipped binary and one stray print corrupts the stream with no
+useful error.
+
+Measured on the frozen executable, not on a proxy: `serverInfo.name`
+**codeatlas**, **22** tools, `list_repositories` returned a result, and an
+unknown repository produced a **`REPOSITORY_NOT_FOUND` envelope** rather than a
+crash.
+
+#### Two existing guards failed, and that was them working
+
+`test_gate_script_invocations.py` derives the grammar `tags.scm` and authored
+`imports.scm` requirements from the adapters and asserted the **build script**
+carried them. Moving the collection into the spec pointed them at the wrong
+file. They were **re-pointed, not weakened**: the derivation is unchanged, both
+files are searched, and the "defining a path is not bundling it" strictness
+survives — the authored-query check now verifies two links, the spec's `datas`
+entry and the script setting `CODEATLAS_BUILD_QUERIES`. Mutation-checked after
+the move, since a guard that changed files is exactly one that might have
+stopped asserting.
+
+Four mutations, all caught: a grammar dropped from the spec's tuple, the
+authored-queries entry deleted, the `codeatlas-mcp` EXE renamed, and the build
+no longer running the verifier.
+
+#### Observed, and deliberately NOT attributed
+
+A build **without** `-SemanticLocal` carries `torch`, `lancedb` and
+`transformers`. `cli/main.py:72` already imports `LazyVectorStore`, so the
+second entry point does not widen that surface, and the mechanism is almost
+certainly the extras being installed in the build environment. **But the
+previous artifact was overwritten before a controlled comparison could be
+run**, so this is recorded as an observation, not a finding. Anyone can settle
+it by stashing the packaging change and rebuilding.
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| `build_package.ps1 -SkipWebBuild -SkipZip` | **exit 0**, both executables produced |
+| packaged MCP, by protocol | **22 tools**, envelope on failure |
+| `ruff check src tests scripts apps` | exit 0 |
+| Packaging guard mutations | **4 of 4 caught** |
+| `pytest tests` | see the commit |
+
+#### Next
+
+**The artifact on disk is now deterministic-only**, because the cheap build was
+used first, deliberately, to find packaging defects before spending a torch
+build on them. `dist/` is gitignored so this is local state, but a
+`-SemanticLocal` rebuild is needed to restore parity before any release
+measurement.
+
+**Not done, and still the honest next step for MCP:** the tool boundary lets a
+non-`CodeAtlasError` escape the envelope, and there is no
+`docs/operations/mcp.md`. Both are MC-02 and MC-03 in
+`docs/superpowers/plans/2026-09-04-mcp-readiness.md`, which remains unapproved.
+
+
 ### 2026-09-04T06:00:00Z — The gate step paid on its first run: preflight was broken on real code
 
 - Agent: Claude Code `claude-opus-5`, branch `main`.

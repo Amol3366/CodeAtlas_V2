@@ -114,57 +114,35 @@ $migrations = Join-Path $root "src/codeatlas/storage/sqlite/migrations"
 # the 2026-08-19 rebuild hit two separate data omissions one after the other.
 $importQueries = Join-Path $root "src/codeatlas/parsing/query_backed/queries"
 
+# Built from `packaging/codeatlas.spec` since 2026-09-04, because the artifact
+# now carries TWO executables -- `codeatlas.exe` and `codeatlas-mcp.exe` -- in
+# one shared bundle, and a command-line invocation cannot express that.
+# `pyinstaller a.py b.py` builds one program over two scripts, not two
+# programs. Only a spec can hand two EXEs to a single COLLECT.
+#
+# This script still owns WHAT is built; the spec owns only HOW it is assembled.
+# The paths below are handed over as environment variables rather than
+# recomputed there, so there is exactly one definition of each.
+$env:CODEATLAS_BUILD_ROOT = $root
+$env:CODEATLAS_BUILD_WEB = $assets
+$env:CODEATLAS_BUILD_MIGRATIONS = $migrations
+$env:CODEATLAS_BUILD_QUERIES = $importQueries
+$env:CODEATLAS_BUILD_SEMANTIC = if ($SemanticLocal) { "1" } else { "0" }
+
 $pyinstallerArgs = @(
     "--noconfirm",
-    "--name", "codeatlas",
     "--distpath", $dist,
-    "--workpath", (Join-Path $dist "build"),
-    "--specpath", (Join-Path $dist "spec"),
-    "--add-data", "$assets;web",
-    "--add-data", "$migrations;codeatlas/storage/sqlite/migrations",
-    "--add-data", "$importQueries;codeatlas/parsing/query_backed/queries",
-    "--collect-submodules", "uvicorn"
+    "--workpath", (Join-Path $dist "build")
 )
 
-# The query-backed grammars ship their `tags.scm` as package *data*, and
-# `load_tags_source` reads it off disk with `os.walk` (ADR-0065). PyInstaller
-# finds the modules by analysis -- the imports are static -- but never the data,
-# which is the same reason the migrations and the web assets above are carried
-# explicitly rather than discovered.
-#
-# Omitting these does not degrade the build, it destroys it: every parser is
-# constructed eagerly by `build_registry()`, so the first command to build
-# services dies with `FileNotFoundError: tree_sitter_java ships no tags.scm`.
-# Measured on the 2026-08-19 artifact: `repo add` and even `doctor` failed with
-# an unhandled exception and only `--help` survived.
-#
-# These are required dependencies, not optional extras, so they belong in the
-# base arguments and never behind `-SemanticLocal`.
-foreach ($grammar in @(
-    "tree_sitter_java",
-    "tree_sitter_go",
-    "tree_sitter_rust",
-    "tree_sitter_scala"
-)) {
-    $pyinstallerArgs += @("--collect-data", $grammar)
-}
+# The grammar `tags.scm` collection and the -SemanticLocal `collect_all` set
+# moved into `packaging/codeatlas.spec` on 2026-09-04, together, when the build
+# became spec-driven. They are the same requirements with the same reasons --
+# recorded at the top of that file and derived from the adapters by
+# `tests/unit/test_gate_script_invocations.py`, which still fails in
+# milliseconds if a new language is added without its data.
 
-if ($SemanticLocal) {
-    Write-Output "==> Including semantic-local optional dependencies"
-    $pyinstallerArgs += @(
-        "--collect-all", "huggingface_hub",
-        "--collect-all", "lancedb",
-        "--collect-all", "pyarrow",
-        "--collect-all", "safetensors",
-        "--collect-all", "sentence_transformers",
-        "--collect-all", "sklearn",
-        "--collect-all", "tokenizers",
-        "--collect-all", "torch",
-        "--collect-all", "transformers"
-    )
-}
-
-& uv run pyinstaller @pyinstallerArgs (Join-Path $root "packaging/entry.py")
+& uv run pyinstaller @pyinstallerArgs (Join-Path $root "packaging/codeatlas.spec")
 
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE."
@@ -186,6 +164,32 @@ if (-not (Test-Path $executable)) {
 if ($LASTEXITCODE -ne 0) {
     throw "The packaged executable failed to run (exit code $LASTEXITCODE)."
 }
+
+# The MCP server, verified by speaking the protocol to it.
+#
+# `--help` cannot check this one: it is a stdio server and would block. More to
+# the point, `--help` is exactly what still worked on 2026-08-19 while the rest
+# of that artifact was destroyed by two missing data sets, so an existence or
+# help check here would repeat a mistake this build script already carries a
+# comment about.
+#
+# `initialize` -> `tools/list` -> one call -> one deliberate failure exercises
+# the frozen bundle's data files, the lazily imported `mcp` transport, and the
+# error envelope, which is every part of this executable packaging can break.
+$mcpExecutable = Join-Path $release "codeatlas-mcp.exe"
+if (-not (Test-Path $mcpExecutable)) {
+    throw "The build produced no codeatlas-mcp.exe. An agent host has nothing to launch."
+}
+
+$mcpProbeDatabase = Join-Path $dist "mcp-verify.sqlite"
+if (Test-Path $mcpProbeDatabase) { Remove-Item -Force $mcpProbeDatabase }
+
+& uv run python (Join-Path $root "scripts/verify_mcp_server.py") `
+    --db $mcpProbeDatabase --expect-tools 22 -- $mcpExecutable
+if ($LASTEXITCODE -ne 0) {
+    throw "The packaged MCP server failed verification (exit code $LASTEXITCODE)."
+}
+Remove-Item -Force $mcpProbeDatabase -ErrorAction SilentlyContinue
 
 # What shipped must be what was built. The guard above stops a stale `dist`
 # reaching PyInstaller; this stops PyInstaller carrying something else — a

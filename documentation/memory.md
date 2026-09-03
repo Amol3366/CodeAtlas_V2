@@ -4,7 +4,49 @@ Append-only working memory for coding agents. Update this at the end of every
 task. **This is a convenience log, not evidence.** The authoritative task status
 and handoff record is `docs/plans/PLAN.md`; where they differ, that file wins.
 
-Last updated: 2026-09-04 (preflight was broken on real code; found and fixed)
+Last updated: 2026-09-04 (the packaged release now ships the MCP server)
+
+## Resume point — 2026-09-04 (MCP ships as its own executable, ADR-0081)
+
+**The packaged release contained no MCP entry point at all.** `entry.py` froze
+one script, so the artifact was `codeatlas.exe` alone and there is no `mcp`
+subcommand — an agent using the release **could not use MCP**, and the README
+listed the 22 tools without saying so. Now `codeatlas-mcp.exe` ships beside it
+in one shared bundle.
+
+**The build is spec-driven now, and that was forced rather than chosen:**
+`pyinstaller a.py b.py` builds one program over two scripts, so only
+`packaging/codeatlas.spec` can hand two `EXE`s to one `COLLECT`. The script
+still owns *what* is built and passes data paths as environment variables; the
+spec owns *how*.
+
+**`--help` cannot verify a stdio server** — it would block — and `--help` is
+exactly what still worked on 2026-08-19 while missing data had destroyed the
+artifact. So `scripts/verify_mcp_server.py` speaks the protocol, and it also
+fails on **non-JSON stdout**, because stdout is now a protocol channel in a
+shipped binary and one stray print corrupts the stream. Measured on the frozen
+exe: 22 tools, and `REPOSITORY_NOT_FOUND` as an **envelope** on failure.
+
+**Two existing guards failed when the collection moved into the spec, and that
+was them working.** Re-pointed, not weakened — derivation from the adapters
+unchanged, both files searched, and the "defining a path is not bundling it"
+rule now checks two links. Mutation-checked after the move: **a guard that
+changed files is exactly one that might have stopped asserting.**
+
+**Observed, NOT attributed:** a build without `-SemanticLocal` carries torch,
+lancedb and transformers. `cli/main.py` already imports `LazyVectorStore` so the
+second entry point does not widen the surface, but the old artifact was
+overwritten before a controlled comparison could run. Recorded as an
+observation.
+
+**`dist/` is deterministic-only right now** — the cheap build was used first on
+purpose. A `-SemanticLocal` rebuild is needed before any release measurement.
+
+**Still open for MCP, both in the unapproved plan:** the tool boundary lets a
+non-`CodeAtlasError` escape the envelope (MC-02), and there is no
+`docs/operations/mcp.md` (MC-03).
+
+## Superseded resume note — 2026-09-04 (preflight was broken on real code)
 
 ## Resume point — 2026-09-04 (the gate step paid on its first run)
 
